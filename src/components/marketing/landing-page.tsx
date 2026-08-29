@@ -72,25 +72,25 @@ export function LandingPage({ primaryHref }: { primaryHref: string }) {
           {/* The photograph sits on the right and is walked down to nothing
               across the headline. On a phone it covers the whole hero, so it
               needs a second, vertical scrim or the copy stops being legible. */}
-          <div aria-hidden className="absolute inset-x-0 top-0 h-[360px] lg:inset-y-0 lg:left-auto lg:right-0 lg:h-auto lg:w-[74%]">
+          <div aria-hidden className="absolute inset-x-0 top-0 h-[340px] sm:h-[420px] lg:inset-y-0 lg:left-auto lg:right-0 lg:h-auto lg:w-[62%]">
             <Image
               src="/marketing/hero-truck.webp"
               alt=""
               width={1536}
               height={1024}
               priority
-              className="size-full object-cover object-[46%_44%]"
+              className="size-full object-cover object-center"
             />
-            <div className="absolute inset-0 bg-[linear-gradient(90deg,#071426_0%,rgba(7,20,38,0.97)_12%,rgba(7,20,38,0.86)_30%,rgba(7,20,38,0.5)_54%,rgba(7,20,38,0.2)_78%,rgba(7,20,38,0.34)_100%)]" />
-            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,20,38,0.62)_0%,rgba(7,20,38,0.72)_42%,#071426_100%)] lg:hidden" />
+            <div className="absolute inset-0 hidden bg-[linear-gradient(90deg,#071426_0%,rgba(7,20,38,0.96)_7%,rgba(7,20,38,0.55)_22%,rgba(7,20,38,0.14)_42%,rgba(7,20,38,0)_62%,rgba(7,20,38,0.14)_100%)] lg:block" />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,20,38,0.42)_0%,rgba(7,20,38,0.58)_45%,#071426_100%)] lg:hidden" />
           </div>
           <div
             aria-hidden
             className="absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,rgba(7,20,38,0)_0%,#071426_86%)]"
           />
 
-          <Container className="relative grid items-center gap-10 pb-16 pt-12 lg:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)] lg:gap-10 lg:pb-24 lg:pt-20">
-            <div>
+          <Container className="relative flex items-center pb-16 pt-12 lg:min-h-[600px] lg:pb-24 lg:pt-20">
+            <div className="max-w-[600px]">
               <h1 className="font-display text-[clamp(36px,6.4vw,64px)] font-black uppercase leading-[0.95] tracking-[-0.03em] text-white">
                 {c.hero.titleTop}
                 <br />
@@ -140,14 +140,6 @@ export function LandingPage({ primaryHref }: { primaryHref: string }) {
               </ul>
             </div>
 
-            {/* The app on a laptop, with the load screen leaning on it. */}
-            <div className="relative pb-14 sm:pb-16 lg:pl-8">
-              <LaptopMock copy={c.preview} />
-              <LoadPhone
-                copy={c.preview}
-                className="absolute -left-4 bottom-0 w-[124px] shadow-[0_34px_70px_-26px_rgba(0,0,0,0.95)] sm:-left-8 sm:w-[150px] lg:-left-10"
-              />
-            </div>
           </Container>
         </section>
 
@@ -157,7 +149,18 @@ export function LandingPage({ primaryHref }: { primaryHref: string }) {
             <h2 className="mx-auto max-w-3xl text-center font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">
               {c.features.title}
             </h2>
-            <div className="mt-10 grid gap-x-4 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+
+            <div className="mx-auto mt-10 flex max-w-[1000px] items-end justify-center gap-5 sm:gap-7">
+              <div className="min-w-0 flex-1">
+                <LaptopMock copy={c.preview} />
+              </div>
+              <LoadPhone
+                copy={c.preview}
+                className="hidden w-[168px] shrink-0 shadow-[0_34px_70px_-26px_rgba(0,0,0,0.95)] sm:block"
+              />
+            </div>
+
+            <div className="mt-12 grid gap-x-4 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
               {c.features.items.map((item, index) => {
                 const Icon = FEATURE_ICONS[index];
                 return (
@@ -189,9 +192,9 @@ export function LandingPage({ primaryHref }: { primaryHref: string }) {
           id="how"
           className="relative scroll-mt-20 overflow-hidden border-t border-white/[0.07] bg-mkt-ink"
         >
-          <Container className="relative grid items-center gap-9 py-16 sm:py-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1.05fr)]">
+          <Container className="relative grid items-center gap-9 py-16 sm:py-20 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(0,1.05fr)]">
             <div>
-              <h2 className="font-display text-[clamp(26px,3vw,42px)] font-black uppercase leading-[1.04] tracking-[-0.025em] text-white">
+              <h2 className="font-display text-[clamp(26px,2.7vw,38px)] font-black uppercase leading-[1.04] tracking-[-0.025em] text-white">
                 {c.how.title}
                 <br />
                 <span className="text-mkt-amber">{c.how.titleAccent}</span>
@@ -202,16 +205,17 @@ export function LandingPage({ primaryHref }: { primaryHref: string }) {
               </Script>
             </div>
 
-            {/* The photograph bleeds to the top and bottom of the section, the
-                way the design has it. It is a texture, not information, so it
-                is the first thing to go when the row collapses. */}
-            <div className="relative -my-16 hidden self-stretch sm:-my-20 lg:block">
+            {/* A band that runs the full height of the section and blends into
+                the navy at its left and right edges -- no vertical fade, or it
+                stops reading as a photograph and starts reading as a vignette.
+                On a phone it is a fixed-height strip instead. */}
+            <div className="relative -mx-5 h-[300px] sm:-mx-10 sm:h-[380px] lg:mx-0 lg:-my-20 lg:h-auto lg:self-stretch">
               <Image
                 src="/marketing/driver.webp"
                 alt={c.proof.imageAlt}
                 width={1400}
                 height={933}
-                className="absolute inset-0 size-full object-cover object-[34%_38%] [mask-composite:intersect] [mask-image:linear-gradient(90deg,transparent_0%,#000_16%,#000_84%,transparent_100%),linear-gradient(180deg,transparent_0%,#000_14%,#000_86%,transparent_100%)]"
+                className="absolute inset-0 size-full object-cover object-[40%_20%] [mask-image:linear-gradient(90deg,transparent_0%,#000_16%,#000_86%,transparent_100%)] lg:object-[38%_22%]"
               />
             </div>
 
