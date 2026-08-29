@@ -289,5 +289,5 @@ export function toCsv(table: ReportTable): string {
 }
 
 export function reportFileName(id: ReportId, period: Period): string {
-  return `truckledger-${id}-${period.start}-to-${period.end}.csv`;
+  return `onroad-books-${id}-${period.start}-to-${period.end}.csv`;
 }

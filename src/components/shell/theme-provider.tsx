@@ -29,8 +29,8 @@ interface ThemeContextValue {
 
 const ThemeContext = React.createContext<ThemeContextValue | null>(null);
 
-const STORAGE_KEY = "truckledger.theme";
-const SCALE_KEY = "truckledger.scale";
+const STORAGE_KEY = "onroadbooks.theme";
+const SCALE_KEY = "onroadbooks.scale";
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // Dark is the product default: this is an operations console, not a

@@ -1,5 +1,5 @@
 /**
- * Domain types for TruckLedger.
+ * Domain types for OnRoad Books.
  *
  * These mirror the Prisma models 1:1 so the JSON store and the Postgres
  * store are interchangeable behind the repository interface.

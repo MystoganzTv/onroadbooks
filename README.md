@@ -1,9 +1,9 @@
-# TruckLedger
+# OnRoad Books
 
 A financial operating console for a **single box truck business**. It answers one
 question on every screen: *is the truck actually making money?*
 
-> `TruckLedger` is a working name. Change `NEXT_PUBLIC_APP_NAME` in `.env` and it
+> The displayed name comes from `NEXT_PUBLIC_APP_NAME` in `.env`; change it there and it
 > updates across the UI and page titles.
 
 ---
@@ -340,7 +340,7 @@ Everything found in the audit is fixed:
   `script-src 'unsafe-inline'` for Next's bootstrap and the theme script, so
   it is defence in depth, not an XSS backstop; a nonce pipeline would let
   that go.
-- **A corrupt `data/truckledger.json` is never overwritten.** It is renamed
+- **A corrupt `data/onroad-books.json` is never overwritten.** It is renamed
   aside and the failure surfaces, rather than a real ledger being silently
   replaced with demo data.
 

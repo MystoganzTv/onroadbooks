@@ -8,18 +8,18 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: `${APP_NAME} - Box Truck Financial Console`,
-    template: `%s - ${APP_NAME}`,
+    default: `${APP_NAME} | Bookkeeping Built for the Road`,
+    template: `%s | ${APP_NAME}`,
   },
   description:
-    "Revenue, cost and profit per mile for a single box truck operation, by month and half month.",
+    "Bookkeeping and financial performance tools built for independent trucking businesses.",
 };
 
 /**
  * Applies the stored theme and interface scale before first paint, so the
  * console never flashes light or resizes after hydration.
  */
-const themeScript = `(function(){try{var e=document.documentElement;var t=localStorage.getItem('truckledger.theme');var d=t!=='light';e.classList.toggle('dark',d);e.style.colorScheme=d?'dark':'light';var m={compact:.94,'default':1,large:1.1,xlarge:1.2};var s=m[localStorage.getItem('truckledger.scale')];if(s)e.style.setProperty('--ui-scale',String(s));}catch(err){document.documentElement.classList.add('dark');}})();`;
+const themeScript = `(function(){try{var e=document.documentElement;var t=localStorage.getItem('onroadbooks.theme');var d=t!=='light';e.classList.toggle('dark',d);e.style.colorScheme=d?'dark':'light';var m={compact:.94,'default':1,large:1.1,xlarge:1.2};var s=m[localStorage.getItem('onroadbooks.scale')];if(s)e.style.setProperty('--ui-scale',String(s));}catch(err){document.documentElement.classList.add('dark');}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

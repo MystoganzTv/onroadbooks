@@ -4,6 +4,7 @@ import { Database, FileText } from "lucide-react";
 import { DisplaySettings } from "@/components/settings/display-settings";
 import { SettingsForm } from "@/components/settings/settings-form";
 import { PageHeader } from "@/components/shared/page-header";
+import { BrandLogo } from "@/components/shell/brand-logo";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { summarizePeriod } from "@/lib/calculations";
@@ -68,7 +69,7 @@ export default async function SettingsPage({
                 <>
                   <p>
                     Running on the bundled local store. Everything you add is written to{" "}
-                    <code className="rounded bg-surface-sunken px-1">data/truckledger.json</code>{" "}
+                    <code className="rounded bg-surface-sunken px-1">data/onroad-books.json</code>{" "}
                     and survives restarts.
                   </p>
                   <p>
@@ -89,16 +90,16 @@ export default async function SettingsPage({
             <CardHeader>
               <div className="flex items-center gap-2">
                 <FileText className="size-3.5 text-muted-foreground" />
-                <CardTitle>Product Name</CardTitle>
+                <CardTitle>Brand</CardTitle>
               </div>
             </CardHeader>
-            <CardContent className="p-4 text-xs leading-relaxed text-muted-foreground">
+            <CardContent className="space-y-3 p-4 text-xs leading-relaxed text-muted-foreground">
+              <BrandLogo className="max-w-[13rem]" />
               <p>
-                The app is currently called{" "}
-                <span className="font-medium text-foreground">{APP_NAME}</span>. It is a working
-                name only -- change{" "}
-                <code className="rounded bg-surface-sunken px-1">NEXT_PUBLIC_APP_NAME</code> in
-                your environment file and it updates everywhere.
+                The product is branded as{" "}
+                <span className="font-medium text-foreground">{APP_NAME}</span>, with the tagline
+                &ldquo;Bookkeeping Built for the Road.&rdquo; The displayed name comes from{" "}
+                <code className="rounded bg-surface-sunken px-1">NEXT_PUBLIC_APP_NAME</code>.
               </p>
             </CardContent>
           </Card>

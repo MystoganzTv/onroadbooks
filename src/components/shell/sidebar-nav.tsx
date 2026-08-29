@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, ChevronRight, LogOut, TruckIcon } from "lucide-react";
+import { Building2, ChevronRight, LogOut } from "lucide-react";
 
-import { cn, APP_NAME } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { BrandLogo } from "./brand-logo";
 import { DisplayMenu } from "./display-menu";
 import { PRIMARY_NAV } from "./nav-items";
 
@@ -26,17 +27,14 @@ export function SidebarNav({
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-sidebar-border px-4">
-        <div className="flex size-8 items-center justify-center rounded bg-primary text-primary-foreground">
-          <TruckIcon className="size-4.5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-base font-semibold tracking-tight text-sidebar-strong">
-            {APP_NAME}
+      <div className="shrink-0 border-b border-sidebar-border p-3">
+        <BrandLogo priority />
+        <div className="mt-2 flex items-center gap-2 px-1">
+          <p className="min-w-0 flex-1 truncate text-xs font-medium text-sidebar-foreground">
+            {truckName}
           </p>
-          <p className="truncate text-2xs text-sidebar-foreground/80">{truckName}</p>
+          <DisplayMenu />
         </div>
-        <DisplayMenu />
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2" aria-label="Main">

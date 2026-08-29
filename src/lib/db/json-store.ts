@@ -52,7 +52,7 @@ import {
  * the behavioural tests need to do.
  */
 const dataDir = () => path.join(process.cwd(), "data");
-const dataFile = () => path.join(dataDir(), "truckledger.json");
+const dataFile = () => path.join(dataDir(), "onroad-books.json");
 
 let writeChain: Promise<unknown> = Promise.resolve();
 
@@ -85,7 +85,7 @@ async function readDataset(): Promise<Dataset> {
     const quarantine = `${dataFile()}.corrupt-${Date.now()}`;
     await fs.rename(dataFile(), quarantine).catch(() => undefined);
     throw new Error(
-      `data/truckledger.json could not be read (${(error as Error).message}). ` +
+      `data/onroad-books.json could not be read (${(error as Error).message}). ` +
         `The file has been moved to ${quarantine} and left untouched. ` +
         `Restore it or delete it to start from seed data.`,
     );
@@ -197,7 +197,7 @@ function demoPdf(title: string, lines: string[]): Buffer {
     ...lines.map(
       (line, i) => `BT /F1 11 Tf 60 ${685 - i * 20} Td (${escape(line)}) Tj ET`,
     ),
-    "BT /F1 8 Tf 60 80 Td (Generated demo document - TruckLedger) Tj ET",
+    "BT /F1 8 Tf 60 80 Td (Generated demo document - OnRoad Books) Tj ET",
   ].join("\n");
 
   const objects = [

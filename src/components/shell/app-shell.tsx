@@ -7,6 +7,7 @@ import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { APP_NAME } from "@/lib/utils";
+import { BrandLogo } from "./brand-logo";
 import { SidebarNav } from "./sidebar-nav";
 import { DisplayMenu } from "./display-menu";
 import { PRIMARY_NAV } from "./nav-items";
@@ -56,7 +57,8 @@ export function AppShell({ businessName, truckName, userEmail, children }: AppSh
           >
             <Menu />
           </Button>
-          <span className="text-base font-semibold">{current}</span>
+          <BrandLogo className="w-[7.5rem] shrink-0 px-1 py-0.5 shadow-none" priority />
+          <span className="min-w-0 truncate text-base font-semibold">{current}</span>
           <div className="ml-auto">
             <DisplayMenu className="text-muted-foreground hover:bg-accent hover:text-foreground" />
           </div>

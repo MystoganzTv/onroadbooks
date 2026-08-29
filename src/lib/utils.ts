@@ -23,4 +23,4 @@ export function toRequiredNumber(value: unknown): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "TruckLedger";
+export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME || "OnRoad Books";

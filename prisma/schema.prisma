@@ -1,4 +1,4 @@
-// TruckLedger -- data model
+// OnRoad Books -- data model
 //
 // Designed for a single box truck today, but every financial row already
 // hangs off a Truck and a Business, so adding trucks (or a second business)

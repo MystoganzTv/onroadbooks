@@ -25,9 +25,9 @@ import { after, before, describe, it } from "node:test";
 import { DEMO_BUSINESS } from "../seed/seed-data";
 import type { ExpenseInput, FuelEntryInput, MaintenanceInput } from "../db/repository";
 
-const SANDBOX = mkdtempSync(path.join(tmpdir(), "truckledger-store-"));
+const SANDBOX = mkdtempSync(path.join(tmpdir(), "onroad-books-store-"));
 const ORIGINAL_CWD = process.cwd();
-const DATA_FILE = path.join(SANDBOX, "data", "truckledger.json");
+const DATA_FILE = path.join(SANDBOX, "data", "onroad-books.json");
 const BUSINESS = DEMO_BUSINESS.id;
 
 type StoreModule = typeof import("../db/json-store");
@@ -377,12 +377,12 @@ describe("accounts", () => {
  * silently replaced by seed data.
  */
 describe("upgrading an older ledger", () => {
-  const legacyDir = mkdtempSync(path.join(tmpdir(), "truckledger-legacy-"));
+  const legacyDir = mkdtempSync(path.join(tmpdir(), "onroad-books-legacy-"));
 
   before(() => {
     mkdirSync(path.join(legacyDir, "data"), { recursive: true });
     writeFileSync(
-      path.join(legacyDir, "data", "truckledger.json"),
+      path.join(legacyDir, "data", "onroad-books.json"),
       JSON.stringify({
         business: { id: BUSINESS, name: "Old Co", currency: "USD", createdAt: "2025-01-01" },
         settings: { id: "fin_001", businessId: BUSINESS, taxReservePct: 20, maintenanceReservePct: 5 },
@@ -432,11 +432,11 @@ describe("upgrading an older ledger", () => {
 });
 
 describe("an unreadable ledger", () => {
-  const brokenDir = mkdtempSync(path.join(tmpdir(), "truckledger-broken-"));
+  const brokenDir = mkdtempSync(path.join(tmpdir(), "onroad-books-broken-"));
 
   before(() => {
     mkdirSync(path.join(brokenDir, "data"), { recursive: true });
-    writeFileSync(path.join(brokenDir, "data", "truckledger.json"), "{ not json at all", "utf8");
+    writeFileSync(path.join(brokenDir, "data", "onroad-books.json"), "{ not json at all", "utf8");
   });
 
   it("is set aside rather than overwritten with demo data", async () => {
@@ -447,11 +447,11 @@ describe("an unreadable ledger", () => {
     process.chdir(SANDBOX);
 
     assert.ok(
-      files.some((f) => f.startsWith("truckledger.json.corrupt-")),
+      files.some((f) => f.startsWith("onroad-books.json.corrupt-")),
       "the user's file must survive so it can be repaired",
     );
     assert.equal(
-      files.includes("truckledger.json"),
+      files.includes("onroad-books.json"),
       false,
       "nothing is written back in its place without the user asking",
     );
