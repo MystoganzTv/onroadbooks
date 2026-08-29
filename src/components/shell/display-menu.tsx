@@ -51,6 +51,10 @@ export function DisplayMenu({ className }: { className?: string }) {
         ).map((option) => (
           <DropdownMenuItem
             key={option.id}
+            // The tick is decorative, so the state is spelled out for
+            // assistive tech as well: these are one-of-N choices, not actions.
+            role="menuitemradio"
+            aria-checked={theme === option.id}
             onSelect={() => setTheme(option.id)}
             className="cursor-pointer"
           >
@@ -69,6 +73,8 @@ export function DisplayMenu({ className }: { className?: string }) {
         {UI_SCALES.map((option) => (
           <DropdownMenuItem
             key={option.id}
+            role="menuitemradio"
+            aria-checked={scale === option.id}
             onSelect={() => setScale(option.id as UiScale)}
             className="cursor-pointer"
           >
