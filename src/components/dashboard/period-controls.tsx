@@ -156,7 +156,9 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
       </div>
 
       <div
-        className="inline-flex h-8 flex-wrap items-center gap-0.5 rounded-md border border-border bg-surface-sunken p-0.5"
+        // min-h, not h: with a fixed height the second row of wrapped pills
+        // rendered on top of the Custom button on a phone.
+        className="inline-flex min-h-8 flex-wrap items-center gap-0.5 rounded-md border border-border bg-surface-sunken p-0.5"
         role="group"
         aria-label="Period"
       >
@@ -176,7 +178,9 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              {option.label}
+              {/* The abbreviations keep the group on one row on a phone. */}
+              <span className="sm:hidden">{option.short}</span>
+              <span className="hidden sm:inline">{option.label}</span>
             </button>
           </span>
         ))}

@@ -12,10 +12,28 @@ import { SESSION_COOKIE } from "@/lib/auth/constants";
  */
 const PUBLIC_PATHS = ["/login", "/setup", "/api/auth"];
 
+/**
+ * Static files served straight off disk: everything in public/ plus the
+ * app-router icon routes. A page path never contains a dot, so the extension
+ * is a safe test -- and it is deliberately NOT applied under /api/, because
+ * that is where uploaded receipts are served from and those stay private.
+ *
+ * Without this, the brand wordmark 307s to /login and next/image reports
+ * "the requested resource isn't a valid image ... received null", because the
+ * optimizer fetched an HTML login page instead of a PNG.
+ */
+function isPublicAsset(pathname: string): boolean {
+  return !pathname.startsWith("/api/") && /\.[a-z0-9]+$/i.test(pathname);
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+    return NextResponse.next();
+  }
+
+  if (isPublicAsset(pathname)) {
     return NextResponse.next();
   }
 
@@ -35,5 +53,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg).*)"],
+  matcher: ["/((?!_next/static|_next/image).*)"],
 };
