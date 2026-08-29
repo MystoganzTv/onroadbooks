@@ -16,9 +16,16 @@ import type {
   MaintenanceRecord,
   MaintenanceType,
   PaymentStatus,
+  FinancialGoal,
+  ReserveAccount,
+  ReserveTransaction,
+  Settlement,
+  SettlementHalf,
+  SettlementSnapshot,
   Truck,
 } from "../types";
 import { defaultCategoryBehavior } from "../categories";
+import { defaultGoals, defaultReserveAccounts } from "../defaults";
 import type {
   AuthStore,
   BusinessInput,
@@ -28,7 +35,11 @@ import type {
   LoadInput,
   MaintenanceInput,
   Repository,
+  GoalInput,
+  ReserveAccountInput,
+  ReserveTransactionInput,
   SettingsInput,
+  SettlementCloseInput,
   TruckInput,
 } from "./repository";
 
@@ -114,6 +125,38 @@ function prettyMaintenance(type: string): string {
     .split("_")
     .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
     .join(" ");
+}
+
+/**
+ * Materialises the two built-in buckets the first time one is needed, so an
+ * existing database gains them without a data migration script.
+ */
+async function ensureReserveAccounts(
+  client: PrismaClientType,
+  businessId: string,
+): Promise<void> {
+  const count = await client.reserveAccount.count({ where: { businessId } });
+  if (count > 0) return;
+  for (const account of defaultReserveAccounts(businessId)) {
+    await client.reserveAccount.create({
+      data: {
+        businessId,
+        kind: account.kind,
+        name: account.name,
+        basis: account.basis,
+        contributionPct: account.contributionPct,
+        targetBalance: account.targetBalance,
+        active: account.active,
+        sortOrder: account.sortOrder,
+      },
+    });
+  }
+}
+
+function requireSettlement(dataset: Dataset, id: string): Settlement {
+  const settlement = dataset.settlements.find((s) => s.id === id);
+  if (!settlement) throw new Error(`Settlement ${id} not found`);
+  return settlement;
 }
 
 /** Account lookups, unscoped by definition. */
@@ -217,7 +260,17 @@ export class PrismaRepository implements Repository {
     const business = await this.business(client);
     const truckRow = business.trucks[0];
 
-    const [loadRows, expenseRows, fuelRows, documentRows, maintenanceRows] = await Promise.all([
+    const [
+      loadRows,
+      expenseRows,
+      fuelRows,
+      documentRows,
+      maintenanceRows,
+      goalRow,
+      reserveAccountRows,
+      reserveTransactionRows,
+      settlementRows,
+    ] = await Promise.all([
       // Tie-break on id so same-day rows have a defined order, matching the
       // JSON store rather than whatever Postgres happens to return.
       client.load.findMany({
@@ -240,7 +293,52 @@ export class PrismaRepository implements Repository {
         where: { businessId: business.id },
         orderBy: [{ serviceDate: "desc" }, { id: "desc" }],
       }),
+      client.financialGoal.findUnique({ where: { businessId: business.id } }),
+      client.reserveAccount.findMany({
+        where: { businessId: business.id },
+        orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+      }),
+      client.reserveTransaction.findMany({
+        where: { businessId: business.id },
+        orderBy: [{ date: "desc" }, { id: "desc" }],
+      }),
+      client.settlement.findMany({
+        where: { businessId: business.id },
+        orderBy: [{ periodStart: "desc" }, { id: "desc" }],
+      }),
     ]);
+
+    // The two built-in buckets are created on first read rather than in a
+    // migration, so an existing database gains them without a data script.
+    const reserveAccounts: ReserveAccount[] =
+      reserveAccountRows.length > 0
+        ? reserveAccountRows.map((row) => ({
+            id: row.id,
+            businessId: row.businessId,
+            kind: row.kind,
+            name: row.name,
+            basis: row.basis,
+            contributionPct: numOrNull(row.contributionPct),
+            targetBalance: numOrNull(row.targetBalance),
+            active: row.active,
+            sortOrder: row.sortOrder,
+            createdAt: row.createdAt.toISOString(),
+          }))
+        : defaultReserveAccounts(business.id);
+
+    const goals: FinancialGoal = goalRow
+      ? {
+          id: goalRow.id,
+          businessId: goalRow.businessId,
+          monthlyRevenueTarget: num(goalRow.monthlyRevenueTarget),
+          monthlyProfitTarget: num(goalRow.monthlyProfitTarget),
+          targetProfitPerMile: num(goalRow.targetProfitPerMile),
+          maxDeadheadPct: num(goalRow.maxDeadheadPct),
+          targetLoads: goalRow.targetLoads,
+          workingDaysPerWeek: goalRow.workingDaysPerWeek,
+          updatedAt: goalRow.updatedAt.toISOString(),
+        }
+      : defaultGoals(business.id);
 
     const settings: FinancialSettings = {
       id: business.settings?.id ?? "settings",
@@ -291,7 +389,37 @@ export class PrismaRepository implements Repository {
         createdAt: business.createdAt.toISOString(),
       } satisfies Business,
       settings,
+      goals,
       truck,
+      reserveAccounts,
+      reserveTransactions: reserveTransactionRows.map(
+        (row): ReserveTransaction => ({
+          id: row.id,
+          businessId: row.businessId,
+          accountId: row.accountId,
+          date: isoDate(row.date),
+          type: row.type,
+          amount: num(row.amount),
+          description: row.description,
+          settlementId: row.settlementId,
+          createdAt: row.createdAt.toISOString(),
+        }),
+      ),
+      settlements: settlementRows.map(
+        (row): Settlement => ({
+          id: row.id,
+          businessId: row.businessId,
+          month: row.month,
+          half: row.half,
+          periodStart: isoDate(row.periodStart),
+          periodEnd: isoDate(row.periodEnd),
+          status: row.status,
+          closedAt: row.closedAt ? row.closedAt.toISOString() : null,
+          snapshot: (row.snapshot as SettlementSnapshot | null) ?? null,
+          notes: row.notes,
+          createdAt: row.createdAt.toISOString(),
+        }),
+      ),
       loads: loadRows.map(
         (row): Load => ({
           id: row.id,
@@ -791,5 +919,239 @@ export class PrismaRepository implements Repository {
       },
     });
     return (await this.getDataset()).truck;
+  }
+
+  /* ---- Goals --------------------------------------------------------- */
+
+  async updateGoals(input: GoalInput): Promise<FinancialGoal> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const data = {
+      monthlyRevenueTarget: roundMoney(input.monthlyRevenueTarget),
+      monthlyProfitTarget: roundMoney(input.monthlyProfitTarget),
+      targetProfitPerMile: input.targetProfitPerMile,
+      maxDeadheadPct: input.maxDeadheadPct,
+      targetLoads: input.targetLoads ?? null,
+      workingDaysPerWeek: input.workingDaysPerWeek,
+    };
+    await client.financialGoal.upsert({
+      where: { businessId: business.id },
+      create: { businessId: business.id, ...data },
+      update: data,
+    });
+    return (await this.getDataset()).goals;
+  }
+
+  /* ---- Reserve buckets ------------------------------------------------ */
+
+  async createReserveAccount(input: ReserveAccountInput): Promise<ReserveAccount> {
+    const client = await getClient();
+    const business = await this.business(client);
+    await ensureReserveAccounts(client, business.id);
+    const count = await client.reserveAccount.count({ where: { businessId: business.id } });
+    const row = await client.reserveAccount.create({
+      data: {
+        businessId: business.id,
+        kind: input.kind,
+        name: input.name.trim(),
+        basis: input.basis,
+        contributionPct: input.contributionPct ?? null,
+        targetBalance: input.targetBalance ?? null,
+        active: input.active ?? true,
+        sortOrder: count,
+      },
+    });
+    const created = (await this.getDataset()).reserveAccounts.find((a) => a.id === row.id);
+    if (!created) throw new Error("Reserve bucket could not be read back after creation.");
+    return created;
+  }
+
+  async updateReserveAccount(id: string, input: ReserveAccountInput): Promise<ReserveAccount> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const existing = await client.reserveAccount.findFirst({
+      where: { id, businessId: business.id },
+    });
+    if (!existing) throw new Error(`Reserve account ${id} not found`);
+
+    await client.reserveAccount.update({
+      where: { id },
+      data: {
+        name: input.name.trim(),
+        basis: input.basis,
+        contributionPct:
+          existing.kind === "TAX" || existing.kind === "MAINTENANCE"
+            ? null
+            : (input.contributionPct ?? null),
+        targetBalance: input.targetBalance ?? null,
+        active: input.active ?? existing.active,
+      },
+    });
+    const updated = (await this.getDataset()).reserveAccounts.find((a) => a.id === id);
+    if (!updated) throw new Error(`Reserve account ${id} not found`);
+    return updated;
+  }
+
+  async deleteReserveAccount(id: string): Promise<void> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const existing = await client.reserveAccount.findFirst({
+      where: { id, businessId: business.id },
+    });
+    if (!existing) return;
+    if (existing.kind === "TAX" || existing.kind === "MAINTENANCE") {
+      throw new Error("The tax and maintenance buckets cannot be deleted.");
+    }
+    await client.reserveAccount.delete({ where: { id } });
+  }
+
+  async createReserveTransaction(input: ReserveTransactionInput): Promise<ReserveTransaction> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const account = await client.reserveAccount.findFirst({
+      where: { id: input.accountId, businessId: business.id },
+    });
+    if (!account) throw new Error("That reserve bucket no longer exists.");
+
+    const magnitude = Math.abs(roundMoney(input.amount));
+    const signed =
+      input.type === "WITHDRAWAL"
+        ? -magnitude
+        : input.type === "ADJUSTMENT" && input.negative
+          ? -magnitude
+          : magnitude;
+
+    const row = await client.reserveTransaction.create({
+      data: {
+        businessId: business.id,
+        accountId: input.accountId,
+        date: toDate(input.date),
+        type: input.type,
+        amount: signed,
+        description: input.description.trim(),
+      },
+    });
+
+    return {
+      id: row.id,
+      businessId: row.businessId,
+      accountId: row.accountId,
+      date: isoDate(row.date),
+      type: row.type,
+      amount: num(row.amount),
+      description: row.description,
+      settlementId: row.settlementId,
+      createdAt: row.createdAt.toISOString(),
+    };
+  }
+
+  async deleteReserveTransaction(id: string): Promise<void> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const row = await client.reserveTransaction.findFirst({
+      where: { id, businessId: business.id },
+    });
+    if (!row) return;
+    if (row.settlementId) {
+      throw new Error(
+        "That contribution was posted by a closed settlement. Reopen the settlement to remove it.",
+      );
+    }
+    await client.reserveTransaction.delete({ where: { id } });
+  }
+
+  /* ---- Settlements ---------------------------------------------------- */
+
+  async ensureSettlement(month: string, half: SettlementHalf): Promise<Settlement> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const [year, monthPart] = month.split("-").map((part) => Number.parseInt(part, 10));
+    const lastDay = new Date(Date.UTC(year, monthPart, 0)).getUTCDate();
+    const periodStart = half === "FIRST" ? `${month}-01` : `${month}-16`;
+    const periodEnd =
+      half === "FIRST" ? `${month}-15` : `${month}-${String(lastDay).padStart(2, "0")}`;
+
+    const row = await client.settlement.upsert({
+      where: { businessId_month_half: { businessId: business.id, month, half } },
+      create: {
+        businessId: business.id,
+        month,
+        half,
+        periodStart: toDate(periodStart),
+        periodEnd: toDate(periodEnd),
+        status: "OPEN",
+      },
+      update: {},
+    });
+    return requireSettlement(await this.getDataset(), row.id);
+  }
+
+  async closeSettlement(id: string, input: SettlementCloseInput): Promise<Settlement> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const existing = await client.settlement.findFirst({ where: { id, businessId: business.id } });
+    if (!existing) throw new Error(`Settlement ${id} not found`);
+    if (existing.status === "CLOSED") throw new Error("That settlement is already closed.");
+
+    await client.$transaction(async (tx) => {
+      await tx.settlement.update({
+        where: { id },
+        data: {
+          status: "CLOSED",
+          closedAt: new Date(),
+          // Frozen on purpose: a closed settlement is a statement of what the
+          // owner settled on, not a live query.
+          snapshot: input.snapshot as unknown as object,
+          notes: input.notes?.trim() || existing.notes,
+        },
+      });
+      for (const contribution of input.contributions) {
+        const amount = roundMoney(contribution.amount);
+        if (amount <= 0) continue;
+        await tx.reserveTransaction.create({
+          data: {
+            businessId: business.id,
+            accountId: contribution.accountId,
+            date: existing.periodEnd,
+            type: "CONTRIBUTION",
+            amount,
+            description: contribution.description,
+            settlementId: id,
+          },
+        });
+      }
+    });
+
+    return requireSettlement(await this.getDataset(), id);
+  }
+
+  async reopenSettlement(id: string): Promise<Settlement> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const existing = await client.settlement.findFirst({ where: { id, businessId: business.id } });
+    if (!existing) throw new Error(`Settlement ${id} not found`);
+
+    // Clearing a nullable Json column needs Prisma's DbNull sentinel, and the
+    // client is only ever imported lazily on this path.
+    const { Prisma } = await import("@/generated/prisma");
+
+    await client.$transaction(async (tx) => {
+      await tx.reserveTransaction.deleteMany({ where: { settlementId: id } });
+      await tx.settlement.update({
+        where: { id },
+        data: { status: "OPEN", closedAt: null, snapshot: Prisma.DbNull },
+      });
+    });
+
+    return requireSettlement(await this.getDataset(), id);
+  }
+
+  async updateSettlementNotes(id: string, notes: string | null): Promise<Settlement> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const existing = await client.settlement.findFirst({ where: { id, businessId: business.id } });
+    if (!existing) throw new Error(`Settlement ${id} not found`);
+    await client.settlement.update({ where: { id }, data: { notes: notes?.trim() || null } });
+    return requireSettlement(await this.getDataset(), id);
   }
 }

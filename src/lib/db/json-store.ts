@@ -5,6 +5,7 @@ import path from "node:path";
 
 import { roundMoney } from "../calculations";
 import { defaultCategoryBehavior } from "../categories";
+import { defaultGoals, defaultReserveAccounts } from "../defaults";
 import { buildSeedDataset, DEMO_DOCUMENTS } from "../seed/seed-data";
 import { buildStorageKey, getDocumentStorage } from "../storage";
 import type {
@@ -14,10 +15,15 @@ import type {
   Document,
   Expense,
   ExpenseCategoryId,
+  FinancialGoal,
   FinancialSettings,
   FuelEntry,
   Load,
   MaintenanceRecord,
+  ReserveAccount,
+  ReserveTransaction,
+  Settlement,
+  SettlementHalf,
   Truck,
 } from "../types";
 import {
@@ -27,10 +33,14 @@ import {
   type DocumentInput,
   type ExpenseInput,
   type FuelEntryInput,
+  type GoalInput,
   type LoadInput,
   type MaintenanceInput,
   type Repository,
+  type ReserveAccountInput,
+  type ReserveTransactionInput,
   type SettingsInput,
+  type SettlementCloseInput,
   type TruckInput,
 } from "./repository";
 
@@ -113,6 +123,28 @@ function migrate(dataset: Dataset): Dataset {
   dataset.fuelEntries ??= [];
   dataset.documents ??= [];
   dataset.maintenanceRecords ??= [];
+  dataset.reserveTransactions ??= [];
+  dataset.settlements ??= [];
+
+  const businessId = dataset.business?.id ?? "";
+  dataset.goals ??= defaultGoals(businessId);
+  if (!Array.isArray(dataset.reserveAccounts) || dataset.reserveAccounts.length === 0) {
+    dataset.reserveAccounts = defaultReserveAccounts(businessId);
+  }
+  for (const account of dataset.reserveAccounts) {
+    account.contributionPct ??= null;
+    account.targetBalance ??= null;
+    account.active ??= true;
+    account.sortOrder ??= 0;
+  }
+  for (const settlement of dataset.settlements) {
+    settlement.snapshot ??= null;
+    settlement.closedAt ??= null;
+    settlement.notes ??= null;
+  }
+  for (const txn of dataset.reserveTransactions) {
+    txn.settlementId ??= null;
+  }
 
   dataset.settings = {
     ...dataset.settings,
@@ -251,6 +283,11 @@ async function mutate<T>(
       (a, b) => b.serviceDate.localeCompare(a.serviceDate) || b.id.localeCompare(a.id),
     );
     dataset.documents.sort((a, b) => a.uploadedAt.localeCompare(b.uploadedAt));
+    dataset.reserveTransactions.sort(byDateDesc);
+    dataset.reserveAccounts.sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
+    dataset.settlements.sort(
+      (a, b) => b.periodStart.localeCompare(a.periodStart) || b.id.localeCompare(a.id),
+    );
     await persist(dataset);
     return result;
   });
@@ -433,6 +470,38 @@ function maintenanceLabelFor(type: string): string {
     .split("_")
     .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
     .join(" ");
+}
+
+/**
+ * The inclusive bounds of a half-month settlement. Kept here (and not derived
+ * at read time) so a closed settlement always reports the window it covered.
+ */
+export function settlementBounds(month: string, half: SettlementHalf): {
+  periodStart: string;
+  periodEnd: string;
+} {
+  const [year, monthPart] = month.split("-").map((part) => Number.parseInt(part, 10));
+  const lastDay = new Date(Date.UTC(year, monthPart, 0)).getUTCDate();
+  return half === "FIRST"
+    ? { periodStart: `${month}-01`, periodEnd: `${month}-15` }
+    : { periodStart: `${month}-16`, periodEnd: `${month}-${String(lastDay).padStart(2, "0")}` };
+}
+
+function newSettlement(businessId: string, month: string, half: SettlementHalf): Settlement {
+  const bounds = settlementBounds(month, half);
+  return {
+    id: `stl_${month}_${half === "FIRST" ? "a" : "b"}`,
+    businessId,
+    month,
+    half,
+    periodStart: bounds.periodStart,
+    periodEnd: bounds.periodEnd,
+    status: "OPEN",
+    closedAt: null,
+    snapshot: null,
+    notes: null,
+    createdAt: new Date().toISOString(),
+  };
 }
 
 /**
@@ -742,6 +811,208 @@ export class JsonRepository implements Repository {
         currentOdometer: input.currentOdometer,
       };
       return dataset.truck;
+    }, this.businessId);
+  }
+
+  /* ---- Goals --------------------------------------------------------- */
+
+  async updateGoals(input: GoalInput): Promise<FinancialGoal> {
+    return mutate((dataset) => {
+      dataset.goals = {
+        ...dataset.goals,
+        monthlyRevenueTarget: roundMoney(input.monthlyRevenueTarget),
+        monthlyProfitTarget: roundMoney(input.monthlyProfitTarget),
+        targetProfitPerMile: input.targetProfitPerMile,
+        maxDeadheadPct: input.maxDeadheadPct,
+        targetLoads: input.targetLoads ?? null,
+        workingDaysPerWeek: input.workingDaysPerWeek,
+        updatedAt: new Date().toISOString(),
+      };
+      return dataset.goals;
+    }, this.businessId);
+  }
+
+  /* ---- Reserve buckets ------------------------------------------------ */
+
+  async createReserveAccount(input: ReserveAccountInput): Promise<ReserveAccount> {
+    return mutate((dataset) => {
+      const account: ReserveAccount = {
+        id: newId("res"),
+        businessId: dataset.business.id,
+        kind: input.kind,
+        name: input.name.trim(),
+        basis: input.basis,
+        contributionPct: input.contributionPct ?? null,
+        targetBalance: input.targetBalance ?? null,
+        active: input.active ?? true,
+        sortOrder: dataset.reserveAccounts.length,
+        createdAt: new Date().toISOString(),
+      };
+      dataset.reserveAccounts.push(account);
+      return account;
+    }, this.businessId);
+  }
+
+  async updateReserveAccount(id: string, input: ReserveAccountInput): Promise<ReserveAccount> {
+    return mutate((dataset) => {
+      const index = dataset.reserveAccounts.findIndex((a) => a.id === id);
+      if (index === -1) throw new Error(`Reserve account ${id} not found`);
+      const previous = dataset.reserveAccounts[index];
+      const updated: ReserveAccount = {
+        ...previous,
+        name: input.name.trim(),
+        basis: input.basis,
+        // Built-in buckets keep their rate in Settings; a null here is not a
+        // missing value, it is "inherit the Settings percentage".
+        contributionPct:
+          previous.kind === "TAX" || previous.kind === "MAINTENANCE"
+            ? null
+            : (input.contributionPct ?? null),
+        targetBalance: input.targetBalance ?? null,
+        active: input.active ?? previous.active,
+      };
+      dataset.reserveAccounts[index] = updated;
+      return updated;
+    }, this.businessId);
+  }
+
+  async deleteReserveAccount(id: string): Promise<void> {
+    await mutate((dataset) => {
+      const account = dataset.reserveAccounts.find((a) => a.id === id);
+      if (!account) return;
+      if (account.kind === "TAX" || account.kind === "MAINTENANCE") {
+        throw new Error("The tax and maintenance buckets cannot be deleted.");
+      }
+      dataset.reserveAccounts = dataset.reserveAccounts.filter((a) => a.id !== id);
+      dataset.reserveTransactions = dataset.reserveTransactions.filter(
+        (t) => t.accountId !== id,
+      );
+    }, this.businessId);
+  }
+
+  async createReserveTransaction(input: ReserveTransactionInput): Promise<ReserveTransaction> {
+    return mutate((dataset) => {
+      if (!dataset.reserveAccounts.some((a) => a.id === input.accountId)) {
+        throw new Error("That reserve bucket no longer exists.");
+      }
+      const magnitude = Math.abs(roundMoney(input.amount));
+      // The sign is decided here, once, so a balance is always a plain sum.
+      const signed =
+        input.type === "WITHDRAWAL"
+          ? -magnitude
+          : input.type === "ADJUSTMENT" && input.negative
+            ? -magnitude
+            : magnitude;
+
+      const txn: ReserveTransaction = {
+        id: newId("rtx"),
+        businessId: dataset.business.id,
+        accountId: input.accountId,
+        date: input.date,
+        type: input.type,
+        amount: signed,
+        description: input.description.trim(),
+        settlementId: null,
+        createdAt: new Date().toISOString(),
+      };
+      dataset.reserveTransactions.push(txn);
+      return txn;
+    }, this.businessId);
+  }
+
+  async deleteReserveTransaction(id: string): Promise<void> {
+    await mutate((dataset) => {
+      const txn = dataset.reserveTransactions.find((t) => t.id === id);
+      if (txn?.settlementId) {
+        throw new Error(
+          "That contribution was posted by a closed settlement. Reopen the settlement to remove it.",
+        );
+      }
+      dataset.reserveTransactions = dataset.reserveTransactions.filter((t) => t.id !== id);
+    }, this.businessId);
+  }
+
+  /* ---- Settlements ---------------------------------------------------- */
+
+  async ensureSettlement(month: string, half: SettlementHalf): Promise<Settlement> {
+    return mutate((dataset) => {
+      const existing = dataset.settlements.find((s) => s.month === month && s.half === half);
+      if (existing) return existing;
+      const settlement = newSettlement(dataset.business.id, month, half);
+      dataset.settlements.push(settlement);
+      return settlement;
+    }, this.businessId);
+  }
+
+  async closeSettlement(id: string, input: SettlementCloseInput): Promise<Settlement> {
+    return mutate((dataset) => {
+      const index = dataset.settlements.findIndex((s) => s.id === id);
+      if (index === -1) throw new Error(`Settlement ${id} not found`);
+      const settlement = dataset.settlements[index];
+      if (settlement.status === "CLOSED") {
+        throw new Error("That settlement is already closed.");
+      }
+
+      const closedAt = new Date().toISOString();
+      const updated: Settlement = {
+        ...settlement,
+        status: "CLOSED",
+        closedAt,
+        // The snapshot is frozen here and never recomputed: this is what the
+        // owner settled on, whatever the settings say later.
+        snapshot: input.snapshot,
+        notes: input.notes?.trim() || settlement.notes,
+      };
+      dataset.settlements[index] = updated;
+
+      for (const contribution of input.contributions) {
+        const amount = roundMoney(contribution.amount);
+        if (amount <= 0) continue;
+        if (!dataset.reserveAccounts.some((a) => a.id === contribution.accountId)) continue;
+        dataset.reserveTransactions.push({
+          id: newId("rtx"),
+          businessId: dataset.business.id,
+          accountId: contribution.accountId,
+          date: updated.periodEnd,
+          type: "CONTRIBUTION",
+          amount,
+          description: contribution.description,
+          settlementId: updated.id,
+          createdAt: closedAt,
+        });
+      }
+
+      return updated;
+    }, this.businessId);
+  }
+
+  async reopenSettlement(id: string): Promise<Settlement> {
+    return mutate((dataset) => {
+      const index = dataset.settlements.findIndex((s) => s.id === id);
+      if (index === -1) throw new Error(`Settlement ${id} not found`);
+      const updated: Settlement = {
+        ...dataset.settlements[index],
+        status: "OPEN",
+        closedAt: null,
+        snapshot: null,
+      };
+      dataset.settlements[index] = updated;
+      // Reopening removes exactly the rows the close posted; anything the
+      // owner entered by hand in the same bucket is untouched.
+      dataset.reserveTransactions = dataset.reserveTransactions.filter(
+        (t) => t.settlementId !== id,
+      );
+      return updated;
+    }, this.businessId);
+  }
+
+  async updateSettlementNotes(id: string, notes: string | null): Promise<Settlement> {
+    return mutate((dataset) => {
+      const index = dataset.settlements.findIndex((s) => s.id === id);
+      if (index === -1) throw new Error(`Settlement ${id} not found`);
+      const updated = { ...dataset.settlements[index], notes: notes?.trim() || null };
+      dataset.settlements[index] = updated;
+      return updated;
     }, this.businessId);
   }
 }

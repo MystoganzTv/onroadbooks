@@ -261,12 +261,16 @@ export interface Dataset {
   business: Business;
   users: User[];
   settings: FinancialSettings;
+  goals: FinancialGoal;
   truck: Truck;
   loads: Load[];
   expenses: Expense[];
   fuelEntries: FuelEntry[];
   documents: Document[];
   maintenanceRecords: MaintenanceRecord[];
+  reserveAccounts: ReserveAccount[];
+  reserveTransactions: ReserveTransaction[];
+  settlements: Settlement[];
 }
 
 /* ---- Derived / computed shapes ------------------------------------- */
@@ -335,4 +339,149 @@ export interface Insight {
   id: string;
   tone: "positive" | "negative" | "neutral" | "warning";
   text: string;
+}
+
+/* ---- Goals ----------------------------------------------------------- */
+
+/**
+ * What the owner is aiming at. One record per business, edited in Settings.
+ * Targets are monthly; every other window is derived from them rather than
+ * stored, so changing a target never rewrites history.
+ */
+export interface FinancialGoal {
+  id: string;
+  businessId: string;
+  /** Gross revenue the owner wants to book in a calendar month. */
+  monthlyRevenueTarget: number;
+  /** Net profit (revenue - operating expenses) wanted in a calendar month. */
+  monthlyProfitTarget: number;
+  /** Profit per total mile the owner is trying to hold. */
+  targetProfitPerMile: number;
+  /** Deadhead share of total miles the owner does not want to exceed. */
+  maxDeadheadPct: number;
+  /** Optional load count target. Null when the owner does not track it. */
+  targetLoads: number | null;
+  /**
+   * Days a week the truck is expected to run. Drives the daily profit target
+   * and the month-end projection -- a projection that assumed seven driving
+   * days would overstate every month.
+   */
+  workingDaysPerWeek: number;
+  updatedAt: string;
+}
+
+/* ---- Reserve buckets -------------------------------------------------- */
+
+export type ReserveKind = "TAX" | "MAINTENANCE" | "EMERGENCY" | "CUSTOM";
+
+/** What a reserve percentage is charged against. */
+export type ReserveBasis = "OPERATING_PROFIT" | "GROSS_REVENUE";
+
+/**
+ * A virtual bucket. These are planning ledgers, not bank accounts: nothing
+ * here moves real money.
+ */
+export interface ReserveAccount {
+  id: string;
+  businessId: string;
+  kind: ReserveKind;
+  name: string;
+  basis: ReserveBasis;
+  /**
+   * Contribution rate as a percent.
+   *
+   * Null for the built-in TAX and MAINTENANCE buckets: their rates live in
+   * FinancialSettings (taxReservePct / maintenanceReservePct) and are edited
+   * on the Settings page, so a reserve rate is stored in exactly one place.
+   * `resolveReserveRules()` is the single reader that merges the two.
+   */
+  contributionPct: number | null;
+  /** Optional balance the owner is building toward. */
+  targetBalance: number | null;
+  active: boolean;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export type ReserveTransactionType = "CONTRIBUTION" | "WITHDRAWAL" | "ADJUSTMENT";
+
+/**
+ * A movement in a bucket. `amount` is always signed: contributions positive,
+ * withdrawals negative, adjustments either way. Balances are a running sum,
+ * never a stored column.
+ */
+export interface ReserveTransaction {
+  id: string;
+  businessId: string;
+  accountId: string;
+  date: string;
+  type: ReserveTransactionType;
+  amount: number;
+  description: string;
+  /** Set when the row was posted automatically by closing a settlement. */
+  settlementId: string | null;
+  createdAt: string;
+}
+
+export interface ReserveBalance {
+  account: ReserveAccount;
+  balance: number;
+  contributions: number;
+  withdrawals: number;
+  /** Movements inside the period being viewed. */
+  periodContributions: number;
+  periodWithdrawals: number;
+  transactions: ReserveTransaction[];
+  /** Progress toward `targetBalance`, or null when no target is set. */
+  targetProgress: number | null;
+}
+
+/* ---- Settlements ------------------------------------------------------ */
+
+/** Which half of the month a settlement covers. */
+export type SettlementHalf = "FIRST" | "SECOND";
+
+export type SettlementStatus = "OPEN" | "CLOSED";
+
+/**
+ * The numbers a settlement is closed on.
+ *
+ * This is the ONE place the app deliberately stores calculated values. A
+ * settlement the owner has closed is a statement of what they were paid on;
+ * changing a reserve percentage next month must not rewrite it.
+ */
+export interface SettlementSnapshot {
+  grossRevenue: number;
+  operatingExpenses: number;
+  operatingProfit: number;
+  reserves: { accountId: string; name: string; kind: ReserveKind; pct: number; basis: ReserveBasis; amount: number }[];
+  reserveTotal: number;
+  safeToPay: number;
+  loadCount: number;
+  totalMiles: number;
+  loadedMiles: number;
+  deadheadMiles: number;
+  deadheadPct: number;
+  fixedCostPerMile: number;
+  variableCostPerMile: number;
+  trueCostPerMile: number;
+  revenuePerMile: number;
+  profitPerMile: number;
+}
+
+export interface Settlement {
+  id: string;
+  businessId: string;
+  /** Anchor month, "2026-08". */
+  month: string;
+  half: SettlementHalf;
+  /** Inclusive ISO bounds, stored so a closed settlement never re-derives. */
+  periodStart: string;
+  periodEnd: string;
+  status: SettlementStatus;
+  closedAt: string | null;
+  /** Populated on close, null while open. */
+  snapshot: SettlementSnapshot | null;
+  notes: string | null;
+  createdAt: string;
 }

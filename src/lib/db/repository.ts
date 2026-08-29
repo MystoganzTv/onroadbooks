@@ -11,6 +11,15 @@ import type {
   Business,
   User,
   Dataset,
+  FinancialGoal,
+  ReserveAccount,
+  ReserveBasis,
+  ReserveKind,
+  ReserveTransaction,
+  ReserveTransactionType,
+  Settlement,
+  SettlementHalf,
+  SettlementSnapshot,
   Document,
   DocumentType,
   Expense,
@@ -125,6 +134,43 @@ export interface TruckInput {
   currentOdometer: number;
 }
 
+export interface GoalInput {
+  monthlyRevenueTarget: number;
+  monthlyProfitTarget: number;
+  targetProfitPerMile: number;
+  maxDeadheadPct: number;
+  targetLoads?: number | null;
+  workingDaysPerWeek: number;
+}
+
+export interface ReserveAccountInput {
+  kind: ReserveKind;
+  name: string;
+  basis: ReserveBasis;
+  /** Null keeps a built-in bucket on its Settings-owned rate. */
+  contributionPct?: number | null;
+  targetBalance?: number | null;
+  active?: boolean;
+}
+
+export interface ReserveTransactionInput {
+  accountId: string;
+  date: string;
+  type: ReserveTransactionType;
+  /** Always positive; the store applies the sign implied by `type`. */
+  amount: number;
+  description: string;
+  /** Adjustments may reduce a balance -- true makes the signed amount negative. */
+  negative?: boolean;
+}
+
+export interface SettlementCloseInput {
+  snapshot: SettlementSnapshot;
+  /** Contributions to post when the settlement closes. */
+  contributions: { accountId: string; amount: number; description: string }[];
+  notes?: string | null;
+}
+
 export interface Repository {
   /** Everything the app needs for a request, in one read. */
   getDataset(): Promise<Dataset>;
@@ -150,6 +196,22 @@ export interface Repository {
   deleteDocument(id: string): Promise<string | null>;
 
   updateSettings(input: SettingsInput): Promise<FinancialSettings>;
+  updateGoals(input: GoalInput): Promise<FinancialGoal>;
+
+  createReserveAccount(input: ReserveAccountInput): Promise<ReserveAccount>;
+  updateReserveAccount(id: string, input: ReserveAccountInput): Promise<ReserveAccount>;
+  deleteReserveAccount(id: string): Promise<void>;
+
+  createReserveTransaction(input: ReserveTransactionInput): Promise<ReserveTransaction>;
+  deleteReserveTransaction(id: string): Promise<void>;
+
+  /** Creates the OPEN settlement for a half-month if it does not exist yet. */
+  ensureSettlement(month: string, half: SettlementHalf): Promise<Settlement>;
+  /** Freezes the snapshot and posts the reserve contributions it implies. */
+  closeSettlement(id: string, input: SettlementCloseInput): Promise<Settlement>;
+  /** Clears the snapshot and removes the contributions the close posted. */
+  reopenSettlement(id: string): Promise<Settlement>;
+  updateSettlementNotes(id: string, notes: string | null): Promise<Settlement>;
   updateBusiness(input: BusinessInput): Promise<Business>;
   updateTruck(input: TruckInput): Promise<Truck>;
 }

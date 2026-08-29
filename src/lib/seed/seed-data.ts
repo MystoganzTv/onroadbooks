@@ -12,6 +12,8 @@
 
 import { defaultCategoryBehavior } from "../categories";
 import { roundMoney } from "../calculations";
+import { defaultGoals, defaultReserveAccounts } from "../defaults";
+import { buildSettlementSnapshot, settlementBounds, settlementId } from "../finance/settlement";
 import { pad } from "../periods";
 import type {
   Business,
@@ -24,6 +26,10 @@ import type {
   FuelEntry,
   Load,
   PaymentStatus,
+  ReserveAccount,
+  ReserveTransaction,
+  Settlement,
+  SettlementHalf,
   Truck,
 } from "../types";
 
@@ -591,12 +597,105 @@ export function buildSeedDataset(): Dataset {
   const byDateDesc = <T extends { date: string; id: string }>(a: T, b: T) =>
     b.date.localeCompare(a.date) || b.id.localeCompare(a.id);
 
+  const sortedLoads = loads.sort(byDateDesc);
+  const sortedExpenses = expenses.sort(byDateDesc);
+
+  // Reserve buckets: the two built-ins plus an emergency fund, so the bucket
+  // UI is exercised with a bucket that carries its own contribution rate.
+  const reserveAccounts: ReserveAccount[] = [
+    ...defaultReserveAccounts(BUSINESS_ID, CREATED),
+    {
+      id: "res_emergency",
+      businessId: BUSINESS_ID,
+      kind: "EMERGENCY",
+      name: "Emergency Fund",
+      basis: "GROSS_REVENUE",
+      contributionPct: 2,
+      targetBalance: 5000,
+      active: true,
+      sortOrder: 2,
+      createdAt: CREATED,
+    },
+  ];
+
+  // Every half-month from May through July is closed, so the app opens with
+  // real settlement history and reserve balances that were actually accrued
+  // rather than typed in. August is left open -- it is the live period.
+  const settlements: Settlement[] = [];
+  const reserveTransactions: ReserveTransaction[] = [];
+  const closedWindows: { month: string; half: SettlementHalf }[] = [
+    { month: "2026-05", half: "FIRST" },
+    { month: "2026-05", half: "SECOND" },
+    { month: "2026-06", half: "FIRST" },
+    { month: "2026-06", half: "SECOND" },
+    { month: "2026-07", half: "FIRST" },
+    { month: "2026-07", half: "SECOND" },
+  ];
+  for (const window of closedWindows) {
+    const bounds = settlementBounds(window.month, window.half);
+    const snapshot = buildSettlementSnapshot(
+      sortedLoads,
+      sortedExpenses,
+      bounds,
+      DEMO_SETTINGS,
+      reserveAccounts,
+    );
+    const id = settlementId(window.month, window.half);
+
+    settlements.push({
+      id,
+      businessId: BUSINESS_ID,
+      month: window.month,
+      half: window.half,
+      periodStart: bounds.start,
+      periodEnd: bounds.end,
+      status: "CLOSED",
+      closedAt: `${bounds.end}T21:00:00.000Z`,
+      snapshot,
+      notes: null,
+      createdAt: `${bounds.start}T08:00:00.000Z`,
+    });
+
+    for (const reserve of snapshot.reserves) {
+      if (reserve.amount <= 0) continue;
+      reserveTransactions.push({
+        id: `rtx_${id}_${reserve.accountId}`,
+        businessId: BUSINESS_ID,
+        accountId: reserve.accountId,
+        date: bounds.end,
+        type: "CONTRIBUTION",
+        amount: reserve.amount,
+        description: `${reserve.pct}% ${reserve.basis === "OPERATING_PROFIT" ? "of operating profit" : "of gross revenue"} - settlement closed`,
+        settlementId: id,
+        createdAt: `${bounds.end}T21:00:00.000Z`,
+      });
+    }
+  }
+
+  // One manual withdrawal, so the ledger shows money leaving a bucket as well
+  // as arriving: the July brake job was paid out of the maintenance reserve.
+  reserveTransactions.push({
+    id: "rtx_manual_brakes",
+    businessId: BUSINESS_ID,
+    accountId: "res_maintenance",
+    date: "2026-07-18",
+    type: "WITHDRAWAL",
+    amount: -640,
+    description: "Front brake service paid from reserve",
+    settlementId: null,
+    createdAt: "2026-07-18T15:00:00.000Z",
+  });
+
+  const bySettlementDateDesc = <T extends { date: string; id: string }>(a: T, b: T) =>
+    b.date.localeCompare(a.date) || b.id.localeCompare(a.id);
+
   return {
     business: DEMO_BUSINESS,
     settings: DEMO_SETTINGS,
+    goals: defaultGoals(BUSINESS_ID, CREATED),
     truck: DEMO_TRUCK,
-    loads: loads.sort(byDateDesc),
-    expenses: expenses.sort(byDateDesc),
+    loads: sortedLoads,
+    expenses: sortedExpenses,
     fuelEntries: fuelEntries.sort(byDateDesc),
     // No user is seeded: first boot sends you to /setup to create the owner
     // account, which then attaches to this demo business.
@@ -604,6 +703,11 @@ export function buildSeedDataset(): Dataset {
     documents: [] as Document[],
     maintenanceRecords: maintenanceRecords.sort((a, b) =>
       b.serviceDate.localeCompare(a.serviceDate),
+    ),
+    reserveAccounts,
+    reserveTransactions: reserveTransactions.sort(bySettlementDateDesc),
+    settlements: settlements.sort(
+      (a, b) => b.periodStart.localeCompare(a.periodStart) || b.id.localeCompare(a.id),
     ),
   };
 }

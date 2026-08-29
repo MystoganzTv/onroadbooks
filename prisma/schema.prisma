@@ -67,6 +67,35 @@ enum MaintenanceBasis {
   BOTH
 }
 
+enum ReserveKind {
+  TAX
+  MAINTENANCE
+  EMERGENCY
+  CUSTOM
+}
+
+/// What a reserve percentage is charged against.
+enum ReserveBasis {
+  OPERATING_PROFIT
+  GROSS_REVENUE
+}
+
+enum ReserveTransactionType {
+  CONTRIBUTION
+  WITHDRAWAL
+  ADJUSTMENT
+}
+
+enum SettlementHalf {
+  FIRST
+  SECOND
+}
+
+enum SettlementStatus {
+  OPEN
+  CLOSED
+}
+
 enum ExpenseCategory {
   FUEL
   TOLLS
@@ -115,6 +144,113 @@ model Business {
   documents   Document[]
   maintenance MaintenanceRecord[]
   settings    FinancialSettings?
+  goals               FinancialGoal?
+  reserveAccounts     ReserveAccount[]
+  reserveTransactions ReserveTransaction[]
+  settlements         Settlement[]
+}
+
+/// What the owner is aiming at. One row per business; targets are monthly and
+/// every shorter window is derived, never stored.
+model FinancialGoal {
+  id         String   @id @default(cuid())
+  businessId String   @unique
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  monthlyRevenueTarget Decimal @default(0) @db.Decimal(12, 2)
+  monthlyProfitTarget  Decimal @default(0) @db.Decimal(12, 2)
+  targetProfitPerMile  Decimal @default(1.5) @db.Decimal(8, 2)
+  maxDeadheadPct       Decimal @default(15) @db.Decimal(5, 2)
+  targetLoads          Int?
+  /// Days a week the truck is expected to run. Drives the daily target and
+  /// the month-end projection.
+  workingDaysPerWeek   Int     @default(6)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// A virtual planning bucket. Not a bank account -- no real money moves.
+model ReserveAccount {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  kind  ReserveKind
+  name  String
+  basis ReserveBasis @default(GROSS_REVENUE)
+
+  /// Null for the built-in TAX and MAINTENANCE buckets: their rates live in
+  /// FinancialSettings so a reserve percentage is stored in one place only.
+  contributionPct Decimal? @db.Decimal(5, 2)
+  targetBalance   Decimal? @db.Decimal(12, 2)
+  active          Boolean  @default(true)
+  sortOrder       Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions ReserveTransaction[]
+
+  @@index([businessId])
+}
+
+/// A movement in a bucket. `amount` is signed: contributions positive,
+/// withdrawals negative. A balance is always the running sum, never a column.
+model ReserveTransaction {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  accountId  String
+  account    ReserveAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  date        DateTime               @db.Date
+  type        ReserveTransactionType
+  amount      Decimal                @db.Decimal(12, 2)
+  description String
+
+  /// Set when the row was posted automatically by closing a settlement, so
+  /// reopening that settlement can reverse exactly these rows.
+  settlementId String?
+  settlement   Settlement? @relation(fields: [settlementId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([businessId, date])
+  @@index([accountId])
+  @@index([settlementId])
+}
+
+/// A half-month review, and the only place the app stores calculated values.
+///
+/// While OPEN the figures are recomputed live. CLOSING freezes `snapshot`, so
+/// a later change to a reserve percentage or a backdated expense can never
+/// rewrite a settlement the owner has already paid themselves on.
+model Settlement {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  /// Anchor month, "2026-08".
+  month String   @db.VarChar(7)
+  half  SettlementHalf
+
+  periodStart DateTime @db.Date
+  periodEnd   DateTime @db.Date
+
+  status   SettlementStatus @default(OPEN)
+  closedAt DateTime?
+  /// Frozen SettlementSnapshot. Null while the settlement is open.
+  snapshot Json?
+  notes    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  reserveTransactions ReserveTransaction[]
+
+  @@unique([businessId, month, half])
+  @@index([businessId, periodStart])
 }
 
 model FinancialSettings {
