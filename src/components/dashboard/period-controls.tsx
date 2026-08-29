@@ -102,7 +102,15 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
     <div
       className={cn(
         "flex flex-wrap items-center gap-2 print:hidden",
-        pending && "pointer-events-none opacity-70",
+        // Dimmed while navigating, but NOT pointer-events-none.
+        //
+        // Next aborts a router push that lands while it is still prefetching
+        // the sidebar routes -- a real possibility on the first click after a
+        // page load. The transition then never resolves, `pending` stays true,
+        // and blocking pointer events left the whole period bar dead until a
+        // full reload. Staying clickable means a second click just works, which
+        // is what a person does anyway.
+        pending && "opacity-70",
         className,
       )}
     >

@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CategoryDonut } from "@/components/charts/category-donut";
+import { PrintDonut } from "@/components/print/print-charts";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PieChart } from "lucide-react";
 import { categoryColor } from "@/lib/categories";
@@ -35,7 +36,12 @@ export function CategoryBreakdown({ categories, total }: CategoryBreakdownProps)
         <span className="text-2xs text-muted-foreground">{categories.length} categories</span>
       </CardHeader>
       <CardContent className="space-y-4 p-4">
-        <CategoryDonut data={categories} total={total} />
+        <div className="print:hidden">
+          <CategoryDonut data={categories} total={total} />
+        </div>
+        <div className="hidden justify-center print:flex">
+          <PrintDonut data={categories} total={total} />
+        </div>
 
         <ul className="space-y-1.5">
           {categories.map((category) => (

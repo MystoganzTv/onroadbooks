@@ -26,7 +26,7 @@ export function AppShell({ businessName, truckName, userEmail, children }: AppSh
   const current = PRIMARY_NAV.find((item) => isNavActive(item, pathname))?.label ?? APP_NAME;
 
   return (
-    <div className="flex min-h-dvh bg-background">
+    <div className="flex min-h-dvh bg-background print:block print:min-h-0">
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 hidden w-60 border-r border-sidebar-border lg:block">
         <SidebarNav businessName={businessName} truckName={truckName} userEmail={userEmail} />
@@ -45,7 +45,7 @@ export function AppShell({ businessName, truckName, userEmail, children }: AppSh
         </DialogContent>
       </Dialog>
 
-      <div className="flex min-w-0 flex-1 flex-col lg:pl-60">
+      <div className="flex min-w-0 flex-1 flex-col lg:pl-60 print:block">
         <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:hidden">
           <Button
             variant="ghost"
@@ -62,7 +62,15 @@ export function AppShell({ businessName, truckName, userEmail, children }: AppSh
           </div>
         </header>
 
-        <main className="min-w-0 flex-1 overflow-x-hidden">{children}</main>
+        {/*
+          * overflow-x-hidden makes the other axis compute to `auto`, which turns
+          * this into a scroll container. On screen that is what stops a wide
+          * table breaking the layout; in print it clips the document to one
+          * page and throws the rest away, so it has to be undone on paper.
+          */}
+        <main className="min-w-0 flex-1 overflow-x-hidden print:overflow-visible">
+          {children}
+        </main>
       </div>
     </div>
   );

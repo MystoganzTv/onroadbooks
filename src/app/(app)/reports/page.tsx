@@ -9,6 +9,17 @@ import { ExportMenu } from "@/components/reports/export-menu";
 import { HalfMonthSplit } from "@/components/reports/half-month-split";
 import { ReportSummary } from "@/components/reports/report-summary";
 import { PageHeader } from "@/components/shared/page-header";
+import {
+  PrintBarChart,
+  PrintLineChart,
+  PrintSplitBar,
+  PRINT_INK,
+} from "@/components/print/print-charts";
+import {
+  ReportColophon,
+  ReportLetterhead,
+  ReportRunningFooter,
+} from "@/components/print/report-letterhead";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   brokerPerformance,
@@ -23,6 +34,7 @@ import {
 import { halfMonthComparison } from "@/lib/chart-data";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
+import { formatDateMedium } from "@/lib/formatters";
 import { periodFromSearchParams, periodQuery, type SearchParams } from "@/lib/period-params";
 import { monthLabel, previousPeriod, trailingHalfMonths, trailingMonths } from "@/lib/periods";
 
@@ -35,7 +47,9 @@ export default async function ReportsPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { loads, expenses, settings } = await getRepository(session.businessId).getDataset();
+  const { business, truck, loads, expenses, settings } = await getRepository(
+    session.businessId,
+  ).getDataset();
   const period = periodFromSearchParams(params);
   const prior = previousPeriod(period);
 
@@ -54,18 +68,40 @@ export default async function ReportsPage({
   const halfTrend = buildTrend(loads, expenses, trailingHalfMonths(period.month, 8));
   const monthTrend = buildTrend(loads, expenses, trailingMonths(period.month, 6));
 
+  // Printed on the letterhead. Rendered on the server so the document states
+  // when it was produced, rather than whenever a reader happens to open it.
+  const generatedAt = new Date().toLocaleString("en-US", {
+    dateStyle: "long",
+    timeStyle: "short",
+  });
+  const rangeLabel = `${formatDateMedium(period.start)} to ${formatDateMedium(period.end)}`;
+
   return (
-    <div className="space-y-4 p-4 lg:p-6 print:p-0">
-      <PageHeader
-        title="Reports"
-        description={`${period.label} - compared against ${prior.label}`}
-        actions={<ExportMenu periodQuery={query} />}
+    <div className="report-doc space-y-4 p-4 lg:p-6 print:space-y-3 print:p-0">
+      <div className="print:hidden">
+        <PageHeader
+          title="Reports"
+          description={`${period.label} - compared against ${prior.label}`}
+          actions={<ExportMenu periodQuery={query} />}
+        />
+      </div>
+
+      <div className="print:hidden">
+        <PeriodControls period={period} />
+      </div>
+
+      <ReportLetterhead
+        businessName={business.name}
+        truckName={truck.name}
+        periodLabel={period.label}
+        comparisonLabel={prior.label}
+        rangeLabel={rangeLabel}
+        generatedAt={generatedAt}
+        summary={summary}
       />
 
-      <PeriodControls period={period} />
-
-      <div className="grid gap-4 xl:grid-cols-3">
-        <div className="min-w-0 xl:col-span-2">
+      <div className="grid gap-4 xl:grid-cols-3 print:gap-3">
+        <div className="min-w-0 print-keep xl:col-span-2">
           <ReportSummary
             current={summary}
             previous={priorSummary}
@@ -73,74 +109,119 @@ export default async function ReportsPage({
             previousLabel={prior.shortLabel}
           />
         </div>
-        <div className="min-w-0 space-y-4">
+        <div className="min-w-0 space-y-4 print-keep">
           <HalfMonthSplit halves={halves} monthLabel={monthLabel(period.month)} />
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <Card>
+      <div className="grid gap-4 xl:grid-cols-2 print:gap-3">
+        <Card className="print-keep">
           <CardHeader>
             <CardTitle>Revenue vs Expenses</CardTitle>
             <span className="text-2xs text-muted-foreground">Last 8 half-months</span>
           </CardHeader>
           <CardContent className="px-2 py-3">
-            <RevenueExpenseChart data={halfTrend} />
+            <div className="print:hidden">
+              <RevenueExpenseChart data={halfTrend} />
+            </div>
+            <div className="hidden print:block">
+              <PrintBarChart
+                data={halfTrend}
+                series={[
+                  { dataKey: "revenue", name: "Revenue", color: PRINT_INK.revenue },
+                  { dataKey: "expenses", name: "Expenses", color: PRINT_INK.expense },
+                ]}
+              />
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="print-keep">
           <CardHeader>
             <CardTitle>Net Profit Trend</CardTitle>
             <span className="text-2xs text-muted-foreground">Last 6 months</span>
           </CardHeader>
           <CardContent className="px-2 py-3">
-            <TrendLineChart
-              data={monthTrend}
-              height={240}
-              series={[
-                { dataKey: "profit", name: "Net Profit", color: "hsl(var(--pos))" },
-                { dataKey: "revenue", name: "Revenue", color: "hsl(var(--info))" },
-              ]}
-            />
+            <div className="print:hidden">
+              <TrendLineChart
+                data={monthTrend}
+                height={240}
+                series={[
+                  { dataKey: "profit", name: "Net Profit", color: "hsl(var(--pos))" },
+                  { dataKey: "revenue", name: "Revenue", color: "hsl(var(--info))" },
+                ]}
+              />
+            </div>
+            <div className="hidden print:block">
+              <PrintLineChart
+                data={monthTrend}
+                series={[
+                  { dataKey: "profit", name: "Net Profit", color: PRINT_INK.revenue },
+                  { dataKey: "revenue", name: "Revenue", color: PRINT_INK.info },
+                ]}
+              />
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="print-keep">
           <CardHeader>
             <CardTitle>Revenue per Mile Trend</CardTitle>
             <span className="text-2xs text-muted-foreground">Last 8 half-months</span>
           </CardHeader>
           <CardContent className="px-2 py-3">
-            <TrendLineChart
-              data={halfTrend}
-              formatter="rate"
-              series={[
-                { dataKey: "revenuePerMile", name: "Revenue / mi", color: "hsl(var(--info))" },
-                { dataKey: "profitPerMile", name: "Profit / mi", color: "hsl(var(--pos))" },
-              ]}
-            />
+            <div className="print:hidden">
+              <TrendLineChart
+                data={halfTrend}
+                formatter="rate"
+                series={[
+                  { dataKey: "revenuePerMile", name: "Revenue / mi", color: "hsl(var(--info))" },
+                  { dataKey: "profitPerMile", name: "Profit / mi", color: "hsl(var(--pos))" },
+                ]}
+              />
+            </div>
+            <div className="hidden print:block">
+              <PrintLineChart
+                data={halfTrend}
+                kind="rate"
+                series={[
+                  { dataKey: "revenuePerMile", name: "Revenue / mi", color: PRINT_INK.info },
+                  { dataKey: "profitPerMile", name: "Profit / mi", color: PRINT_INK.revenue },
+                ]}
+              />
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="print-keep">
           <CardHeader>
             <CardTitle>Cost per Mile Trend</CardTitle>
             <span className="text-2xs text-muted-foreground">Last 8 half-months</span>
           </CardHeader>
           <CardContent className="px-2 py-3">
-            <TrendLineChart
-              data={halfTrend}
-              formatter="rate"
-              series={[{ dataKey: "costPerMile", name: "Cost / mi", color: "hsl(var(--neg))" }]}
-            />
+            <div className="print:hidden">
+              <TrendLineChart
+                data={halfTrend}
+                formatter="rate"
+                series={[{ dataKey: "costPerMile", name: "Cost / mi", color: "hsl(var(--neg))" }]}
+              />
+            </div>
+            <div className="hidden print:block">
+              <PrintLineChart
+                data={halfTrend}
+                kind="rate"
+                series={[{ dataKey: "costPerMile", name: "Cost / mi", color: PRINT_INK.expense }]}
+              />
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      <BrokerTable brokers={brokers} />
+      <div className="print-break-before">
+        <BrokerTable brokers={brokers} />
+      </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="print-break-before grid gap-4 xl:grid-cols-3 print:gap-3">
         <div className="min-w-0 xl:col-span-1">
           <CategoryBreakdown categories={categories} total={summary.operatingExpenses} />
         </div>
@@ -150,11 +231,19 @@ export default async function ReportsPage({
             <span className="text-2xs text-muted-foreground">{period.label}</span>
           </CardHeader>
           <CardContent className="space-y-4 p-4">
-            <SplitBar
-              fixed={summary.fixedExpenses}
-              variable={summary.variableExpenses}
-              total={summary.operatingExpenses}
-            />
+            <div className="print:hidden">
+              <SplitBar
+                fixed={summary.fixedExpenses}
+                variable={summary.variableExpenses}
+                total={summary.operatingExpenses}
+              />
+            </div>
+            <div className="hidden print:block">
+              <PrintSplitBar
+                fixed={summary.fixedExpenses}
+                variable={summary.variableExpenses}
+              />
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <BehaviorList
                 title="Fixed"
@@ -175,6 +264,13 @@ export default async function ReportsPage({
           </CardContent>
         </Card>
       </div>
+
+      <ReportColophon
+        periodLabel={period.label}
+        operatingExpenses={summary.operatingExpenses}
+      />
+
+      <ReportRunningFooter businessName={business.name} periodLabel={period.label} />
     </div>
   );
 }

@@ -163,27 +163,82 @@
 }
 
 @media print {
-  /* Print / save-as-PDF view: drop the chrome, keep the numbers. */
-  aside,
-  header,
-  .print\:hidden {
-    display: none !important;
+  /*
+   * PRINT
+   * =====
+   *
+   * A printed report is a document, not a screenshot of the app. Three things
+   * have to be undone before any styling matters:
+   *
+   * 1. The theme script sets `color-scheme: dark` inline on <html> before
+   *    first paint. The browser then paints the PAGE CANVAS dark, and every
+   *    sheet came out of the printer with a black surround that no
+   *    background rule could reach. Forcing the scheme back to light is the
+   *    actual fix; overriding --background alone is not enough.
+   * 2. The interface-scale control multiplies the root font size. A person
+   *    reading the app at "large" would otherwise get a differently
+   *    paginated document from everyone else, so print pins its own size.
+   * 3. Anything that scrolls on screen must open up. A clipped table with a
+   *    scrollbar rendered into a PDF is worse than no table.
+   */
+
+  :root,
+  html.dark,
+  .dark {
+    color-scheme: light !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #18181b !important;
+  }
+
+  html {
+    /* Document size, independent of the app's zoom control. */
+    font-size: 10.5pt !important;
   }
 
   :root,
   .dark {
     --background: 0 0% 100%;
-    --foreground: 0 0% 0%;
+    --foreground: 240 6% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 0%;
-    --border: 0 0% 80%;
-    --muted-foreground: 0 0% 35%;
-    --surface-sunken: 0 0% 96%;
+    --card-foreground: 240 6% 10%;
+    --popover: 0 0% 100%;
+    --border: 240 6% 83%;
+    --input: 240 6% 83%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 40%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+    --accent: 240 5% 96%;
+    --surface: 0 0% 100%;
+    --surface-raised: 0 0% 100%;
+    --surface-sunken: 240 5% 97%;
+    --primary: 217 91% 40%;
+    --pos: 142 72% 29%;
+    --pos-soft: 142 60% 96%;
+    --neg: 0 74% 42%;
+    --neg-soft: 0 70% 97%;
+    --warn: 32 81% 37%;
+    --warn-soft: 40 80% 96%;
+    --info: 224 76% 40%;
+    --info-soft: 214 90% 97%;
   }
 
-  body {
-    background: #fff !important;
-    color: #000 !important;
+  /* Keep the fills we do rely on -- score bars, chips, table banding. */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* App chrome never reaches paper. */
+  aside,
+  header.sticky,
+  [data-sonner-toaster],
+  .print\:hidden {
+    display: none !important;
   }
 
   main {
@@ -194,12 +249,136 @@
     padding-left: 0 !important;
   }
 
+  /*
+   * Nothing may be clipped or scrolled on paper.
+   *
+   * This matters more than it looks: an element with `overflow-x: hidden`
+   * computes `overflow-y` to `auto`, which makes it a scroll container, and a
+   * scroll container in print is clipped to a single page with the remainder
+   * DISCARDED -- not continued on the next sheet. That is how the last two
+   * sections of this report went missing from the PDF entirely.
+   */
+  [class*="overflow-"] {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  main,
+  main > div {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  ::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  /*
+   * Panels read as sections of a document, not as floating cards.
+   *
+   * A card is app furniture: a fill, a border and a corner radius exist to
+   * separate one panel from another on a screen that scrolls. On paper the
+   * separation comes from whitespace and a rule, so the outer cards are
+   * flattened and their headers become section rules. `bg-card` is the
+   * discriminator -- the tinted sub-blocks inside a section use
+   * `bg-surface-sunken` and are deliberately left alone.
+   */
+  [class*="rounded-lg"],
+  [class*="rounded-md"] {
+    box-shadow: none !important;
+  }
+
+  .report-doc [class~="bg-card"] {
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  /* The card header becomes the section rule. */
+  .report-doc [class~="bg-card"] > div:first-child {
+    border-bottom: 1.5px solid #0f1e38 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    padding-bottom: 4pt !important;
+    align-items: baseline !important;
+  }
+
+  .report-doc [class~="bg-card"] > div:first-child h3 {
+    font-size: 9.5pt !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.14em !important;
+    text-transform: uppercase !important;
+    color: #0f1e38 !important;
+  }
+
+  /* Section bodies lose the card's inset, since the rule now defines the edge. */
+  .report-doc [class~="bg-card"] > div:not(:first-child) {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  /* Icons beside a section title are screen affordances. */
+  .report-doc [class~="bg-card"] > div:first-child svg {
+    display: none !important;
+  }
+
+  /* Room for the running footer, which repeats on every sheet. */
+  .report-doc {
+    padding-bottom: 12mm !important;
+  }
+
+  .panel,
   [class*="rounded-lg"] {
     break-inside: avoid;
     page-break-inside: avoid;
   }
 
+  table {
+    width: 100% !important;
+    font-size: 8.5pt !important;
+  }
+
+  /* Screen row heights are sized for a pointer; paper wants density. */
+  th,
+  td {
+    padding-top: 3.5pt !important;
+    padding-bottom: 3.5pt !important;
+    height: auto !important;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr,
+  li {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  /* Deliberate pagination, set on the page itself. */
+  .print-break-before {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .print-keep {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  a[href]::after {
+    content: none !important;
+  }
+
   @page {
-    margin: 12mm;
+    margin: 14mm 12mm;
   }
 }

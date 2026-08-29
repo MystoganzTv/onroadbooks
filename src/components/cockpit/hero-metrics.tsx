@@ -30,7 +30,7 @@ export function HeroMetrics({
   const profitable = summary.netProfit >= 0;
 
   return (
-    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+    <div className="grid h-full grid-cols-2 gap-3 xl:grid-cols-4">
       <HeroTile
         label="Revenue"
         value={formatMoneyCompact(summary.grossRevenue)}
@@ -96,7 +96,7 @@ function HeroTile({
   delta?: number;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-lg border border-border bg-card p-4 pl-5">
+    <div className="relative flex h-full flex-col justify-between overflow-hidden rounded-lg border border-border bg-card p-4 pl-5">
       {/* A colour spine rather than a coloured card: the number stays the
           loudest thing on the tile. */}
       <span className={cn("absolute inset-y-0 left-0 w-1", TONE_EDGE[tone])} aria-hidden />

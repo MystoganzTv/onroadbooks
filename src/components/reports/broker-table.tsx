@@ -25,6 +25,9 @@ import { cn } from "@/lib/utils";
  * Which brokers actually make money -- ranked on trip profit, with profit
  * per total mile alongside so a high-volume broker paying thin rates cannot
  * hide behind its revenue.
+ *
+ * Miles and rate per loaded mile are dropped in print: ten columns do not fit
+ * a portrait page, and those two are the ones the reader can live without.
  */
 export function BrokerTable({ brokers }: { brokers: BrokerPerformance[] }) {
   const best = brokers[0];
@@ -56,9 +59,9 @@ export function BrokerTable({ brokers }: { brokers: BrokerPerformance[] }) {
                   <TableHead>Broker</TableHead>
                   <TableHead className="text-right">Loads</TableHead>
                   <TableHead className="text-right">Revenue</TableHead>
-                  <TableHead className="text-right">Miles</TableHead>
+                  <TableHead className="text-right print:hidden">Miles</TableHead>
                   <TableHead className="text-right">DH %</TableHead>
-                  <TableHead className="text-right">$/Loaded</TableHead>
+                  <TableHead className="text-right print:hidden">$/Loaded</TableHead>
                   <TableHead className="text-right">Trip Profit</TableHead>
                   <TableHead className="text-right">Profit/mi</TableHead>
                   <TableHead>Rating</TableHead>
@@ -77,7 +80,7 @@ export function BrokerTable({ brokers }: { brokers: BrokerPerformance[] }) {
                     <TableCell className="text-right tnum">
                       {formatMoney(broker.revenue)}
                     </TableCell>
-                    <TableCell className="text-right tnum text-muted-foreground">
+                    <TableCell className="text-right tnum text-muted-foreground print:hidden">
                       {formatNumber(broker.totalMiles)}
                     </TableCell>
                     <TableCell
@@ -88,7 +91,7 @@ export function BrokerTable({ brokers }: { brokers: BrokerPerformance[] }) {
                     >
                       {formatPercent(broker.deadheadPct)}
                     </TableCell>
-                    <TableCell className="text-right tnum text-muted-foreground">
+                    <TableCell className="text-right tnum text-muted-foreground print:hidden">
                       {formatRateValue(broker.revenuePerLoadedMile)}
                     </TableCell>
                     <TableCell

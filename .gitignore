@@ -24,6 +24,10 @@ tsconfig.tsbuildinfo
 # Generated Prisma client (rebuilt by `npm install` via postinstall)
 /src/generated
 
+# Local archives. A stray tarball once got swept into a commit by `git add -A`.
+*.tgz
+*.tar.gz
+
 # Logs and OS noise
 npm-debug.log*
 yarn-error.log*
