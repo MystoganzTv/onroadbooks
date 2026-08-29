@@ -17,9 +17,11 @@ import type {
   ReserveKind,
   ReserveTransaction,
   ReserveTransactionType,
+  PlanId,
   Settlement,
   SettlementHalf,
   SettlementSnapshot,
+  Subscription,
   Document,
   DocumentType,
   Expense,
@@ -171,6 +173,13 @@ export interface SettlementCloseInput {
   notes?: string | null;
 }
 
+export interface SubscriptionInput {
+  plan: PlanId;
+  /** Omitted leaves the current status untouched. */
+  status?: Subscription["status"];
+  currentPeriodEnd?: string | null;
+}
+
 export interface Repository {
   /** Everything the app needs for a request, in one read. */
   getDataset(): Promise<Dataset>;
@@ -197,6 +206,7 @@ export interface Repository {
 
   updateSettings(input: SettingsInput): Promise<FinancialSettings>;
   updateGoals(input: GoalInput): Promise<FinancialGoal>;
+  updateSubscription(input: SubscriptionInput): Promise<Subscription>;
 
   createReserveAccount(input: ReserveAccountInput): Promise<ReserveAccount>;
   updateReserveAccount(id: string, input: ReserveAccountInput): Promise<ReserveAccount>;
@@ -232,6 +242,8 @@ export interface AuthStore {
     name?: string | null;
     passwordHash: string;
     businessName?: string;
+    /** Chosen during onboarding. Defaults to Individual. */
+    plan?: PlanId;
   }): Promise<User>;
 }
 

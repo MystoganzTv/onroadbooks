@@ -1,4 +1,4 @@
-import type { FinancialGoal, ReserveAccount } from "./types";
+import type { FinancialGoal, ReserveAccount, Subscription } from "./types";
 
 /**
  * Defaults for records added after the first release.
@@ -58,4 +58,26 @@ export function defaultReserveAccounts(
       createdAt,
     },
   ];
+}
+
+/**
+ * A business with no subscription row yet is treated as Individual and
+ * trialing, never as lapsed: an existing install must not wake up locked out
+ * of its own books because a new concept was added underneath it.
+ */
+export function defaultSubscription(
+  businessId: string,
+  startedAt = CREATED_FALLBACK,
+): Subscription {
+  return {
+    id: "sub_001",
+    businessId,
+    plan: "INDIVIDUAL",
+    status: "TRIALING",
+    currentPeriodEnd: null,
+    providerCustomerId: null,
+    providerSubscriptionId: null,
+    startedAt,
+    updatedAt: startedAt,
+  };
 }

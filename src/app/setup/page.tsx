@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { AuthCard } from "@/components/auth/auth-card";
+import { SetupFlow } from "@/components/auth/setup-flow";
 import { needsSetup } from "@/lib/auth";
 
 // Reads the account state and the session cookie, so it must never be
@@ -13,5 +13,5 @@ export const metadata: Metadata = { title: "Set up" };
 export default async function SetupPage() {
   // Setup is a one-time door: once an owner exists it must never be reachable.
   if (!(await needsSetup())) redirect("/login");
-  return <AuthCard mode="setup" />;
+  return <SetupFlow />;
 }

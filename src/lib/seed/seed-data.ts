@@ -12,7 +12,7 @@
 
 import { defaultCategoryBehavior } from "../categories";
 import { roundMoney } from "../calculations";
-import { defaultGoals, defaultReserveAccounts } from "../defaults";
+import { defaultGoals, defaultReserveAccounts, defaultSubscription } from "../defaults";
 import { buildSettlementSnapshot, settlementBounds, settlementId } from "../finance/settlement";
 import { pad } from "../periods";
 import type {
@@ -693,6 +693,7 @@ export function buildSeedDataset(): Dataset {
     business: DEMO_BUSINESS,
     settings: DEMO_SETTINGS,
     goals: defaultGoals(BUSINESS_ID, CREATED),
+    subscription: defaultSubscription(BUSINESS_ID, CREATED),
     truck: DEMO_TRUCK,
     loads: sortedLoads,
     expenses: sortedExpenses,

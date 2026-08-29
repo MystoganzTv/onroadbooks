@@ -5,7 +5,7 @@ import path from "node:path";
 
 import { roundMoney } from "../calculations";
 import { defaultCategoryBehavior } from "../categories";
-import { defaultGoals, defaultReserveAccounts } from "../defaults";
+import { defaultGoals, defaultReserveAccounts, defaultSubscription } from "../defaults";
 import { buildSeedDataset, DEMO_DOCUMENTS } from "../seed/seed-data";
 import { buildStorageKey, getDocumentStorage } from "../storage";
 import type {
@@ -20,10 +20,12 @@ import type {
   FuelEntry,
   Load,
   MaintenanceRecord,
+  PlanId,
   ReserveAccount,
   ReserveTransaction,
   Settlement,
   SettlementHalf,
+  Subscription,
   Truck,
 } from "../types";
 import {
@@ -41,6 +43,7 @@ import {
   type ReserveTransactionInput,
   type SettingsInput,
   type SettlementCloseInput,
+  type SubscriptionInput,
   type TruckInput,
 } from "./repository";
 
@@ -128,6 +131,10 @@ function migrate(dataset: Dataset): Dataset {
 
   const businessId = dataset.business?.id ?? "";
   dataset.goals ??= defaultGoals(businessId);
+  dataset.subscription ??= defaultSubscription(businessId);
+  dataset.subscription.providerCustomerId ??= null;
+  dataset.subscription.providerSubscriptionId ??= null;
+  dataset.subscription.currentPeriodEnd ??= null;
   if (!Array.isArray(dataset.reserveAccounts) || dataset.reserveAccounts.length === 0) {
     dataset.reserveAccounts = defaultReserveAccounts(businessId);
   }
@@ -525,6 +532,7 @@ export class JsonAuthStore implements AuthStore {
     name?: string | null;
     passwordHash: string;
     businessName?: string;
+    plan?: PlanId;
   }): Promise<User> {
     return mutate((dataset) => {
       const email = input.email.trim().toLowerCase();
@@ -532,6 +540,13 @@ export class JsonAuthStore implements AuthStore {
         throw new Error("That email already has an account.");
       }
       if (input.businessName) dataset.business.name = input.businessName.trim();
+      if (input.plan) {
+        dataset.subscription = {
+          ...dataset.subscription,
+          plan: input.plan,
+          updatedAt: new Date().toISOString(),
+        };
+      }
 
       const user: User = {
         id: newId("user"),
@@ -815,6 +830,22 @@ export class JsonRepository implements Repository {
   }
 
   /* ---- Goals --------------------------------------------------------- */
+
+  async updateSubscription(input: SubscriptionInput): Promise<Subscription> {
+    return mutate((dataset) => {
+      dataset.subscription = {
+        ...dataset.subscription,
+        plan: input.plan,
+        status: input.status ?? dataset.subscription.status,
+        currentPeriodEnd:
+          input.currentPeriodEnd === undefined
+            ? dataset.subscription.currentPeriodEnd
+            : input.currentPeriodEnd,
+        updatedAt: new Date().toISOString(),
+      };
+      return dataset.subscription;
+    }, this.businessId);
+  }
 
   async updateGoals(input: GoalInput): Promise<FinancialGoal> {
     return mutate((dataset) => {

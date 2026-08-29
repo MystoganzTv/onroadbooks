@@ -96,6 +96,18 @@ enum SettlementStatus {
   CLOSED
 }
 
+enum PlanId {
+  INDIVIDUAL
+  FLEET
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
 enum ExpenseCategory {
   FUEL
   TOLLS
@@ -145,6 +157,7 @@ model Business {
   maintenance MaintenanceRecord[]
   settings    FinancialSettings?
   goals               FinancialGoal?
+  subscription        Subscription?
   reserveAccounts     ReserveAccount[]
   reserveTransactions ReserveTransaction[]
   settlements         Settlement[]
@@ -166,6 +179,32 @@ model FinancialGoal {
   /// the month-end projection.
   workingDaysPerWeek   Int     @default(6)
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Which plan a business is on, and whether it is paid up.
+///
+/// Prices and truck limits are NOT stored: they live in lib/plans.ts, because
+/// a price is a product decision that ships with a release rather than a row
+/// someone can edit into an inconsistent state. The provider columns are
+/// deliberately present and empty -- there is no payment integration yet, and
+/// when one arrives it fills these in rather than reshaping the model.
+model Subscription {
+  id         String   @id @default(cuid())
+  businessId String   @unique
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  plan   PlanId             @default(INDIVIDUAL)
+  status SubscriptionStatus @default(TRIALING)
+
+  /// End of the trial or the paid period.
+  currentPeriodEnd DateTime?
+
+  providerCustomerId     String?
+  providerSubscriptionId String? @unique
+
+  startedAt DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

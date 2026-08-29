@@ -271,6 +271,7 @@ export interface Dataset {
   reserveAccounts: ReserveAccount[];
   reserveTransactions: ReserveTransaction[];
   settlements: Settlement[];
+  subscription: Subscription;
 }
 
 /* ---- Derived / computed shapes ------------------------------------- */
@@ -484,4 +485,34 @@ export interface Settlement {
   snapshot: SettlementSnapshot | null;
   notes: string | null;
   createdAt: string;
+}
+
+/* ---- Plans and subscription ------------------------------------------- */
+
+export type PlanId = "INDIVIDUAL" | "FLEET";
+
+export type SubscriptionStatus = "TRIALING" | "ACTIVE" | "PAST_DUE" | "CANCELED";
+
+/**
+ * Which plan a business is on, and whether it is paid up.
+ *
+ * The prices and the truck limits are NOT here -- they live in lib/plans.ts,
+ * because a price is a product decision that ships with a release. What is
+ * stored is the choice and the state.
+ *
+ * The provider fields are deliberately present and empty. There is no payment
+ * integration yet; when one arrives it fills these in rather than reshaping
+ * the model.
+ */
+export interface Subscription {
+  id: string;
+  businessId: string;
+  plan: PlanId;
+  status: SubscriptionStatus;
+  /** End of the trial or the paid period, ISO date. Null while unbilled. */
+  currentPeriodEnd: string | null;
+  providerCustomerId: string | null;
+  providerSubscriptionId: string | null;
+  startedAt: string;
+  updatedAt: string;
 }

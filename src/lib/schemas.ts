@@ -274,4 +274,9 @@ export const setupSchema = z.object({
   // 10 characters with no composition rules: length is what actually helps,
   // and arbitrary symbol requirements push people toward weaker patterns.
   password: z.string().min(10, "Use at least 10 characters").max(200),
+  plan: z.enum(["INDIVIDUAL", "FLEET"]).optional(),
+});
+
+export const planChangeSchema = z.object({
+  plan: z.enum(["INDIVIDUAL", "FLEET"]),
 });

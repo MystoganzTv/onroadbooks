@@ -3,6 +3,7 @@ import { Database, FileText } from "lucide-react";
 
 import { DisplaySettings } from "@/components/settings/display-settings";
 import { GoalsForm } from "@/components/settings/goals-form";
+import { PlanCard } from "@/components/settings/plan-card";
 import { SettingsForm } from "@/components/settings/settings-form";
 import { PageHeader } from "@/components/shared/page-header";
 import { BrandLogo } from "@/components/shell/brand-logo";
@@ -23,9 +24,8 @@ export default async function SettingsPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { business, settings, goals, loads, expenses } = await getRepository(
-    session.businessId,
-  ).getDataset();
+  const { business, settings, goals, subscription, truck, loads, expenses } =
+    await getRepository(session.businessId).getDataset();
   const period = periodFromSearchParams(params);
   const preview = summarizePeriod(loads, expenses, period, settings);
   const mode = storageMode();
@@ -56,6 +56,11 @@ export default async function SettingsPage({
         </div>
 
         <div className="min-w-0 space-y-4">
+          <PlanCard
+            subscription={subscription}
+            activeTruckCount={truck.active ? 1 : 0}
+          />
+
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">

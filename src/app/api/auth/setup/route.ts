@@ -35,6 +35,7 @@ export async function POST(request: Request) {
       name: parsed.data.name ?? null,
       passwordHash: await hashPassword(parsed.data.password),
       businessName: parsed.data.businessName,
+      plan: parsed.data.plan ?? "INDIVIDUAL",
     });
 
     const token = await encodeSession({

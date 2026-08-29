@@ -19,13 +19,15 @@ import type {
   FinancialGoal,
   ReserveAccount,
   ReserveTransaction,
+  PlanId,
   Settlement,
   SettlementHalf,
   SettlementSnapshot,
+  Subscription,
   Truck,
 } from "../types";
 import { defaultCategoryBehavior } from "../categories";
-import { defaultGoals, defaultReserveAccounts } from "../defaults";
+import { defaultGoals, defaultReserveAccounts, defaultSubscription } from "../defaults";
 import type {
   AuthStore,
   BusinessInput,
@@ -40,6 +42,7 @@ import type {
   ReserveTransactionInput,
   SettingsInput,
   SettlementCloseInput,
+  SubscriptionInput,
   TruckInput,
 } from "./repository";
 
@@ -185,6 +188,7 @@ export class PrismaAuthStore implements AuthStore {
     name?: string | null;
     passwordHash: string;
     businessName?: string;
+    plan?: PlanId;
   }): Promise<User> {
     const client = await getClient();
     const email = input.email.trim().toLowerCase();
@@ -207,6 +211,14 @@ export class PrismaAuthStore implements AuthStore {
         data: { name: input.businessName.trim() },
       });
     }
+
+    // The plan chosen during onboarding. Upserted rather than created, so an
+    // existing business that predates subscriptions gains one here.
+    await client.subscription.upsert({
+      where: { businessId: business.id },
+      create: { businessId: business.id, plan: input.plan ?? "INDIVIDUAL" },
+      update: input.plan ? { plan: input.plan } : {},
+    });
 
     const row = await client.user.create({
       data: {
@@ -267,6 +279,7 @@ export class PrismaRepository implements Repository {
       documentRows,
       maintenanceRows,
       goalRow,
+      subscriptionRow,
       reserveAccountRows,
       reserveTransactionRows,
       settlementRows,
@@ -294,6 +307,7 @@ export class PrismaRepository implements Repository {
         orderBy: [{ serviceDate: "desc" }, { id: "desc" }],
       }),
       client.financialGoal.findUnique({ where: { businessId: business.id } }),
+      client.subscription.findUnique({ where: { businessId: business.id } }),
       client.reserveAccount.findMany({
         where: { businessId: business.id },
         orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
@@ -325,6 +339,22 @@ export class PrismaRepository implements Repository {
             createdAt: row.createdAt.toISOString(),
           }))
         : defaultReserveAccounts(business.id);
+
+    const subscription: Subscription = subscriptionRow
+      ? {
+          id: subscriptionRow.id,
+          businessId: subscriptionRow.businessId,
+          plan: subscriptionRow.plan,
+          status: subscriptionRow.status,
+          currentPeriodEnd: subscriptionRow.currentPeriodEnd
+            ? isoDate(subscriptionRow.currentPeriodEnd)
+            : null,
+          providerCustomerId: subscriptionRow.providerCustomerId,
+          providerSubscriptionId: subscriptionRow.providerSubscriptionId,
+          startedAt: subscriptionRow.startedAt.toISOString(),
+          updatedAt: subscriptionRow.updatedAt.toISOString(),
+        }
+      : defaultSubscription(business.id);
 
     const goals: FinancialGoal = goalRow
       ? {
@@ -390,6 +420,7 @@ export class PrismaRepository implements Repository {
       } satisfies Business,
       settings,
       goals,
+      subscription,
       truck,
       reserveAccounts,
       reserveTransactions: reserveTransactionRows.map(
@@ -922,6 +953,24 @@ export class PrismaRepository implements Repository {
   }
 
   /* ---- Goals --------------------------------------------------------- */
+
+  async updateSubscription(input: SubscriptionInput): Promise<Subscription> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const data = {
+      plan: input.plan,
+      ...(input.status ? { status: input.status } : {}),
+      ...(input.currentPeriodEnd === undefined
+        ? {}
+        : { currentPeriodEnd: input.currentPeriodEnd ? toDate(input.currentPeriodEnd) : null }),
+    };
+    await client.subscription.upsert({
+      where: { businessId: business.id },
+      create: { businessId: business.id, ...data },
+      update: data,
+    });
+    return (await this.getDataset()).subscription;
+  }
 
   async updateGoals(input: GoalInput): Promise<FinancialGoal> {
     const client = await getClient();
