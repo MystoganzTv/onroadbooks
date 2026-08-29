@@ -85,6 +85,8 @@ interface MaintenanceFormDialogProps {
   record?: MaintenanceRecord;
   documents?: Document[];
   currentOdometer: number;
+  /** The unit whose page this is. Service belongs to a specific truck. */
+  truckId?: string;
   trigger?: React.ReactNode;
 }
 
@@ -92,6 +94,7 @@ export function MaintenanceFormDialog({
   record,
   documents = [],
   currentOdometer,
+  truckId,
   trigger,
 }: MaintenanceFormDialogProps) {
   const router = useRouter();
@@ -172,6 +175,7 @@ export function MaintenanceFormDialog({
     event.preventDefault();
 
     const payload = {
+      truckId: record?.truckId ?? truckId ?? null,
       type: values.type,
       basis: values.basis,
       serviceDate: values.serviceDate,

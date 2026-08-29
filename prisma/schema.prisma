@@ -31,6 +31,14 @@ enum ExpenseBehavior {
   VARIABLE
 }
 
+/// What an expense belongs to. TRUCK is a cost a unit caused; BUSINESS is
+/// overhead the fleet carries between its units. Keeping them apart is what
+/// lets a unit report an honest contribution instead of an invented profit.
+enum ExpenseScope {
+  TRUCK
+  BUSINESS
+}
+
 enum DocumentType {
   RATE_CONFIRMATION
   BOL
@@ -336,6 +344,12 @@ model Truck {
   currentOdometer  Int      @default(0)
   active           Boolean  @default(true)
 
+  /// When the unit joined the fleet, and when it left. A sold truck keeps all
+  /// of its history and keeps appearing in past reports; it simply stops being
+  /// something new work can be booked against.
+  acquiredOn DateTime? @db.Date
+  soldOn     DateTime? @db.Date
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -400,6 +414,7 @@ model Expense {
   load       Load?    @relation(fields: [loadId], references: [id], onDelete: SetNull)
 
   date        DateTime        @db.Date
+  scope       ExpenseScope    @default(TRUCK)
   category    ExpenseCategory
   description String
   vendor      String?
@@ -418,6 +433,7 @@ model Expense {
   @@index([businessId, date])
   @@index([category])
   @@index([loadId])
+  @@index([truckId, date])
 }
 
 model FuelEntry {

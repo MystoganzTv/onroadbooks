@@ -58,3 +58,26 @@ export function periodQuery(period: Period): string {
 export function param(params: SearchParams, name: string, fallback = ""): string {
   return first(params[name]) ?? fallback;
 }
+
+/**
+ * Which unit the page is scoped to, or null for the whole fleet.
+ *
+ * Lives in the URL beside the period for the same reason the period does:
+ * every server component on the page then computes from the same scope, and
+ * the view is shareable and directly exportable. An id that no longer exists
+ * falls back to the whole fleet rather than showing an empty page.
+ */
+export function truckFromSearchParams(
+  params: SearchParams,
+  trucks: { id: string }[],
+): string | null {
+  const requested = first(params.truck);
+  if (!requested || requested === "all") return null;
+  return trucks.some((t) => t.id === requested) ? requested : null;
+}
+
+/** Rebuilds the query string that reproduces a period and a truck scope. */
+export function scopeQuery(period: Period, truckId: string | null): string {
+  const base = periodQuery(period);
+  return truckId ? `${base}&truck=${encodeURIComponent(truckId)}` : base;
+}

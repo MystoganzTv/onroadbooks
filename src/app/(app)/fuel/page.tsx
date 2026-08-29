@@ -6,6 +6,7 @@ import { PeriodControls } from "@/components/dashboard/period-controls";
 import { FuelFormDialog } from "@/components/fuel/fuel-form-dialog";
 import { FuelTable } from "@/components/fuel/fuel-table";
 import { PageHeader } from "@/components/shared/page-header";
+import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   fuelInPeriod,
@@ -25,8 +26,13 @@ import {
   formatPricePerGallon,
   formatRate,
 } from "@/lib/formatters";
+import { expensesForTruck, loadsForTruck, orderedTrucks } from "@/lib/fleet";
 import { defaultEntryDate } from "@/lib/periods";
-import { periodFromSearchParams, type SearchParams } from "@/lib/period-params";
+import {
+  periodFromSearchParams,
+  truckFromSearchParams,
+  type SearchParams,
+} from "@/lib/period-params";
 
 export const metadata: Metadata = { title: "Fuel" };
 
@@ -37,9 +43,22 @@ export default async function FuelPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { loads, expenses, fuelEntries, settings } = await getRepository(session.businessId).getDataset();
+  const {
+    trucks,
+    loads: allLoads,
+    expenses: allExpenses,
+    fuelEntries: allFuel,
+    settings,
+  } = await getRepository(session.businessId).getDataset();
   const period = periodFromSearchParams(params);
   const ratingThresholds = thresholdsFromSettings(settings);
+
+  // MPG is a fact about one odometer, so scoping matters more here than
+  // anywhere else: mixing two trucks' readings produces a meaningless figure.
+  const truckId = truckFromSearchParams(params, trucks);
+  const loads = loadsForTruck(allLoads, truckId);
+  const expenses = expensesForTruck(allExpenses, truckId);
+  const fuelEntries = truckId ? allFuel.filter((e) => e.truckId === truckId) : allFuel;
 
   const summary = summarizePeriod(loads, expenses, period, settings);
   const periodFuel = fuelInPeriod(fuelEntries, period);
@@ -65,13 +84,18 @@ export default async function FuelPage({
         actions={
           <FuelFormDialog
             loads={periodLoads}
+            trucks={trucks}
+            defaultTruckId={truckId}
             defaultDate={defaultEntryDate(period)}
             lastOdometer={lastOdometer}
           />
         }
       />
 
-      <PeriodControls period={period} />
+      <div className="flex flex-wrap items-center gap-2">
+        <PeriodControls period={period} />
+        <TruckSwitcher trucks={orderedTrucks(trucks)} selectedId={truckId} />
+      </div>
 
       <section
         aria-label="Fuel summary"
@@ -109,6 +133,8 @@ export default async function FuelPage({
       <FuelTable
         entries={periodFuel}
         loads={periodLoads}
+        trucks={trucks}
+        defaultTruckId={truckId}
         defaultDate={defaultEntryDate(period)}
         lastOdometer={lastOdometer}
       />

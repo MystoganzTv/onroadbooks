@@ -23,6 +23,7 @@ import { RecentLoads } from "@/components/dashboard/recent-loads";
 import { ExpenseFormDialog } from "@/components/expenses/expense-form-dialog";
 import { LoadFormDialog } from "@/components/loads/load-form-dialog";
 import { PageHeader } from "@/components/shared/page-header";
+import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireSession } from "@/lib/auth";
@@ -37,6 +38,13 @@ import {
 } from "@/lib/calculations";
 import { periodBuckets } from "@/lib/chart-data";
 import { getRepository } from "@/lib/db";
+import {
+  expensesForTruck,
+  loadsForTruck,
+  orderedTrucks,
+  primaryTruck,
+  truckById,
+} from "@/lib/fleet";
 import {
   bestAndWorst,
   buildCockpitInsights,
@@ -63,7 +71,12 @@ import {
   formatRateValue,
 } from "@/lib/formatters";
 import { thresholdsFrom } from "@/lib/maintenance";
-import { periodFromSearchParams, periodQuery, type SearchParams } from "@/lib/period-params";
+import {
+  periodFromSearchParams,
+  scopeQuery,
+  truckFromSearchParams,
+  type SearchParams,
+} from "@/lib/period-params";
 import { defaultEntryDate, previousPeriod, todayISO } from "@/lib/periods";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -99,11 +112,11 @@ export default async function DashboardPage({
   const prior = previousPeriod(period);
 
   const {
-    loads,
-    expenses,
+    loads: allLoads,
+    expenses: allExpenses,
     settings,
     goals,
-    truck,
+    trucks,
     maintenanceRecords,
     reserveAccounts,
     reserveTransactions,
@@ -112,6 +125,12 @@ export default async function DashboardPage({
   // PeriodControls sends the browser's calendar date for "Today", so that
   // period is authoritative; otherwise fall back to the server's date.
   const today = period.key === "today" ? period.start : todayISO();
+
+  // Scope. Null means the whole fleet; a truck id narrows every figure below
+  // to that unit's own loads and its own direct costs.
+  const truckId = truckFromSearchParams(params, trucks);
+  const loads = truckId ? loadsForTruck(allLoads, truckId) : allLoads;
+  const expenses = truckId ? expensesForTruck(allExpenses, truckId) : allExpenses;
 
   const ratingThresholds = thresholdsFromSettings(settings);
   const summary = summarizePeriod(loads, expenses, period, settings);
@@ -140,9 +159,12 @@ export default async function DashboardPage({
 
   const balances = calculateReserveBalances(reserveAccounts, reserveTransactions, period);
   const maintenanceReserve = reserveBalanceFor(balances, "MAINTENANCE");
+  // Health is reported for one unit at a time, because "miles remaining" is a
+  // fact about a specific odometer.
+  const healthTruck = truckById(trucks, truckId) ?? primaryTruck(trucks);
   const maintenance = calculateMaintenanceHealth(
-    maintenanceRecords,
-    truck,
+    maintenanceRecords.filter((record) => record.truckId === healthTruck.id),
+    healthTruck,
     today,
     thresholdsFrom(settings),
     maintenanceReserve?.balance ?? 0,
@@ -165,7 +187,7 @@ export default async function DashboardPage({
   });
 
   const buckets = periodBuckets(loads, expenses, period);
-  const query = periodQuery(period);
+  const query = scopeQuery(period, truckId);
   const brokerNames = [...new Set(loads.map((l) => l.broker).filter(Boolean))].sort() as string[];
   const settlementHref =
     period.key === "first" || period.key === "second"
@@ -185,9 +207,16 @@ export default async function DashboardPage({
                 Load calculator
               </Link>
             </Button>
-            <ExpenseFormDialog defaultDate={defaultEntryDate(period)} loads={periodLoads} />
+            <ExpenseFormDialog
+              defaultDate={defaultEntryDate(period)}
+              loads={periodLoads}
+              trucks={trucks}
+              defaultTruckId={truckId}
+            />
             <LoadFormDialog
               brokers={brokerNames}
+              trucks={trucks}
+              defaultTruckId={truckId}
               defaultDate={defaultEntryDate(period)}
               ratingThresholds={ratingThresholds}
             />
@@ -195,7 +224,10 @@ export default async function DashboardPage({
         }
       />
 
-      <PeriodControls period={period} />
+      <div className="flex flex-wrap items-center gap-2">
+        <PeriodControls period={period} />
+        <TruckSwitcher trucks={orderedTrucks(trucks)} selectedId={truckId} />
+      </div>
 
       {/* ---- The bottom line ------------------------------------------- */}
       <Section

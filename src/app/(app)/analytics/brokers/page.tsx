@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AnalyticsTabs } from "@/components/cockpit/analytics-tabs";
+import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import { PeriodControls } from "@/components/dashboard/period-controls";
 import { MiniStat } from "@/components/dashboard/mini-stat";
 import { RatingBadge } from "@/components/loads/rating-badge";
@@ -33,7 +34,14 @@ import {
   formatPercent,
   formatRateValue,
 } from "@/lib/formatters";
-import { param, periodFromSearchParams, periodQuery, type SearchParams } from "@/lib/period-params";
+import { loadsForTruck, orderedTrucks } from "@/lib/fleet";
+import {
+  param,
+  periodFromSearchParams,
+  scopeQuery,
+  truckFromSearchParams,
+  type SearchParams,
+} from "@/lib/period-params";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Broker Scorecard" };
@@ -54,8 +62,13 @@ export default async function BrokersPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { loads, settings } = await getRepository(session.businessId).getDataset();
+  const { trucks, loads: allLoads, settings } = await getRepository(
+    session.businessId,
+  ).getDataset();
   const period = periodFromSearchParams(params);
+
+  const truckId = truckFromSearchParams(params, trucks);
+  const loads = loadsForTruck(allLoads, truckId);
 
   const sortParam = param(params, "sort") as BrokerSort;
   const sort: BrokerSort = SORT_KEYS.includes(sortParam) ? sortParam : "profit";
@@ -67,7 +80,7 @@ export default async function BrokersPage({
 
   const best = bestBroker(brokers);
   const weakest = weakestBroker(brokers);
-  const query = periodQuery(period);
+  const query = scopeQuery(period, truckId);
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
@@ -76,7 +89,10 @@ export default async function BrokersPage({
         description="Which brokers are actually making you money, measured on the miles they cost you."
       />
       <AnalyticsTabs />
-      <PeriodControls period={period} />
+      <div className="flex flex-wrap items-center gap-2">
+        <PeriodControls period={period} />
+        <TruckSwitcher trucks={orderedTrucks(trucks)} selectedId={truckId} />
+      </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <MiniStat label="Brokers" value={String(brokers.length)} sub={period.shortLabel} />

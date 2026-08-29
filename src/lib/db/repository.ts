@@ -26,6 +26,7 @@ import type {
   DocumentType,
   Expense,
   ExpenseCategoryId,
+  ExpenseScope,
   FinancialSettings,
   FuelEntry,
   Load,
@@ -37,6 +38,8 @@ import type {
 } from "../types";
 
 export interface LoadInput {
+  /** Which unit ran it. Defaults to the primary truck. */
+  truckId?: string | null;
   date: string;
   originCity: string;
   originState: string;
@@ -57,6 +60,13 @@ export interface LoadInput {
 }
 
 export interface ExpenseInput {
+  /**
+   * TRUCK charges the cost to a unit; BUSINESS is fleet overhead and forces
+   * truckId to null. Defaults to TRUCK on the primary truck, which is what a
+   * single-truck business always means.
+   */
+  scope?: ExpenseScope;
+  truckId?: string | null;
   date: string;
   category: ExpenseCategoryId;
   description: string;
@@ -69,6 +79,7 @@ export interface ExpenseInput {
 }
 
 export interface FuelEntryInput {
+  truckId?: string | null;
   date: string;
   gallons: number;
   pricePerGallon: number;
@@ -92,6 +103,7 @@ export interface SettingsInput {
 }
 
 export interface MaintenanceInput {
+  truckId?: string | null;
   type: MaintenanceType;
   basis: MaintenanceBasis;
   serviceDate: string;
@@ -125,6 +137,7 @@ export interface BusinessInput {
 
 export interface TruckInput {
   name: string;
+  acquiredOn?: string | null;
   year?: number | null;
   make?: string | null;
   model?: string | null;
@@ -223,7 +236,16 @@ export interface Repository {
   reopenSettlement(id: string): Promise<Settlement>;
   updateSettlementNotes(id: string, notes: string | null): Promise<Settlement>;
   updateBusiness(input: BusinessInput): Promise<Business>;
-  updateTruck(input: TruckInput): Promise<Truck>;
+
+  createTruck(input: TruckInput): Promise<Truck>;
+  /** Omitting the id updates the primary truck, which is what a single-truck business means. */
+  updateTruck(input: TruckInput, id?: string): Promise<Truck>;
+  /**
+   * Retires a unit without deleting anything. Its loads, expenses and service
+   * history stay exactly where they are and keep appearing in past reports.
+   */
+  archiveTruck(id: string, soldOn?: string | null): Promise<Truck>;
+  restoreTruck(id: string): Promise<Truck>;
 }
 
 /**

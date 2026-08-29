@@ -23,12 +23,14 @@
  *   Where am I losing money?           deadhead + cost-per-mile lines
  *   Which brokers pay?                 brokers.calculateBrokerPerformance
  *   Which lanes pay?                   lanes.calculateLanePerformance
+ *   Which TRUCK pays?                  fleet.calculateFleetSummary
  *   Am I on track this month?          goals.calculateProjection
  *   Am I saving enough?                reserves + maintenance-health
  *   What changed?                      insights.buildCockpitInsights
  */
 
 export * from "./cost-per-mile";
+export * from "./fleet";
 export * from "./owner-pay";
 export * from "./settlement";
 export * from "./load-score";

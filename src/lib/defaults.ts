@@ -1,4 +1,4 @@
-import type { FinancialGoal, ReserveAccount, Subscription } from "./types";
+import type { Expense, FinancialGoal, ReserveAccount, Subscription, Truck } from "./types";
 
 /**
  * Defaults for records added after the first release.
@@ -80,4 +80,31 @@ export function defaultSubscription(
     startedAt,
     updatedAt: startedAt,
   };
+}
+
+/**
+ * Brings a truck written before the fleet existed up to shape.
+ * A unit with no recorded acquisition date is not "acquired today" -- it is
+ * simply unknown, so both dates stay null rather than being invented.
+ */
+export function migrateTruck(truck: Truck): Truck {
+  truck.acquiredOn ??= null;
+  truck.soldOn ??= null;
+  truck.active ??= true;
+  return truck;
+}
+
+/**
+ * Every expense that predates the scope column belonged to the one truck the
+ * business had, so it maps to TRUCK. That is what keeps every previously
+ * reported figure identical after the migration -- see the August 2026
+ * invariant in the test suite.
+ */
+export function migrateExpense(expense: Expense, fallbackTruckId: string): Expense {
+  if (!expense.scope) {
+    expense.scope = "TRUCK";
+    expense.truckId ??= fallbackTruckId;
+  }
+  if (expense.scope === "BUSINESS") expense.truckId = null;
+  return expense;
 }

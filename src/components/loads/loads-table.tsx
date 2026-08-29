@@ -41,7 +41,7 @@ import {
   formatNumber,
   formatRateValue,
 } from "@/lib/formatters";
-import type { LoadWithMetrics } from "@/lib/types";
+import type { LoadWithMetrics, Truck } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { LoadFormDialog } from "./load-form-dialog";
 import { RatingBadge } from "./rating-badge";
@@ -123,6 +123,8 @@ function valueFor(load: LoadWithMetrics, key: SortKey): string | number {
 interface LoadsTableProps {
   loads: LoadWithMetrics[];
   brokers: string[];
+  trucks?: Truck[];
+  defaultTruckId?: string | null;
   /** Same default the page header uses, so both entry points agree. */
   defaultDate?: string;
   ratingThresholds?: RatingThresholds;
@@ -133,10 +135,16 @@ interface LoadsTableProps {
 export function LoadsTable({
   loads,
   brokers,
+  trucks = [],
+  defaultTruckId,
   defaultDate,
   ratingThresholds,
   emptyDescription,
 }: LoadsTableProps) {
+  // Only worth a line on the row once there is more than one unit it could
+  // have been.
+  const showTruck = trucks.length > 1;
+  const truckName = (id: string) => trucks.find((t) => t.id === id)?.name ?? "Unknown truck";
   const router = useRouter();
   const [search, setSearch] = React.useState("");
   const [broker, setBroker] = React.useState("all");
@@ -327,6 +335,8 @@ export function LoadsTable({
             ) : (
               <LoadFormDialog
                 brokers={brokers}
+                trucks={trucks}
+                defaultTruckId={defaultTruckId}
                 defaultDate={defaultDate}
                 ratingThresholds={ratingThresholds}
               />
@@ -390,6 +400,11 @@ export function LoadsTable({
                         {load.originState}-{load.destinationState}
                       </span>
                     </Link>
+                    {showTruck ? (
+                      <span className="ml-2 text-2xs text-muted-foreground">
+                        {truckName(load.truckId)}
+                      </span>
+                    ) : null}
                   </TableCell>
                   <TableCell className="max-w-[13rem] truncate text-muted-foreground">
                     {load.broker ?? "--"}

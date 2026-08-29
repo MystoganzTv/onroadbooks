@@ -35,7 +35,7 @@ function load(over: Partial<Load> = {}): Load {
 
 function expense(over: Partial<Expense> = {}): Expense {
   return {
-    id: "e", businessId: "b", truckId: "t", loadId: null, date: "2026-08-05",
+    id: "e", businessId: "b", truckId: "t", scope: "TRUCK", loadId: null, date: "2026-08-05",
     category: "OTHER", description: "x", vendor: null, amount: 100, recurring: false,
     receiptNumber: null, notes: null, createdAt: "", ...over,
   };

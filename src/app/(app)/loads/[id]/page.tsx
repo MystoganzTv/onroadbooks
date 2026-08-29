@@ -71,6 +71,9 @@ export default async function LoadDetailPage({
             {formatDateLong(load.date)}
             {load.broker ? ` - ${load.broker}` : ""}
             {load.loadNumber ? ` - Load #${load.loadNumber}` : ""}
+            {dataset.trucks.length > 1
+              ? ` - ${dataset.trucks.find((t) => t.id === load.truckId)?.name ?? "Unknown truck"}`
+              : ""}
           </p>
         </div>
 
@@ -79,6 +82,7 @@ export default async function LoadDetailPage({
           <LoadFormDialog
             load={load}
             brokers={brokers}
+            trucks={dataset.trucks}
             ratingThresholds={thresholdsFromSettings(dataset.settings)}
             trigger={
               <Button variant="outline" size="sm">

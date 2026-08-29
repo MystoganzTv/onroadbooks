@@ -75,6 +75,14 @@ export interface Truck {
   id: string;
   businessId: string;
   name: string;
+  /** When the unit joined the fleet. Null when it predates the record. */
+  acquiredOn: string | null;
+  /**
+   * When it left. A sold truck keeps every load and expense it ever carried --
+   * its history still belongs in past reports -- but it stops appearing as a
+   * unit you can book work against.
+   */
+  soldOn: string | null;
   year: number | null;
   make: string | null;
   model: string | null;
@@ -116,10 +124,27 @@ export interface Load {
   createdAt: string;
 }
 
+/**
+ * What an expense belongs to.
+ *
+ * TRUCK is a cost a specific unit caused: its fuel, its note, its tyres.
+ * BUSINESS is overhead the fleet carries between them: the phone, the
+ * accountant, the dispatch software.
+ *
+ * This is the distinction that makes per-unit numbers honest. Charging
+ * overhead to trucks invents a cost per unit; leaving it out entirely makes
+ * every truck look profitable while the business loses money. So a unit
+ * reports CONTRIBUTION -- its own revenue less its own costs -- and the
+ * overhead is subtracted once, at the fleet level.
+ */
+export type ExpenseScope = "TRUCK" | "BUSINESS";
+
 export interface Expense {
   id: string;
   businessId: string;
+  /** Null exactly when scope is BUSINESS. */
   truckId: string | null;
+  scope: ExpenseScope;
   loadId: string | null;
   date: string;
   category: ExpenseCategoryId;
@@ -262,7 +287,7 @@ export interface Dataset {
   users: User[];
   settings: FinancialSettings;
   goals: FinancialGoal;
-  truck: Truck;
+  trucks: Truck[];
   loads: Load[];
   expenses: Expense[];
   fuelEntries: FuelEntry[];

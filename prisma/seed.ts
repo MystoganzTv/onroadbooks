@@ -16,6 +16,7 @@ function toDate(value: string): Date {
 
 async function main() {
   const dataset = buildSeedDataset();
+  const primary = dataset.trucks[0];
 
   console.log("Clearing existing data...");
   await prisma.document.deleteMany();
@@ -48,16 +49,16 @@ async function main() {
       },
       trucks: {
         create: {
-          name: dataset.truck.name,
-          year: dataset.truck.year,
-          make: dataset.truck.make,
-          model: dataset.truck.model,
-          vin: dataset.truck.vin,
-          purchasePrice: dataset.truck.purchasePrice,
-          monthlyPayment: dataset.truck.monthlyPayment,
-          monthlyInsurance: dataset.truck.monthlyInsurance,
-          startingOdometer: dataset.truck.startingOdometer,
-          currentOdometer: dataset.truck.currentOdometer,
+          name: primary.name,
+          year: primary.year,
+          make: primary.make,
+          model: primary.model,
+          vin: primary.vin,
+          purchasePrice: primary.purchasePrice,
+          monthlyPayment: primary.monthlyPayment,
+          monthlyInsurance: primary.monthlyInsurance,
+          startingOdometer: primary.startingOdometer,
+          currentOdometer: primary.currentOdometer,
         },
       },
     },

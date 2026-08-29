@@ -4,6 +4,7 @@ import { WelcomeFlow } from "@/components/onboarding/welcome-flow";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { planOf } from "@/lib/plans";
+import { primaryTruck } from "@/lib/fleet";
 
 export const metadata: Metadata = { title: "Welcome" };
 
@@ -21,7 +22,7 @@ export const dynamic = "force-dynamic";
 
 export default async function WelcomePage() {
   const session = await requireSession();
-  const { business, truck, settings, goals, subscription } = await getRepository(
+  const { business, trucks, settings, goals, subscription } = await getRepository(
     session.businessId,
   ).getDataset();
 
@@ -29,7 +30,7 @@ export default async function WelcomePage() {
     <div className="min-h-dvh bg-background">
       <WelcomeFlow
         business={business}
-        truck={truck}
+        truck={primaryTruck(trucks)}
         settings={settings}
         goals={goals}
         planName={planOf(subscription).name}

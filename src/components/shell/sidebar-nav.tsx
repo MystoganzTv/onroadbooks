@@ -12,6 +12,8 @@ import { isNavActive, NAV_GROUPS } from "./nav-items";
 interface SidebarNavProps {
   businessName: string;
   truckName: string;
+  /** Fleet-only destinations stay hidden while there is one truck. */
+  hasFleet?: boolean;
   userEmail?: string;
   onNavigate?: () => void;
 }
@@ -19,11 +21,13 @@ interface SidebarNavProps {
 export function SidebarNav({
   businessName,
   truckName,
+  hasFleet = false,
   userEmail,
   onNavigate,
 }: SidebarNavProps) {
   const pathname = usePathname();
-  const settingsActive = pathname === "/settings" || pathname.startsWith("/settings/");
+  const settingsActive =
+    pathname === "/settings" || pathname.startsWith("/settings/");
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -44,30 +48,35 @@ export function SidebarNav({
               {group.label}
             </p>
             <ul className="space-y-0.5">
-              {group.items.map((item) => {
-                const active = isNavActive(item, pathname);
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      onClick={onNavigate}
-                      aria-current={active ? "page" : undefined}
-                      className={cn(
-                        "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                        active
-                          ? "bg-sidebar-accent text-sidebar-strong"
-                          : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-strong",
-                      )}
-                    >
-                      <item.icon
-                        className={cn("size-4.5 shrink-0", active ? "text-primary" : "opacity-70")}
-                      />
-                      {item.label}
-                    </Link>
-                  </li>
-                );
-              })}
+              {group.items
+                .filter((item) => hasFleet || !item.fleetOnly)
+                .map((item) => {
+                  const active = isNavActive(item, pathname);
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        onClick={onNavigate}
+                        aria-current={active ? "page" : undefined}
+                        className={cn(
+                          "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                          active
+                            ? "bg-sidebar-accent text-sidebar-strong"
+                            : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-strong",
+                        )}
+                      >
+                        <item.icon
+                          className={cn(
+                            "size-4.5 shrink-0",
+                            active ? "text-primary" : "opacity-70",
+                          )}
+                        />
+                        {item.label}
+                      </Link>
+                    </li>
+                  );
+                })}
             </ul>
           </div>
         ))}
@@ -88,8 +97,12 @@ export function SidebarNav({
             <Building2 className="size-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-sidebar-strong">{businessName}</p>
-            <p className="truncate text-2xs text-sidebar-foreground">Business Settings</p>
+            <p className="truncate text-sm font-medium text-sidebar-strong">
+              {businessName}
+            </p>
+            <p className="truncate text-2xs text-sidebar-foreground">
+              Business Settings
+            </p>
           </div>
           <ChevronRight className="size-4 shrink-0 text-sidebar-foreground transition-transform group-hover:translate-x-0.5" />
         </Link>

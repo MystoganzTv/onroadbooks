@@ -6,6 +6,7 @@ import { ExpensesTable } from "@/components/expenses/expenses-table";
 import { MiniStat } from "@/components/dashboard/mini-stat";
 import { PeriodControls } from "@/components/dashboard/period-controls";
 import { PageHeader } from "@/components/shared/page-header";
+import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import {
   categoryTotals,
   expensesInPeriod,
@@ -17,8 +18,13 @@ import {
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { formatMoneyCompact, formatPercent, formatRate } from "@/lib/formatters";
+import { expensesForTruck, loadsForTruck, orderedTrucks } from "@/lib/fleet";
 import { defaultEntryDate } from "@/lib/periods";
-import { periodFromSearchParams, type SearchParams } from "@/lib/period-params";
+import {
+  periodFromSearchParams,
+  truckFromSearchParams,
+  type SearchParams,
+} from "@/lib/period-params";
 
 export const metadata: Metadata = { title: "Expenses" };
 
@@ -29,13 +35,21 @@ export default async function ExpensesPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { loads, expenses, documents, settings } = await getRepository(session.businessId).getDataset();
+  const { trucks, loads, expenses, documents, settings } = await getRepository(
+    session.businessId,
+  ).getDataset();
   const period = periodFromSearchParams(params);
   const ratingThresholds = thresholdsFromSettings(settings);
 
-  const periodExpenses = expensesInPeriod(expenses, period);
-  const periodLoads = withMetricsAll(loadsInPeriod(loads, period), ratingThresholds);
-  const summary = summarizePeriod(loads, expenses, period, settings);
+  // Scoping to a unit means its own costs only. Business overhead is not
+  // divided between trucks -- it is subtracted once, on the Fleet page.
+  const scopeTruckId = truckFromSearchParams(params, trucks);
+  const scopedLoads = loadsForTruck(loads, scopeTruckId);
+  const scopedExpenses = expensesForTruck(expenses, scopeTruckId);
+
+  const periodExpenses = expensesInPeriod(scopedExpenses, period);
+  const periodLoads = withMetricsAll(loadsInPeriod(scopedLoads, period), ratingThresholds);
+  const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings);
   const categories = categoryTotals(periodExpenses, settings);
 
   const fixedShare =
@@ -49,13 +63,18 @@ export default async function ExpensesPage({
         actions={
           <ExpenseFormDialog
             loads={periodLoads}
+            trucks={trucks}
+            defaultTruckId={scopeTruckId}
             defaultDate={defaultEntryDate(period)}
             categoryBehavior={settings.categoryBehavior}
           />
         }
       />
 
-      <PeriodControls period={period} />
+      <div className="flex flex-wrap items-center gap-2">
+        <PeriodControls period={period} />
+        <TruckSwitcher trucks={orderedTrucks(trucks)} selectedId={scopeTruckId} />
+      </div>
 
       <section
         aria-label="Expense summary"
@@ -95,6 +114,8 @@ export default async function ExpensesPage({
             loads={periodLoads}
             categoryBehavior={settings.categoryBehavior}
             defaultDate={defaultEntryDate(period)}
+            trucks={trucks}
+            defaultTruckId={scopeTruckId}
           />
         </div>
         <CategoryBreakdown categories={categories} total={summary.operatingExpenses} />

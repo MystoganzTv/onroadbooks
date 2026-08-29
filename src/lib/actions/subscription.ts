@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
+import { activeTrucks } from "@/lib/fleet";
 import { evaluatePlanChange } from "@/lib/plans";
 import { planChangeSchema } from "@/lib/schemas";
 import { fieldErrorsFrom, type ActionResult } from "./types";
@@ -31,10 +32,11 @@ export async function changePlanAction(values: unknown): Promise<ActionResult> {
     const repository = getRepository((await requireSession()).businessId);
     const dataset = await repository.getDataset();
 
-    // One truck today; counted rather than assumed, so this keeps working
-    // unchanged once a business can have several.
-    const activeTrucks = dataset.truck.active ? 1 : 0;
-    const decision = evaluatePlanChange(dataset.subscription, parsed.data.plan, activeTrucks);
+    const decision = evaluatePlanChange(
+      dataset.subscription,
+      parsed.data.plan,
+      activeTrucks(dataset.trucks).length,
+    );
 
     if (!decision.allowed) {
       return { ok: false, error: decision.reason ?? "That plan change is not available." };

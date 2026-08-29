@@ -5,12 +5,20 @@ import path from "node:path";
 
 import { roundMoney } from "../calculations";
 import { defaultCategoryBehavior } from "../categories";
-import { defaultGoals, defaultReserveAccounts, defaultSubscription } from "../defaults";
+import {
+  defaultGoals,
+  defaultReserveAccounts,
+  defaultSubscription,
+  migrateExpense,
+  migrateTruck,
+} from "../defaults";
+import { primaryTruck } from "../fleet";
 import { buildSeedDataset, DEMO_DOCUMENTS } from "../seed/seed-data";
 import { buildStorageKey, getDocumentStorage } from "../storage";
 import type {
   Business,
   Dataset,
+  ExpenseScope,
   User,
   Document,
   Expense,
@@ -88,7 +96,10 @@ async function readDataset(): Promise<Dataset> {
 
   try {
     const parsed = JSON.parse(raw) as Dataset;
-    if (!parsed?.business || !parsed?.truck || !Array.isArray(parsed.loads)) {
+    const hasTruck =
+      Array.isArray((parsed as unknown as { trucks?: unknown[] }).trucks) ||
+      Boolean((parsed as unknown as { truck?: unknown }).truck);
+    if (!parsed?.business || !hasTruck || !Array.isArray(parsed.loads)) {
       throw new Error("Missing required top-level records");
     }
     return migrate(parsed);
@@ -121,6 +132,18 @@ async function seedFresh(): Promise<Dataset> {
  */
 function migrate(dataset: Dataset): Dataset {
   dataset.users ??= [];
+
+  // A ledger written before the fleet existed carries `truck`, not `trucks`.
+  // The one unit becomes the fleet's first member and every expense it ever
+  // carried keeps belonging to it, which is what makes every previously
+  // reported figure come out identical afterwards.
+  const legacy = (dataset as unknown as { truck?: Truck }).truck;
+  if (!Array.isArray(dataset.trucks)) {
+    dataset.trucks = legacy ? [legacy] : [];
+  }
+  delete (dataset as unknown as { truck?: Truck }).truck;
+  dataset.trucks = dataset.trucks.map(migrateTruck);
+
   dataset.loads ??= [];
   dataset.expenses ??= [];
   dataset.fuelEntries ??= [];
@@ -171,8 +194,10 @@ function migrate(dataset: Dataset): Dataset {
     load.tolls ??= 0;
     load.otherExpenses ??= 0;
   }
+  const fallbackTruckId = dataset.trucks[0]?.id ?? "";
   for (const expense of dataset.expenses) {
     expense.receiptNumber ??= null;
+    migrateExpense(expense, fallbackTruckId);
   }
   for (const record of dataset.maintenanceRecords) {
     record.expenseId ??= null;
@@ -213,7 +238,7 @@ async function materializeDemoDocuments(dataset: Dataset): Promise<void> {
       businessId: dataset.business.id,
       loadId: demo.owner === "LOAD" ? demo.targetId : null,
       expenseId: demo.owner === "EXPENSE" ? demo.targetId : null,
-      truckId: demo.owner === "TRUCK" ? dataset.truck.id : null,
+      truckId: demo.owner === "TRUCK" ? primaryTruck(dataset.trucks).id : null,
       maintenanceId: demo.owner === "MAINTENANCE" ? demo.targetId : null,
       type: demo.type,
       label: demo.title
@@ -292,6 +317,12 @@ async function mutate<T>(
     dataset.documents.sort((a, b) => a.uploadedAt.localeCompare(b.uploadedAt));
     dataset.reserveTransactions.sort(byDateDesc);
     dataset.reserveAccounts.sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
+    dataset.trucks.sort(
+      (a, b) =>
+        Number(b.active) - Number(a.active) ||
+        a.name.localeCompare(b.name) ||
+        a.id.localeCompare(b.id),
+    );
     dataset.settlements.sort(
       (a, b) => b.periodStart.localeCompare(a.periodStart) || b.id.localeCompare(a.id),
     );
@@ -304,7 +335,7 @@ function loadFromInput(input: LoadInput, dataset: Dataset, id: string, createdAt
   return {
     id,
     businessId: dataset.business.id,
-    truckId: dataset.truck.id,
+    truckId: input.truckId?.trim() || primaryTruck(dataset.trucks).id,
     date: input.date,
     originCity: input.originCity.trim(),
     originState: input.originState.trim().toUpperCase(),
@@ -332,10 +363,14 @@ function expenseFromInput(
   id: string,
   createdAt: string,
 ): Expense {
+  // Overhead belongs to the business, so it deliberately carries no truck.
+  const scope: ExpenseScope = input.scope ?? "TRUCK";
   return {
     id,
     businessId: dataset.business.id,
-    truckId: dataset.truck.id,
+    truckId:
+      scope === "BUSINESS" ? null : input.truckId?.trim() || primaryTruck(dataset.trucks).id,
+    scope,
     loadId: input.loadId || null,
     date: input.date,
     category: input.category,
@@ -358,7 +393,7 @@ function fuelFromInput(
   return {
     id,
     businessId: dataset.business.id,
-    truckId: dataset.truck.id,
+    truckId: input.truckId?.trim() || primaryTruck(dataset.trucks).id,
     loadId: input.loadId || null,
     date: input.date,
     gallons: Math.round(input.gallons * 1000) / 1000,
@@ -372,6 +407,13 @@ function fuelFromInput(
     notes: input.notes?.trim() || null,
     createdAt,
   };
+}
+
+/** An odometer only ever moves forward, and only on the unit that recorded it. */
+function bumpOdometer(dataset: Dataset, truckId: string, odometer: number | null): void {
+  if (!odometer) return;
+  const truck = dataset.trucks.find((t) => t.id === truckId);
+  if (truck && odometer > truck.currentOdometer) truck.currentOdometer = odometer;
 }
 
 /** Deterministic id of the ledger row a fuel entry mirrors into. */
@@ -397,7 +439,8 @@ function syncFuelExpense(dataset: Dataset, entry: FuelEntry): void {
   dataset.expenses.push({
     id: expenseId,
     businessId: dataset.business.id,
-    truckId: dataset.truck.id,
+    truckId: entry.truckId,
+    scope: "TRUCK",
     loadId: entry.loadId,
     date: entry.date,
     category: "FUEL",
@@ -434,7 +477,7 @@ function maintenanceFromInput(
   return {
     id,
     businessId: dataset.business.id,
-    truckId: dataset.truck.id,
+    truckId: input.truckId?.trim() || primaryTruck(dataset.trucks).id,
     type: input.type,
     basis: input.basis,
     serviceDate: input.serviceDate,
@@ -458,7 +501,8 @@ function ledgerExpenseFor(
   return {
     id: existingId ?? `expmaint_${record.id}`,
     businessId: dataset.business.id,
-    truckId: dataset.truck.id,
+    truckId: record.truckId,
+    scope: "TRUCK",
     loadId: null,
     date: record.serviceDate,
     category: MAINTENANCE_EXPENSE_CATEGORY[record.type] ?? "MAINTENANCE",
@@ -652,9 +696,7 @@ export class JsonRepository implements Repository {
         dataset.expenses.push(expense);
         record.expenseId = expense.id;
       }
-      if (record.odometer && record.odometer > dataset.truck.currentOdometer) {
-        dataset.truck.currentOdometer = record.odometer;
-      }
+      bumpOdometer(dataset, record.truckId, record.odometer);
 
       dataset.maintenanceRecords.push(record);
       return record;
@@ -756,9 +798,7 @@ export class JsonRepository implements Repository {
       const entry = fuelFromInput(input, dataset, newId("fuel"), new Date().toISOString());
       dataset.fuelEntries.push(entry);
       syncFuelExpense(dataset, entry);
-      if (entry.odometer && entry.odometer > dataset.truck.currentOdometer) {
-        dataset.truck.currentOdometer = entry.odometer;
-      }
+      bumpOdometer(dataset, entry.truckId, entry.odometer);
       return entry;
     }, this.businessId);
   }
@@ -810,11 +850,22 @@ export class JsonRepository implements Repository {
     }, this.businessId);
   }
 
-  async updateTruck(input: TruckInput): Promise<Truck> {
+  async createTruck(input: TruckInput): Promise<Truck> {
     return mutate((dataset) => {
-      dataset.truck = {
-        ...dataset.truck,
-        name: input.name,
+      // The plan limit is checked in the action, against the trucks that
+      // actually exist. The store's job is only to refuse a duplicate name,
+      // because two units called "Truck 1" make every report ambiguous.
+      const name = input.name.trim();
+      if (dataset.trucks.some((t) => t.active && t.name.toLowerCase() === name.toLowerCase())) {
+        throw new Error(`You already have a truck called ${name}.`);
+      }
+
+      const truck: Truck = {
+        id: newId("truck"),
+        businessId: dataset.business.id,
+        name,
+        acquiredOn: input.acquiredOn ?? null,
+        soldOn: null,
         year: input.year ?? null,
         make: input.make ?? null,
         model: input.model ?? null,
@@ -824,8 +875,66 @@ export class JsonRepository implements Repository {
         monthlyInsurance: input.monthlyInsurance ?? null,
         startingOdometer: input.startingOdometer,
         currentOdometer: input.currentOdometer,
+        active: true,
+        createdAt: new Date().toISOString(),
       };
-      return dataset.truck;
+      dataset.trucks.push(truck);
+      return truck;
+    }, this.businessId);
+  }
+
+  async updateTruck(input: TruckInput, id?: string): Promise<Truck> {
+    return mutate((dataset) => {
+      const target = id
+        ? dataset.trucks.find((t) => t.id === id)
+        : primaryTruck(dataset.trucks);
+      if (!target) throw new Error(`Truck ${id ?? "(primary)"} not found`);
+
+      Object.assign(target, {
+        name: input.name.trim(),
+        acquiredOn: input.acquiredOn ?? target.acquiredOn,
+        year: input.year ?? null,
+        make: input.make ?? null,
+        model: input.model ?? null,
+        vin: input.vin ?? null,
+        purchasePrice: input.purchasePrice ?? null,
+        monthlyPayment: input.monthlyPayment ?? null,
+        monthlyInsurance: input.monthlyInsurance ?? null,
+        startingOdometer: input.startingOdometer,
+        currentOdometer: input.currentOdometer,
+      });
+      return target;
+    }, this.businessId);
+  }
+
+  /**
+   * Retiring a unit deletes nothing.
+   *
+   * Its loads, expenses, fuel and service history stay exactly where they are
+   * and keep appearing in every past report. All that changes is that it stops
+   * being something you can book new work against -- and that it no longer
+   * counts against the plan's limit.
+   */
+  async archiveTruck(id: string, soldOn?: string | null): Promise<Truck> {
+    return mutate((dataset) => {
+      const target = dataset.trucks.find((t) => t.id === id);
+      if (!target) throw new Error(`Truck ${id} not found`);
+      if (dataset.trucks.filter((t) => t.active).length <= 1) {
+        throw new Error("This is your only active truck. Add another one before retiring it.");
+      }
+      target.active = false;
+      target.soldOn = soldOn ?? null;
+      return target;
+    }, this.businessId);
+  }
+
+  async restoreTruck(id: string): Promise<Truck> {
+    return mutate((dataset) => {
+      const target = dataset.trucks.find((t) => t.id === id);
+      if (!target) throw new Error(`Truck ${id} not found`);
+      target.active = true;
+      target.soldOn = null;
+      return target;
     }, this.businessId);
   }
 

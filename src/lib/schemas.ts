@@ -18,8 +18,12 @@ const miles = z
   .min(0, "Cannot be negative")
   .max(100_000, "That looks too large");
 
+/** TRUCK charges a unit; BUSINESS is fleet overhead and carries no truck. */
+export const expenseScopeValues = ["TRUCK", "BUSINESS"] as const;
+
 export const loadSchema = z
   .object({
+    truckId: z.string().trim().optional().nullable(),
     date: isoDate,
     originCity: z.string().trim().min(1, "Origin city is required").max(80),
     originState: z
@@ -61,6 +65,8 @@ export const loadSchema = z
   );
 
 export const expenseSchema = z.object({
+  scope: z.enum(expenseScopeValues).optional(),
+  truckId: z.string().trim().optional().nullable(),
   date: isoDate,
   category: z.enum(CATEGORY_IDS as [string, ...string[]]),
   description: z.string().trim().min(1, "Description is required").max(200),
@@ -73,6 +79,7 @@ export const expenseSchema = z.object({
 });
 
 export const fuelSchema = z.object({
+  truckId: z.string().trim().optional().nullable(),
   date: isoDate,
   gallons: z
     .number({ invalid_type_error: "Enter a number" })
@@ -148,6 +155,7 @@ export const settingsSchema = z.object({
 
 export const maintenanceSchema = z
   .object({
+    truckId: z.string().trim().optional().nullable(),
     type: z.enum(MAINTENANCE_TYPE_IDS as [string, ...string[]]),
     basis: z.enum(["DATE", "MILEAGE", "BOTH"]),
     serviceDate: isoDate,
@@ -189,6 +197,11 @@ export const maintenanceSchema = z
     },
   );
 
+export const truckArchiveSchema = z.object({
+  id: z.string().trim().min(1),
+  soldOn: isoDate.optional().nullable(),
+});
+
 export const documentMetaSchema = z.object({
   type: z.enum(DOCUMENT_TYPE_IDS as [string, ...string[]]),
   label: z.string().trim().max(120).optional().nullable(),
@@ -198,6 +211,7 @@ export const documentMetaSchema = z.object({
 
 export const truckSchema = z.object({
   name: z.string().trim().min(1, "Truck name is required").max(80),
+  acquiredOn: isoDate.optional().nullable(),
   year: z.number().int().min(1950).max(2100).optional().nullable(),
   make: z.string().trim().max(60).optional().nullable(),
   model: z.string().trim().max(80).optional().nullable(),

@@ -156,6 +156,12 @@ async function ensureReserveAccounts(
   }
 }
 
+function requireTruck(dataset: Dataset, id: string): Truck {
+  const truck = dataset.trucks.find((t) => t.id === id);
+  if (!truck) throw new Error(`Truck ${id} not found`);
+  return truck;
+}
+
 function requireSettlement(dataset: Dataset, id: string): Settlement {
   const settlement = dataset.settlements.find((s) => s.id === id);
   if (!settlement) throw new Error(`Settlement ${id} not found`);
@@ -240,6 +246,24 @@ export class PrismaAuthStore implements AuthStore {
   }
 }
 
+/**
+ * Which unit a row belongs to.
+ *
+ * The id is checked against this business's own trucks before it is used, so
+ * a forged id cannot file a load under someone else's unit, and it falls back
+ * to the primary truck -- what a single-truck business means by "the truck".
+ * The JSON store resolves it exactly the same way; the two must never
+ * disagree about where a row landed.
+ */
+function truckIdFor(
+  business: { trucks: { id: string }[] },
+  requested: string | null | undefined,
+): string {
+  const wanted = requested?.trim();
+  if (wanted && business.trucks.some((t) => t.id === wanted)) return wanted;
+  return business.trucks[0].id;
+}
+
 export class PrismaRepository implements Repository {
   /** Bound to one business; every query filters on it. */
   constructor(private readonly businessId: string) {}
@@ -251,7 +275,7 @@ export class PrismaRepository implements Repository {
       where: { id: this.businessId },
       include: {
         settings: true,
-        trucks: { orderBy: [{ active: "desc" }, { createdAt: "asc" }], take: 1 },
+        trucks: { orderBy: [{ active: "desc" }, { name: "asc" }, { id: "asc" }] },
       },
     });
     if (existing && existing.trucks.length > 0) return existing;
@@ -270,7 +294,6 @@ export class PrismaRepository implements Repository {
   async getDataset(): Promise<Dataset> {
     const client = await getClient();
     const business = await this.business(client);
-    const truckRow = business.trucks[0];
 
     const [
       loadRows,
@@ -393,22 +416,24 @@ export class PrismaRepository implements Repository {
       updatedAt: (business.settings?.updatedAt ?? new Date()).toISOString(),
     };
 
-    const truck: Truck = {
-      id: truckRow.id,
+    const trucks: Truck[] = business.trucks.map((row) => ({
+      id: row.id,
       businessId: business.id,
-      name: truckRow.name,
-      year: truckRow.year,
-      make: truckRow.make,
-      model: truckRow.model,
-      vin: truckRow.vin,
-      purchasePrice: numOrNull(truckRow.purchasePrice),
-      monthlyPayment: numOrNull(truckRow.monthlyPayment),
-      monthlyInsurance: numOrNull(truckRow.monthlyInsurance),
-      startingOdometer: truckRow.startingOdometer,
-      currentOdometer: truckRow.currentOdometer,
-      active: truckRow.active,
-      createdAt: truckRow.createdAt.toISOString(),
-    };
+      name: row.name,
+      acquiredOn: row.acquiredOn ? isoDate(row.acquiredOn) : null,
+      soldOn: row.soldOn ? isoDate(row.soldOn) : null,
+      year: row.year,
+      make: row.make,
+      model: row.model,
+      vin: row.vin,
+      purchasePrice: numOrNull(row.purchasePrice),
+      monthlyPayment: numOrNull(row.monthlyPayment),
+      monthlyInsurance: numOrNull(row.monthlyInsurance),
+      startingOdometer: row.startingOdometer,
+      currentOdometer: row.currentOdometer,
+      active: row.active,
+      createdAt: row.createdAt.toISOString(),
+    }));
 
     return {
       users: [],
@@ -421,7 +446,7 @@ export class PrismaRepository implements Repository {
       settings,
       goals,
       subscription,
-      truck,
+      trucks,
       reserveAccounts,
       reserveTransactions: reserveTransactionRows.map(
         (row): ReserveTransaction => ({
@@ -481,6 +506,7 @@ export class PrismaRepository implements Repository {
           id: row.id,
           businessId: row.businessId,
           truckId: row.truckId,
+          scope: row.scope,
           loadId: row.loadId,
           date: isoDate(row.date),
           category: row.category as ExpenseCategoryId,
@@ -580,7 +606,7 @@ export class PrismaRepository implements Repository {
       data: {
         ...this.loadData(input),
         businessId: business.id,
-        truckId: business.trucks[0].id,
+        truckId: truckIdFor(business, input.truckId),
       },
     });
     const dataset = await this.getDataset();
@@ -589,7 +615,11 @@ export class PrismaRepository implements Repository {
 
   async updateLoad(id: string, input: LoadInput): Promise<Load> {
     const client = await getClient();
-    await client.load.update({ where: { id }, data: this.loadData(input) });
+    const business = await this.business(client);
+    await client.load.update({
+      where: { id },
+      data: { ...this.loadData(input), truckId: truckIdFor(business, input.truckId) },
+    });
     const dataset = await this.getDataset();
     return dataset.loads.find((l) => l.id === id)!;
   }
@@ -616,11 +646,13 @@ export class PrismaRepository implements Repository {
   async createExpense(input: ExpenseInput): Promise<Expense> {
     const client = await getClient();
     const business = await this.business(client);
+    const scope = input.scope ?? "TRUCK";
     const row = await client.expense.create({
       data: {
         ...this.expenseData(input),
         businessId: business.id,
-        truckId: business.trucks[0].id,
+        scope,
+        truckId: scope === "BUSINESS" ? null : truckIdFor(business, input.truckId),
       },
     });
     const dataset = await this.getDataset();
@@ -629,7 +661,16 @@ export class PrismaRepository implements Repository {
 
   async updateExpense(id: string, input: ExpenseInput): Promise<Expense> {
     const client = await getClient();
-    await client.expense.update({ where: { id }, data: this.expenseData(input) });
+    const business = await this.business(client);
+    const scope = input.scope ?? "TRUCK";
+    await client.expense.update({
+      where: { id },
+      data: {
+        ...this.expenseData(input),
+        scope,
+        truckId: scope === "BUSINESS" ? null : truckIdFor(business, input.truckId),
+      },
+    });
     const dataset = await this.getDataset();
     return dataset.expenses.find((e) => e.id === id)!;
   }
@@ -655,7 +696,7 @@ export class PrismaRepository implements Repository {
   async createFuelEntry(input: FuelEntryInput): Promise<FuelEntry> {
     const client = await getClient();
     const business = await this.business(client);
-    const truckId = business.trucks[0].id;
+    const truckId = truckIdFor(business, input.truckId);
     const data = this.fuelData(input);
 
     const row = await client.$transaction(async (tx) => {
@@ -697,16 +738,18 @@ export class PrismaRepository implements Repository {
     const client = await getClient();
     const business = await this.business(client);
     const data = this.fuelData(input);
+    const truckId = truckIdFor(business, input.truckId);
 
     await client.$transaction(async (tx) => {
       const existing = await tx.fuelEntry.findUniqueOrThrow({ where: { id } });
-      await tx.fuelEntry.update({ where: { id }, data });
+      await tx.fuelEntry.update({ where: { id }, data: { ...data, truckId } });
 
       // Keep the ledger row in step, or the Fuel page and the Expenses page
       // permanently disagree about the same money.
       const mirror = {
         loadId: data.loadId,
         date: data.date,
+        truckId,
         description: fuelDescription(input.gallons, input.pricePerGallon),
         vendor: data.location,
         amount: data.totalCost,
@@ -719,7 +762,6 @@ export class PrismaRepository implements Repository {
           data: {
             ...mirror,
             businessId: business.id,
-            truckId: business.trucks[0].id,
             category: "FUEL",
             recurring: false,
           },
@@ -765,7 +807,7 @@ export class PrismaRepository implements Repository {
   async createMaintenance(input: MaintenanceInput): Promise<MaintenanceRecord> {
     const client = await getClient();
     const business = await this.business(client);
-    const truckId = business.trucks[0].id;
+    const truckId = truckIdFor(business, input.truckId);
     const data = this.maintenanceData(input);
 
     const row = await client.$transaction(async (tx) => {
@@ -931,13 +973,21 @@ export class PrismaRepository implements Repository {
     return (await this.getDataset()).business;
   }
 
-  async updateTruck(input: TruckInput): Promise<Truck> {
+  async createTruck(input: TruckInput): Promise<Truck> {
     const client = await getClient();
     const business = await this.business(client);
-    await client.truck.update({
-      where: { id: business.trucks[0].id },
+
+    const name = input.name.trim();
+    const clash = await client.truck.findFirst({
+      where: { businessId: business.id, active: true, name },
+    });
+    if (clash) throw new Error(`You already have a truck called ${name}.`);
+
+    const row = await client.truck.create({
       data: {
-        name: input.name,
+        businessId: business.id,
+        name,
+        acquiredOn: input.acquiredOn ? toDate(input.acquiredOn) : null,
         year: input.year ?? null,
         make: input.make ?? null,
         model: input.model ?? null,
@@ -949,7 +999,54 @@ export class PrismaRepository implements Repository {
         currentOdometer: input.currentOdometer,
       },
     });
-    return (await this.getDataset()).truck;
+    return requireTruck(await this.getDataset(), row.id);
+  }
+
+  async updateTruck(input: TruckInput, id?: string): Promise<Truck> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const targetId = id ?? business.trucks[0].id;
+
+    await client.truck.update({
+      where: { id: targetId },
+      data: {
+        name: input.name.trim(),
+        ...(input.acquiredOn === undefined
+          ? {}
+          : { acquiredOn: input.acquiredOn ? toDate(input.acquiredOn) : null }),
+        year: input.year ?? null,
+        make: input.make ?? null,
+        model: input.model ?? null,
+        vin: input.vin ?? null,
+        purchasePrice: input.purchasePrice ?? null,
+        monthlyPayment: input.monthlyPayment ?? null,
+        monthlyInsurance: input.monthlyInsurance ?? null,
+        startingOdometer: input.startingOdometer,
+        currentOdometer: input.currentOdometer,
+      },
+    });
+    return requireTruck(await this.getDataset(), targetId);
+  }
+
+  /** Retires a unit. Deletes nothing -- its history stays in past reports. */
+  async archiveTruck(id: string, soldOn?: string | null): Promise<Truck> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const active = await client.truck.count({ where: { businessId: business.id, active: true } });
+    if (active <= 1) {
+      throw new Error("This is your only active truck. Add another one before retiring it.");
+    }
+    await client.truck.update({
+      where: { id },
+      data: { active: false, soldOn: soldOn ? toDate(soldOn) : null },
+    });
+    return requireTruck(await this.getDataset(), id);
+  }
+
+  async restoreTruck(id: string): Promise<Truck> {
+    const client = await getClient();
+    await client.truck.update({ where: { id }, data: { active: true, soldOn: null } });
+    return requireTruck(await this.getDataset(), id);
   }
 
   /* ---- Goals --------------------------------------------------------- */

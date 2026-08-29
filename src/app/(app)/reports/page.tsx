@@ -34,11 +34,20 @@ import {
 import { halfMonthComparison } from "@/lib/chart-data";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
+import { activeTrucks } from "@/lib/fleet";
 import { formatDateMedium } from "@/lib/formatters";
 import { periodFromSearchParams, periodQuery, type SearchParams } from "@/lib/period-params";
 import { monthLabel, previousPeriod, trailingHalfMonths, trailingMonths } from "@/lib/periods";
 
 export const metadata: Metadata = { title: "Reports" };
+
+/** One truck is named; a fleet is counted. */
+function fleetLabel(trucks: Parameters<typeof activeTrucks>[0]): string {
+  const active = activeTrucks(trucks);
+  if (active.length === 1) return active[0].name;
+  if (active.length === 0) return "No active truck";
+  return `${active.length} trucks`;
+}
 
 export default async function ReportsPage({
   searchParams,
@@ -47,7 +56,7 @@ export default async function ReportsPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { business, truck, loads, expenses, settings } = await getRepository(
+  const { business, trucks, loads, expenses, settings } = await getRepository(
     session.businessId,
   ).getDataset();
   const period = periodFromSearchParams(params);
@@ -92,7 +101,7 @@ export default async function ReportsPage({
 
       <ReportLetterhead
         businessName={business.name}
-        truckName={truck.name}
+        truckName={fleetLabel(trucks)}
         periodLabel={period.label}
         comparisonLabel={prior.label}
         rangeLabel={rangeLabel}

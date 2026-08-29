@@ -24,7 +24,7 @@ export const metadata: Metadata = { title: "Load Calculator" };
 export default async function CalculatorPage() {
   const session = await requireSession();
   const dataset = await getRepository(session.businessId).getDataset();
-  const { loads, expenses, fuelEntries, settings, goals } = dataset;
+  const { trucks, loads, expenses, fuelEntries, settings, goals } = dataset;
   const today = todayISO();
 
   const basis = trailingCostBasis(loads, expenses, settings, today);
@@ -50,6 +50,7 @@ export default async function CalculatorPage() {
     deadheadWarnPct: settings.deadheadWarnPct,
     thresholds: thresholdsFromSettings(settings),
     brokers: [...new Set(loads.map((l) => l.broker).filter(Boolean))].sort() as string[],
+    trucks,
     defaultDate: today,
   };
 

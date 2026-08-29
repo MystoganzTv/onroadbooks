@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { FileText, Gauge, Info, TruckIcon } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, FileText, Gauge, TruckIcon } from "lucide-react";
 
 import { MiniStat } from "@/components/dashboard/mini-stat";
 import { DocumentList } from "@/components/documents/document-list";
@@ -12,11 +13,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Metric } from "@/components/shared/metric";
 import { PageHeader } from "@/components/shared/page-header";
 import { TruckForm } from "@/components/truck/truck-form";
+import { TruckDialog } from "@/components/fleet/truck-dialog";
+import { TruckRetireButton } from "@/components/fleet/truck-retire-button";
+import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { summarizeFuel, truckLifetime } from "@/lib/calculations";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
+import { activeTrucks, orderedTrucks, primaryTruck, truckById } from "@/lib/fleet";
+import { truckAllowance } from "@/lib/plans";
+import { truckFromSearchParams, type SearchParams } from "@/lib/period-params";
 import { thresholdsFrom, upcomingMaintenance } from "@/lib/maintenance";
 import { calculateMaintenanceHealth } from "@/lib/finance/maintenance-health";
 import { calculateReserveBalances, reserveBalanceFor } from "@/lib/finance/reserves";
@@ -31,16 +39,30 @@ import {
 
 export const metadata: Metadata = { title: "Truck" };
 
-export default async function TruckPage() {
+export default async function TruckPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const params = await searchParams;
   const session = await requireSession();
   const dataset = await getRepository(session.businessId).getDataset();
-  const { truck } = dataset;
+
+  // One unit at a time: miles remaining and reserve coverage are facts about a
+  // specific odometer, not about a fleet.
+  const trucks = orderedTrucks(dataset.trucks);
+  const selectedId = truckFromSearchParams(params, trucks);
+  const truck = truckById(trucks, selectedId) ?? primaryTruck(trucks);
   const lifetime = truckLifetime(dataset, truck);
-  const fuel = summarizeFuel(dataset.fuelEntries, lifetime.totalMiles);
+  const fuel = summarizeFuel(
+    dataset.fuelEntries.filter((entry) => entry.truckId === truck.id),
+    lifetime.totalMiles,
+  );
 
   const today = todayISO();
   const thresholds = thresholdsFrom(dataset.settings);
-  const upcoming = upcomingMaintenance(dataset.maintenanceRecords, truck, today, thresholds);
+  const records = dataset.maintenanceRecords.filter((r) => r.truckId === truck.id);
+  const upcoming = upcomingMaintenance(records, truck, today, thresholds);
   const truckDocuments = dataset.documents.filter((doc) => doc.truckId === truck.id);
   const overdue = upcoming.filter((item) => item.status === "OVERDUE").length;
   const dueSoon = upcoming.filter((item) => item.status === "DUE_SOON").length;
@@ -48,7 +70,7 @@ export default async function TruckPage() {
   // Can the maintenance bucket actually pay for what is coming?
   const balances = calculateReserveBalances(dataset.reserveAccounts, dataset.reserveTransactions);
   const health = calculateMaintenanceHealth(
-    dataset.maintenanceRecords,
+    records,
     truck,
     today,
     thresholds,
@@ -56,6 +78,13 @@ export default async function TruckPage() {
   );
 
   const description = [truck.year, truck.make, truck.model].filter(Boolean).join(" ");
+
+  // What the plan actually allows, checked against the units that exist. The
+  // add button reads this; the server action checks it again on submit,
+  // because a hidden button is a suggestion and the limit is a rule.
+  const running = activeTrucks(trucks).length;
+  const allowance = truckAllowance(dataset.subscription, running);
+  const isFleet = trucks.length > 1;
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
@@ -72,12 +101,26 @@ export default async function TruckPage() {
               <Badge variant="warning">{dueSoon} approaching</Badge>
             ) : null}
             <Badge variant={truck.active ? "positive" : "outline"}>
-              {truck.active ? "Active" : "Inactive"}
+              {truck.active ? "Active" : "Retired"}
             </Badge>
-            <MaintenanceFormDialog currentOdometer={truck.currentOdometer} />
+            <MaintenanceFormDialog currentOdometer={truck.currentOdometer} truckId={truck.id} />
           </>
         }
       />
+
+      {isFleet ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {/* This page reports one unit's odometer, service and documents, so
+              there is no whole-fleet view to offer. */}
+          <TruckSwitcher trucks={trucks} selectedId={truck.id} includeAll={false} />
+          <Button asChild variant="outline" size="sm">
+            <Link href="/fleet">
+              Compare units
+              <ArrowRight className="size-4" />
+            </Link>
+          </Button>
+        </div>
+      ) : null}
 
       <section
         aria-label="Lifetime economics"
@@ -135,8 +178,9 @@ export default async function TruckPage() {
             </div>
             <div className="min-w-0 xl:col-span-2">
               <MaintenanceTable
-                records={dataset.maintenanceRecords}
+                records={records}
                 documents={dataset.documents}
+                truckId={truck.id}
                 currentOdometer={truck.currentOdometer}
                 today={today}
                 thresholds={thresholds}
@@ -223,14 +267,31 @@ export default async function TruckPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-dashed">
-            <CardContent className="flex items-start gap-2.5 p-3">
-              <Info className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-              <p className="text-2xs leading-relaxed text-muted-foreground">
-                Every load, expense and fuel entry already belongs to this truck in the database, so
-                adding a second truck later is a filter -- not a migration. The interface stays
-                single-truck until you need more.
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <TruckIcon className="size-3.5 text-muted-foreground" />
+                <CardTitle>Fleet</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 p-4">
+              <p className="text-xs text-muted-foreground">
+                {`Running ${running} of the ${allowance.limit} ${allowance.limit === 1 ? "truck" : "trucks"} your plan covers.`}
               </p>
+              {allowance.reason ? (
+                <p className="text-2xs leading-relaxed text-muted-foreground">
+                  {allowance.reason}
+                </p>
+              ) : null}
+              <div className="flex flex-wrap items-center gap-2">
+                <TruckDialog canAdd={allowance.canAdd} limitReason={allowance.reason} />
+                {/* Retiring the only truck you have would leave nothing to
+                    book work against, so it is offered only once there is a
+                    second one. */}
+                {running > 1 || !truck.active ? (
+                  <TruckRetireButton truck={truck} canRestore={allowance.canAdd} />
+                ) : null}
+              </div>
             </CardContent>
           </Card>
         </div>

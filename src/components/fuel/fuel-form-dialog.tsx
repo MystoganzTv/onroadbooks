@@ -32,7 +32,8 @@ import { roundMoney } from "@/lib/calculations";
 import { formatDateShort, formatMoney } from "@/lib/formatters";
 import { todayISO } from "@/lib/periods";
 import { fuelSchema } from "@/lib/schemas";
-import type { FuelEntry, LoadWithMetrics } from "@/lib/types";
+import { orderedTrucks } from "@/lib/fleet";
+import type { FuelEntry, LoadWithMetrics, Truck } from "@/lib/types";
 import { toNumber } from "@/lib/utils";
 
 const FIELD_LABELS: Record<string, string> = {
@@ -59,6 +60,8 @@ interface FormState {
 interface FuelFormDialogProps {
   entry?: FuelEntry;
   loads?: LoadWithMetrics[];
+  trucks?: Truck[];
+  defaultTruckId?: string | null;
   defaultDate?: string;
   lastOdometer?: number | null;
   trigger?: React.ReactNode;
@@ -71,12 +74,23 @@ interface FuelFormDialogProps {
 export function FuelFormDialog({
   entry,
   loads = [],
+  trucks = [],
+  defaultTruckId,
   defaultDate,
   lastOdometer,
   trigger,
 }: FuelFormDialogProps) {
   const router = useRouter();
   const isEdit = Boolean(entry);
+
+  const truckOptions = React.useMemo(
+    () => orderedTrucks(trucks).filter((t) => t.active || t.id === entry?.truckId),
+    [trucks, entry?.truckId],
+  );
+  const showTruck = truckOptions.length > 1;
+  const [truckId, setTruckId] = React.useState(
+    () => entry?.truckId ?? defaultTruckId ?? truckOptions.find((t) => t.active)?.id ?? "",
+  );
 
   const initial = React.useMemo<FormState>(
     () =>
@@ -140,6 +154,7 @@ export function FuelFormDialog({
     event.preventDefault();
 
     const payload = {
+      truckId: truckId || null,
       date: values.date,
       gallons,
       pricePerGallon: price,
@@ -201,6 +216,29 @@ export function FuelFormDialog({
 
         <DialogBody>
           <form id="fuel-form" onSubmit={submit} className="space-y-4" noValidate>
+            {showTruck ? (
+              <Field
+                label="Truck"
+                htmlFor="fuel-truck"
+                required
+                hint="Sets the odometer this reading belongs to"
+              >
+                <Select value={truckId} onValueChange={setTruckId}>
+                  <SelectTrigger id="fuel-truck">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {truckOptions.map((truck) => (
+                      <SelectItem key={truck.id} value={truck.id}>
+                        {truck.name}
+                        {truck.active ? "" : " (retired)"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            ) : null}
+
             <div className="grid grid-cols-2 gap-3">
               <Field label="Date" htmlFor="fuel-date" required error={errors.date}>
                 <Input

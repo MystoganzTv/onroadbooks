@@ -40,12 +40,14 @@ import { formatDateShort, formatMoney } from "@/lib/formatters";
 import { todayISO } from "@/lib/periods";
 import { expenseSchema } from "@/lib/schemas";
 import { DocumentList } from "@/components/documents/document-list";
+import { orderedTrucks } from "@/lib/fleet";
 import type {
   Document,
   Expense,
   ExpenseBehavior,
   ExpenseCategoryId,
   LoadWithMetrics,
+  Truck,
 } from "@/lib/types";
 import { toNumber } from "@/lib/utils";
 
@@ -59,7 +61,12 @@ const FIELD_LABELS: Record<string, string> = {
   receiptNumber: "Receipt number",
 };
 
+/** The sentinel the "charged to" control uses for fleet overhead. */
+const BUSINESS = "BUSINESS";
+
 interface FormState {
+  /** A truck id, or BUSINESS for overhead. Empty when there is no fleet. */
+  charge: string;
   date: string;
   category: ExpenseCategoryId;
   description: string;
@@ -71,8 +78,9 @@ interface FormState {
   notes: string;
 }
 
-function emptyState(defaultDate: string): FormState {
+function emptyState(defaultDate: string, charge: string): FormState {
   return {
+    charge,
     date: defaultDate,
     category: "FUEL",
     description: "",
@@ -89,6 +97,9 @@ interface ExpenseFormDialogProps {
   expense?: Expense;
   documents?: Document[];
   loads?: LoadWithMetrics[];
+  trucks?: Truck[];
+  /** Preselects the unit the page is currently scoped to. */
+  defaultTruckId?: string | null;
   defaultDate?: string;
   categoryBehavior?: Record<string, ExpenseBehavior>;
   trigger?: React.ReactNode;
@@ -99,6 +110,8 @@ export function ExpenseFormDialog({
   expense,
   documents = [],
   loads = [],
+  trucks = [],
+  defaultTruckId,
   defaultDate,
   categoryBehavior,
   trigger,
@@ -106,10 +119,32 @@ export function ExpenseFormDialog({
   const router = useRouter();
   const isEdit = Boolean(expense);
 
+  /**
+   * Who the cost is charged to.
+   *
+   * A retired unit stays in the list only while an existing expense still
+   * points at it, so editing history never silently re-assigns the charge.
+   */
+  const chargeOptions = React.useMemo(
+    () => orderedTrucks(trucks).filter((t) => t.active || t.id === expense?.truckId),
+    [trucks, expense?.truckId],
+  );
+  /*
+   * Shown once the business has ever run more than one truck -- not once it
+   * has more than one RUNNING. A fleet that is temporarily down to a single
+   * unit still has overhead, and hiding the control on that day would leave
+   * the owner no way to record the phone bill as anything but that truck's
+   * cost. A business that has only ever had one truck is not asked, because
+   * for it "the truck" and "the business" are the same thing.
+   */
+  const showCharge = trucks.length > 1;
+  const defaultCharge = defaultTruckId ?? chargeOptions.find((t) => t.active)?.id ?? "";
+
   const initial = React.useMemo<FormState>(
     () =>
       expense
         ? {
+            charge: expense.scope === "BUSINESS" ? BUSINESS : (expense.truckId ?? ""),
             date: expense.date,
             category: expense.category,
             description: expense.description,
@@ -120,8 +155,8 @@ export function ExpenseFormDialog({
             receiptNumber: expense.receiptNumber ?? "",
             notes: expense.notes ?? "",
           }
-        : emptyState(defaultDate ?? todayISO()),
-    [expense, defaultDate],
+        : emptyState(defaultDate ?? todayISO(), defaultCharge),
+    [expense, defaultDate, defaultCharge],
   );
 
   const [open, setOpen] = React.useState(false);
@@ -156,7 +191,12 @@ export function ExpenseFormDialog({
   function submit(event: React.FormEvent) {
     event.preventDefault();
 
+    // An empty charge means this business has no fleet to choose between:
+    // send no truck and let the store bill the one unit that exists.
+    const business = values.charge === BUSINESS;
     const payload = {
+      scope: business ? ("BUSINESS" as const) : ("TRUCK" as const),
+      truckId: business || !values.charge ? null : values.charge,
       date: values.date,
       category: values.category,
       description: values.description,
@@ -255,6 +295,34 @@ export function ExpenseFormDialog({
                 />
               </Field>
             </div>
+
+            {showCharge ? (
+              <Field
+                label="Charged to"
+                htmlFor="expense-charge"
+                required
+                hint={
+                  values.charge === BUSINESS
+                    ? "Overhead: subtracted from the fleet once, not billed to any truck"
+                    : "Counts against this truck's own profit"
+                }
+              >
+                <Select value={values.charge} onValueChange={(value) => set("charge", value)}>
+                  <SelectTrigger id="expense-charge">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {chargeOptions.map((truck) => (
+                      <SelectItem key={truck.id} value={truck.id}>
+                        {truck.name}
+                        {truck.active ? "" : " (retired)"}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value={BUSINESS}>The business (overhead)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            ) : null}
 
             <Field
               label="Category"

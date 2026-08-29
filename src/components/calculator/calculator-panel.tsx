@@ -23,6 +23,7 @@ import {
   formatPercent,
   formatRateValue,
 } from "@/lib/formatters";
+import type { Truck } from "@/lib/types";
 import { cn, toNumber } from "@/lib/utils";
 
 export interface CalculatorDefaults {
@@ -39,6 +40,7 @@ export interface CalculatorDefaults {
   deadheadWarnPct: number;
   thresholds: RatingThresholds;
   brokers: string[];
+  trucks: Truck[];
   defaultDate: string;
 }
 
@@ -401,6 +403,7 @@ function EvaluateResult({
           </div>
           <LoadFormDialog
             brokers={defaults.brokers}
+            trucks={defaults.trucks}
             defaultDate={defaults.defaultDate}
             ratingThresholds={defaults.thresholds}
             prefill={{

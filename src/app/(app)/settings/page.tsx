@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { summarizePeriod } from "@/lib/calculations";
 import { requireSession } from "@/lib/auth";
 import { getRepository, storageMode } from "@/lib/db";
+import { activeTrucks } from "@/lib/fleet";
 import { periodFromSearchParams, type SearchParams } from "@/lib/period-params";
 import { APP_NAME } from "@/lib/utils";
 
@@ -24,7 +25,7 @@ export default async function SettingsPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { business, settings, goals, subscription, truck, loads, expenses } =
+  const { business, settings, goals, subscription, trucks, loads, expenses } =
     await getRepository(session.businessId).getDataset();
   const period = periodFromSearchParams(params);
   const preview = summarizePeriod(loads, expenses, period, settings);
@@ -58,7 +59,7 @@ export default async function SettingsPage({
         <div className="min-w-0 space-y-4">
           <PlanCard
             subscription={subscription}
-            activeTruckCount={truck.active ? 1 : 0}
+            activeTruckCount={activeTrucks(trucks).length}
           />
 
           <Card>

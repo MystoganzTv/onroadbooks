@@ -18,6 +18,8 @@ export interface NavItem {
   icon: LucideIcon;
   /** Also treat these prefixes as "on this section". */
   matches?: string[];
+  /** Hidden until the business actually runs more than one truck. */
+  fleetOnly?: boolean;
 }
 
 export interface NavGroup {
@@ -52,6 +54,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/analytics/cost-per-mile", label: "Analytics", icon: BarChart3, matches: ["/analytics"] },
       { href: "/reports", label: "Reports", icon: BarChart3 },
+      { href: "/fleet", label: "Fleet", icon: Truck, fleetOnly: true },
       { href: "/truck", label: "Truck", icon: Truck },
     ],
   },

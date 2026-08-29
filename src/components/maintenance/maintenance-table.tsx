@@ -36,6 +36,7 @@ interface MaintenanceTableProps {
   records: MaintenanceRecord[];
   documents: Document[];
   currentOdometer: number;
+  truckId?: string;
   today: string;
   thresholds: DueThresholds;
 }
@@ -43,6 +44,7 @@ interface MaintenanceTableProps {
 export function MaintenanceTable({
   records,
   documents,
+  truckId,
   currentOdometer,
   today,
   thresholds,
@@ -71,7 +73,7 @@ export function MaintenanceTable({
           icon={Wrench}
           title="No service history yet"
           description="Log oil changes, tires, inspections and renewals to build a maintenance record for this truck."
-          action={<MaintenanceFormDialog currentOdometer={currentOdometer} />}
+          action={<MaintenanceFormDialog currentOdometer={currentOdometer} truckId={truckId} />}
         />
       </div>
     );

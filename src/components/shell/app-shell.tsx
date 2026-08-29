@@ -15,11 +15,18 @@ import { isNavActive, PRIMARY_NAV } from "./nav-items";
 interface AppShellProps {
   businessName: string;
   truckName: string;
+  hasFleet?: boolean;
   userEmail: string;
   children: React.ReactNode;
 }
 
-export function AppShell({ businessName, truckName, userEmail, children }: AppShellProps) {
+export function AppShell({
+  businessName,
+  truckName,
+  hasFleet = false,
+  userEmail,
+  children,
+}: AppShellProps) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const pathname = usePathname();
 
@@ -29,7 +36,12 @@ export function AppShell({ businessName, truckName, userEmail, children }: AppSh
     <div className="flex min-h-dvh bg-background print:block print:min-h-0">
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 hidden w-60 border-r border-sidebar-border lg:block">
-        <SidebarNav businessName={businessName} truckName={truckName} userEmail={userEmail} />
+        <SidebarNav
+          businessName={businessName}
+          truckName={truckName}
+          hasFleet={hasFleet}
+          userEmail={userEmail}
+        />
       </aside>
 
       {/* Mobile drawer */}
@@ -39,6 +51,7 @@ export function AppShell({ businessName, truckName, userEmail, children }: AppSh
           <SidebarNav
             businessName={businessName}
             truckName={truckName}
+            hasFleet={hasFleet}
             userEmail={userEmail}
             onNavigate={() => setMobileOpen(false)}
           />

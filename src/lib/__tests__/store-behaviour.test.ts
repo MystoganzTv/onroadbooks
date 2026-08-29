@@ -165,14 +165,14 @@ describe("fuel <-> expense mirror", () => {
   });
 
   it("advances the odometer but never rolls it back", async () => {
-    const start = (await repo.getDataset()).truck.currentOdometer;
+    const start = (await repo.getDataset()).trucks[0].currentOdometer;
 
     const forward = await repo.createFuelEntry(fuel({ odometer: start + 500 }));
-    assert.equal((await repo.getDataset()).truck.currentOdometer, start + 500);
+    assert.equal((await repo.getDataset()).trucks[0].currentOdometer, start + 500);
 
     const backward = await repo.createFuelEntry(fuel({ odometer: start - 5_000 }));
     assert.equal(
-      (await repo.getDataset()).truck.currentOdometer,
+      (await repo.getDataset()).trucks[0].currentOdometer,
       start + 500,
       "a mistyped older reading must not reset the truck",
     );
@@ -253,9 +253,9 @@ describe("maintenance <-> expense mirror", () => {
   });
 
   it("keeps a service reading from lowering the odometer", async () => {
-    const start = (await repo.getDataset()).truck.currentOdometer;
+    const start = (await repo.getDataset()).trucks[0].currentOdometer;
     const record = await repo.createMaintenance(service({ odometer: start - 10_000 }));
-    assert.equal((await repo.getDataset()).truck.currentOdometer, start);
+    assert.equal((await repo.getDataset()).trucks[0].currentOdometer, start);
     await repo.deleteMaintenance(record.id);
   });
 });
@@ -455,5 +455,120 @@ describe("an unreadable ledger", () => {
       false,
       "nothing is written back in its place without the user asking",
     );
+  });
+});
+
+/**
+ * Routing a row to a unit.
+ *
+ * These are the rules the fleet views rest on. If a load, a fill-up or a
+ * service lands on the wrong truck, every per-unit figure in the app is
+ * quietly wrong while every total still balances -- which is the worst kind
+ * of wrong, because nothing looks broken.
+ */
+describe("which truck a row belongs to", () => {
+  it("bills an expense to the truck it names", async () => {
+    const before = await repo.getDataset();
+    const second = await repo.createTruck({
+      name: "Unit 102",
+      acquiredOn: null,
+      year: null,
+      make: null,
+      model: null,
+      vin: null,
+      purchasePrice: null,
+      monthlyPayment: null,
+      monthlyInsurance: null,
+      startingOdometer: 10_000,
+      currentOdometer: 10_000,
+    });
+    assert.notEqual(second.id, before.trucks[0].id);
+
+    const charged = await repo.createExpense(expense({ truckId: second.id }));
+    assert.equal(charged.truckId, second.id);
+    assert.equal(charged.scope, "TRUCK");
+  });
+
+  it("falls back to the primary truck when none is named", async () => {
+    const { trucks } = await repo.getDataset();
+    const created = await repo.createExpense(expense({ description: "No truck named" }));
+    assert.equal(created.truckId, trucks.find((t) => t.active)!.id);
+  });
+
+  it("keeps business overhead off every truck", async () => {
+    const overhead = await repo.createExpense(
+      expense({ scope: "BUSINESS", category: "OTHER", description: "Phone plan", amount: 95 }),
+    );
+    assert.equal(overhead.scope, "BUSINESS");
+    assert.equal(overhead.truckId, null, "overhead belongs to the business, not to a unit");
+  });
+
+  it("moves an expense between units without leaving a copy behind", async () => {
+    const { trucks } = await repo.getDataset();
+    const [first, second] = trucks;
+    const created = await repo.createExpense(expense({ truckId: first.id, amount: 10 }));
+    const moved = await repo.updateExpense(created.id, expense({ truckId: second.id, amount: 10 }));
+
+    assert.equal(moved.truckId, second.id);
+    const { expenses } = await repo.getDataset();
+    assert.equal(expenses.filter((e) => e.id === created.id).length, 1);
+  });
+
+  it("books a load and its miles against the truck that ran it", async () => {
+    const { trucks } = await repo.getDataset();
+    const second = trucks[1];
+    const load = await repo.createLoad({
+      truckId: second.id,
+      date: "2026-08-18",
+      originCity: "Reno",
+      originState: "NV",
+      destinationCity: "Boise",
+      destinationState: "ID",
+      broker: null,
+      loadNumber: null,
+      loadedMiles: 420,
+      deadheadMiles: 30,
+      grossRate: 1200,
+      fuelCost: 0,
+      tolls: 0,
+      dispatchFee: 0,
+      factoringFee: 0,
+      otherExpenses: 0,
+      status: "PENDING",
+      notes: null,
+    });
+    assert.equal(load.truckId, second.id);
+  });
+
+  it("moves a fill-up's odometer and its ledger row to the same truck", async () => {
+    const { trucks } = await repo.getDataset();
+    const second = trucks[1];
+    const entry = await repo.createFuelEntry(fuel({ truckId: second.id, odometer: 12_500 }));
+
+    assert.equal(entry.truckId, second.id);
+
+    const after = await repo.getDataset();
+    const mirror = after.expenses.find((e) => e.id === fuelExpenseId(entry.id));
+    assert.equal(mirror?.truckId, second.id, "the ledger row follows the fill-up");
+    assert.equal(
+      after.trucks.find((t) => t.id === second.id)!.currentOdometer,
+      12_500,
+      "the reading advances the odometer it was taken from",
+    );
+    assert.notEqual(
+      after.trucks.find((t) => t.id === trucks[0].id)!.currentOdometer,
+      12_500,
+      "and leaves the other truck's odometer alone",
+    );
+  });
+
+  it("logs a service, and its ledger row, against the truck it names", async () => {
+    const { trucks } = await repo.getDataset();
+    const second = trucks[1];
+    const record = await repo.createMaintenance(service({ truckId: second.id, odometer: 13_000 }));
+
+    assert.equal(record.truckId, second.id);
+    const { expenses } = await repo.getDataset();
+    assert.equal(expenses.find((e) => e.id === record.expenseId)?.truckId, second.id);
   });
 });

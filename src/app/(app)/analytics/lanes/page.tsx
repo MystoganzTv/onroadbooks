@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ArrowRight } from "lucide-react";
 
 import { AnalyticsTabs } from "@/components/cockpit/analytics-tabs";
+import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import { PeriodControls } from "@/components/dashboard/period-controls";
 import { MiniStat } from "@/components/dashboard/mini-stat";
 import { PageHeader } from "@/components/shared/page-header";
@@ -24,7 +25,12 @@ import {
   formatPercent,
   formatRateValue,
 } from "@/lib/formatters";
-import { periodFromSearchParams, type SearchParams } from "@/lib/period-params";
+import { loadsForTruck, orderedTrucks } from "@/lib/fleet";
+import {
+  periodFromSearchParams,
+  truckFromSearchParams,
+  type SearchParams,
+} from "@/lib/period-params";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Lane Intelligence" };
@@ -43,8 +49,13 @@ export default async function LanesPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { loads, settings } = await getRepository(session.businessId).getDataset();
+  const { trucks, loads: allLoads, settings } = await getRepository(
+    session.businessId,
+  ).getDataset();
   const period = periodFromSearchParams(params);
+
+  const truckId = truckFromSearchParams(params, trucks);
+  const loads = loadsForTruck(allLoads, truckId);
 
   const thresholds = thresholdsFromSettings(settings);
   const periodLoads = withMetricsAll(loadsInPeriod(loads, period), thresholds);
@@ -75,7 +86,10 @@ export default async function LanesPage({
         description="Which runs pay. Direction matters — the way out and the way back are separate businesses."
       />
       <AnalyticsTabs />
-      <PeriodControls period={period} />
+      <div className="flex flex-wrap items-center gap-2">
+        <PeriodControls period={period} />
+        <TruckSwitcher trucks={orderedTrucks(trucks)} selectedId={truckId} />
+      </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <MiniStat label="Lanes run" value={String(lanes.length)} sub={period.shortLabel} />

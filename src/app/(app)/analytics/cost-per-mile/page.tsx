@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { AnalyticsTabs } from "@/components/cockpit/analytics-tabs";
+import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import { CostPerMileCard } from "@/components/cockpit/cost-per-mile-card";
 import { PeriodControls } from "@/components/dashboard/period-controls";
 import { MiniStat } from "@/components/dashboard/mini-stat";
@@ -17,7 +18,12 @@ import {
   formatPercent,
   formatRateValue,
 } from "@/lib/formatters";
-import { periodFromSearchParams, type SearchParams } from "@/lib/period-params";
+import { expensesForTruck, loadsForTruck, orderedTrucks } from "@/lib/fleet";
+import {
+  periodFromSearchParams,
+  truckFromSearchParams,
+  type SearchParams,
+} from "@/lib/period-params";
 import { todayISO } from "@/lib/periods";
 import type { CostLine } from "@/lib/finance/cost-per-mile";
 import { cn } from "@/lib/utils";
@@ -39,8 +45,19 @@ export default async function CostPerMilePage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { loads, expenses, settings } = await getRepository(session.businessId).getDataset();
+  const {
+    trucks,
+    loads: allLoads,
+    expenses: allExpenses,
+    settings,
+  } = await getRepository(session.businessId).getDataset();
   const period = periodFromSearchParams(params);
+
+  // Scoped to a unit, this is that truck's own cost per mile: its loads and
+  // the costs it caused, with no share of overhead imputed to it.
+  const truckId = truckFromSearchParams(params, trucks);
+  const loads = loadsForTruck(allLoads, truckId);
+  const expenses = expensesForTruck(allExpenses, truckId);
 
   const summary = summarizePeriod(loads, expenses, period, settings);
   const cost = calculateTrueCostPerMile(loads, expenses, period, settings, period.label);
@@ -53,7 +70,10 @@ export default async function CostPerMilePage({
         description="Actual expenses over actual miles. Nothing prorated, nothing split from a monthly total."
       />
       <AnalyticsTabs />
-      <PeriodControls period={period} />
+      <div className="flex flex-wrap items-center gap-2">
+        <PeriodControls period={period} />
+        <TruckSwitcher trucks={orderedTrucks(trucks)} selectedId={truckId} />
+      </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <MiniStat

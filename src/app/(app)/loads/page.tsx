@@ -5,6 +5,7 @@ import { LoadFormDialog } from "@/components/loads/load-form-dialog";
 import { LoadsTable } from "@/components/loads/loads-table";
 import { MiniStat } from "@/components/dashboard/mini-stat";
 import { PageHeader } from "@/components/shared/page-header";
+import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import {
   loadsInPeriod,
   summarizePeriod,
@@ -19,8 +20,13 @@ import {
   formatPercent,
   formatRate,
 } from "@/lib/formatters";
+import { expensesForTruck, loadsForTruck, orderedTrucks } from "@/lib/fleet";
 import { defaultEntryDate } from "@/lib/periods";
-import { periodFromSearchParams, type SearchParams } from "@/lib/period-params";
+import {
+  periodFromSearchParams,
+  truckFromSearchParams,
+  type SearchParams,
+} from "@/lib/period-params";
 
 export const metadata: Metadata = { title: "Loads" };
 
@@ -31,12 +37,18 @@ export default async function LoadsPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { loads, expenses, settings } = await getRepository(session.businessId).getDataset();
+  const { trucks, loads, expenses, settings } = await getRepository(
+    session.businessId,
+  ).getDataset();
   const period = periodFromSearchParams(params);
   const ratingThresholds = thresholdsFromSettings(settings);
 
-  const periodLoads = withMetricsAll(loadsInPeriod(loads, period), ratingThresholds);
-  const summary = summarizePeriod(loads, expenses, period, settings);
+  const scopeTruckId = truckFromSearchParams(params, trucks);
+  const scopedLoads = loadsForTruck(loads, scopeTruckId);
+  const scopedExpenses = expensesForTruck(expenses, scopeTruckId);
+
+  const periodLoads = withMetricsAll(loadsInPeriod(scopedLoads, period), ratingThresholds);
+  const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings);
   const brokers = [...new Set(loads.map((l) => l.broker).filter(Boolean))].sort() as string[];
 
   const tripExpenses = periodLoads.reduce((sum, load) => sum + load.metrics.tripExpenses, 0);
@@ -49,12 +61,17 @@ export default async function LoadsPage({
         description={`${period.label} - every load dated inside the selected period`}
         actions={<LoadFormDialog
             brokers={brokers}
+            trucks={trucks}
+            defaultTruckId={scopeTruckId}
             defaultDate={defaultEntryDate(period)}
             ratingThresholds={ratingThresholds}
           />}
       />
 
-      <PeriodControls period={period} />
+      <div className="flex flex-wrap items-center gap-2">
+        <PeriodControls period={period} />
+        <TruckSwitcher trucks={orderedTrucks(trucks)} selectedId={scopeTruckId} />
+      </div>
 
       <section
         aria-label="Load summary"
@@ -89,6 +106,8 @@ export default async function LoadsPage({
       <LoadsTable
         loads={periodLoads}
         brokers={brokers}
+        trucks={trucks}
+        defaultTruckId={scopeTruckId}
         defaultDate={defaultEntryDate(period)}
         ratingThresholds={ratingThresholds}
         emptyDescription={`No loads are dated inside ${period.label}. Try another period or add one.`}

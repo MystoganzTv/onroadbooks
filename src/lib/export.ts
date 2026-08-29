@@ -24,6 +24,7 @@ import { behaviorOf, categoryLabel } from "./categories";
 import { maintenanceLabel } from "./maintenance";
 import type { Period } from "./periods";
 import type { Dataset } from "./types";
+import { primaryTruck } from "./fleet";
 
 export type ReportId =
   | "loads"
@@ -240,7 +241,7 @@ export function buildReport(id: ReportId, dataset: Dataset, period: Period): Rep
     case "maintenance":
     default:
       return {
-        title: `Maintenance - ${dataset.truck.name}`,
+        title: `Maintenance - ${primaryTruck(dataset.trucks).name}`,
         columns: [
           "Service Date", "Type", "Tracked By", "Odometer", "Cost", "Vendor",
           "Next Service Date", "Next Service Odometer", "In Expense Ledger", "Notes",

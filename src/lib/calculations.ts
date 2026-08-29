@@ -524,7 +524,12 @@ export interface TruckLifetime {
 
 export function truckLifetime(dataset: Dataset, truck: Truck): TruckLifetime {
   const loads = dataset.loads.filter((l) => l.truckId === truck.id);
-  const expenses = dataset.expenses.filter((e) => !e.truckId || e.truckId === truck.id);
+  // Only what this unit caused. Business overhead is charged once, at the
+  // fleet level -- imputing it to a truck would invent a cost per unit, and
+  // the shape of that lie is the whole reason expenses carry a scope.
+  const expenses = dataset.expenses.filter(
+    (e) => e.scope !== "BUSINESS" && e.truckId === truck.id,
+  );
 
   const totalRevenue = roundMoney(sum(loads, (l) => l.grossRate));
   const totalExpenses = roundMoney(sum(expenses, (e) => e.amount));

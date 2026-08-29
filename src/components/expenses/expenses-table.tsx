@@ -44,7 +44,7 @@ import { deleteExpenseAction } from "@/lib/actions/expenses";
 import type { Document } from "@/lib/types";
 import { behaviorOf, categoryColor, categoryLabel, EXPENSE_CATEGORIES } from "@/lib/categories";
 import { formatDateShort, formatMoney } from "@/lib/formatters";
-import type { Expense, ExpenseBehavior, LoadWithMetrics } from "@/lib/types";
+import type { Expense, ExpenseBehavior, LoadWithMetrics, Truck } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ExpenseFormDialog } from "./expense-form-dialog";
 
@@ -56,6 +56,8 @@ interface ExpensesTableProps {
   loads: LoadWithMetrics[];
   categoryBehavior: Record<string, ExpenseBehavior>;
   defaultDate: string;
+  trucks?: Truck[];
+  defaultTruckId?: string | null;
 }
 
 export function ExpensesTable({
@@ -64,6 +66,8 @@ export function ExpensesTable({
   loads,
   categoryBehavior,
   defaultDate,
+  trucks = [],
+  defaultTruckId,
 }: ExpensesTableProps) {
   const router = useRouter();
   const [search, setSearch] = React.useState("");
@@ -102,6 +106,10 @@ export function ExpensesTable({
   }, [expenses, search, category, behavior, sort, categoryBehavior]);
 
   const total = filtered.reduce((sum, expense) => sum + expense.amount, 0);
+  // With one truck every cost is that truck's, so saying so on every row is
+  // noise. With a fleet it is the first thing you need to know.
+  const showCharge = trucks.length > 1;
+  const truckName = (id: string | null) => trucks.find((t) => t.id === id)?.name ?? "Unknown truck";
   const hasFilters = search !== "" || category !== "all" || behavior !== "all";
 
   function toggleSort(key: SortKey) {
@@ -212,7 +220,13 @@ export function ExpensesTable({
                 Clear filters
               </Button>
             ) : (
-              <ExpenseFormDialog loads={loads} defaultDate={defaultDate} categoryBehavior={categoryBehavior} />
+              <ExpenseFormDialog
+                loads={loads}
+                defaultDate={defaultDate}
+                categoryBehavior={categoryBehavior}
+                trucks={trucks}
+                defaultTruckId={defaultTruckId}
+              />
             )
           }
         />
@@ -300,6 +314,13 @@ export function ExpensesTable({
                           {mirroredFuel ? "From Fuel" : "From Service"}
                         </Badge>
                       ) : null}
+                      {showCharge ? (
+                        <span className="ml-1.5 text-2xs text-muted-foreground">
+                          {expense.scope === "BUSINESS"
+                            ? "Overhead"
+                            : truckName(expense.truckId)}
+                        </span>
+                      ) : null}
                     </TableCell>
                     <TableCell className="max-w-[13rem] truncate text-muted-foreground">
                       {expense.vendor ?? "--"}
@@ -333,6 +354,7 @@ export function ExpensesTable({
                           documents={documents.filter((d) => d.expenseId === expense.id)}
                           loads={loads}
                           categoryBehavior={categoryBehavior}
+                          trucks={trucks}
                           trigger={
                             <Button variant="ghost" size="icon-sm" aria-label="Edit expense">
                               <Pencil />

@@ -38,7 +38,8 @@ import { PAYMENT_STATUSES } from "@/lib/categories";
 import { formatMiles, formatMoney, formatRateValue } from "@/lib/formatters";
 import { loadSchema } from "@/lib/schemas";
 import { todayISO } from "@/lib/periods";
-import type { Load, PaymentStatus } from "@/lib/types";
+import { orderedTrucks } from "@/lib/fleet";
+import type { Load, PaymentStatus, Truck } from "@/lib/types";
 import { toNumber } from "@/lib/utils";
 
 const FIELD_LABELS: Record<string, string> = {
@@ -61,6 +62,7 @@ const FIELD_LABELS: Record<string, string> = {
 };
 
 interface FormState {
+  truckId: string;
   date: string;
   originCity: string;
   originState: string;
@@ -80,8 +82,9 @@ interface FormState {
   notes: string;
 }
 
-function emptyState(defaultDate: string): FormState {
+function emptyState(defaultDate: string, truckId: string): FormState {
   return {
+    truckId,
     date: defaultDate,
     originCity: "",
     originState: "",
@@ -104,6 +107,7 @@ function emptyState(defaultDate: string): FormState {
 
 function stateFromLoad(load: Load): FormState {
   return {
+    truckId: load.truckId,
     date: load.date,
     originCity: load.originCity,
     originState: load.originState,
@@ -166,6 +170,9 @@ function applyPrefill(state: FormState, prefill?: LoadPrefill): FormState {
 interface LoadFormDialogProps {
   load?: Load;
   brokers?: string[];
+  trucks?: Truck[];
+  /** Preselects the unit the page is currently scoped to. */
+  defaultTruckId?: string | null;
   defaultDate?: string;
   ratingThresholds?: RatingThresholds;
   trigger?: React.ReactNode;
@@ -181,6 +188,8 @@ interface LoadFormDialogProps {
 export function LoadFormDialog({
   load,
   brokers = [],
+  trucks = [],
+  defaultTruckId,
   defaultDate,
   ratingThresholds,
   trigger,
@@ -189,17 +198,31 @@ export function LoadFormDialog({
   const router = useRouter();
   const isEdit = Boolean(load);
   const prefillKey = JSON.stringify(prefill ?? null);
+
+  /**
+   * Which unit ran the load. A retired truck stays selectable only while an
+   * existing load still points at it, so editing history never moves the
+   * revenue onto a different unit.
+   */
+  const truckOptions = React.useMemo(
+    () => orderedTrucks(trucks).filter((t) => t.active || t.id === load?.truckId),
+    [trucks, load?.truckId],
+  );
+  // One truck ran it. Asking would be a question with a single answer.
+  const showTruck = truckOptions.length > 1;
+  const defaultTruck = defaultTruckId ?? truckOptions.find((t) => t.active)?.id ?? "";
+
   const initial = React.useMemo(
     () =>
       load
         ? stateFromLoad(load)
         : applyPrefill(
-            emptyState(defaultDate ?? todayISO()),
+            emptyState(defaultDate ?? todayISO(), defaultTruck),
             prefillKey === "null" ? undefined : (JSON.parse(prefillKey) as LoadPrefill),
           ),
     // Serialised so a freshly built prefill object on every keystroke does not
     // re-seed the form while the dialog is open.
-    [load, defaultDate, prefillKey],
+    [load, defaultDate, defaultTruck, prefillKey],
   );
 
   const [open, setOpen] = React.useState(false);
@@ -238,6 +261,9 @@ export function LoadFormDialog({
     event.preventDefault();
 
     const payload = {
+      // Empty when the business has one truck: the store bills the unit that
+      // exists rather than the form guessing at an id.
+      truckId: values.truckId || null,
       date: values.date,
       originCity: values.originCity,
       originState: values.originState,
@@ -321,6 +347,29 @@ export function LoadFormDialog({
 
         <DialogBody>
           <form id="load-form" onSubmit={submit} className="space-y-4" noValidate>
+            {showTruck ? (
+              <Field
+                label="Truck"
+                htmlFor="load-truck"
+                required
+                hint="The unit this load's revenue and miles belong to"
+              >
+                <Select value={values.truckId} onValueChange={(value) => set("truckId", value)}>
+                  <SelectTrigger id="load-truck">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {truckOptions.map((truck) => (
+                      <SelectItem key={truck.id} value={truck.id}>
+                        {truck.name}
+                        {truck.active ? "" : " (retired)"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            ) : null}
+
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Field label="Date" htmlFor="load-date" required error={errors.date}>
                 <Input

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
+import { primaryTruck } from "@/lib/fleet";
 import {
   documentTypeLabel,
   isAcceptedType,
@@ -106,7 +107,7 @@ export async function POST(request: Request) {
         ? dataset.expenses.some((e) => e.id === entityId)
         : owner === "MAINTENANCE"
           ? dataset.maintenanceRecords.some((m) => m.id === entityId)
-          : dataset.truck.id === entityId;
+          : primaryTruck(dataset.trucks).id === entityId;
 
   if (!ownerExists) {
     return NextResponse.json({ error: "That record no longer exists." }, { status: 404 });

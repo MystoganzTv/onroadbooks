@@ -26,17 +26,26 @@ import {
   formatNumber,
   formatOdometer,
 } from "@/lib/formatters";
-import type { FuelEntry, LoadWithMetrics } from "@/lib/types";
+import type { FuelEntry, LoadWithMetrics, Truck } from "@/lib/types";
 import { FuelFormDialog } from "./fuel-form-dialog";
 
 interface FuelTableProps {
   entries: FuelEntry[];
   loads: LoadWithMetrics[];
+  trucks?: Truck[];
+  defaultTruckId?: string | null;
   defaultDate: string;
   lastOdometer: number | null;
 }
 
-export function FuelTable({ entries, loads, defaultDate, lastOdometer }: FuelTableProps) {
+export function FuelTable({
+  entries,
+  loads,
+  trucks = [],
+  defaultTruckId,
+  defaultDate,
+  lastOdometer,
+}: FuelTableProps) {
   const router = useRouter();
   const [deleting, setDeleting] = React.useState<string | null>(null);
 
@@ -89,7 +98,13 @@ export function FuelTable({ entries, loads, defaultDate, lastOdometer }: FuelTab
           title="No fuel purchases in this period"
           description="Log each fill-up with its odometer reading and the app will calculate MPG and fuel cost per mile."
           action={
-            <FuelFormDialog loads={loads} defaultDate={defaultDate} lastOdometer={lastOdometer} />
+            <FuelFormDialog
+              loads={loads}
+              trucks={trucks}
+              defaultTruckId={defaultTruckId}
+              defaultDate={defaultDate}
+              lastOdometer={lastOdometer}
+            />
           }
         />
       </div>
@@ -142,6 +157,7 @@ export function FuelTable({ entries, loads, defaultDate, lastOdometer }: FuelTab
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-0.5">
                       <FuelFormDialog
+                        trucks={trucks}
                         entry={entry}
                         loads={loads}
                         lastOdometer={lastOdometer}
