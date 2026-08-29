@@ -1,0 +1,54 @@
+name: CI
+
+# Every push and every pull request has to survive the same four gates the
+# app is developed against: it compiles, it type-checks, it lints clean, and
+# the money maths still holds.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Build, types, lint and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      # CI never talks to Postgres: the JSON store is the reference
+      # implementation and the one the behavioural tests exercise.
+      DATA_SOURCE: json
+      DOCUMENT_STORAGE: local
+      # A fixed key so the build does not write a session secret into the
+      # workspace. It signs nothing that outlives the job.
+      AUTH_SECRET: ci-only-not-a-real-secret
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` runs the postinstall hook, which regenerates the Prisma
+      # client into src/generated -- that directory is not in the repo.
+      - name: Install
+        run: npm ci
+
+      - name: Types
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build

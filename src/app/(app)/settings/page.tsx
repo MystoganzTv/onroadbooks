@@ -1,0 +1,109 @@
+import type { Metadata } from "next";
+import { Database, FileText } from "lucide-react";
+
+import { DisplaySettings } from "@/components/settings/display-settings";
+import { SettingsForm } from "@/components/settings/settings-form";
+import { PageHeader } from "@/components/shared/page-header";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { summarizePeriod } from "@/lib/calculations";
+import { requireSession } from "@/lib/auth";
+import { getRepository, storageMode } from "@/lib/db";
+import { periodFromSearchParams, type SearchParams } from "@/lib/period-params";
+import { APP_NAME } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Settings" };
+
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const params = await searchParams;
+  const session = await requireSession();
+  const { business, settings, loads, expenses } = await getRepository(session.businessId).getDataset();
+  const period = periodFromSearchParams(params);
+  const preview = summarizePeriod(loads, expenses, period, settings);
+  const mode = storageMode();
+
+  return (
+    <div className="space-y-4 p-4 lg:p-6">
+      <PageHeader
+        title="Business Settings"
+        description="Reserve percentages and expense classification apply to every period in the app."
+      />
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <div className="min-w-0 xl:col-span-2">
+          <SettingsForm
+            business={business}
+            settings={settings}
+            preview={preview}
+            previewLabel={period.label}
+          />
+
+          <div className="mt-4">
+            <DisplaySettings />
+          </div>
+        </div>
+
+        <div className="min-w-0 space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Database className="size-3.5 text-muted-foreground" />
+                <CardTitle>Data Source</CardTitle>
+              </div>
+              <Badge variant={mode === "postgres" ? "positive" : "info"}>
+                {mode === "postgres" ? "PostgreSQL" : "Local JSON"}
+              </Badge>
+            </CardHeader>
+            <CardContent className="space-y-2 p-4 text-xs leading-relaxed text-muted-foreground">
+              {mode === "postgres" ? (
+                <p>
+                  Connected to PostgreSQL through Prisma. Schema changes go through{" "}
+                  <code className="rounded bg-surface-sunken px-1">prisma migrate</code>.
+                </p>
+              ) : (
+                <>
+                  <p>
+                    Running on the bundled local store. Everything you add is written to{" "}
+                    <code className="rounded bg-surface-sunken px-1">data/truckledger.json</code>{" "}
+                    and survives restarts.
+                  </p>
+                  <p>
+                    To move to Supabase or any Postgres: set{" "}
+                    <code className="rounded bg-surface-sunken px-1">DATABASE_URL</code>, set{" "}
+                    <code className="rounded bg-surface-sunken px-1">DATA_SOURCE=postgres</code>,
+                    then run{" "}
+                    <code className="rounded bg-surface-sunken px-1">npm run db:push</code> and{" "}
+                    <code className="rounded bg-surface-sunken px-1">npm run db:seed</code>. No
+                    application code changes.
+                  </p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <FileText className="size-3.5 text-muted-foreground" />
+                <CardTitle>Product Name</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 text-xs leading-relaxed text-muted-foreground">
+              <p>
+                The app is currently called{" "}
+                <span className="font-medium text-foreground">{APP_NAME}</span>. It is a working
+                name only -- change{" "}
+                <code className="rounded bg-surface-sunken px-1">NEXT_PUBLIC_APP_NAME</code> in
+                your environment file and it updates everywhere.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}

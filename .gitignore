@@ -1,0 +1,33 @@
+# Dependencies
+node_modules
+
+# Next.js
+.next
+out
+build
+next-env.d.ts
+tsconfig.tsbuildinfo
+
+# Secrets and environment
+.env
+.env*.local
+*.pem
+
+# Local ledger, uploaded receipts and the generated session key.
+# The demo dataset rebuilds itself on first run, so nothing here belongs in
+# version control -- and uploads/ holds real documents.
+/data/*.json
+/data/*.json.corrupt-*
+/data/uploads/
+/data/.auth-secret
+
+# Generated Prisma client (rebuilt by `npm install` via postinstall)
+/src/generated
+
+# Logs and OS noise
+npm-debug.log*
+yarn-error.log*
+install.log
+server.log
+.DS_Store
+Thumbs.db
