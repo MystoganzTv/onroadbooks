@@ -15,9 +15,13 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000. No database setup required -- the app boots on a
-local JSON store seeded with a realistic August 2026 dataset (plus three months
-of history so trends and period comparisons are populated).
+Open http://localhost:3000. The first visit lands on `/setup`, where you create
+the owner account -- email, password, business name. After that, `/login`.
+
+No database setup required: the app boots on a local JSON store seeded with a
+realistic August 2026 dataset (plus three months of history so trends and period
+comparisons are populated). The account you create attaches to that seeded
+business, so there is data on screen from the first sign-in.
 
 ---
 
@@ -273,6 +277,7 @@ filter and a selector, not a migration. The UI stays deliberately single-truck.
 | `npm run build` / `npm start` | production build and serve |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
+| `npm test` | the test suite (see below) |
 | `npm run db:generate` | regenerate the Prisma client |
 | `npm run db:push` | push the schema to Postgres |
 | `npm run db:seed` | seed Postgres with the demo dataset |
@@ -302,9 +307,22 @@ sidebar becomes a drawer.
 
 ## Security posture
 
-There is no authentication yet — that is the deliberate gap, and it is the
-one thing to close before this is exposed beyond localhost. Everything else
-found in the audit is fixed:
+- **Authentication** is single-owner email + password, built on `node:crypto`
+  alone: scrypt password hashing with a per-user salt, constant-time
+  comparison, and an HMAC-SHA256 signed session cookie (`httpOnly`,
+  `sameSite=lax`, `secure` in production). `middleware.ts` gates every route
+  except `/login`, `/setup` and `/api/auth/*` -- pages redirect, API routes
+  get a 401. `AUTH_SECRET` signs the cookie; if it is unset a key is
+  generated once into `data/.auth-secret` (mode 0600), which is fine locally
+  and wrong for a deployment, because a restart on new hardware signs
+  everyone out.
+- **Every repository instance is bound to a `businessId`** taken from the
+  session, and the binding is checked on read *and* on write. A repository
+  cannot be constructed without one. Today the file holds a single business,
+  so this buys nothing visible -- it is there so that adding the second one
+  is a schema change rather than a security incident.
+
+Everything found in the audit is fixed:
 
 - **Uploads** accept a strict MIME allowlist (PNG, JPEG, WebP, HEIC/HEIF, GIF,
   PDF). SVG is refused: it is a script-bearing document, and it was previously
@@ -326,8 +344,45 @@ found in the audit is fixed:
   aside and the failure surfaces, rather than a real ledger being silently
   replaced with demo data.
 
+## Tests and CI
+
+```bash
+npm test
+```
+
+77 tests on `node:test`, no framework. They cover the parts where a quiet
+mistake costs money rather than throwing an error:
+
+| File | What it pins down |
+| --- | --- |
+| `calculations.test.ts` | division by zero and non-finite input, `roundMoney` symmetry and the `-$0.00` case, trip costs counted once, profit rated per mile *driven* (a $4.00/loaded-mile load with 300 empty miles rates MARGINAL against a plain $3.00 run at GREAT), reserve maths including a losing month |
+| `periods.test.ts` | every period key, leap years, year rollover on the previous-period comparison, week anchoring, a reversed custom range, impossible dates like `2026-02-30`, and that the two halves of a month sum exactly to the full month |
+| `maintenance.test.ts` | overdue on either measure, `BOTH` meaning whichever comes first, urgency scored against the user's own thresholds rather than an assumed miles-per-day, and zero thresholds |
+| `export.test.ts` | CSV formula neutralisation, RFC 4180 quoting, no row wider than its header, and summary labels staying out of numeric columns |
+| `store-contract.test.ts` | the JSON and Prisma stores expose the same shape, so the Postgres implementation cannot drift without the suite noticing |
+| `store-behaviour.test.ts` | the rules both stores must keep: a fuel purchase appears in the ledger exactly once across create/edit/delete, a service record's ledger row lives and dies with it, deleting a load unlinks its costs instead of deleting them, an odometer never moves backwards, a session cannot touch another business's rows, an older ledger file upgrades instead of crashing, and a corrupt one is set aside rather than replaced |
+
+The store tests run against a temporary directory, never `data/`.
+
+Two notes on running them. The suite passes `--conditions=react-server` so
+that the `server-only` marker resolves to its empty build instead of throwing;
+that is what the `test` script does for you. And the JSON store resolves its
+paths per call rather than at import, which is what lets a test point it at a
+scratch directory.
+
+`.github/workflows/ci.yml` runs types, lint, tests and a production build on
+every push and pull request.
+
+---
+
 ## Not built yet (deliberately)
 
-Authentication, receipt file upload, invoice generation, IFTA reporting, and
-multi-truck UI. The data model accommodates all of them; the MVP focuses on the
-financial product.
+Invoice generation, IFTA reporting, multi-user accounts (the auth model is
+single-owner: `/setup` closes once one account exists), and the multi-truck UI.
+The data model accommodates all of them; the MVP focuses on the financial
+product.
+
+Two more honest gaps: the Supabase storage adapter is written and selected by
+`DOCUMENT_STORAGE=supabase`, but it has never been run against a live project,
+and there are no browser-level end-to-end tests in CI -- the suite below covers
+the logic, not the wiring.
