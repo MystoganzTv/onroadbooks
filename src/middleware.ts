@@ -13,6 +13,12 @@ import { SESSION_COOKIE } from "@/lib/auth/constants";
 const PUBLIC_PATHS = ["/login", "/setup", "/api/auth"];
 
 /**
+ * The marketing landing page. It is matched exactly and never by prefix --
+ * `"/".startsWith` would let the whole application through.
+ */
+const PUBLIC_EXACT_PATHS = ["/"];
+
+/**
  * Static files served straight off disk: everything in public/ plus the
  * app-router icon routes. A page path never contains a dot, so the extension
  * is a safe test -- and it is deliberately NOT applied under /api/, because
@@ -28,6 +34,10 @@ function isPublicAsset(pathname: string): boolean {
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (PUBLIC_EXACT_PATHS.includes(pathname)) {
+    return NextResponse.next();
+  }
 
   if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
     return NextResponse.next();

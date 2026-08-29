@@ -2,7 +2,10 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Check, Loader2, TruckIcon } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Check, Loader2 } from "lucide-react";
+
+import { BrandLogo } from "@/components/shell/brand-logo";
 
 import { Field } from "@/components/shared/field";
 import { Button } from "@/components/ui/button";
@@ -90,16 +93,18 @@ export function SetupFlow() {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-background p-4 py-10">
       <div className="w-full max-w-3xl">
-        <div className="mb-6 flex items-center gap-2.5">
-          <div className="flex size-9 items-center justify-center rounded bg-primary text-primary-foreground">
-            <TruckIcon className="size-5" />
-          </div>
-          <div>
-            <p className="text-lg font-semibold tracking-tight">{APP_NAME}</p>
-            <p className="text-2xs text-muted-foreground">
-              Drive the truck. Know the business.
-            </p>
-          </div>
+        <div className="mb-6">
+          <Link
+            href="/"
+            className="mb-5 inline-flex items-center gap-1.5 text-2xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="size-3.5" aria-hidden />
+            Back to {APP_NAME}
+          </Link>
+          <BrandLogo className="w-40" priority />
+          <p className="mt-2 text-2xs text-muted-foreground">
+            Drive the truck. Know the business.
+          </p>
         </div>
 
         <form onSubmit={submit} noValidate className="grid gap-4 lg:grid-cols-[1fr_1.15fr]">

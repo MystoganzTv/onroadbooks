@@ -68,6 +68,29 @@ const config: Config = {
           DEFAULT: "hsl(var(--info))",
           soft: "hsl(var(--info-soft))",
         },
+        // The public landing page runs its own fixed dark palette rather than
+        // the app's theme tokens: it is a sales page with one look, and it
+        // must not change when a visitor's system flips to light. Nothing
+        // inside the product may use these.
+        mkt: {
+          ink: "#071426",
+          deep: "#061225",
+          mid: "#0A1B33",
+          mid2: "#0C2440",
+          panel: "#0C1F39",
+          raised: "#10233F",
+          amber: "#F6A81B",
+          amberhi: "#FFC24A",
+          amberdeep: "#D97C08",
+          blue: "#4FA3F7",
+          green: "#63D843",
+          text: "#E8EEF7",
+          sub: "#A9BBD1",
+          dim: "#93A7BF",
+          faint: "#6C819B",
+          paper: "#F1F2F0",
+          slate: "#14203a",
+        },
       },
       spacing: {
         "4.5": "1.125rem",
@@ -80,6 +103,11 @@ const config: Config = {
       fontFamily: {
         sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
         mono: ["var(--font-mono)", "ui-monospace", "SFMono-Regular", "monospace"],
+        // Landing page only: Archivo for the display type, Caveat for the two
+        // handwritten asides. Loaded in app/page.tsx so the app bundle never
+        // pays for them.
+        display: ["var(--font-display)", "var(--font-sans)", "ui-sans-serif", "sans-serif"],
+        script: ["var(--font-script)", "cursive"],
       },
       fontSize: {
         // Reading scale for a dense financial UI. Everything is rem based so
