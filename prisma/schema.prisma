@@ -1,0 +1,337 @@
+// OnRoad Books -- data model
+//
+// Designed for a single box truck today, but every financial row already
+// hangs off a Truck and a Business, so adding trucks (or a second business)
+// is additive rather than a migration of every table.
+//
+// Money is stored as Decimal(12,2) so Postgres, not floating point, owns
+// rounding once a real database is connected.
+
+generator client {
+  provider = "prisma-client-js"
+  // Custom output keeps the generated client inside the repo (the
+  // direction Prisma is moving in) and out of node_modules.
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum PaymentStatus {
+  PENDING
+  INVOICED
+  PAID
+}
+
+enum ExpenseBehavior {
+  FIXED
+  VARIABLE
+}
+
+enum DocumentType {
+  RATE_CONFIRMATION
+  BOL
+  POD
+  INVOICE
+  RECEIPT
+  REGISTRATION
+  INSURANCE
+  TITLE
+  INSPECTION
+  OTHER
+}
+
+enum MaintenanceType {
+  OIL_CHANGE
+  OIL_FILTER
+  FUEL_FILTER
+  TIRES
+  BRAKES
+  TRANSMISSION
+  COOLANT
+  BATTERY
+  DOT_INSPECTION
+  STATE_INSPECTION
+  REGISTRATION
+  INSURANCE
+  OTHER
+}
+
+/// What the next service is measured against.
+enum MaintenanceBasis {
+  DATE
+  MILEAGE
+  BOTH
+}
+
+enum ExpenseCategory {
+  FUEL
+  TOLLS
+  INSURANCE
+  TRUCK_PAYMENT
+  MAINTENANCE
+  REPAIRS
+  PARKING
+  DISPATCH
+  FACTORING
+  ELD
+  PERMITS
+  REGISTRATION
+  OFFICE
+  PHONE
+  ACCOUNTING
+  OTHER
+}
+
+model User {
+  id         String     @id @default(cuid())
+  email      String     @unique
+  name       String?
+  businessId String?
+  business   Business?  @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@index([businessId])
+}
+
+model Business {
+  id        String   @id @default(cuid())
+  name      String
+  currency  String   @default("USD")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users      User[]
+  trucks     Truck[]
+  loads       Load[]
+  expenses    Expense[]
+  fuelEntries FuelEntry[]
+  documents   Document[]
+  maintenance MaintenanceRecord[]
+  settings    FinancialSettings?
+}
+
+model FinancialSettings {
+  id                    String   @id @default(cuid())
+  businessId            String   @unique
+  business              Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  /// Percent of operating profit set aside for taxes (20 = 20%).
+  taxReservePct         Decimal  @default(20) @db.Decimal(5, 2)
+  /// Percent of gross revenue set aside for maintenance (5 = 5%).
+  maintenanceReservePct Decimal  @default(5) @db.Decimal(5, 2)
+  /// Map of ExpenseCategory -> ExpenseBehavior overrides.
+  categoryBehavior      Json     @default("{}")
+
+  /// Profit-per-total-mile floors for the load profitability rating.
+  ratingGreatPerMile    Decimal  @default(2) @db.Decimal(8, 2)
+  ratingGoodPerMile     Decimal  @default(1.5) @db.Decimal(8, 2)
+  ratingMarginalPerMile Decimal  @default(1) @db.Decimal(8, 2)
+
+  /// Deadhead share of total miles that triggers a warning.
+  deadheadWarnPct       Decimal  @default(20) @db.Decimal(5, 2)
+  /// Remaining service life that flags maintenance as due soon.
+  maintenanceWarnMiles  Int      @default(2000)
+  maintenanceWarnDays   Int      @default(30)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Truck {
+  id               String   @id @default(cuid())
+  businessId       String
+  business         Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  name             String
+  year             Int?
+  make             String?
+  model            String?
+  vin              String?
+  purchasePrice    Decimal? @db.Decimal(12, 2)
+  monthlyPayment   Decimal? @db.Decimal(12, 2)
+  monthlyInsurance Decimal? @db.Decimal(12, 2)
+  startingOdometer Int      @default(0)
+  currentOdometer  Int      @default(0)
+  active           Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  loads       Load[]
+  expenses    Expense[]
+  fuelEntries FuelEntry[]
+  documents   Document[]
+  maintenance MaintenanceRecord[]
+
+  @@index([businessId])
+}
+
+model Load {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  truckId    String
+  truck      Truck    @relation(fields: [truckId], references: [id], onDelete: Cascade)
+
+  /// Service date -- the date the period filters key off.
+  date              DateTime @db.Date
+  originCity        String
+  originState       String   @db.VarChar(2)
+  destinationCity   String
+  destinationState  String   @db.VarChar(2)
+  broker            String?
+  loadNumber        String?
+
+  loadedMiles   Int
+  deadheadMiles Int     @default(0)
+  grossRate     Decimal @db.Decimal(12, 2)
+
+  /// Trip-level costs, used for per-load profitability.
+  fuelCost       Decimal @default(0) @db.Decimal(12, 2)
+  tolls          Decimal @default(0) @db.Decimal(12, 2)
+  dispatchFee    Decimal @default(0) @db.Decimal(12, 2)
+  factoringFee   Decimal @default(0) @db.Decimal(12, 2)
+  otherExpenses  Decimal @default(0) @db.Decimal(12, 2)
+
+  status PaymentStatus @default(PENDING)
+  notes  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  expenses    Expense[]
+  fuelEntries FuelEntry[]
+  documents   Document[]
+
+  @@index([businessId, date])
+  @@index([truckId, date])
+  @@index([status])
+}
+
+model Expense {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  truckId    String?
+  truck      Truck?   @relation(fields: [truckId], references: [id], onDelete: SetNull)
+  loadId     String?
+  load       Load?    @relation(fields: [loadId], references: [id], onDelete: SetNull)
+
+  date        DateTime        @db.Date
+  category    ExpenseCategory
+  description String
+  vendor      String?
+  amount        Decimal         @db.Decimal(12, 2)
+  recurring     Boolean         @default(false)
+  receiptNumber String?
+  notes         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  documents   Document[]
+  maintenance MaintenanceRecord[]
+
+  @@index([businessId, date])
+  @@index([category])
+  @@index([loadId])
+}
+
+model FuelEntry {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  truckId    String
+  truck      Truck    @relation(fields: [truckId], references: [id], onDelete: Cascade)
+  loadId     String?
+  load       Load?    @relation(fields: [loadId], references: [id], onDelete: SetNull)
+
+  date           DateTime @db.Date
+  gallons        Decimal  @db.Decimal(10, 3)
+  pricePerGallon Decimal  @db.Decimal(10, 3)
+  totalCost      Decimal  @db.Decimal(12, 2)
+  /// Odometer at fill-up -- drives MPG once two readings exist.
+  odometer       Int?
+  location       String?
+  notes          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([businessId, date])
+  @@index([truckId, odometer])
+}
+
+/// A logged service or renewal. Next service can be measured by date,
+/// by mileage, or by whichever arrives first.
+model MaintenanceRecord {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  truckId    String
+  truck      Truck    @relation(fields: [truckId], references: [id], onDelete: Cascade)
+
+  type  MaintenanceType
+  basis MaintenanceBasis @default(BOTH)
+
+  serviceDate DateTime @db.Date
+  odometer    Int?
+  cost        Decimal  @default(0) @db.Decimal(12, 2)
+  vendor      String?
+
+  nextServiceDate     DateTime? @db.Date
+  nextServiceOdometer Int?
+
+  /// Set when the cost was also written to the expense ledger, so the money
+  /// is counted exactly once.
+  expenseId String?  @unique
+  expense   Expense? @relation(fields: [expenseId], references: [id], onDelete: SetNull)
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  documents Document[]
+
+  @@index([businessId, serviceDate])
+  @@index([truckId, type])
+}
+
+/// A stored file. Exactly one owner column is set; the storageKey is opaque
+/// and resolved by the storage adapter (local disk today, Supabase Storage
+/// later) so moving buckets never touches application code.
+model Document {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  loadId        String?
+  load          Load?              @relation(fields: [loadId], references: [id], onDelete: Cascade)
+  expenseId     String?
+  expense       Expense?           @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  truckId       String?
+  truck         Truck?             @relation(fields: [truckId], references: [id], onDelete: Cascade)
+  maintenanceId String?
+  maintenance   MaintenanceRecord? @relation(fields: [maintenanceId], references: [id], onDelete: Cascade)
+
+  type        DocumentType @default(OTHER)
+  label       String
+  fileName    String
+  contentType String
+  sizeBytes   Int
+  storageKey  String       @unique
+
+  uploadedAt DateTime @default(now())
+
+  @@index([businessId])
+  @@index([loadId])
+  @@index([expenseId])
+  @@index([truckId])
+  @@index([maintenanceId])
+}

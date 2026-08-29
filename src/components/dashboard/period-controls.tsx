@@ -1,0 +1,237 @@
+"use client";
+
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { CalendarRange, ChevronLeft, ChevronRight } from "lucide-react";
+import { useCallback, useEffect, useState, useTransition } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  FLOATING_PERIODS,
+  monthOptions,
+  PERIOD_OPTIONS,
+  shiftMonth,
+  todayISO,
+  weekRange,
+  type Period,
+  type PeriodKey,
+} from "@/lib/periods";
+import { cn } from "@/lib/utils";
+
+interface PeriodControlsProps {
+  period: Period;
+  className?: string;
+}
+
+/**
+ * The single period control, used on every screen.
+ *
+ * State lives in the URL, so switching from 1-15 to Quarter recomputes every
+ * server component on the page from the same range -- and the same query
+ * string drives the CSV exports.
+ */
+export function PeriodControls({ period, className }: PeriodControlsProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [pending, startTransition] = useTransition();
+  const [customOpen, setCustomOpen] = useState(false);
+  const [from, setFrom] = useState(period.start);
+  const [to, setTo] = useState(period.end);
+
+  // The component survives searchParam navigations, so without this the
+  // popover would keep showing the range from whenever the page first
+  // rendered and "Apply" would silently reinstate it.
+  useEffect(() => {
+    setFrom(period.start);
+    setTo(period.end);
+  }, [period.start, period.end]);
+
+  const push = useCallback(
+    (next: { month?: string; period?: PeriodKey; from?: string; to?: string }) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (next.month) params.set("month", next.month);
+      if (next.period) params.set("period", next.period);
+      if (next.period && next.period !== "custom") {
+        params.delete("from");
+        params.delete("to");
+      }
+
+      // "Today" and "This week" are resolved from the browser's calendar and
+      // sent along explicitly. Otherwise the server would use its own
+      // timezone, which can be a day out from the person entering the loads.
+      if (next.period === "today") {
+        const today = todayISO();
+        params.set("from", today);
+        params.set("to", today);
+        params.set("month", today.slice(0, 7));
+      } else if (next.period === "week") {
+        const week = weekRange(todayISO());
+        params.set("from", week.start);
+        params.set("to", week.end);
+        params.set("month", week.start.slice(0, 7));
+      }
+
+      if (next.from) params.set("from", next.from);
+      if (next.to) params.set("to", next.to);
+      startTransition(() => {
+        router.push(`${pathname}?${params.toString()}`, { scroll: false });
+      });
+    },
+    [pathname, router, searchParams],
+  );
+
+  // Today / This Week / Custom ignore the month selector entirely, so it is
+  // actually disabled rather than merely dimmed -- clicking a control that
+  // looks dead should not silently change the period.
+  const monthDisabled = FLOATING_PERIODS.includes(period.key);
+
+  return (
+    <div
+      className={cn(
+        "flex flex-wrap items-center gap-2 print:hidden",
+        pending && "pointer-events-none opacity-70",
+        className,
+      )}
+    >
+      <div
+        className={cn(
+          "flex items-center rounded-md border border-border bg-card transition-opacity",
+          monthDisabled && "opacity-50",
+        )}
+      >
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="rounded-r-none"
+          disabled={monthDisabled}
+          onClick={() => push({ month: shiftMonth(period.month, -1), period: "full" })}
+          aria-label="Previous month"
+          title={monthDisabled ? "Pick a month-based period first" : "Previous month"}
+        >
+          <ChevronLeft />
+        </Button>
+        <Select
+          value={period.month}
+          disabled={monthDisabled}
+          onValueChange={(value) => push({ month: value, period: period.key })}
+        >
+          <SelectTrigger
+            className="h-8 w-[10.5rem] rounded-none border-x border-y-0 border-border shadow-none focus:ring-0 focus:ring-offset-0"
+            aria-label="Select month"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {monthOptions(period.month).map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="rounded-l-none"
+          disabled={monthDisabled}
+          onClick={() => push({ month: shiftMonth(period.month, 1), period: "full" })}
+          aria-label="Next month"
+          title={monthDisabled ? "Pick a month-based period first" : "Next month"}
+        >
+          <ChevronRight />
+        </Button>
+      </div>
+
+      <div
+        className="inline-flex h-8 flex-wrap items-center gap-0.5 rounded-md border border-border bg-surface-sunken p-0.5"
+        role="group"
+        aria-label="Period"
+      >
+        {PERIOD_OPTIONS.filter((o) => o.key !== "custom").map((option, index, all) => (
+          <span key={option.key} className="flex items-center">
+            {index > 0 && all[index - 1].group !== option.group ? (
+              <span className="mx-1 h-4 w-px bg-border" aria-hidden />
+            ) : null}
+            <button
+              type="button"
+              onClick={() => push({ period: option.key })}
+              aria-pressed={period.key === option.key}
+              className={cn(
+                "rounded px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                period.key === option.key
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {option.label}
+            </button>
+          </span>
+        ))}
+      </div>
+
+      <Popover open={customOpen} onOpenChange={setCustomOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant={period.key === "custom" ? "secondary" : "outline"}
+            size="sm"
+            aria-pressed={period.key === "custom"}
+          >
+            <CalendarRange />
+            {period.key === "custom" ? period.shortLabel : "Custom"}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[17.25rem]" align="end">
+          <p className="label-xs">Custom range</p>
+          <div className="mt-2 space-y-2">
+            <label className="block">
+              <span className="mb-1 block text-2xs text-muted-foreground">From</span>
+              <Input
+                type="date"
+                value={from}
+                max={to || todayISO()}
+                onChange={(e) => setFrom(e.target.value)}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-2xs text-muted-foreground">To</span>
+              <Input
+                type="date"
+                value={to}
+                min={from}
+                onChange={(e) => setTo(e.target.value)}
+              />
+            </label>
+            <Button
+              size="sm"
+              className="w-full"
+              disabled={!from || !to}
+              onClick={() => {
+                setCustomOpen(false);
+                push({ period: "custom", from, to });
+              }}
+            >
+              Apply range
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <span className="ml-auto hidden whitespace-nowrap text-2xs text-muted-foreground sm:block">
+        {period.label}
+      </span>
+    </div>
+  );
+}
