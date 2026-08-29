@@ -209,7 +209,53 @@ export const truckSchema = z.object({
   currentOdometer: z.number().int().min(0).max(5_000_000),
 });
 
+/* ---- Goals ----------------------------------------------------------- */
+
+export const goalSchema = z.object({
+  monthlyRevenueTarget: money,
+  monthlyProfitTarget: money,
+  targetProfitPerMile: z.number().min(0).max(100),
+  maxDeadheadPct: z.number().min(0).max(100),
+  targetLoads: z.number().int().min(0).max(1000).optional().nullable(),
+  workingDaysPerWeek: z.number().int().min(1, "At least one day").max(7),
+});
+
+/* ---- Reserve buckets -------------------------------------------------- */
+
+export const reserveAccountSchema = z.object({
+  kind: z.enum(["TAX", "MAINTENANCE", "EMERGENCY", "CUSTOM"]),
+  name: z.string().trim().min(1, "Give the bucket a name").max(60),
+  basis: z.enum(["OPERATING_PROFIT", "GROSS_REVENUE"]),
+  contributionPct: z.number().min(0).max(100).optional().nullable(),
+  targetBalance: money.optional().nullable(),
+  active: z.boolean().optional(),
+});
+
+export const reserveTransactionSchema = z.object({
+  accountId: z.string().trim().min(1, "Pick a bucket"),
+  date: isoDate,
+  type: z.enum(["CONTRIBUTION", "WITHDRAWAL", "ADJUSTMENT"]),
+  amount: z.number().min(0.01, "Enter an amount").max(1_000_000),
+  description: z.string().trim().min(1, "Say what this is for").max(200),
+  negative: z.boolean().optional(),
+});
+
+/* ---- Settlements ------------------------------------------------------ */
+
+export const settlementRefSchema = z.object({
+  month: z.string().regex(/^\d{4}-\d{2}$/, "Expected YYYY-MM"),
+  half: z.enum(["FIRST", "SECOND"]),
+});
+
+export const settlementNotesSchema = z.object({
+  id: z.string().trim().min(1),
+  notes: z.string().trim().max(2000).optional().nullable(),
+});
+
 export type LoadFormValues = z.infer<typeof loadSchema>;
+export type GoalFormValues = z.infer<typeof goalSchema>;
+export type ReserveAccountFormValues = z.infer<typeof reserveAccountSchema>;
+export type ReserveTransactionFormValues = z.infer<typeof reserveTransactionSchema>;
 export type ExpenseFormValues = z.infer<typeof expenseSchema>;
 export type FuelFormValues = z.infer<typeof fuelSchema>;
 export type SettingsFormValues = z.infer<typeof settingsSchema>;
