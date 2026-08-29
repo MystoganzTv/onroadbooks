@@ -192,61 +192,82 @@ export function LandingPage({ primaryHref }: { primaryHref: string }) {
           id="how"
           className="relative scroll-mt-20 overflow-hidden border-t border-white/[0.07] bg-mkt-ink"
         >
-          <Container className="relative grid items-center gap-9 py-16 sm:py-20 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(0,1.05fr)]">
-            <div>
-              <h2 className="font-display text-[clamp(26px,2.7vw,38px)] font-black uppercase leading-[1.04] tracking-[-0.025em] text-white">
-                {c.how.title}
-                <br />
-                <span className="text-mkt-amber">{c.how.titleAccent}</span>
-              </h2>
-              <p className="mt-6 text-[17px] leading-relaxed text-mkt-sub">{c.how.body}</p>
-              <Script className="mt-7 text-mkt-blue" underline="border-mkt-blue">
-                {c.how.script}
-              </Script>
-            </div>
-
-            {/* A band that runs the full height of the section and blends into
-                the navy at its left and right edges -- no vertical fade, or it
-                stops reading as a photograph and starts reading as a vignette.
-                On a phone it is a fixed-height strip instead. */}
-            <div className="relative -mx-5 h-[300px] sm:-mx-10 sm:h-[380px] lg:mx-0 lg:-my-20 lg:h-auto lg:self-stretch">
+          <Container className="relative py-14 sm:py-16">
+            {/* The band runs the full height of the section and slides UNDER the
+                copy on its left, which is what the design does -- the headline
+                sits on the faded third of the photograph, not beside it. Soft
+                edges left and right only: fade the top and bottom too and it
+                stops reading as a photograph and starts reading as a vignette. */}
+            <div
+              aria-hidden
+              className="absolute -bottom-14 -top-14 left-[23%] hidden w-[41%] sm:-bottom-16 sm:-top-16 lg:block"
+            >
               <Image
                 src="/marketing/driver.webp"
-                alt={c.proof.imageAlt}
+                alt=""
                 width={1400}
                 height={933}
-                className="absolute inset-0 size-full object-cover object-[40%_20%] [mask-image:linear-gradient(90deg,transparent_0%,#000_16%,#000_86%,transparent_100%)] lg:object-[38%_22%]"
+                className="absolute inset-0 size-full object-cover object-[36%_50%] [mask-image:linear-gradient(90deg,transparent_0%,#000_34%,#000_84%,transparent_100%)]"
               />
             </div>
 
-            <div>
-              <div className="mb-5 font-display text-[22px] font-extrabold uppercase tracking-[0.02em] text-white">
-                {c.how.compareTitle}
+            <div className="relative flex flex-col gap-10 lg:flex-row lg:items-center lg:justify-between lg:gap-0">
+              <div className="lg:w-[30%]">
+                <h2 className="font-display text-[clamp(22px,2vw,27px)] font-black uppercase leading-[1.08] tracking-[-0.025em] text-white">
+                  {c.how.title}
+                  <br />
+                  <span className="text-mkt-amber">{c.how.titleAccent}</span>
+                </h2>
+                <p className="mt-5 text-[15px] leading-relaxed text-mkt-sub">{c.how.body}</p>
+                <Script className="mt-6 text-mkt-blue" underline="border-mkt-blue">
+                  {c.how.script}
+                </Script>
               </div>
-              <div className="relative grid grid-cols-2 gap-5 sm:gap-6">
-                <CompareCard
-                  title={c.how.cards[0].title}
-                  note={c.how.cards[0].note}
-                  value={PREVIEW_FIGURES.revenuePerMile}
-                  unit={c.how.cards[0].unit}
+
+              {/* The same photograph, in the flow, on anything narrower than lg. */}
+              <div className="relative -mx-5 h-[300px] sm:-mx-10 sm:h-[380px] lg:hidden">
+                <Image
+                  src="/marketing/driver.webp"
+                  alt={c.proof.imageAlt}
+                  width={1400}
+                  height={933}
+                  className="absolute inset-0 size-full object-cover object-[40%_20%] [mask-image:linear-gradient(90deg,transparent_0%,#000_14%,#000_88%,transparent_100%)]"
                 />
-                <CompareCard
-                  title={c.how.cards[1].title}
-                  note={c.how.cards[1].note}
-                  value={PREVIEW_FIGURES.profitPerMile}
-                  unit={c.how.cards[1].unit}
-                  accent
-                />
-                <div
-                  aria-hidden
-                  className="absolute left-1/2 top-1/2 flex size-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-[1.5px] border-mkt-amber bg-mkt-ink font-display text-sm font-extrabold text-mkt-amber"
-                >
-                  {c.how.vs}
+              </div>
+
+              <div className="lg:w-[41%]">
+                <div className="mb-5 font-display text-[22px] font-extrabold uppercase tracking-[0.02em] text-white">
+                  {c.how.compareTitle}
                 </div>
+                <div className="relative grid grid-cols-2 gap-5 sm:gap-6">
+                  <CompareCard
+                    title={c.how.cards[0].title}
+                    note={c.how.cards[0].note}
+                    value={PREVIEW_FIGURES.revenuePerMile}
+                    unit={c.how.cards[0].unit}
+                  />
+                  <CompareCard
+                    title={c.how.cards[1].title}
+                    note={c.how.cards[1].note}
+                    value={PREVIEW_FIGURES.profitPerMile}
+                    unit={c.how.cards[1].unit}
+                    accent
+                  />
+                  <div
+                    aria-hidden
+                    className="absolute left-1/2 top-1/2 flex size-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-[1.5px] border-mkt-amber bg-mkt-ink font-display text-sm font-extrabold text-mkt-amber"
+                  >
+                    {c.how.vs}
+                  </div>
+                </div>
+                <Script
+                  className="ml-auto mt-6 text-right text-white"
+                  underline="border-mkt-amber"
+                  right
+                >
+                  {c.how.scriptTwo}
+                </Script>
               </div>
-              <Script className="ml-auto mt-7 text-right text-white" underline="border-mkt-amber" right>
-                {c.how.scriptTwo}
-              </Script>
             </div>
           </Container>
         </section>
