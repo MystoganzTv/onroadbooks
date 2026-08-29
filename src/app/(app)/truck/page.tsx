@@ -7,6 +7,7 @@ import { DocumentUploader } from "@/components/documents/document-uploader";
 import { MaintenanceFormDialog } from "@/components/maintenance/maintenance-form-dialog";
 import { MaintenanceTable } from "@/components/maintenance/maintenance-table";
 import { UpcomingMaintenance } from "@/components/maintenance/upcoming-maintenance";
+import { TruckHealthPanel } from "@/components/cockpit/truck-health-panel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Metric } from "@/components/shared/metric";
 import { PageHeader } from "@/components/shared/page-header";
@@ -17,6 +18,8 @@ import { summarizeFuel, truckLifetime } from "@/lib/calculations";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { thresholdsFrom, upcomingMaintenance } from "@/lib/maintenance";
+import { calculateMaintenanceHealth } from "@/lib/finance/maintenance-health";
+import { calculateReserveBalances, reserveBalanceFor } from "@/lib/finance/reserves";
 import { todayISO } from "@/lib/periods";
 import {
   formatMoney,
@@ -41,6 +44,16 @@ export default async function TruckPage() {
   const truckDocuments = dataset.documents.filter((doc) => doc.truckId === truck.id);
   const overdue = upcoming.filter((item) => item.status === "OVERDUE").length;
   const dueSoon = upcoming.filter((item) => item.status === "DUE_SOON").length;
+
+  // Can the maintenance bucket actually pay for what is coming?
+  const balances = calculateReserveBalances(dataset.reserveAccounts, dataset.reserveTransactions);
+  const health = calculateMaintenanceHealth(
+    dataset.maintenanceRecords,
+    truck,
+    today,
+    thresholds,
+    reserveBalanceFor(balances, "MAINTENANCE")?.balance ?? 0,
+  );
 
   const description = [truck.year, truck.make, truck.model].filter(Boolean).join(" ");
 
@@ -116,7 +129,8 @@ export default async function TruckPage() {
 
         <TabsContent value="maintenance" className="mt-4 space-y-4">
           <div className="grid gap-4 xl:grid-cols-3">
-            <div className="min-w-0 xl:col-span-1">
+            <div className="min-w-0 space-y-4 xl:col-span-1">
+              <TruckHealthPanel health={health} />
               <UpcomingMaintenance items={upcoming} currentOdometer={truck.currentOdometer} />
             </div>
             <div className="min-w-0 xl:col-span-2">

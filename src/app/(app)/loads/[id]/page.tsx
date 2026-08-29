@@ -16,6 +16,8 @@ import { Separator } from "@/components/ui/separator";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { loadMetrics, thresholdsFromSettings } from "@/lib/calculations";
+import { calculateLoadScore } from "@/lib/finance/load-score";
+import { LoadScoreBreakdown } from "@/components/cockpit/load-score-badge";
 import {
   formatDateLong,
   formatGallons,
@@ -40,6 +42,11 @@ export default async function LoadDetailPage({
   if (!load) notFound();
 
   const metrics = loadMetrics(load, thresholdsFromSettings(dataset.settings));
+  const score = calculateLoadScore(
+    metrics,
+    thresholdsFromSettings(dataset.settings),
+    dataset.settings.deadheadWarnPct,
+  );
   const brokers = [...new Set(dataset.loads.map((l) => l.broker).filter(Boolean))].sort() as string[];
   const linkedExpenses = dataset.expenses.filter((expense) => expense.loadId === load.id);
   const linkedFuel = dataset.fuelEntries.filter((entry) => entry.loadId === load.id);
@@ -86,6 +93,8 @@ export default async function LoadDetailPage({
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="min-w-0 space-y-4 lg:col-span-2">
+        <LoadScoreBreakdown score={score} />
+
         <TripWaterfall load={load} metrics={metrics} />
 
         <Card>

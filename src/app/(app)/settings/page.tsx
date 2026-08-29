@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Database, FileText } from "lucide-react";
 
 import { DisplaySettings } from "@/components/settings/display-settings";
+import { GoalsForm } from "@/components/settings/goals-form";
 import { SettingsForm } from "@/components/settings/settings-form";
 import { PageHeader } from "@/components/shared/page-header";
 import { BrandLogo } from "@/components/shell/brand-logo";
@@ -22,7 +23,9 @@ export default async function SettingsPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { business, settings, loads, expenses } = await getRepository(session.businessId).getDataset();
+  const { business, settings, goals, loads, expenses } = await getRepository(
+    session.businessId,
+  ).getDataset();
   const period = periodFromSearchParams(params);
   const preview = summarizePeriod(loads, expenses, period, settings);
   const mode = storageMode();
@@ -31,7 +34,7 @@ export default async function SettingsPage({
     <div className="space-y-4 p-4 lg:p-6">
       <PageHeader
         title="Business Settings"
-        description="Reserve percentages and expense classification apply to every period in the app."
+        description="Reserve percentages, targets and expense classification apply to every period in the app."
       />
 
       <div className="grid gap-4 xl:grid-cols-3">
@@ -42,6 +45,10 @@ export default async function SettingsPage({
             preview={preview}
             previewLabel={period.label}
           />
+
+          <div className="mt-4">
+            <GoalsForm goals={goals} />
+          </div>
 
           <div className="mt-4">
             <DisplaySettings />

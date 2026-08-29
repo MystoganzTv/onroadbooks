@@ -1,11 +1,14 @@
 import {
+  BarChart3,
+  Calculator,
   Fuel,
+  Landmark,
   LayoutDashboard,
   Package,
   Receipt,
   Settings,
-  BarChart3,
   Truck,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 
@@ -13,14 +16,54 @@ export interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
+  /** Also treat these prefixes as "on this section". */
+  matches?: string[];
 }
 
+export interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
+/**
+ * Navigation is grouped by the question being asked, not by data table:
+ * what the truck is doing, what the money is doing, and what the numbers say.
+ */
+export const NAV_GROUPS: NavGroup[] = [
+  {
+    label: "Operate",
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/loads", label: "Loads", icon: Package },
+      { href: "/calculator", label: "Load Calculator", icon: Calculator },
+      { href: "/expenses", label: "Expenses", icon: Receipt },
+      { href: "/fuel", label: "Fuel", icon: Fuel },
+    ],
+  },
+  {
+    label: "Money",
+    items: [
+      { href: "/settlements", label: "Settlements", icon: Wallet },
+      { href: "/reserves", label: "Reserves", icon: Landmark },
+    ],
+  },
+  {
+    label: "Intelligence",
+    items: [
+      { href: "/analytics/cost-per-mile", label: "Analytics", icon: BarChart3, matches: ["/analytics"] },
+      { href: "/reports", label: "Reports", icon: BarChart3 },
+      { href: "/truck", label: "Truck", icon: Truck },
+    ],
+  },
+];
+
+/** Flat list, kept for the mobile header title and anything else that needs it. */
 export const PRIMARY_NAV: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/loads", label: "Loads", icon: Package },
-  { href: "/expenses", label: "Expenses", icon: Receipt },
-  { href: "/fuel", label: "Fuel", icon: Fuel },
-  { href: "/reports", label: "Reports", icon: BarChart3 },
-  { href: "/truck", label: "Truck", icon: Truck },
+  ...NAV_GROUPS.flatMap((group) => group.items),
   { href: "/settings", label: "Settings", icon: Settings },
 ];
+
+export function isNavActive(item: NavItem, pathname: string): boolean {
+  const prefixes = item.matches ?? [item.href];
+  return prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}

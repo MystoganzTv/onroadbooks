@@ -10,7 +10,7 @@ import { APP_NAME } from "@/lib/utils";
 import { BrandLogo } from "./brand-logo";
 import { SidebarNav } from "./sidebar-nav";
 import { DisplayMenu } from "./display-menu";
-import { PRIMARY_NAV } from "./nav-items";
+import { isNavActive, PRIMARY_NAV } from "./nav-items";
 
 interface AppShellProps {
   businessName: string;
@@ -23,9 +23,7 @@ export function AppShell({ businessName, truckName, userEmail, children }: AppSh
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const pathname = usePathname();
 
-  const current =
-    PRIMARY_NAV.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
-      ?.label ?? APP_NAME;
+  const current = PRIMARY_NAV.find((item) => isNavActive(item, pathname))?.label ?? APP_NAME;
 
   return (
     <div className="flex min-h-dvh bg-background">

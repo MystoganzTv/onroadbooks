@@ -124,12 +124,53 @@ function stateFromLoad(load: Load): FormState {
   };
 }
 
+/**
+ * Numbers carried over from somewhere else -- today, the load calculator
+ * handing off a quote it just priced. Only used when adding, never when
+ * editing an existing load.
+ */
+export interface LoadPrefill {
+  loadedMiles?: number;
+  deadheadMiles?: number;
+  grossRate?: number;
+  fuelCost?: number;
+  tolls?: number;
+  dispatchFee?: number;
+  factoringFee?: number;
+  otherExpenses?: number;
+  broker?: string;
+}
+
+function applyPrefill(state: FormState, prefill?: LoadPrefill): FormState {
+  if (!prefill) return state;
+  const put = (value: number | undefined) =>
+    value !== undefined && Number.isFinite(value) && value > 0 ? String(roundMoney(value)) : "";
+
+  return {
+    ...state,
+    broker: prefill.broker ?? state.broker,
+    loadedMiles: prefill.loadedMiles ? String(Math.round(prefill.loadedMiles)) : state.loadedMiles,
+    deadheadMiles:
+      prefill.deadheadMiles !== undefined
+        ? String(Math.round(prefill.deadheadMiles))
+        : state.deadheadMiles,
+    grossRate: put(prefill.grossRate) || state.grossRate,
+    fuelCost: put(prefill.fuelCost) || state.fuelCost,
+    tolls: put(prefill.tolls) || state.tolls,
+    dispatchFee: put(prefill.dispatchFee) || state.dispatchFee,
+    factoringFee: put(prefill.factoringFee) || state.factoringFee,
+    otherExpenses: put(prefill.otherExpenses) || state.otherExpenses,
+  };
+}
+
 interface LoadFormDialogProps {
   load?: Load;
   brokers?: string[];
   defaultDate?: string;
   ratingThresholds?: RatingThresholds;
   trigger?: React.ReactNode;
+  /** Seed values for a NEW load, e.g. handed over by the load calculator. */
+  prefill?: LoadPrefill;
 }
 
 /**
@@ -143,12 +184,22 @@ export function LoadFormDialog({
   defaultDate,
   ratingThresholds,
   trigger,
+  prefill,
 }: LoadFormDialogProps) {
   const router = useRouter();
   const isEdit = Boolean(load);
+  const prefillKey = JSON.stringify(prefill ?? null);
   const initial = React.useMemo(
-    () => (load ? stateFromLoad(load) : emptyState(defaultDate ?? todayISO())),
-    [load, defaultDate],
+    () =>
+      load
+        ? stateFromLoad(load)
+        : applyPrefill(
+            emptyState(defaultDate ?? todayISO()),
+            prefillKey === "null" ? undefined : (JSON.parse(prefillKey) as LoadPrefill),
+          ),
+    // Serialised so a freshly built prefill object on every keystroke does not
+    // re-seed the form while the dialog is open.
+    [load, defaultDate, prefillKey],
   );
 
   const [open, setOpen] = React.useState(false);

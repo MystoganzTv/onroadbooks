@@ -1,58 +1,92 @@
 import type { Metadata } from "next";
-import {
-  Banknote,
-  Gauge,
-  Percent,
-  Route,
-  TrendingDown,
-  TrendingUp,
-  Wallet,
-} from "lucide-react";
+import Link from "next/link";
+import { Calculator, Route } from "lucide-react";
 
 import { RevenueExpenseChart } from "@/components/charts/revenue-expense-chart";
-import { DeadheadCard } from "@/components/dashboard/deadhead-card";
-import { InsightsCard } from "@/components/dashboard/insights-card";
-import { LoadQualityCard } from "@/components/dashboard/load-quality-card";
-import { KpiCard } from "@/components/dashboard/kpi-card";
+import { BestWorstLoads } from "@/components/cockpit/best-worst-loads";
+import { BrokerPanel } from "@/components/cockpit/broker-panel";
+import { CostPerMileCard } from "@/components/cockpit/cost-per-mile-card";
+import { DeadheadMonitor } from "@/components/cockpit/deadhead-monitor";
+import { GoalProgressCard } from "@/components/cockpit/goal-progress-card";
+import { HeroMetrics } from "@/components/cockpit/hero-metrics";
+import { InsightsPanel } from "@/components/cockpit/insights-panel";
+import { LanePanel } from "@/components/cockpit/lane-panel";
+import { MoneyFlow } from "@/components/cockpit/money-flow";
+import { ReservesPanel } from "@/components/cockpit/reserves-panel";
+import { SafeToPayCard } from "@/components/cockpit/safe-to-pay-card";
+import { Section } from "@/components/cockpit/section";
+import { TodayCard } from "@/components/cockpit/today-card";
+import { TruckHealthPanel } from "@/components/cockpit/truck-health-panel";
 import { MiniStat } from "@/components/dashboard/mini-stat";
-import { MoneyBreakdownCard } from "@/components/dashboard/money-breakdown-card";
 import { PeriodControls } from "@/components/dashboard/period-controls";
 import { RecentLoads } from "@/components/dashboard/recent-loads";
 import { ExpenseFormDialog } from "@/components/expenses/expense-form-dialog";
 import { LoadFormDialog } from "@/components/loads/load-form-dialog";
 import { PageHeader } from "@/components/shared/page-header";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { requireSession } from "@/lib/auth";
 import {
-  analyzeDeadhead,
-  brokerPerformance,
-  buildInsights,
   categoryTotals,
-  ratingBreakdown,
   expensesInPeriod,
-  fuelInPeriod,
   loadsInPeriod,
-  moneyBreakdown,
   pctChange,
-  summarizeFuel,
   summarizePeriod,
   thresholdsFromSettings,
   withMetricsAll,
 } from "@/lib/calculations";
 import { periodBuckets } from "@/lib/chart-data";
-import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
+import {
+  bestAndWorst,
+  buildCockpitInsights,
+  calculateBrokerPerformance,
+  calculateDaySnapshot,
+  calculateDeadheadCost,
+  calculateGoalProgress,
+  calculateLanePerformance,
+  calculateMaintenanceHealth,
+  calculateProjection,
+  calculateReserveBalances,
+  calculateSafeOwnerPay,
+  calculateTrueCostPerMile,
+  LANE_MIN_LOADS,
+  reserveBalanceFor,
+  resolveReserveRules,
+  scoreLoads,
+} from "@/lib/finance";
 import {
   formatMiles,
   formatMoneyCompact,
   formatNumber,
   formatPercent,
-  formatRate,
+  formatRateValue,
 } from "@/lib/formatters";
+import { thresholdsFrom } from "@/lib/maintenance";
 import { periodFromSearchParams, periodQuery, type SearchParams } from "@/lib/period-params";
-import { defaultEntryDate, previousPeriod } from "@/lib/periods";
+import { defaultEntryDate, previousPeriod, todayISO } from "@/lib/periods";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
+/**
+ * THE COCKPIT
+ * ===========
+ *
+ * Read top to bottom, this page answers, in order:
+ *
+ *   Am I making money?              the hero band
+ *   How did today go?               the Today strip
+ *   What does a mile cost, and am I on track?   business health
+ *   Where did the money go?         the money flow
+ *   Which loads were worth it?      load performance
+ *   Who and where pays?             operations intelligence
+ *   Am I saving enough?             reserves and truck health
+ *   What changed?                   insights
+ *
+ * Every figure is recomputed from the rows dated inside the selected period.
+ * Nothing is prorated, and no number on this page is calculated here -- the
+ * page composes lib/finance, it does not do arithmetic.
+ */
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -64,227 +98,246 @@ export default async function DashboardPage({
   const period = periodFromSearchParams(params);
   const prior = previousPeriod(period);
 
-  const { loads, expenses, fuelEntries, settings } = dataset;
-  const ratingThresholds = thresholdsFromSettings(settings);
+  const {
+    loads,
+    expenses,
+    settings,
+    goals,
+    truck,
+    maintenanceRecords,
+    reserveAccounts,
+    reserveTransactions,
+  } = dataset;
 
+  // PeriodControls sends the browser's calendar date for "Today", so that
+  // period is authoritative; otherwise fall back to the server's date.
+  const today = period.key === "today" ? period.start : todayISO();
+
+  const ratingThresholds = thresholdsFromSettings(settings);
   const summary = summarizePeriod(loads, expenses, period, settings);
   const priorSummary = summarizePeriod(loads, expenses, prior, settings);
-  const breakdown = moneyBreakdown(summary, settings);
 
-  const periodLoads = withMetricsAll(loadsInPeriod(loads, period), ratingThresholds);
+  const reserveRules = resolveReserveRules(settings, reserveAccounts);
+  const ownerPay = calculateSafeOwnerPay(summary, reserveRules);
+
+  const periodLoads = scoreLoads(
+    withMetricsAll(loadsInPeriod(loads, period), ratingThresholds),
+    ratingThresholds,
+    settings.deadheadWarnPct,
+  );
   const periodExpenses = expensesInPeriod(expenses, period);
   const categories = categoryTotals(periodExpenses, settings);
-  const fuel = summarizeFuel(fuelInPeriod(fuelEntries, period), summary.totalMiles);
-  const deadhead = analyzeDeadhead(summary, settings);
-  const buckets = periodBuckets(loads, expenses, period);
-  const quality = ratingBreakdown(periodLoads);
-  const worstLoads = [...periodLoads]
-    .sort((a, b) => a.metrics.profitPerMile - b.metrics.profitPerMile)
-    .slice(0, 3);
-  const topBroker = brokerPerformance(periodLoads, ratingThresholds)[0];
-  const query = periodQuery(period);
-  const insights = buildInsights(summary, priorSummary, categories, fuel, period, {
+
+  const costBasis = calculateTrueCostPerMile(loads, expenses, period, settings, period.label);
+  const deadhead = calculateDeadheadCost(summary, costBasis, settings, goals.maxDeadheadPct);
+  const goalProgress = calculateGoalProgress(summary, goals, period);
+  const projection = calculateProjection(summary, period, goals, today);
+  const day = calculateDaySnapshot(loads, expenses, today, goals);
+
+  const brokers = calculateBrokerPerformance(periodLoads, ratingThresholds);
+  const lanes = calculateLanePerformance(periodLoads, ratingThresholds);
+  const { best, worst } = bestAndWorst(periodLoads);
+
+  const balances = calculateReserveBalances(reserveAccounts, reserveTransactions, period);
+  const maintenanceReserve = reserveBalanceFor(balances, "MAINTENANCE");
+  const maintenance = calculateMaintenanceHealth(
+    maintenanceRecords,
+    truck,
+    today,
+    thresholdsFrom(settings),
+    maintenanceReserve?.balance ?? 0,
+  );
+
+  const insights = buildCockpitInsights({
+    period,
+    summary,
+    previous: priorSummary,
+    previousLabel: prior.shortLabel,
+    categories,
+    costBasis,
     deadhead,
-    topBroker,
+    ownerPay,
+    goals,
+    projection,
+    brokers,
+    lanes,
+    maintenance,
   });
 
-  const brokers = [...new Set(loads.map((l) => l.broker).filter(Boolean))].sort() as string[];
-  const profitable = summary.netProfit >= 0;
+  const buckets = periodBuckets(loads, expenses, period);
+  const query = periodQuery(period);
+  const brokerNames = [...new Set(loads.map((l) => l.broker).filter(Boolean))].sort() as string[];
+  const settlementHref =
+    period.key === "first" || period.key === "second"
+      ? `/settlements?month=${period.month}&half=${period.key === "first" ? "FIRST" : "SECOND"}`
+      : undefined;
 
   return (
-    <div className="space-y-4 p-4 lg:p-6">
+    <div className="space-y-5 p-4 lg:p-6">
       <PageHeader
-        title="Dashboard"
-        description={`${period.label} - ${summary.loadCount} ${summary.loadCount === 1 ? "load" : "loads"}, ${formatMiles(summary.totalMiles)}`}
+        title="Financial Cockpit"
+        description="Drive the truck. Know the business."
         actions={
           <>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/calculator">
+                <Calculator className="size-4" />
+                Load calculator
+              </Link>
+            </Button>
             <ExpenseFormDialog defaultDate={defaultEntryDate(period)} loads={periodLoads} />
             <LoadFormDialog
-            brokers={brokers}
-            defaultDate={defaultEntryDate(period)}
-            ratingThresholds={ratingThresholds}
-          />
+              brokers={brokerNames}
+              defaultDate={defaultEntryDate(period)}
+              ratingThresholds={ratingThresholds}
+            />
           </>
         }
       />
 
       <PeriodControls period={period} />
 
-      {/* Headline financials -- the four numbers that answer "am I making money". */}
-      <section aria-label="Key financials" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <KpiCard
-          label="Gross Revenue"
-          value={formatMoneyCompact(summary.grossRevenue)}
-          icon={Banknote}
-          tone="info"
-          emphasis
-          delta={{ value: pctChange(summary.grossRevenue, priorSummary.grossRevenue) }}
-          sub={`vs ${prior.shortLabel}`}
-        />
-        <KpiCard
-          label="Operating Expenses"
-          value={formatMoneyCompact(summary.operatingExpenses)}
-          icon={TrendingDown}
-          tone="negative"
-          emphasis
-          delta={{
-            value: pctChange(summary.operatingExpenses, priorSummary.operatingExpenses),
-            higherIsBetter: false,
-          }}
-          sub={`vs ${prior.shortLabel}`}
-        />
-        <KpiCard
-          label="Net Profit"
-          value={formatMoneyCompact(summary.netProfit)}
-          icon={profitable ? TrendingUp : TrendingDown}
-          tone={profitable ? "positive" : "negative"}
-          emphasis
-          delta={{ value: pctChange(summary.netProfit, priorSummary.netProfit) }}
-          sub={`vs ${prior.shortLabel}`}
-        />
-        <KpiCard
-          label="Net Margin"
-          value={formatPercent(summary.netMargin)}
-          icon={Percent}
-          tone={summary.netMargin >= 25 ? "positive" : summary.netMargin >= 10 ? "warning" : "negative"}
-          emphasis
-          delta={{ value: summary.netMargin - priorSummary.netMargin }}
-          sub="percentage points"
-        />
-      </section>
-
-      {/* Operating metrics. */}
-      <section
-        aria-label="Operating metrics"
-        className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7"
+      {/* ---- The bottom line ------------------------------------------- */}
+      <Section
+        title="The bottom line"
+        description={`${period.label} · ${summary.loadCount} ${summary.loadCount === 1 ? "load" : "loads"} · ${formatMiles(summary.totalMiles)}`}
       >
-        <MiniStat label="Total Miles" value={formatNumber(summary.totalMiles)} sub="mi" />
-        <MiniStat label="Loaded Miles" value={formatNumber(summary.loadedMiles)} sub="mi" />
-        <MiniStat
-          label="Deadhead Miles"
-          value={formatNumber(summary.deadheadMiles)}
-          sub="mi"
-          tone={deadhead.elevated ? "warning" : "neutral"}
-        />
-        <MiniStat
-          label="Deadhead %"
-          value={formatPercent(summary.deadheadPct)}
-          tone={deadhead.elevated ? "warning" : "positive"}
-          sub={`threshold ${formatPercent(deadhead.warnPct, 0)}`}
-        />
-        <MiniStat
-          label="Revenue / Mile"
-          value={formatRate(summary.revenuePerMile)}
-          tone="info"
-          sub="all miles"
-        />
-        <MiniStat
-          label="Cost / Mile"
-          value={formatRate(summary.costPerMile)}
-          tone="negative"
-          sub="all expenses"
-        />
-        <MiniStat
-          label="Profit / Mile"
-          value={formatRate(summary.profitPerMile)}
-          tone={summary.profitPerMile >= 0 ? "positive" : "negative"}
-          sub="what you keep"
-        />
-      </section>
+        <div className="grid gap-3 xl:grid-cols-3">
+          <div className="min-w-0 xl:col-span-2">
+            <HeroMetrics
+              summary={summary}
+              previous={priorSummary}
+              ownerPay={ownerPay}
+              previousLabel={prior.shortLabel}
+              deltas={{
+                revenue: pctChange(summary.grossRevenue, priorSummary.grossRevenue),
+                profit: pctChange(summary.netProfit, priorSummary.netProfit),
+                profitPerMile: pctChange(summary.profitPerMile, priorSummary.profitPerMile),
+              }}
+            />
+          </div>
+          <SafeToPayCard
+            ownerPay={ownerPay}
+            periodLabel={period.label}
+            href={settlementHref}
+            className="min-w-0"
+          />
+        </div>
+      </Section>
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        <div className="min-w-0 space-y-4 xl:col-span-2">
-          <Card>
+      {/* ---- Today ------------------------------------------------------ */}
+      <TodayCard day={day} />
+
+      {/* ---- Business health -------------------------------------------- */}
+      <Section title="Business health" description="What a mile costs, and whether the pace holds">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <MiniStat label="Total Miles" value={formatNumber(summary.totalMiles)} sub="mi" />
+          <MiniStat label="Loaded Miles" value={formatNumber(summary.loadedMiles)} sub="mi" />
+          <MiniStat
+            label="Deadhead Miles"
+            value={formatNumber(summary.deadheadMiles)}
+            sub={formatPercent(summary.deadheadPct)}
+            tone={deadhead.elevated ? "warning" : "neutral"}
+          />
+          <MiniStat
+            label="True Cost / Mile"
+            value={costBasis.sufficient ? formatRateValue(costBasis.trueCostPerMile) : "—"}
+            sub="actual, not prorated"
+            tone="negative"
+          />
+          <MiniStat
+            label="Revenue / Mile"
+            value={formatRateValue(summary.revenuePerMile)}
+            sub="all miles"
+            tone="info"
+          />
+          <MiniStat
+            label="Loads Completed"
+            value={formatNumber(summary.loadCount)}
+            sub={`${formatMoneyCompact(summary.paidRevenue)} collected`}
+            tone="neutral"
+          />
+        </div>
+
+        <div className="grid gap-3 lg:grid-cols-3">
+          <CostPerMileCard
+            cost={costBasis}
+            revenuePerMile={summary.revenuePerMile}
+            href={`/analytics/cost-per-mile?${query}`}
+            className="min-w-0"
+          />
+          <GoalProgressCard
+            goals={goalProgress}
+            projection={projection}
+            periodLabel={period.label}
+            className="min-w-0"
+          />
+          <DeadheadMonitor report={deadhead} className="min-w-0" />
+        </div>
+      </Section>
+
+      {/* ---- Money flow -------------------------------------------------- */}
+      <Section title="Where the money went" description={period.label}>
+        <div className="grid gap-3 xl:grid-cols-3">
+          <MoneyFlow
+            ownerPay={ownerPay}
+            categories={categories}
+            periodLabel={period.label}
+            className="min-w-0 xl:col-span-2"
+          />
+          <Card className="min-w-0">
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Route className="size-3.5 text-muted-foreground" />
                 <CardTitle>Revenue vs Expenses</CardTitle>
               </div>
               <span className="text-2xs text-muted-foreground">
-                {period.days > 62 ? "By month" : "By day"} - {period.label}
+                {period.days > 62 ? "By month" : "By day"}
               </span>
             </CardHeader>
             <CardContent className="px-2 py-3">
               <RevenueExpenseChart data={buckets} />
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Gauge className="size-3.5 text-muted-foreground" />
-                <CardTitle>Collection & Costs</CardTitle>
-              </div>
-              <span className="text-2xs text-muted-foreground">{period.label}</span>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-3 lg:grid-cols-6">
-              <Stat label="Collected" value={formatMoneyCompact(summary.paidRevenue)} tone="pos" />
-              <Stat
-                label="Outstanding"
-                value={formatMoneyCompact(summary.outstandingRevenue)}
-                tone={summary.outstandingRevenue > 0 ? "warn" : undefined}
-              />
-              <Stat label="Fixed Costs" value={formatMoneyCompact(summary.fixedExpenses)} />
-              <Stat label="Variable Costs" value={formatMoneyCompact(summary.variableExpenses)} />
-              <Stat label="Fuel Spend" value={formatMoneyCompact(summary.fuelExpense)} />
-              <Stat
-                label="Fuel / Mile"
-                value={formatRate(fuel.fuelCostPerMile)}
-                sub={fuel.milesPerGallon ? `${fuel.milesPerGallon.toFixed(1)} MPG` : undefined}
-              />
-            </CardContent>
-          </Card>
-
-          <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-            <DeadheadCard analysis={deadhead} />
-            <LoadQualityCard breakdown={quality} worst={worstLoads} periodQuery={query} />
-          </div>
-
-          <RecentLoads loads={periodLoads.slice(0, 8)} />
         </div>
+      </Section>
 
-        <div className="min-w-0 space-y-4">
-          <MoneyBreakdownCard breakdown={breakdown} periodLabel={period.label} />
-          <InsightsCard insights={insights} />
+      {/* ---- Load performance ------------------------------------------- */}
+      <Section title="Load performance" description="The one to repeat, and the one to learn from">
+        <BestWorstLoads
+          best={best}
+          worst={worst}
+          periodQuery={query}
+          periodLabel={period.label}
+        />
+        <RecentLoads loads={periodLoads.slice(0, 8)} />
+      </Section>
 
-          <Card className="border-dashed">
-            <CardContent className="flex items-start gap-2.5 p-3">
-              <Wallet className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-              <p className="text-2xs leading-relaxed text-muted-foreground">
-                Every figure above is recalculated from the loads and expenses actually dated inside{" "}
-                <span className="text-foreground">{period.label}</span>. Nothing is prorated or
-                split from a monthly total.
-              </p>
-            </CardContent>
-          </Card>
+      {/* ---- Operations intelligence ------------------------------------ */}
+      <Section title="Operations intelligence" description="Who pays, and where">
+        <div className="grid gap-3 lg:grid-cols-2">
+          <BrokerPanel brokers={brokers} href={`/analytics/brokers?${query}`} className="min-w-0" />
+          <LanePanel
+            lanes={lanes}
+            minLoads={LANE_MIN_LOADS}
+            href={`/analytics/lanes?${query}`}
+            className="min-w-0"
+          />
         </div>
-      </div>
-    </div>
-  );
-}
+      </Section>
 
-function Stat({
-  label,
-  value,
-  sub,
-  tone,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  tone?: "pos" | "warn";
-}) {
-  return (
-    <div>
-      <p className="label-xs">{label}</p>
-      <p
-        className={`mt-1 text-lg font-semibold tnum tracking-tight ${
-          tone === "pos" ? "text-pos" : tone === "warn" ? "text-warn" : "text-foreground"
-        }`}
-      >
-        {value}
-      </p>
-      {sub ? <p className="mt-0.5 text-2xs text-muted-foreground tnum">{sub}</p> : null}
+      {/* ---- Reserves and the truck ------------------------------------- */}
+      <Section title="Reserves and the truck" description="Am I setting enough aside">
+        <div className="grid gap-3 lg:grid-cols-2">
+          <ReservesPanel balances={balances} periodLabel={period.label} className="min-w-0" />
+          <TruckHealthPanel health={maintenance} className="min-w-0" />
+        </div>
+      </Section>
+
+      {/* ---- Insights ---------------------------------------------------- */}
+      <Section title="Insights" description="Deterministic observations from this period's data">
+        <InsightsPanel insights={insights} />
+      </Section>
     </div>
   );
 }

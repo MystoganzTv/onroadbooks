@@ -7,7 +7,7 @@ import { Building2, ChevronRight, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "./brand-logo";
 import { DisplayMenu } from "./display-menu";
-import { PRIMARY_NAV } from "./nav-items";
+import { isNavActive, NAV_GROUPS } from "./nav-items";
 
 interface SidebarNavProps {
   businessName: string;
@@ -37,33 +37,40 @@ export function SidebarNav({
         </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto p-2" aria-label="Main">
-        <ul className="space-y-0.5">
-          {PRIMARY_NAV.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  onClick={onNavigate}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                    active
-                      ? "bg-sidebar-accent text-sidebar-strong"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-strong",
-                  )}
-                >
-                  <item.icon
-                    className={cn("size-4.5 shrink-0", active ? "text-primary" : "opacity-70")}
-                  />
-                  {item.label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+      <nav className="flex-1 space-y-3 overflow-y-auto p-2" aria-label="Main">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label}>
+            <p className="px-2.5 pb-1 text-2xs font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/60">
+              {group.label}
+            </p>
+            <ul className="space-y-0.5">
+              {group.items.map((item) => {
+                const active = isNavActive(item, pathname);
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      onClick={onNavigate}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                        active
+                          ? "bg-sidebar-accent text-sidebar-strong"
+                          : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-strong",
+                      )}
+                    >
+                      <item.icon
+                        className={cn("size-4.5 shrink-0", active ? "text-primary" : "opacity-70")}
+                      />
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </nav>
 
       <div className="shrink-0 border-t border-sidebar-border p-2">
