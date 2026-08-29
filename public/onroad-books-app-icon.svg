@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">OnRoad Books</title>
+  <desc id="desc">A geometric truck, rising bars, and an open road.</desc>
+
+  <rect width="512" height="512" rx="112" fill="#0b1220"/>
+  <rect x="10" y="10" width="492" height="492" rx="102" fill="none" stroke="#1e293b" stroke-width="4"/>
+
+  <path d="M102 324a164 164 0 1 1 308 0" fill="none" stroke="#f59e0b" stroke-width="12" stroke-linecap="round"/>
+
+  <g aria-label="Rising financial bars">
+    <rect x="118" y="186" width="30" height="82" rx="5" fill="#3b82f6"/>
+    <rect x="164" y="151" width="30" height="117" rx="5" fill="#f59e0b"/>
+    <rect x="210" y="116" width="30" height="152" rx="5" fill="#3b82f6"/>
+  </g>
+
+  <g aria-label="Truck" stroke="#f8fafc" stroke-linejoin="round">
+    <path d="M132 226h162v106H132z" fill="#111c2e" stroke-width="13"/>
+    <path d="M294 248h55l44 42v42h-99z" fill="#2563eb" stroke-width="13"/>
+    <path d="M313 264h32l27 26h-59z" fill="#0b1220" stroke-width="8"/>
+    <path d="M132 304h162" fill="none" stroke="#3b82f6" stroke-width="12"/>
+    <path d="M118 332h291" fill="none" stroke-width="13" stroke-linecap="round"/>
+    <path d="M393 306h16" fill="none" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="182" cy="334" r="28" fill="#0b1220" stroke-width="12"/>
+    <circle cx="354" cy="334" r="28" fill="#0b1220" stroke-width="12"/>
+    <circle cx="182" cy="334" r="7" fill="#3b82f6" stroke="none"/>
+    <circle cx="354" cy="334" r="7" fill="#3b82f6" stroke="none"/>
+  </g>
+
+  <g aria-label="Open road">
+    <path d="M76 414c61-76 123-91 180-48-46 12-85 45-116 83z" fill="#2563eb"/>
+    <path d="M436 414c-61-76-123-91-180-48 46 12 85 45 116 83z" fill="#f59e0b"/>
+    <path d="M140 449c46-20 84-14 116 14 32-28 70-34 116-14l-116 37z" fill="#3b82f6"/>
+    <path d="M256 366c-19 17-34 40-44 69l44 28 44-28c-10-29-25-52-44-69z" fill="#0b1220"/>
+    <path d="M256 384v16M256 418v11" fill="none" stroke="#f8fafc" stroke-width="8" stroke-linecap="round"/>
+  </g>
+</svg>
