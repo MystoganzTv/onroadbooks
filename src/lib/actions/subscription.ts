@@ -32,6 +32,20 @@ export async function changePlanAction(values: unknown): Promise<ActionResult> {
     const repository = getRepository((await requireWritableSession()).businessId);
     const dataset = await repository.getDataset();
 
+    if (
+      parsed.data.plan === "FLEET" &&
+      !(
+        dataset.subscription.status === "ACTIVE" &&
+        dataset.subscription.providerSubscriptionId
+      )
+    ) {
+      return {
+        ok: false,
+        error:
+          "OnRoad Fleet is a separate paid service. Request Fleet access before activating its tools.",
+      };
+    }
+
     const decision = evaluatePlanChange(
       dataset.subscription,
       parsed.data.plan,

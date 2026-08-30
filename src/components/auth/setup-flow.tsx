@@ -111,7 +111,7 @@ export function SetupFlow() {
             <div>
               <h1 className="text-md font-semibold tracking-tight">Create your account</h1>
               <p className="mt-0.5 text-2xs text-muted-foreground">
-                Start with your owner profile. You will set up the truck next.
+                Start your 7-day OnRoad Pro trial for one truck. No card required.
               </p>
             </div>
 

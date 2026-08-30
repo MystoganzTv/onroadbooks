@@ -8,8 +8,11 @@ import {
   cheapestPlanWith,
   evaluatePlanChange,
   getPlan,
+  hasFleetAccess,
   planAllows,
   planOf,
+  trialEndsOn,
+  trialState,
   truckAllowance,
 } from "../plans";
 import { defaultSubscription } from "../defaults";
@@ -17,6 +20,15 @@ import type { Subscription } from "../types";
 
 function sub(over: Partial<Subscription> = {}): Subscription {
   return { ...defaultSubscription("biz"), ...over };
+}
+
+function paidFleet(over: Partial<Subscription> = {}): Subscription {
+  return sub({
+    plan: "FLEET",
+    status: "ACTIVE",
+    providerSubscriptionId: "sub_fleet_001",
+    ...over,
+  });
 }
 
 describe("the plan catalogue", () => {
@@ -51,7 +63,7 @@ describe("the plan catalogue", () => {
     assert.equal(planOf(undefined).id, "OWNER");
   });
 
-  it("carries a business on the old Individual plan up to Owner-Operator", () => {
+  it("carries a business on the old Individual plan up to OnRoad Pro", () => {
     // Individual was the single-truck plan before the tiers were split by
     // depth. It included the cockpit, so it must not land on Solo Starter.
     const carried = getPlan("INDIVIDUAL");
@@ -66,14 +78,19 @@ describe("planAllows", () => {
     assert.equal(planAllows(sub({ plan: "SOLO" }), "fleet"), false);
   });
 
-  it("opens the cockpit on Owner-Operator, but not per-unit economics", () => {
+  it("opens the cockpit on OnRoad Pro, but not per-unit economics", () => {
     assert.equal(planAllows(sub({ plan: "OWNER" }), "cockpit"), true);
     assert.equal(planAllows(sub({ plan: "OWNER" }), "fleet"), false);
   });
 
-  it("opens everything on Fleet", () => {
+  it("only opens Fleet for an active, paid Fleet subscription", () => {
     assert.equal(planAllows(sub({ plan: "FLEET" }), "cockpit"), true);
-    assert.equal(planAllows(sub({ plan: "FLEET" }), "fleet"), true);
+    assert.equal(hasFleetAccess(sub({ plan: "FLEET" })), false);
+    assert.equal(planAllows(sub({ plan: "FLEET" }), "fleet"), false);
+    assert.equal(hasFleetAccess(paidFleet()), true);
+    assert.equal(planAllows(paidFleet(), "fleet"), true);
+    assert.equal(hasFleetAccess(paidFleet({ status: "PAST_DUE" })), false);
+    assert.equal(hasFleetAccess(paidFleet({ providerSubscriptionId: null })), false);
   });
 
   it("treats a business with no subscription row as being on the default plan", () => {
@@ -98,20 +115,27 @@ describe("truckAllowance", () => {
     for (const plan of ["SOLO", "OWNER"] as const) {
       const allowance = truckAllowance(sub({ plan }), 1);
       assert.equal(allowance.canAdd, false, plan);
-      assert.match(allowance.reason ?? "", /Small Fleet/);
+      assert.match(allowance.reason ?? "", /OnRoad Fleet/);
     }
   });
 
   it("allows up to eight on Fleet and refuses the ninth", () => {
-    assert.equal(truckAllowance(sub({ plan: "FLEET" }), 7).canAdd, true);
-    const full = truckAllowance(sub({ plan: "FLEET" }), 8);
+    assert.equal(truckAllowance(paidFleet(), 7).canAdd, true);
+    const full = truckAllowance(paidFleet(), 8);
     assert.equal(full.canAdd, false);
     assert.equal(full.remaining, 0);
     assert.match(full.reason ?? "", /larger plan/);
   });
 
   it("never reports negative headroom when somehow over the limit", () => {
-    assert.equal(truckAllowance(sub({ plan: "FLEET" }), 12).remaining, 0);
+    assert.equal(truckAllowance(paidFleet(), 12).remaining, 0);
+  });
+
+  it("keeps an unpaid Fleet label at one truck", () => {
+    const allowance = truckAllowance(sub({ plan: "FLEET" }), 1);
+    assert.equal(allowance.limit, 1);
+    assert.equal(allowance.canAdd, false);
+    assert.match(allowance.reason ?? "", /separate paid service/);
   });
 });
 
@@ -187,6 +211,36 @@ describe("a business created before subscriptions existed", () => {
     const created = defaultSubscription("biz");
     assert.equal(created.providerCustomerId, null);
     assert.equal(created.providerSubscriptionId, null);
-    assert.equal(created.currentPeriodEnd, null);
+    assert.equal(created.currentPeriodEnd, trialEndsOn(created.startedAt));
+  });
+});
+
+describe("the 7-day OnRoad Pro trial", () => {
+  it("ends seven calendar days after account creation", () => {
+    assert.equal(trialEndsOn("2026-08-29T22:00:00.000Z"), "2026-09-05");
+  });
+
+  it("reports time left, the final day and expiration without client clock drift", () => {
+    const trial = sub({
+      startedAt: "2026-08-29T22:00:00.000Z",
+      currentPeriodEnd: "2026-09-05",
+    });
+
+    assert.deepEqual(trialState(trial, "2026-08-29"), {
+      endsOn: "2026-09-05",
+      daysRemaining: 7,
+      expired: false,
+    });
+    assert.deepEqual(trialState(trial, "2026-09-05"), {
+      endsOn: "2026-09-05",
+      daysRemaining: 0,
+      expired: false,
+    });
+    assert.deepEqual(trialState(trial, "2026-09-06"), {
+      endsOn: "2026-09-05",
+      daysRemaining: 0,
+      expired: true,
+    });
+    assert.equal(trialState({ ...trial, status: "ACTIVE" }, "2026-08-29"), null);
   });
 });

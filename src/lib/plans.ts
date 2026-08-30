@@ -27,9 +27,9 @@
  * which plan is bigger. `rank` does, and it is what upgrade and downgrade are
  * decided against.
  *
- * Nothing here talks to a payment provider. `Subscription` carries empty
- * provider references so that adding one later is a field being filled in
- * rather than a model being reshaped.
+ * Fleet access is stricter: its provider reference must be present and the
+ * subscription active. That keeps Fleet a paid service instead of letting a
+ * plan label or an old truck row turn the workspace on by accident.
  */
 
 import type { PlanId, Subscription, SubscriptionStatus } from "./types";
@@ -77,7 +77,7 @@ export const PLANS: Record<PlanId, Plan> = {
   },
   OWNER: {
     id: "OWNER",
-    name: "Owner-Operator",
+    name: "OnRoad Pro",
     priceMonthly: 39,
     truckLimit: 1,
     rank: 1,
@@ -96,14 +96,14 @@ export const PLANS: Record<PlanId, Plan> = {
   },
   FLEET: {
     id: "FLEET",
-    name: "Small Fleet",
+    name: "OnRoad Fleet",
     priceMonthly: 89,
     truckLimit: 8,
     rank: 2,
     tagline: "Two to eight trucks, each with its own economics.",
     capabilities: ["cockpit", "fleet"],
     features: [
-      "Everything in Owner-Operator",
+      "Everything in OnRoad Pro",
       "Up to eight trucks on one account",
       "Cost per mile and contribution per unit",
       "Business overhead kept separate from truck costs",
@@ -122,13 +122,51 @@ export const PLAN_IDS: PlanId[] = ["SOLO", "OWNER", "FLEET"];
  *
  * The single-truck plan was called Individual before the tiers were split by
  * depth. Anyone on it keeps the cockpit they were sold, so it maps up to
- * Owner-Operator rather than down to Solo Starter.
+ * OnRoad Pro rather than down to Solo Starter.
  */
 const LEGACY_PLAN_IDS: Record<string, PlanId> = {
   INDIVIDUAL: "OWNER",
 };
 
 export const DEFAULT_PLAN: PlanId = "OWNER";
+export const TRIAL_DAYS = 7;
+
+/** The date a new Pro trial ends, expressed in the same date-only form we store. */
+export function trialEndsOn(startedAt: string): string {
+  const start = new Date(startedAt);
+  const validStart = Number.isNaN(start.getTime()) ? new Date() : start;
+  validStart.setUTCDate(validStart.getUTCDate() + TRIAL_DAYS);
+  return validStart.toISOString().slice(0, 10);
+}
+
+export interface TrialState {
+  endsOn: string;
+  daysRemaining: number;
+  expired: boolean;
+}
+
+/** A stable, date-only trial summary. Callers pass today so SSR and hydration agree. */
+export function trialState(
+  subscription: Subscription | undefined,
+  today: string,
+): TrialState | null {
+  if (!subscription || subscription.status !== "TRIALING") return null;
+
+  const endsOn = subscription.currentPeriodEnd ?? trialEndsOn(subscription.startedAt);
+  const end = Date.parse(`${endsOn}T00:00:00.000Z`);
+  const now = Date.parse(`${today}T00:00:00.000Z`);
+  const day = 24 * 60 * 60 * 1000;
+  const daysRemaining =
+    Number.isNaN(end) || Number.isNaN(now)
+      ? TRIAL_DAYS
+      : Math.max(0, Math.ceil((end - now) / day));
+
+  return {
+    endsOn,
+    daysRemaining,
+    expired: !Number.isNaN(end) && !Number.isNaN(now) && now > end,
+  };
+}
 
 export function getPlan(id: string | null | undefined): Plan {
   if (!id) return PLANS[DEFAULT_PLAN];
@@ -138,6 +176,16 @@ export function getPlan(id: string | null | undefined): Plan {
 
 export function planOf(subscription: Subscription | undefined): Plan {
   return getPlan(subscription?.plan);
+}
+
+/** Fleet is a separate paid service, not a UI mode inferred from truck count. */
+export function hasFleetAccess(subscription: Subscription | undefined): boolean {
+  return Boolean(
+    subscription &&
+      planOf(subscription).id === "FLEET" &&
+      subscription.status === "ACTIVE" &&
+      subscription.providerSubscriptionId,
+  );
 }
 
 /**
@@ -151,6 +199,7 @@ export function planAllows(
   subscription: Subscription | undefined,
   capability: PlanCapability,
 ): boolean {
+  if (capability === "fleet") return hasFleetAccess(subscription);
   return planOf(subscription).capabilities.includes(capability);
 }
 
@@ -172,6 +221,9 @@ export function cheapestPlanWith(capability: PlanCapability): Plan {
  */
 export function capabilityRefusal(capability: PlanCapability): string {
   const plan = cheapestPlanWith(capability);
+  if (capability === "fleet") {
+    return `${plan.name} is a separate paid service, $${plan.priceMonthly} a month. Request Fleet access in Settings — nothing in your books moves either way.`;
+  }
   return `That is part of ${plan.name}, $${plan.priceMonthly} a month. Switch plans in Settings — nothing in your books moves either way.`;
 }
 
@@ -204,18 +256,19 @@ export function truckAllowance(
   activeTruckCount: number,
 ): TruckAllowance {
   const plan = planOf(subscription);
-  const remaining = Math.max(0, plan.truckLimit - activeTruckCount);
+  const limit = hasFleetAccess(subscription) ? plan.truckLimit : 1;
+  const remaining = Math.max(0, limit - activeTruckCount);
   const canAdd = remaining > 0;
 
   return {
-    limit: plan.truckLimit,
+    limit,
     used: activeTruckCount,
     remaining,
     canAdd,
     reason: canAdd
       ? null
-      : plan.truckLimit === 1
-        ? `${plan.name} covers one truck. Move to ${PLANS.FLEET.name} to run up to ${PLANS.FLEET.truckLimit}.`
+      : limit === 1
+        ? `${plan.name} covers one truck. ${PLANS.FLEET.name} is a separate paid service for up to ${PLANS.FLEET.truckLimit}.`
         : `${plan.name} covers ${plan.truckLimit} trucks, and you are running ${activeTruckCount}. Get in touch and we will sort out a larger plan.`,
   };
 }
@@ -234,7 +287,7 @@ export interface PlanChange {
  * records to fit a cheaper plan is never the right answer, so they archive a
  * truck first and keep its history.
  *
- * Dropping a capability is NOT refused. Moving from Owner-Operator to Solo
+ * Dropping a capability is NOT refused. Moving from OnRoad Pro to Solo
  * Starter puts the cockpit away; it does not touch a single row, and coming
  * back turns it on again with the history intact.
  */

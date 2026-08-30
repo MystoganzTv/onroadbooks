@@ -28,7 +28,7 @@ import type {
 } from "../types";
 import { defaultCategoryBehavior } from "../categories";
 import { defaultGoals, defaultReserveAccounts, defaultSubscription } from "../defaults";
-import { DEFAULT_PLAN, getPlan } from "../plans";
+import { DEFAULT_PLAN, getPlan, trialEndsOn } from "../plans";
 import { DEMO_EMAIL } from "../auth/constants";
 import type {
   AuthStore,
@@ -265,6 +265,7 @@ export class PrismaAuthStore implements AuthStore {
   }): Promise<User> {
     const client = await getClient();
     const email = input.email.trim().toLowerCase();
+    const trialStartedAt = new Date();
 
     return client.$transaction(async (tx) => {
       if (await tx.user.findUnique({ where: { email } })) {
@@ -277,7 +278,14 @@ export class PrismaAuthStore implements AuthStore {
           currency: "USD",
           settings: { create: { categoryBehavior: defaultCategoryBehavior() } },
           trucks: { create: { name: "Truck 1" } },
-          subscription: { create: { plan: input.plan ?? DEFAULT_PLAN } },
+          subscription: {
+            create: {
+              plan: input.plan ?? DEFAULT_PLAN,
+              status: "TRIALING",
+              startedAt: trialStartedAt,
+              currentPeriodEnd: toDate(trialEndsOn(trialStartedAt.toISOString())),
+            },
+          },
         },
       });
 
@@ -527,7 +535,9 @@ export class PrismaRepository implements Repository {
           status: subscriptionRow.status,
           currentPeriodEnd: subscriptionRow.currentPeriodEnd
             ? isoDate(subscriptionRow.currentPeriodEnd)
-            : null,
+            : subscriptionRow.status === "TRIALING"
+              ? trialEndsOn(subscriptionRow.startedAt.toISOString())
+              : null,
           providerCustomerId: subscriptionRow.providerCustomerId,
           providerSubscriptionId: subscriptionRow.providerSubscriptionId,
           startedAt: subscriptionRow.startedAt.toISOString(),

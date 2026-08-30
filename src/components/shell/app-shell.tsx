@@ -11,6 +11,10 @@ import { BrandLogo } from "./brand-logo";
 import { SidebarNav } from "./sidebar-nav";
 import { DisplayMenu } from "./display-menu";
 import { isNavActive, PRIMARY_NAV } from "./nav-items";
+import {
+  TrialBanner,
+  type TrialBannerData,
+} from "@/components/subscription/trial-banner";
 
 interface AppShellProps {
   businessName: string;
@@ -18,6 +22,7 @@ interface AppShellProps {
   hasFleet?: boolean;
   userEmail: string;
   isDemo?: boolean;
+  trial?: TrialBannerData | null;
   children: React.ReactNode;
 }
 
@@ -27,6 +32,7 @@ export function AppShell({
   hasFleet = false,
   userEmail,
   isDemo = false,
+  trial = null,
   children,
 }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -67,6 +73,7 @@ export function AppShell({
             <span className="text-muted-foreground"> — sample data is read-only.</span>
           </div>
         ) : null}
+        {!isDemo && trial ? <TrialBanner trial={trial} /> : null}
 
         <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:hidden">
           <Button

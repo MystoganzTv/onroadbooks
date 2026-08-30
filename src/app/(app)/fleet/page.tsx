@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { PeriodControls } from "@/components/dashboard/period-controls";
 import { MiniStat } from "@/components/dashboard/mini-stat";
 import { PageHeader } from "@/components/shared/page-header";
-import { PlanGate } from "@/components/shared/plan-gate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -19,7 +18,7 @@ import { summarizePeriod } from "@/lib/calculations";
 import { getRepository } from "@/lib/db";
 import { calculateFleetSummary, fleetExtremes } from "@/lib/finance/fleet";
 import { orderedTrucks } from "@/lib/fleet";
-import { planAllows } from "@/lib/plans";
+import { hasFleetAccess } from "@/lib/plans";
 import {
   formatMiles,
   formatMoney,
@@ -63,27 +62,10 @@ export default async function FleetPage({
     session.businessId,
   ).getDataset();
 
-  // One truck has no fleet economics: its contribution IS the business, and
-  // the dashboard already says so.
-  if (trucks.length < 2) redirect("/truck");
-
-  // Belt and braces: the truck limit already keeps a single-truck plan from
-  // ever having a second unit, but the capability is what says this screen is
-  // theirs, and it is checked here rather than assumed from the count.
-  if (!planAllows(subscription, "fleet")) {
-    return (
-      <div className="space-y-4 p-4 lg:p-6">
-        <PageHeader
-          title="Fleet"
-          description="What each unit contributes, and what the business keeps after the costs no truck caused."
-        />
-        <PlanGate
-          capability="fleet"
-          what="Compare your trucks on what each one actually contributes, with business overhead subtracted once at the bottom rather than smeared across the units."
-        />
-      </div>
-    );
-  }
+  // Fleet is a separate paid service. An individual account never sees a
+  // preview of the operational Fleet workspace, even if an old truck row
+  // remains in its history.
+  if (!hasFleetAccess(subscription)) redirect("/truck");
 
   const period = periodFromSearchParams(params);
   const fleet = calculateFleetSummary(orderedTrucks(trucks), loads, expenses, period, settings);

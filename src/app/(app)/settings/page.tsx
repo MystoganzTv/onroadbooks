@@ -15,6 +15,7 @@ import { requireSession } from "@/lib/auth";
 import { getRepository, storageMode } from "@/lib/db";
 import { activeTrucks } from "@/lib/fleet";
 import { periodFromSearchParams, type SearchParams } from "@/lib/period-params";
+import { todayISO } from "@/lib/periods";
 import { APP_NAME } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -61,6 +62,7 @@ export default async function SettingsPage({
           <PlanCard
             subscription={subscription}
             activeTruckCount={activeTrucks(trucks).length}
+            today={todayISO()}
           />
 
           <Card>

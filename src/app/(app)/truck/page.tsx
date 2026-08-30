@@ -31,7 +31,7 @@ import { summarizeFuel, truckLifetime } from "@/lib/calculations";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { activeTrucks, orderedTrucks, primaryTruck, truckById } from "@/lib/fleet";
-import { planOf, truckAllowance } from "@/lib/plans";
+import { hasFleetAccess, planOf, truckAllowance } from "@/lib/plans";
 import { truckFromSearchParams, type SearchParams } from "@/lib/period-params";
 import { thresholdsFrom, upcomingMaintenance } from "@/lib/maintenance";
 import { calculateMaintenanceHealth } from "@/lib/finance/maintenance-health";
@@ -59,8 +59,10 @@ export default async function TruckPage({
   // One unit at a time: miles remaining and reserve coverage are facts about a
   // specific odometer, not about a fleet.
   const trucks = orderedTrucks(dataset.trucks);
-  const selectedId = truckFromSearchParams(params, trucks);
-  const truck = truckById(trucks, selectedId) ?? primaryTruck(trucks);
+  const fleetAccount = hasFleetAccess(dataset.subscription);
+  const primary = primaryTruck(trucks);
+  const selectedId = fleetAccount ? truckFromSearchParams(params, trucks) : primary.id;
+  const truck = truckById(trucks, selectedId) ?? primary;
   const lifetime = truckLifetime(dataset, truck);
   const fuel = summarizeFuel(
     dataset.fuelEntries.filter((entry) => entry.truckId === truck.id),
@@ -93,8 +95,7 @@ export default async function TruckPage({
   const running = activeTrucks(trucks).length;
   const allowance = truckAllowance(dataset.subscription, running);
   const plan = planOf(dataset.subscription);
-  const fleetAccount = allowance.limit > 1;
-  const hasSeveralTrucks = trucks.length > 1;
+  const hasSeveralTrucks = fleetAccount && trucks.length > 1;
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
@@ -197,13 +198,7 @@ export default async function TruckPage({
               variant="cards"
             />
           ) : (
-            <div
-              className={
-                fleetAccount
-                  ? "max-w-2xl"
-                  : "grid gap-2 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]"
-              }
-            >
+            <div className="max-w-2xl">
               <div className="flex items-center gap-3 rounded-lg border border-primary bg-primary/10 p-3 shadow-sm">
                 <span
                   className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"
@@ -221,22 +216,6 @@ export default async function TruckPage({
                   {truck.active ? "Selected · Active" : "Selected · Retired"}
                 </Badge>
               </div>
-              {!fleetAccount ? (
-                <div className="flex items-center justify-between gap-3 rounded-lg border border-dashed border-border bg-card/70 px-3 py-2.5">
-                  <div>
-                    <p className="text-xs font-medium text-foreground">Need another truck?</p>
-                    <p className="mt-0.5 text-2xs text-muted-foreground">
-                      Fleet mode separates every unit&rsquo;s numbers.
-                    </p>
-                  </div>
-                  <Button asChild variant="ghost" size="sm" className="shrink-0 text-primary">
-                    <Link href="/settings">
-                      View fleet plans
-                      <ArrowRight className="size-4" />
-                    </Link>
-                  </Button>
-                </div>
-              ) : null}
             </div>
           )}
         </div>

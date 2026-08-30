@@ -66,7 +66,7 @@ const en = {
       "Bookkeeping and profit tracking for owner-operators. True cost per mile, load screening before you book, owner pay after reserves, and broker and lane scoring - all from your own ledger.",
   },
   banner: {
-    text: "Half-month settlements and reserve buckets are live. Free for 14 days, no card.",
+    text: "Half-month settlements and reserve buckets are live. Free for 7 days, no card.",
   },
   nav: {
     links: [
@@ -216,7 +216,7 @@ const en = {
   cta: {
     title: "Ready to take control of your numbers?",
     checks: [
-      "Start your 14-day free trial",
+      "Start your 7-day free trial",
       "No credit card required",
       "No bank connection, ever",
       "Cancel anytime and export everything",
@@ -272,18 +272,18 @@ const en = {
       },
       {
         id: "FLEET",
-        badge: "Early access",
+        badge: "Separate paid service",
         featured: false,
-        cta: "Start free trial",
+        cta: "Request Fleet access",
         tagline: "Two to eight trucks, each with its own economics.",
         features: [
-          "Everything in Owner-Operator",
+          "Everything in OnRoad Pro",
           "Up to eight trucks on one account",
           "Cost per mile and contribution per unit",
           "Business overhead kept separate from truck costs",
           "Fleet-wide settlements",
         ],
-        note: "Everything listed here works today. A second sign-in for a partner or a bookkeeper does not exist yet, and early access pricing is locked for life.",
+        note: "Fleet is activated separately from a one-truck account. Everything listed here works today; a second sign-in for a partner or bookkeeper does not exist yet.",
       },
     ],
   },
@@ -339,7 +339,7 @@ const es: LandingCopy = {
       "Contabilidad y control de ganancia para owner-operators. Costo real por milla, la carga evaluada antes de aceptarla, cuánto puedes pagarte después de reservas, y qué brokers y rutas rinden - todo desde tu propio libro.",
   },
   banner: {
-    text: "Ya están los cortes de quincena y las reservas. Gratis 14 días, sin tarjeta.",
+    text: "Ya están los cortes de quincena y las reservas. Gratis 7 días, sin tarjeta.",
   },
   nav: {
     links: [
@@ -488,7 +488,7 @@ const es: LandingCopy = {
   cta: {
     title: "¿Listo para tomar control de tus números?",
     checks: [
-      "Empieza tu prueba de 14 días",
+      "Empieza tu prueba de 7 días",
       "Sin tarjeta de crédito",
       "Nunca se conecta a tu banco",
       "Cancela cuando quieras y exporta todo",
@@ -544,18 +544,18 @@ const es: LandingCopy = {
       },
       {
         id: "FLEET",
-        badge: "Acceso anticipado",
+        badge: "Servicio pagado aparte",
         featured: false,
-        cta: "Prueba gratis",
+        cta: "Solicitar acceso Fleet",
         tagline: "De dos a ocho camiones, cada uno con su economía.",
         features: [
-          "Todo lo de Owner-Operator",
+          "Todo lo de OnRoad Pro",
           "Hasta ocho camiones en una cuenta",
           "Costo por milla y aporte por unidad",
           "Gastos del negocio separados de los del camión",
           "Cortes de toda la flota",
         ],
-        note: "Todo lo listado aquí funciona hoy. Un segundo acceso para un socio o un contador todavía no existe, y el precio de acceso anticipado queda fijo de por vida.",
+        note: "Fleet se activa por separado de una cuenta de un solo camión. Todo lo listado aquí funciona hoy; un segundo acceso para un socio o contador todavía no existe.",
       },
     ],
   },

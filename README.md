@@ -140,7 +140,7 @@ ceilings never scale with the length of the window.
 not `NJ>VA`, and the two are never averaged), ranked only once a lane has run at
 least three times. Two loads is an anecdote.
 
-**Fleet** -- up to eight trucks on the Small Fleet plan, each with its own
+**Fleet** -- up to eight trucks on the paid OnRoad Fleet service, each with its own
 contribution and cost per mile. A truck is never charged a share of the phone bill; business
 overhead is subtracted once, visibly, at the fleet level, so the fleet view ties
 back exactly to the net profit on the dashboard.
@@ -348,7 +348,7 @@ rather than failing to boot.
 
 Every `Load`, `Expense` and `FuelEntry` carries `businessId` and `truckId`, and
 an expense carries a scope: `TRUCK` charges a unit, `BUSINESS` is overhead and
-carries no truck. Small Fleet raises the truck limit to eight, enforced
+carries no truck. Paid OnRoad Fleet raises the truck limit to eight, enforced
 server-side in the action that creates one rather than by hiding a button. A
 single-truck ledger written before any of this upgrades in place -- covered by
 `fleet-migration.test.ts`.
@@ -451,7 +451,7 @@ mistake costs money rather than throwing an error:
 | `calculations.test.ts` | division by zero and non-finite input, `roundMoney` symmetry and the `-$0.00` case, trip costs counted once, profit rated per mile *driven* (a $4.00/loaded-mile load with 300 empty miles rates MARGINAL against a plain $3.00 run at GREAT), reserve maths including a losing month |
 | `finance.test.ts` | the product layer: cost per mile refusing to prorate a monthly cost across the halves, the trailing basis falling back when the window is thin, overhead per mile excluding what the calculator asks for directly, reserves and safe-to-pay always reconstructing operating profit, the score never disagreeing with the rating about which load is better, a target rate that really does clear the target after fees, lanes staying directional and unranked below three loads, and a pro-rated goal saying that it was pro-rated |
 | `fleet-migration.test.ts` | a single-truck ledger upgrading in place, and the fleet reconciliation: contributions minus overhead equals the dashboard's net profit, to the cent |
-| `plans.test.ts` | prices, limits and ranks matching what is sold, each tier being the one below plus something, the cockpit closed on Solo and open on Owner-Operator, a ledger written on the old Individual plan carried up rather than down, the second truck refused on a single-truck plan and the ninth on Fleet, downgrades blocked while too many trucks are running, and a lapsed subscription closing writes |
+| `plans.test.ts` | prices, limits and ranks matching what is sold, the cockpit closed on Solo and open on OnRoad Pro, paid Fleet access requiring an active provider subscription, a legacy Individual ledger carried up rather than down, truck limits, trial dates, safe downgrades, and a lapsed subscription closing writes |
 | `periods.test.ts` | every period key, leap years, year rollover on the previous-period comparison, week anchoring, a reversed custom range, impossible dates like `2026-02-30`, and that the two halves of a month sum exactly to the full month |
 | `maintenance.test.ts` | overdue on either measure, `BOTH` meaning whichever comes first, urgency scored against the user's own thresholds rather than an assumed miles-per-day, and zero thresholds |
 | `export.test.ts` | CSV formula neutralisation, RFC 4180 quoting, no row wider than its header, and summary labels staying out of numeric columns |

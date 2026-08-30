@@ -14,7 +14,7 @@ import {
   migrateTruck,
 } from "../defaults";
 import { primaryTruck } from "../fleet";
-import { getPlan } from "../plans";
+import { DEFAULT_PLAN, getPlan, trialEndsOn } from "../plans";
 import { buildSeedDataset, DEMO_DOCUMENTS } from "../seed/seed-data";
 import { buildStorageKey, getDocumentStorage } from "../storage";
 import type {
@@ -159,10 +159,13 @@ function migrate(dataset: Dataset): Dataset {
   dataset.subscription ??= defaultSubscription(businessId);
   dataset.subscription.providerCustomerId ??= null;
   dataset.subscription.providerSubscriptionId ??= null;
-  dataset.subscription.currentPeriodEnd ??= null;
+  dataset.subscription.currentPeriodEnd ??=
+    dataset.subscription.status === "TRIALING"
+      ? trialEndsOn(dataset.subscription.startedAt)
+      : null;
   // The plan a ledger was written with may no longer be a plan we sell. The
   // catalogue decides what it becomes -- Individual, the old single-truck
-  // plan, keeps the cockpit it was sold and becomes Owner-Operator.
+  // plan, keeps the cockpit it was sold and becomes OnRoad Pro.
   dataset.subscription.plan = getPlan(dataset.subscription.plan).id;
   if (!Array.isArray(dataset.reserveAccounts) || dataset.reserveAccounts.length === 0) {
     dataset.reserveAccounts = defaultReserveAccounts(businessId);
@@ -609,17 +612,19 @@ export class JsonAuthStore implements AuthStore {
   }): Promise<User> {
     return mutate((dataset) => {
       const email = input.email.trim().toLowerCase();
+      const trialStartedAt = new Date().toISOString();
       if (dataset.users.some((u) => u.email.toLowerCase() === email)) {
         throw new Error("That email already has an account.");
       }
       if (input.businessName) dataset.business.name = input.businessName.trim();
-      if (input.plan) {
-        dataset.subscription = {
-          ...dataset.subscription,
-          plan: input.plan,
-          updatedAt: new Date().toISOString(),
-        };
-      }
+      dataset.subscription = {
+        ...dataset.subscription,
+        plan: input.plan ?? DEFAULT_PLAN,
+        status: "TRIALING",
+        currentPeriodEnd: trialEndsOn(trialStartedAt),
+        startedAt: trialStartedAt,
+        updatedAt: trialStartedAt,
+      };
 
       const user: User = {
         id: newId("user"),
