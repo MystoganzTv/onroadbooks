@@ -12,7 +12,7 @@ import { isNavActive, NAV_GROUPS } from "./nav-items";
 interface SidebarNavProps {
   businessName: string;
   truckName: string;
-  /** Fleet-only destinations stay hidden while there is one truck. */
+  /** Fleet-only destinations stay hidden until paid Fleet access is active. */
   hasFleet?: boolean;
   userEmail?: string;
   onNavigate?: () => void;

@@ -25,6 +25,7 @@ import { ExpenseFormDialog } from "@/components/expenses/expense-form-dialog";
 import { LoadFormDialog } from "@/components/loads/load-form-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import { PlanGate } from "@/components/shared/plan-gate";
+import { DashboardSubscriptionStatus } from "@/components/subscription/dashboard-subscription-status";
 import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -221,6 +222,9 @@ export default async function DashboardPage({
       defaultTruckId={truckId}
     />
   );
+  const subscriptionStatus = session.isDemo ? null : (
+    <DashboardSubscriptionStatus subscription={dataset.subscription} today={today} />
+  );
 
   if (!hasLedgerHistory) {
     return (
@@ -237,6 +241,7 @@ export default async function DashboardPage({
             </Button>
           }
         />
+        {subscriptionStatus}
         <EmptyCockpit
           businessName={dataset.business.name}
           loadAction={loadAction}
@@ -264,6 +269,7 @@ export default async function DashboardPage({
           </>
         }
       />
+      {subscriptionStatus}
 
       <div className="flex flex-wrap items-center gap-2">
         <PeriodControls period={period} />

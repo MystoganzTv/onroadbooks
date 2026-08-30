@@ -4,16 +4,15 @@ import { Database, FileText } from "lucide-react";
 import { DisplaySettings } from "@/components/settings/display-settings";
 import { AccountDangerZone } from "@/components/settings/account-danger-zone";
 import { GoalsForm } from "@/components/settings/goals-form";
-import { PlanCard } from "@/components/settings/plan-card";
 import { SettingsForm } from "@/components/settings/settings-form";
 import { PageHeader } from "@/components/shared/page-header";
 import { BrandLogo } from "@/components/shell/brand-logo";
+import { CurrentPlanCard } from "@/components/subscription/current-plan-card";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { summarizePeriod } from "@/lib/calculations";
 import { requireSession } from "@/lib/auth";
 import { getRepository, storageMode } from "@/lib/db";
-import { activeTrucks } from "@/lib/fleet";
 import { periodFromSearchParams, type SearchParams } from "@/lib/period-params";
 import { todayISO } from "@/lib/periods";
 import { APP_NAME } from "@/lib/utils";
@@ -27,7 +26,7 @@ export default async function SettingsPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { business, settings, goals, subscription, trucks, loads, expenses } =
+  const { business, settings, goals, subscription, loads, expenses } =
     await getRepository(session.businessId).getDataset();
   const period = periodFromSearchParams(params);
   const preview = summarizePeriod(loads, expenses, period, settings);
@@ -59,11 +58,7 @@ export default async function SettingsPage({
         </div>
 
         <div className="min-w-0 space-y-4">
-          <PlanCard
-            subscription={subscription}
-            activeTruckCount={activeTrucks(trucks).length}
-            today={todayISO()}
-          />
+          <CurrentPlanCard subscription={subscription} today={todayISO()} />
 
           <Card>
             <CardHeader>

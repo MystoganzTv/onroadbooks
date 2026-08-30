@@ -2,8 +2,7 @@ import { AppShell } from "@/components/shell/app-shell";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { activeTrucks, primaryTruck } from "@/lib/fleet";
-import { hasFleetAccess, planOf, trialState } from "@/lib/plans";
-import { todayISO } from "@/lib/periods";
+import { hasFleetAccess } from "@/lib/plans";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await requireSession();
@@ -13,8 +12,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // happen to exist. A non-Fleet account always presents one primary unit.
   const running = activeTrucks(trucks);
   const hasFleet = hasFleetAccess(subscription);
-  const trial = trialState(subscription, todayISO());
-  const currentPlan = planOf(subscription);
 
   return (
     <AppShell
@@ -29,16 +26,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       hasFleet={hasFleet}
       userEmail={session.email}
       isDemo={session.isDemo}
-      trial={
-        trial
-          ? {
-              planName: currentPlan.name,
-              priceMonthly: currentPlan.priceMonthly,
-              daysRemaining: trial.daysRemaining,
-              expired: trial.expired,
-            }
-          : null
-      }
     >
       {children}
     </AppShell>

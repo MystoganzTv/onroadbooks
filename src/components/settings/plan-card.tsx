@@ -60,6 +60,7 @@ function OneTruckPlan({
   const current = planOf(subscription);
   const isCurrent = current.id === id;
   const decision = evaluatePlanChange(subscription, id, activeTruckCount);
+  const requiresActivation = id === "OWNER" && decision.direction === "upgrade";
 
   return (
     <div
@@ -95,19 +96,23 @@ function OneTruckPlan({
 
       {!isCurrent ? (
         <>
-          <Button
-            type="button"
-            size="sm"
-            variant={decision.direction === "upgrade" ? "default" : "outline"}
-            className="mt-3 w-full"
-            disabled={pending || !decision.allowed}
-            onClick={() => onChange(id)}
-          >
-            {pending ? <Loader2 className="animate-spin" /> : null}
-            {decision.direction === "upgrade"
-              ? `Move to ${plan.name}`
-              : `Go back to ${plan.name}`}
-          </Button>
+          {requiresActivation ? (
+            <Button asChild type="button" size="sm" className="mt-3 w-full">
+              <a href={activationEmail("OnRoad Pro")}>Upgrade to OnRoad Pro</a>
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="mt-3 w-full"
+              disabled={pending || !decision.allowed}
+              onClick={() => onChange(id)}
+            >
+              {pending ? <Loader2 className="animate-spin" /> : null}
+              Go back to {plan.name}
+            </Button>
+          )}
           {decision.reason ? (
             <p className="mt-1.5 text-2xs leading-relaxed text-warn">{decision.reason}</p>
           ) : null}
@@ -191,7 +196,7 @@ export function PlanCard({
               Your account stays centered on one truck. Fleet tools do not appear here.
             </p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+          <div className="grid gap-3 md:grid-cols-2">
             {ONE_TRUCK_PLANS.map((id) => (
               <OneTruckPlan
                 key={id}

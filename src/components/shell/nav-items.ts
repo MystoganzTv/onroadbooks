@@ -1,6 +1,7 @@
 import {
   BarChart3,
   Calculator,
+  CreditCard,
   Fuel,
   Landmark,
   LayoutDashboard,
@@ -18,7 +19,7 @@ export interface NavItem {
   icon: LucideIcon;
   /** Also treat these prefixes as "on this section". */
   matches?: string[];
-  /** Hidden until the business actually runs more than one truck. */
+  /** Hidden until the paid Fleet service is active. */
   fleetOnly?: boolean;
 }
 
@@ -63,6 +64,7 @@ export const NAV_GROUPS: NavGroup[] = [
 /** Flat list, kept for the mobile header title and anything else that needs it. */
 export const PRIMARY_NAV: NavItem[] = [
   ...NAV_GROUPS.flatMap((group) => group.items),
+  { href: "/plans", label: "Plans & Billing", icon: CreditCard },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

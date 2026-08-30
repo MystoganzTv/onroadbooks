@@ -29,7 +29,7 @@ business, so there is data on screen from the first sign-in.
 
 ## What it does
 
-**Dashboard** -- the full period selector (Today / This Week / 1-15 / 16-End / Full Month / Quarter / Year to Date / Custom range), four
+**Dashboard** -- visible trial time or active plan status, the full period selector (Today / This Week / 1-15 / 16-End / Full Month / Quarter / Year to Date / Custom range), four
 headline KPIs (gross revenue, operating expenses, net profit, net margin), seven
 operating metrics (total / loaded / deadhead miles, deadhead %, revenue, cost and
 profit per mile), a daily revenue-vs-expense chart, the Money Breakdown, and
@@ -155,7 +155,11 @@ mile.
 **Settings** -- business name, currency, both built-in reserve percentages (with
 a live preview against real period numbers), monthly goals and the working week,
 the load profitability thresholds with a visual scale, the deadhead and
-maintenance warning thresholds, and the fixed/variable classification matrix.
+maintenance warning thresholds, the fixed/variable classification matrix, and a
+compact subscription summary that links out instead of embedding a plan selector.
+
+**Plans & Billing** -- a dedicated comparison for Solo Starter and OnRoad Pro,
+with Fleet presented and activated as a separate paid service.
 
 ---
 
