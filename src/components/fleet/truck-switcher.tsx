@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Truck as TruckIcon } from "lucide-react";
+import { Check, Truck as TruckIcon } from "lucide-react";
 
 import type { Truck } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,7 @@ export function TruckSwitcher({
   selectedId,
   allLabel = "Whole fleet",
   includeAll = true,
+  variant = "compact",
   className,
 }: {
   trucks: Truck[];
@@ -31,6 +32,8 @@ export function TruckSwitcher({
    * silently falls back to a single unit is worse than not offering it.
    */
   includeAll?: boolean;
+  /** Cards make the current unit unmistakable on the truck workspace. */
+  variant?: "compact" | "cards";
   className?: string;
 }) {
   const pathname = usePathname();
@@ -46,7 +49,7 @@ export function TruckSwitcher({
     return query ? `${pathname}?${query}` : pathname;
   };
 
-  const option = (id: string | null, label: string, inactive = false) => {
+  const compactOption = (id: string | null, label: string, inactive = false) => {
     const active = selectedId === id;
     return (
       <Link
@@ -66,6 +69,70 @@ export function TruckSwitcher({
     );
   };
 
+  if (variant === "cards") {
+    return (
+      <div
+        className={cn("grid w-full gap-2 sm:grid-cols-2 xl:grid-cols-3", className)}
+        role="group"
+        aria-label="Choose a truck"
+      >
+        {trucks.map((truck) => {
+          const active = selectedId === truck.id;
+          const description = [truck.year, truck.make, truck.model].filter(Boolean).join(" ");
+
+          return (
+            <Link
+              key={truck.id}
+              href={href(truck.id)}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "group flex min-w-0 items-center gap-3 rounded-lg border p-3 text-left transition-colors focus-ring",
+                active
+                  ? "border-primary bg-primary/10 shadow-sm"
+                  : "border-border bg-card hover:border-primary/50 hover:bg-accent/50",
+                !truck.active && !active && "opacity-70",
+              )}
+            >
+              <span
+                className={cn(
+                  "flex size-9 shrink-0 items-center justify-center rounded-md border",
+                  active
+                    ? "border-primary/30 bg-primary text-primary-foreground"
+                    : "border-border bg-surface-sunken text-muted-foreground group-hover:text-foreground",
+                )}
+                aria-hidden
+              >
+                <TruckIcon className="size-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-2">
+                  <span className="truncate text-sm font-semibold text-foreground">{truck.name}</span>
+                  {!truck.active ? (
+                    <span className="rounded border border-border px-1.5 py-0.5 text-2xs font-medium text-muted-foreground">
+                      Retired
+                    </span>
+                  ) : null}
+                </span>
+                <span className="mt-0.5 block truncate text-2xs text-muted-foreground">
+                  {description || "Vehicle details not added"}
+                </span>
+              </span>
+              {active ? (
+                <span
+                  className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
+                  aria-label="Currently viewing"
+                  title="Currently viewing"
+                >
+                  <Check className="size-3" />
+                </span>
+              ) : null}
+            </Link>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -78,8 +145,8 @@ export function TruckSwitcher({
       <span className="px-1.5 text-muted-foreground" aria-hidden>
         <TruckIcon className="size-3.5" />
       </span>
-      {includeAll ? option(null, allLabel) : null}
-      {trucks.map((truck) => option(truck.id, truck.name, !truck.active))}
+      {includeAll ? compactOption(null, allLabel) : null}
+      {trucks.map((truck) => compactOption(truck.id, truck.name, !truck.active))}
     </div>
   );
 }

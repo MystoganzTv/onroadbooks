@@ -25,13 +25,13 @@ export function TruckRetireButton({ truck, canRestore }: { truck: Truck; canRest
   if (!truck.active) {
     return (
       <ConfirmAction
-        title={`Bring ${truck.name} back?`}
-        description="It becomes available for new loads and expenses again, and counts against your plan's truck limit."
-        confirmLabel="Bring it back"
+        title={`Return ${truck.name} to active service?`}
+        description="The unit will become available for new loads and expenses again and will count toward your plan's active-truck limit."
+        confirmLabel="Return to service"
         trigger={
           <Button variant="outline" size="sm" disabled={!canRestore}>
             <RotateCcw className="size-4" />
-            Bring back
+            Return to service
           </Button>
         }
         onConfirm={async () => {
@@ -49,14 +49,18 @@ export function TruckRetireButton({ truck, canRestore }: { truck: Truck; canRest
 
   return (
     <ConfirmAction
-      title={`Retire ${truck.name}?`}
-      description="Its history stays exactly where it is and keeps appearing in past reports. You just stop being able to book new work against it."
-      confirmLabel="Retire it"
-      variant="outline"
+      title={`Take ${truck.name} out of active service?`}
+      description="This does not delete the truck or any of its history. Past loads, expenses, fuel and service remain in reports; the unit simply becomes unavailable for new work."
+      confirmLabel="Take out of service"
+      variant="destructive"
       trigger={
-        <Button variant="ghost" size="sm" className="text-muted-foreground">
+        <Button
+          variant="outline"
+          size="sm"
+          className="border-neg/30 text-neg hover:bg-neg-soft hover:text-neg"
+        >
           <Archive className="size-4" />
-          Retire
+          Take out of service
         </Button>
       }
       onConfirm={async () => {

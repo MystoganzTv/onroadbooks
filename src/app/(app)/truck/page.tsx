@@ -1,6 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, FileText, Gauge, TruckIcon } from "lucide-react";
+import {
+  ArrowRight,
+  Building2,
+  FileText,
+  Gauge,
+  Settings2,
+  ShieldCheck,
+  TruckIcon,
+} from "lucide-react";
 
 import { MiniStat } from "@/components/dashboard/mini-stat";
 import { DocumentList } from "@/components/documents/document-list";
@@ -23,7 +31,7 @@ import { summarizeFuel, truckLifetime } from "@/lib/calculations";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { activeTrucks, orderedTrucks, primaryTruck, truckById } from "@/lib/fleet";
-import { truckAllowance } from "@/lib/plans";
+import { planOf, truckAllowance } from "@/lib/plans";
 import { truckFromSearchParams, type SearchParams } from "@/lib/period-params";
 import { thresholdsFrom, upcomingMaintenance } from "@/lib/maintenance";
 import { calculateMaintenanceHealth } from "@/lib/finance/maintenance-health";
@@ -84,7 +92,9 @@ export default async function TruckPage({
   // because a hidden button is a suggestion and the limit is a rule.
   const running = activeTrucks(trucks).length;
   const allowance = truckAllowance(dataset.subscription, running);
-  const isFleet = trucks.length > 1;
+  const plan = planOf(dataset.subscription);
+  const fleetAccount = allowance.limit > 1;
+  const hasSeveralTrucks = trucks.length > 1;
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
@@ -108,19 +118,129 @@ export default async function TruckPage({
         }
       />
 
-      {isFleet ? (
-        <div className="flex flex-wrap items-center gap-2">
-          {/* This page reports one unit's odometer, service and documents, so
-              there is no whole-fleet view to offer. */}
-          <TruckSwitcher trucks={trucks} selectedId={truck.id} includeAll={false} />
-          <Button asChild variant="outline" size="sm">
-            <Link href="/fleet">
-              Compare units
-              <ArrowRight className="size-4" />
-            </Link>
-          </Button>
+      <section
+        aria-labelledby="account-mode-title"
+        className="overflow-hidden rounded-xl border border-border bg-card"
+      >
+        <div className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between lg:p-5">
+          <div className="flex min-w-0 items-start gap-3.5">
+            <span
+              className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
+              aria-hidden
+            >
+              <Building2 className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-2xs font-semibold uppercase tracking-[0.16em] text-primary">
+                Account mode
+              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <h2 id="account-mode-title" className="text-lg font-semibold tracking-tight">
+                  {fleetAccount ? "Fleet account" : "Individual account"}
+                </h2>
+                <Badge variant="info">{plan.name} plan</Badge>
+              </div>
+              <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
+                {fleetAccount
+                  ? "Each truck keeps its own revenue, costs, mileage and service history. Choose a unit below before editing its profile."
+                  : "This workspace is built around one active truck. Its loads, costs, mileage, service and documents all stay together."}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 flex-wrap items-center gap-2 md:justify-end">
+            <div className="mr-1 border-r border-border pr-3 text-right">
+              <p className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">
+                Active trucks
+              </p>
+              <p className="tnum text-sm font-semibold">
+                {running} of {allowance.limit}
+              </p>
+            </div>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/settings">
+                <Settings2 className="size-4" />
+                Manage plan
+              </Link>
+            </Button>
+            {fleetAccount ? (
+              <TruckDialog canAdd={allowance.canAdd} limitReason={allowance.reason} />
+            ) : null}
+          </div>
         </div>
-      ) : null}
+
+        <div className="border-t border-border bg-surface-sunken/50 p-4 lg:px-5">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold text-foreground">
+                {hasSeveralTrucks ? "Choose the truck you are viewing" : "Current truck"}
+              </p>
+              <p className="mt-0.5 text-2xs text-muted-foreground">
+                The metrics and details below belong to the selected unit only.
+              </p>
+            </div>
+            {hasSeveralTrucks ? (
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/fleet">
+                  Compare all units
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+            ) : null}
+          </div>
+
+          {hasSeveralTrucks ? (
+            <TruckSwitcher
+              trucks={trucks}
+              selectedId={truck.id}
+              includeAll={false}
+              variant="cards"
+            />
+          ) : (
+            <div
+              className={
+                fleetAccount
+                  ? "max-w-2xl"
+                  : "grid gap-2 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]"
+              }
+            >
+              <div className="flex items-center gap-3 rounded-lg border border-primary bg-primary/10 p-3 shadow-sm">
+                <span
+                  className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"
+                  aria-hidden
+                >
+                  <TruckIcon className="size-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">{truck.name}</p>
+                  <p className="mt-0.5 truncate text-2xs text-muted-foreground">
+                    {description || "Vehicle details not added"}
+                  </p>
+                </div>
+                <Badge variant={truck.active ? "positive" : "outline"}>
+                  {truck.active ? "Selected · Active" : "Selected · Retired"}
+                </Badge>
+              </div>
+              {!fleetAccount ? (
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-dashed border-border bg-card/70 px-3 py-2.5">
+                  <div>
+                    <p className="text-xs font-medium text-foreground">Need another truck?</p>
+                    <p className="mt-0.5 text-2xs text-muted-foreground">
+                      Fleet mode separates every unit&rsquo;s numbers.
+                    </p>
+                  </div>
+                  <Button asChild variant="ghost" size="sm" className="shrink-0 text-primary">
+                    <Link href="/settings">
+                      View fleet plans
+                      <ArrowRight className="size-4" />
+                    </Link>
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </div>
+      </section>
 
       <section
         aria-label="Lifetime economics"
@@ -270,28 +390,37 @@ export default async function TruckPage({
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
-                <TruckIcon className="size-3.5 text-muted-foreground" />
-                <CardTitle>Fleet</CardTitle>
+                <ShieldCheck className="size-3.5 text-muted-foreground" />
+                <CardTitle>Unit Status</CardTitle>
               </div>
+              <Badge variant={truck.active ? "positive" : "outline"}>
+                {truck.active ? "In service" : "Out of service"}
+              </Badge>
             </CardHeader>
             <CardContent className="space-y-3 p-4">
-              <p className="text-xs text-muted-foreground">
-                {`Running ${running} of the ${allowance.limit} ${allowance.limit === 1 ? "truck" : "trucks"} your plan covers.`}
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                {truck.active
+                  ? "This unit is available for new loads, expenses and service entries."
+                  : "This unit remains available in historical reports, but no new work can be assigned to it."}
               </p>
-              {allowance.reason ? (
-                <p className="text-2xs leading-relaxed text-muted-foreground">
-                  {allowance.reason}
-                </p>
-              ) : null}
-              <div className="flex flex-wrap items-center gap-2">
-                <TruckDialog canAdd={allowance.canAdd} limitReason={allowance.reason} />
-                {/* Retiring the only truck you have would leave nothing to
-                    book work against, so it is offered only once there is a
-                    second one. */}
-                {running > 1 || !truck.active ? (
+              {running > 1 || !truck.active ? (
+                <div className="rounded-lg border border-border bg-surface-sunken/60 p-3">
+                  <p className="mb-2.5 text-2xs leading-relaxed text-muted-foreground">
+                    {truck.active
+                      ? "Taking a unit out of service never deletes its records. You can return it to service later."
+                      : "Returning this unit to service makes it selectable for new activity and uses one available plan slot."}
+                  </p>
                   <TruckRetireButton truck={truck} canRestore={allowance.canAdd} />
-                ) : null}
-              </div>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2 rounded-lg border border-info/25 bg-info-soft p-3">
+                  <ShieldCheck className="mt-0.5 size-4 shrink-0 text-info" />
+                  <p className="text-2xs leading-relaxed text-muted-foreground">
+                    This is your only active truck, so it stays in service. Add another active unit
+                    before taking this one out of service.
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
