@@ -15,6 +15,7 @@ interface SidebarNavProps {
   /** Fleet-only destinations stay hidden until paid Fleet access is active. */
   hasFleet?: boolean;
   userEmail?: string;
+  isAdmin?: boolean;
   onNavigate?: () => void;
 }
 
@@ -23,6 +24,7 @@ export function SidebarNav({
   truckName,
   hasFleet = false,
   userEmail,
+  isAdmin = false,
   onNavigate,
 }: SidebarNavProps) {
   const pathname = usePathname();
@@ -42,15 +44,18 @@ export function SidebarNav({
       </div>
 
       <nav className="flex-1 space-y-3 overflow-y-auto p-2" aria-label="Main">
-        {NAV_GROUPS.map((group) => (
+        {NAV_GROUPS.map((group) => {
+          const items = group.items.filter(
+            (item) => (hasFleet || !item.fleetOnly) && (isAdmin || !item.adminOnly),
+          );
+          if (items.length === 0) return null;
+          return (
           <div key={group.label}>
             <p className="px-2.5 pb-1 text-2xs font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/60">
               {group.label}
             </p>
             <ul className="space-y-0.5">
-              {group.items
-                .filter((item) => hasFleet || !item.fleetOnly)
-                .map((item) => {
+              {items.map((item) => {
                   const active = isNavActive(item, pathname);
                   return (
                     <li key={item.href}>
@@ -79,7 +84,8 @@ export function SidebarNav({
                 })}
             </ul>
           </div>
-        ))}
+          );
+        })}
       </nav>
 
       <div className="shrink-0 border-t border-sidebar-border p-2">

@@ -31,6 +31,7 @@ import { defaultGoals, defaultReserveAccounts, defaultSubscription } from "../de
 import { DEFAULT_PLAN, getPlan, trialEndsOn } from "../plans";
 import { DEMO_EMAIL } from "../auth/constants";
 import type {
+  AdminAccountSummary,
   AuthStore,
   BusinessInput,
   DocumentInput,
@@ -209,6 +210,50 @@ function requireSettlement(dataset: Dataset, id: string): Settlement {
 
 /** Account lookups, unscoped by definition. */
 export class PrismaAuthStore implements AuthStore {
+  async listAccounts(): Promise<AdminAccountSummary[]> {
+    const client = await getClient();
+    const rows = await client.user.findMany({
+      where: { businessId: { not: null } },
+      orderBy: { createdAt: "desc" },
+      include: {
+        business: {
+          include: {
+            subscription: true,
+            _count: { select: { trucks: true, loads: true, expenses: true, documents: true } },
+          },
+        },
+      },
+    });
+
+    return rows.flatMap((row) => {
+      if (!row.business || !row.businessId) return [];
+      const subscription = row.business.subscription;
+      return [{
+        userId: row.id,
+        businessId: row.businessId,
+        email: row.email,
+        name: row.name,
+        businessName: row.business.name,
+        createdAt: row.createdAt.toISOString(),
+        plan: getPlan(subscription?.plan).id,
+        subscriptionStatus: subscription?.status ?? "TRIALING",
+        currentPeriodEnd: subscription?.currentPeriodEnd
+          ? isoDate(subscription.currentPeriodEnd)
+          : subscription?.status === "TRIALING"
+            ? trialEndsOn(subscription.startedAt.toISOString())
+            : null,
+        hasProviderSubscription: Boolean(subscription?.providerSubscriptionId),
+        counts: {
+          trucks: row.business._count.trucks,
+          loads: row.business._count.loads,
+          expenses: row.business._count.expenses,
+          documents: row.business._count.documents,
+        },
+        isDemo: row.email.trim().toLowerCase() === DEMO_EMAIL,
+      }];
+    });
+  }
+
   async countUsers(): Promise<number> {
     const client = await getClient();
     return client.user.count();

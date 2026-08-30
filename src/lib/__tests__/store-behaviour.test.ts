@@ -378,6 +378,17 @@ describe("accounts", () => {
     assert.equal(await auth.findUserByEmail("nobody@example.com"), null);
   });
 
+  it("builds the protected admin account index without exposing credentials", async () => {
+    const accounts = await auth.listAccounts();
+    assert.equal(accounts.length, 1);
+    assert.equal(accounts[0].email, "owner@example.com");
+    assert.equal(accounts[0].businessName, "Padron Freight LLC");
+    assert.equal(accounts[0].counts.trucks, 1);
+    assert.ok(accounts[0].counts.loads > 0);
+    assert.equal(accounts[0].subscriptionStatus, "TRIALING");
+    assert.equal("passwordHash" in accounts[0], false, "password material never reaches the index");
+  });
+
   it("resets only ledger data, then invalidates the owner when the account is deleted", async () => {
     const original = readFileSync(DATA_FILE, "utf8");
     try {

@@ -276,6 +276,28 @@ export interface AuthStore {
   resetBusinessData(userId: string, businessId: string): Promise<string[]>;
   /** Removes the owner and, when they are the last owner, their whole business. */
   deleteAccount(userId: string, businessId: string): Promise<{ email: string; storageKeys: string[] }>;
+  /** Server-only account index used by the protected operator console. */
+  listAccounts(): Promise<AdminAccountSummary[]>;
+}
+
+export interface AdminAccountSummary {
+  userId: string;
+  businessId: string;
+  email: string;
+  name: string | null;
+  businessName: string;
+  createdAt: string;
+  plan: PlanId;
+  subscriptionStatus: Subscription["status"];
+  currentPeriodEnd: string | null;
+  hasProviderSubscription: boolean;
+  counts: {
+    trucks: number;
+    loads: number;
+    expenses: number;
+    documents: number;
+  };
+  isDemo: boolean;
 }
 
 export function newId(prefix: string): string {

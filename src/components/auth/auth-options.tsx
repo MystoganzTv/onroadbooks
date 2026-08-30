@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { Eye, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -58,6 +59,12 @@ export function AuthOptions({ showDemo = false }: { showDemo?: boolean }) {
           Continue with Google
         </a>
       </Button>
+      <p className="text-center text-[10px] leading-relaxed text-muted-foreground">
+        By continuing, you agree to the{" "}
+        <Link href="/terms" className="underline underline-offset-2 hover:text-foreground">Terms</Link>
+        {" "}and acknowledge the{" "}
+        <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">Privacy Policy</Link>.
+      </p>
 
       {showDemo ? (
         <Button

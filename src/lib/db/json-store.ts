@@ -40,6 +40,7 @@ import type {
 } from "../types";
 import {
   newId,
+  type AdminAccountSummary,
   type AuthStore,
   type BusinessInput,
   type DocumentInput,
@@ -569,6 +570,29 @@ function newSettlement(businessId: string, month: string, half: SettlementHalf):
  * the business a request belongs to.
  */
 export class JsonAuthStore implements AuthStore {
+  async listAccounts(): Promise<AdminAccountSummary[]> {
+    const dataset = await serialise(readDataset);
+    return dataset.users.map((user) => ({
+      userId: user.id,
+      businessId: user.businessId,
+      email: user.email,
+      name: user.name,
+      businessName: dataset.business.name,
+      createdAt: user.createdAt,
+      plan: getPlan(dataset.subscription.plan).id,
+      subscriptionStatus: dataset.subscription.status,
+      currentPeriodEnd: dataset.subscription.currentPeriodEnd,
+      hasProviderSubscription: Boolean(dataset.subscription.providerSubscriptionId),
+      counts: {
+        trucks: dataset.trucks.length,
+        loads: dataset.loads.length,
+        expenses: dataset.expenses.length,
+        documents: dataset.documents.length,
+      },
+      isDemo: user.email.trim().toLowerCase() === DEMO_EMAIL,
+    }));
+  }
+
   async countUsers(): Promise<number> {
     const dataset = await serialise(readDataset);
     return dataset.users.length;

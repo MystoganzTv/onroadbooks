@@ -18,6 +18,7 @@ interface AppShellProps {
   hasFleet?: boolean;
   userEmail: string;
   isDemo?: boolean;
+  isAdmin?: boolean;
   children: React.ReactNode;
 }
 
@@ -27,6 +28,7 @@ export function AppShell({
   hasFleet = false,
   userEmail,
   isDemo = false,
+  isAdmin = false,
   children,
 }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -42,6 +44,7 @@ export function AppShell({
           businessName={businessName}
           truckName={truckName}
           hasFleet={hasFleet}
+          isAdmin={isAdmin}
           userEmail={userEmail}
         />
       </aside>
@@ -54,6 +57,7 @@ export function AppShell({
             businessName={businessName}
             truckName={truckName}
             hasFleet={hasFleet}
+            isAdmin={isAdmin}
             userEmail={userEmail}
             onNavigate={() => setMobileOpen(false)}
           />

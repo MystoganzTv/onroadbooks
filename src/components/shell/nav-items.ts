@@ -8,6 +8,7 @@ import {
   Package,
   Receipt,
   Settings,
+  ShieldCheck,
   Truck,
   Wallet,
   type LucideIcon,
@@ -21,6 +22,8 @@ export interface NavItem {
   matches?: string[];
   /** Hidden until the paid Fleet service is active. */
   fleetOnly?: boolean;
+  /** Visible only to the server-authorized operator account. */
+  adminOnly?: boolean;
 }
 
 export interface NavGroup {
@@ -58,6 +61,10 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/fleet", label: "Fleet", icon: Truck, fleetOnly: true },
       { href: "/truck", label: "Truck", icon: Truck },
     ],
+  },
+  {
+    label: "System",
+    items: [{ href: "/admin", label: "Admin", icon: ShieldCheck, adminOnly: true }],
   },
 ];
 
