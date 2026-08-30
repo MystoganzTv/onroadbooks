@@ -28,6 +28,7 @@ import type {
 } from "../types";
 import { defaultCategoryBehavior } from "../categories";
 import { defaultGoals, defaultReserveAccounts, defaultSubscription } from "../defaults";
+import { DEFAULT_PLAN } from "../plans";
 import { DEMO_EMAIL } from "../auth/constants";
 import type {
   AuthStore,
@@ -276,7 +277,7 @@ export class PrismaAuthStore implements AuthStore {
           currency: "USD",
           settings: { create: { categoryBehavior: defaultCategoryBehavior() } },
           trucks: { create: { name: "Truck 1" } },
-          subscription: { create: { plan: input.plan ?? "INDIVIDUAL" } },
+          subscription: { create: { plan: input.plan ?? DEFAULT_PLAN } },
         },
       });
 

@@ -7,6 +7,7 @@ import { PeriodControls } from "@/components/dashboard/period-controls";
 import { MiniStat } from "@/components/dashboard/mini-stat";
 import { RatingBadge } from "@/components/loads/rating-badge";
 import { PageHeader } from "@/components/shared/page-header";
+import { PlanGate } from "@/components/shared/plan-gate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -35,6 +36,7 @@ import {
   formatRateValue,
 } from "@/lib/formatters";
 import { loadsForTruck, orderedTrucks } from "@/lib/fleet";
+import { planAllows } from "@/lib/plans";
 import {
   param,
   periodFromSearchParams,
@@ -62,10 +64,25 @@ export default async function BrokersPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { trucks, loads: allLoads, settings } = await getRepository(
+  const { trucks, loads: allLoads, settings, subscription } = await getRepository(
     session.businessId,
   ).getDataset();
   const period = periodFromSearchParams(params);
+
+  if (!planAllows(subscription, "cockpit")) {
+    return (
+      <div className="space-y-4 p-4 lg:p-6">
+        <PageHeader
+          title="Brokers"
+          description="Who is worth the most to you, and who pays well per mile. Two different questions."
+        />
+        <PlanGate
+          capability="cockpit"
+          what="Rank the brokers you actually haul for on profit per mile driven, not on the rate they quote."
+        />
+      </div>
+    );
+  }
 
   const truckId = truckFromSearchParams(params, trucks);
   const loads = loadsForTruck(allLoads, truckId);

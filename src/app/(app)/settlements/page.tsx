@@ -3,9 +3,11 @@ import Link from "next/link";
 
 import { SettlementDetail } from "@/components/settlements/settlement-detail";
 import { PageHeader } from "@/components/shared/page-header";
+import { PlanGate } from "@/components/shared/plan-gate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
+import { planAllows } from "@/lib/plans";
 import { calculateSettlement, settlementWindows } from "@/lib/finance/settlement";
 import { formatMoneyCompact, formatPercent, formatRateValue } from "@/lib/formatters";
 import { param, type SearchParams } from "@/lib/period-params";
@@ -36,6 +38,21 @@ export default async function SettlementsPage({
   const session = await requireSession();
   const dataset = await getRepository(session.businessId).getDataset();
   const { loads, expenses, settings, reserveAccounts, settlements } = dataset;
+
+  if (!planAllows(dataset.subscription, "cockpit")) {
+    return (
+      <div className="space-y-4 p-4 lg:p-6">
+        <PageHeader
+          title="Settlements"
+          description="The twice-monthly review: 1-15 and 16 to month end."
+        />
+        <PlanGate
+          capability="cockpit"
+          what="Close the half-month, freeze the figures you settled on, and post the reserve contributions they imply."
+        />
+      </div>
+    );
+  }
 
   const today = todayISO();
   const anchorMonth = currentMonth();

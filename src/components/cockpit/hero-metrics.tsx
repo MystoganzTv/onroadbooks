@@ -10,7 +10,12 @@ import type { PeriodSummary } from "@/lib/types";
 interface HeroMetricsProps {
   summary: PeriodSummary;
   previous: PeriodSummary;
-  ownerPay: OwnerPay;
+  /**
+   * Omitted when the plan does not include the cockpit. The tile then shows
+   * what a mile cost, which is a fact about the miles already run rather than
+   * a planning figure.
+   */
+  ownerPay?: OwnerPay;
   previousLabel: string;
   deltas: { revenue: number; profit: number; profitPerMile: number };
 }
@@ -47,13 +52,23 @@ export function HeroMetrics({
         delta={deltas.profit}
         sub={`${summary.netMargin.toFixed(1)}% margin`}
       />
-      <HeroTile
-        label="Available Cash"
-        value={formatMoneyCompact(ownerPay.safeToPay)}
-        icon={Wallet}
-        tone={ownerPay.safeToPay >= 0 ? "positive" : "negative"}
-        sub={`after ${formatMoneyCompact(ownerPay.reserveTotal)} of reserves`}
-      />
+      {ownerPay ? (
+        <HeroTile
+          label="Available Cash"
+          value={formatMoneyCompact(ownerPay.safeToPay)}
+          icon={Wallet}
+          tone={ownerPay.safeToPay >= 0 ? "positive" : "negative"}
+          sub={`after ${formatMoneyCompact(ownerPay.reserveTotal)} of reserves`}
+        />
+      ) : (
+        <HeroTile
+          label="Cost / Mile"
+          value={formatRate(summary.costPerMile)}
+          icon={Wallet}
+          tone="negative"
+          sub="actual, not prorated"
+        />
+      )}
       <HeroTile
         label="Profit / Mile"
         value={formatRate(summary.profitPerMile)}

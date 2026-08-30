@@ -22,6 +22,7 @@ import {
 
 import { ExpensesPhone, LaptopMock, LoadPhone } from "@/components/marketing/preview";
 import { LANDING_COPY, type Lang, type LandingCopy } from "@/lib/marketing/copy";
+import { getPlan } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
 /**
@@ -378,8 +379,12 @@ export function LandingPage({ primaryHref }: { primaryHref: string }) {
             </p>
           </Container>
 
-          <Container className="grid max-w-[900px] items-start gap-5 pb-16 pt-10 sm:grid-cols-2 sm:pb-20">
-            {c.pricing.plans.map((plan) => (
+          <Container className="grid max-w-[1120px] items-start gap-5 pb-16 pt-10 sm:grid-cols-2 lg:grid-cols-3 sm:pb-20">
+            {c.pricing.plans.map((plan) => {
+              // Name and price come from lib/plans, so the page cannot quote a
+              // figure the product does not charge.
+              const catalogue = getPlan(plan.id);
+              return (
               <div
                 key={plan.id}
                 className={cn(
@@ -390,7 +395,7 @@ export function LandingPage({ primaryHref }: { primaryHref: string }) {
                 )}
               >
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="font-display text-[19px] font-bold text-white">{plan.name}</div>
+                  <div className="font-display text-[19px] font-bold text-white">{catalogue.name}</div>
                   <span
                     className={cn(
                       "whitespace-nowrap rounded-md px-2.5 py-1 font-display text-[10.5px] font-extrabold uppercase tracking-[0.08em]",
@@ -410,7 +415,7 @@ export function LandingPage({ primaryHref }: { primaryHref: string }) {
                       plan.featured ? "text-mkt-amber" : "text-white",
                     )}
                   >
-                    {plan.price}
+                    ${catalogue.priceMonthly}
                   </span>
                   <span className="text-[15px] text-mkt-dim">{c.pricing.per}</span>
                 </div>
@@ -438,7 +443,8 @@ export function LandingPage({ primaryHref }: { primaryHref: string }) {
                   <p className="mt-4 text-[13px] leading-relaxed text-mkt-faint">{plan.note}</p>
                 ) : null}
               </div>
-            ))}
+              );
+            })}
           </Container>
         </section>
 

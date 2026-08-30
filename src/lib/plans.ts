@@ -2,15 +2,30 @@
  * PLANS
  * =====
  *
- * Two plans, and the catalogue lives in code rather than in the database: a
+ * Three plans, and the catalogue lives in code rather than in the database: a
  * price is a product decision that ships with a release, not a row someone
  * can edit into an inconsistent state. What the database holds is which plan
  * a business is on, and the state of its subscription.
  *
- * The truck limit is the only thing a plan actually gates today. It is
- * enforced server-side in the action that would create a truck, never by
- * hiding a button -- the same rule the rest of the app follows, where the
- * businessId comes from the signed session and never from the browser.
+ * The tiers are split by DEPTH, not by how much of the same thing you get:
+ *
+ *   SOLO    the book      what happened. Loads, expenses, fuel, documents,
+ *                         profit per load and per mile, true cost per mile.
+ *   OWNER   the cockpit   what to do next. The load calculator and target
+ *                         rate, brokers and lanes, deadhead, settlements,
+ *                         reserves and Safe to Pay Yourself, goals and pace.
+ *   FLEET   the units     which truck pays. Contribution per unit, business
+ *                         overhead kept separate, up to eight trucks.
+ *
+ * Two things a plan gates, and both are enforced server-side -- in the action
+ * that would perform the write, never by hiding a button:
+ *
+ *   the truck limit    checked against the units that actually exist;
+ *   the capabilities   `cockpit` and `fleet`, checked by `planAllows`.
+ *
+ * SOLO and OWNER both cover one truck, so the truck limit no longer says
+ * which plan is bigger. `rank` does, and it is what upgrade and downgrade are
+ * decided against.
  *
  * Nothing here talks to a payment provider. `Subscription` carries empty
  * provider references so that adding one later is a field being filled in
@@ -19,56 +34,145 @@
 
 import type { PlanId, Subscription, SubscriptionStatus } from "./types";
 
+/**
+ * What a plan unlocks beyond the ledger.
+ *
+ * `cockpit` is the decision layer: anything that answers "what should I do",
+ * as opposed to "what did I do". `fleet` is per-unit economics.
+ */
+export type PlanCapability = "cockpit" | "fleet";
+
 export interface Plan {
   id: PlanId;
   name: string;
   /** US dollars per month. */
   priceMonthly: number;
   truckLimit: number;
+  /** Order of the tiers. Bigger is more plan; this decides up versus down. */
+  rank: number;
   tagline: string;
   features: string[];
+  capabilities: PlanCapability[];
+  /** Shown under the plan wherever it is offered. Honest small print. */
+  note: string | null;
 }
 
 export const PLANS: Record<PlanId, Plan> = {
-  INDIVIDUAL: {
-    id: "INDIVIDUAL",
-    name: "Individual",
-    priceMonthly: 29,
+  SOLO: {
+    id: "SOLO",
+    name: "Solo Starter",
+    priceMonthly: 19,
     truckLimit: 1,
-    tagline: "One truck, and every number about it.",
+    rank: 0,
+    tagline: "One truck, and every number about the miles you already ran.",
+    capabilities: [],
     features: [
-      "One truck",
-      "Loads, expenses, fuel and documents",
-      "True cost per mile and Safe to Pay Yourself",
-      "Load calculator and target rate",
-      "1–15 and 16–end settlements",
-      "Broker and lane intelligence",
+      "One truck, unlimited loads",
+      "Loads, expenses, fuel, receipts and documents",
+      "Profit per load and profit per mile",
+      "True cost per mile, never prorated",
+      "Print-ready reports and CSV export",
     ],
+    note: null,
+  },
+  OWNER: {
+    id: "OWNER",
+    name: "Owner-Operator",
+    priceMonthly: 39,
+    truckLimit: 1,
+    rank: 1,
+    tagline: "The decisions, not just the record.",
+    capabilities: ["cockpit"],
+    features: [
+      "Everything in Solo Starter",
+      "Load calculator and target rate",
+      "Broker and lane scorecards",
+      "Deadhead analysis, priced at your own cost per mile",
+      "1-15 and 16-end settlements, frozen when you close them",
+      "Tax and maintenance reserves, and Safe to Pay Yourself",
+      "Monthly goals, pace and projection",
+    ],
+    note: null,
   },
   FLEET: {
     id: "FLEET",
-    name: "Fleet",
-    priceMonthly: 49,
-    truckLimit: 5,
-    tagline: "Up to five trucks, each with its own economics.",
+    name: "Small Fleet",
+    priceMonthly: 89,
+    truckLimit: 8,
+    rank: 2,
+    tagline: "Two to eight trucks, each with its own economics.",
+    capabilities: ["cockpit", "fleet"],
     features: [
-      "Everything in Individual",
-      "Up to five trucks",
-      "Contribution and cost per mile per unit",
+      "Everything in Owner-Operator",
+      "Up to eight trucks on one account",
+      "Cost per mile and contribution per unit",
       "Business overhead kept separate from truck costs",
       "Fleet-wide settlements",
     ],
+    note:
+      "Fleet is in early access. Everything listed here works today; a second sign-in for a partner or a bookkeeper does not exist yet, and early access pricing is locked for life.",
   },
 };
 
-export const PLAN_IDS: PlanId[] = ["INDIVIDUAL", "FLEET"];
+/** Cheapest first. The order the plans are offered in. */
+export const PLAN_IDS: PlanId[] = ["SOLO", "OWNER", "FLEET"];
+
+/**
+ * Plans that existed under an older name.
+ *
+ * The single-truck plan was called Individual before the tiers were split by
+ * depth. Anyone on it keeps the cockpit they were sold, so it maps up to
+ * Owner-Operator rather than down to Solo Starter.
+ */
+const LEGACY_PLAN_IDS: Record<string, PlanId> = {
+  INDIVIDUAL: "OWNER",
+};
+
+export const DEFAULT_PLAN: PlanId = "OWNER";
 
 export function getPlan(id: string | null | undefined): Plan {
-  return PLANS[(id as PlanId) ?? "INDIVIDUAL"] ?? PLANS.INDIVIDUAL;
+  if (!id) return PLANS[DEFAULT_PLAN];
+  const resolved = LEGACY_PLAN_IDS[id] ?? (id as PlanId);
+  return PLANS[resolved] ?? PLANS[DEFAULT_PLAN];
 }
 
 export function planOf(subscription: Subscription | undefined): Plan {
   return getPlan(subscription?.plan);
+}
+
+/**
+ * Whether this business's plan includes a capability.
+ *
+ * Call it in the server action or the page that would do the work. A
+ * component may also call it to explain the gate, but a component saying no
+ * is presentation; this is the rule.
+ */
+export function planAllows(
+  subscription: Subscription | undefined,
+  capability: PlanCapability,
+): boolean {
+  return planOf(subscription).capabilities.includes(capability);
+}
+
+/** The cheapest plan that includes a capability. What an upsell should offer. */
+export function cheapestPlanWith(capability: PlanCapability): Plan {
+  return (
+    PLAN_IDS.map((id) => PLANS[id])
+      .sort((a, b) => a.rank - b.rank)
+      .find((plan) => plan.capabilities.includes(capability)) ?? PLANS[DEFAULT_PLAN]
+  );
+}
+
+/**
+ * What to tell someone whose plan does not cover what they just asked for.
+ *
+ * It names the plan and the price, and it promises the books are untouched --
+ * because the fear behind a paywall in a bookkeeping app is that the data is
+ * hostage. It is not: dropping a tier puts the tool away, not the ledger.
+ */
+export function capabilityRefusal(capability: PlanCapability): string {
+  const plan = cheapestPlanWith(capability);
+  return `That is part of ${plan.name}, $${plan.priceMonthly} a month. Switch plans in Settings — nothing in your books moves either way.`;
 }
 
 /** Statuses that still allow writing. A lapsed subscription reads, it does not write. */
@@ -110,9 +214,9 @@ export function truckAllowance(
     canAdd,
     reason: canAdd
       ? null
-      : plan.id === "INDIVIDUAL"
-        ? `The Individual plan covers one truck. Switch to Fleet to run up to ${PLANS.FLEET.truckLimit}.`
-        : `The Fleet plan covers ${plan.truckLimit} trucks, and you are running ${activeTruckCount}. Get in touch and we will sort out a larger plan.`,
+      : plan.truckLimit === 1
+        ? `${plan.name} covers one truck. Move to ${PLANS.FLEET.name} to run up to ${PLANS.FLEET.truckLimit}.`
+        : `${plan.name} covers ${plan.truckLimit} trucks, and you are running ${activeTruckCount}. Get in touch and we will sort out a larger plan.`,
   };
 }
 
@@ -129,6 +233,10 @@ export interface PlanChange {
  * running more trucks than the smaller plan covers -- deleting somebody's
  * records to fit a cheaper plan is never the right answer, so they archive a
  * truck first and keep its history.
+ *
+ * Dropping a capability is NOT refused. Moving from Owner-Operator to Solo
+ * Starter puts the cockpit away; it does not touch a single row, and coming
+ * back turns it on again with the history intact.
  */
 export function evaluatePlanChange(
   current: Subscription | undefined,
@@ -142,7 +250,7 @@ export function evaluatePlanChange(
     return { allowed: false, direction: "same", reason: `You are already on ${to.name}.` };
   }
 
-  const direction = to.truckLimit > from.truckLimit ? "upgrade" : "downgrade";
+  const direction = to.rank > from.rank ? "upgrade" : "downgrade";
 
   if (direction === "downgrade" && activeTruckCount > to.truckLimit) {
     return {

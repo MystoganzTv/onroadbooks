@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
 import { getAuthStore } from "@/lib/db";
+import { DEFAULT_PLAN } from "@/lib/plans";
 import { setupSchema } from "@/lib/schemas";
 import {
   encodeSession,
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
       name: parsed.data.name ?? null,
       passwordHash: await hashPassword(parsed.data.password),
       businessName: parsed.data.businessName,
-      plan: parsed.data.plan ?? "INDIVIDUAL",
+      plan: parsed.data.plan ?? DEFAULT_PLAN,
     });
 
     const token = await encodeSession({

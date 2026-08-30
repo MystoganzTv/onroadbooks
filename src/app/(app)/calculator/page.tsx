@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 
 import { CalculatorPanel, type CalculatorDefaults } from "@/components/calculator/calculator-panel";
 import { PageHeader } from "@/components/shared/page-header";
+import { PlanGate } from "@/components/shared/plan-gate";
 import { requireSession } from "@/lib/auth";
 import { div, summarizeFuel, thresholdsFromSettings } from "@/lib/calculations";
 import { getRepository } from "@/lib/db";
 import { overheadCostPerMile, trailingCostBasis } from "@/lib/finance/cost-per-mile";
 import { todayISO } from "@/lib/periods";
+import { planAllows } from "@/lib/plans";
 
 export const metadata: Metadata = { title: "Load Calculator" };
 
@@ -25,6 +27,21 @@ export default async function CalculatorPage() {
   const session = await requireSession();
   const dataset = await getRepository(session.businessId).getDataset();
   const { trucks, loads, expenses, fuelEntries, settings, goals } = dataset;
+
+  if (!planAllows(dataset.subscription, "cockpit")) {
+    return (
+      <div className="space-y-4 p-4 lg:p-6">
+        <PageHeader
+          title="Load Calculator"
+          description="Price a load before you say yes, or work out what to quote the broker."
+        />
+        <PlanGate
+          capability="cockpit"
+          what="Price a load before you say yes, and work out the rate to quote — costed on this truck's own fuel, fees and overhead rather than an average."
+        />
+      </div>
+    );
+  }
   const today = todayISO();
 
   const basis = trailingCostBasis(loads, expenses, settings, today);

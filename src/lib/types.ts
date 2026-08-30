@@ -514,7 +514,7 @@ export interface Settlement {
 
 /* ---- Plans and subscription ------------------------------------------- */
 
-export type PlanId = "INDIVIDUAL" | "FLEET";
+export type PlanId = "SOLO" | "OWNER" | "FLEET";
 
 export type SubscriptionStatus = "TRIALING" | "ACTIVE" | "PAST_DUE" | "CANCELED";
 

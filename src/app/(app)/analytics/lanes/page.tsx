@@ -6,6 +6,7 @@ import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import { PeriodControls } from "@/components/dashboard/period-controls";
 import { MiniStat } from "@/components/dashboard/mini-stat";
 import { PageHeader } from "@/components/shared/page-header";
+import { PlanGate } from "@/components/shared/plan-gate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -26,6 +27,7 @@ import {
   formatRateValue,
 } from "@/lib/formatters";
 import { loadsForTruck, orderedTrucks } from "@/lib/fleet";
+import { planAllows } from "@/lib/plans";
 import {
   periodFromSearchParams,
   truckFromSearchParams,
@@ -49,10 +51,25 @@ export default async function LanesPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { trucks, loads: allLoads, settings } = await getRepository(
+  const { trucks, loads: allLoads, settings, subscription } = await getRepository(
     session.businessId,
   ).getDataset();
   const period = periodFromSearchParams(params);
+
+  if (!planAllows(subscription, "cockpit")) {
+    return (
+      <div className="space-y-4 p-4 lg:p-6">
+        <PageHeader
+          title="Lanes"
+          description="Which state-to-state runs actually pay, in the direction you ran them."
+        />
+        <PlanGate
+          capability="cockpit"
+          what="See which lanes pay and which ones only look busy — directional, and never ranked on a sample too thin to mean anything."
+        />
+      </div>
+    );
+  }
 
   const truckId = truckFromSearchParams(params, trucks);
   const loads = loadsForTruck(allLoads, truckId);

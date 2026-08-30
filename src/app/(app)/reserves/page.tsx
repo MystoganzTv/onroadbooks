@@ -10,6 +10,7 @@ import { ReserveTransactionDialog } from "@/components/reserves/reserve-transact
 import { MiniStat } from "@/components/dashboard/mini-stat";
 import { PeriodControls } from "@/components/dashboard/period-controls";
 import { PageHeader } from "@/components/shared/page-header";
+import { PlanGate } from "@/components/shared/plan-gate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
@@ -22,6 +23,7 @@ import {
   formatPercent,
 } from "@/lib/formatters";
 import { periodFromSearchParams, type SearchParams } from "@/lib/period-params";
+import { planAllows } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Reserves" };
@@ -40,9 +42,24 @@ export default async function ReservesPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { settings, reserveAccounts, reserveTransactions } = await getRepository(
+  const { settings, reserveAccounts, reserveTransactions, subscription } = await getRepository(
     session.businessId,
   ).getDataset();
+
+  if (!planAllows(subscription, "cockpit")) {
+    return (
+      <div className="space-y-4 p-4 lg:p-6">
+        <PageHeader
+          title="Reserves"
+          description="Virtual buckets, not bank accounts. What you are setting aside, and whether it is enough."
+        />
+        <PlanGate
+          capability="cockpit"
+          what="Set money aside for tax and the truck as each settlement closes, and see whether the buckets are keeping up."
+        />
+      </div>
+    );
+  }
   const period = periodFromSearchParams(params);
 
   const balances = calculateReserveBalances(reserveAccounts, reserveTransactions, period);

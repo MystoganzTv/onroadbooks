@@ -24,6 +24,7 @@ import { RecentLoads } from "@/components/dashboard/recent-loads";
 import { ExpenseFormDialog } from "@/components/expenses/expense-form-dialog";
 import { LoadFormDialog } from "@/components/loads/load-form-dialog";
 import { PageHeader } from "@/components/shared/page-header";
+import { PlanGate } from "@/components/shared/plan-gate";
 import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +40,7 @@ import {
 } from "@/lib/calculations";
 import { periodBuckets } from "@/lib/chart-data";
 import { getRepository } from "@/lib/db";
+import { planAllows } from "@/lib/plans";
 import {
   expensesForTruck,
   loadsForTruck,
@@ -139,6 +141,12 @@ export default async function DashboardPage({
 
   const reserveRules = resolveReserveRules(settings, reserveAccounts);
   const ownerPay = calculateSafeOwnerPay(summary, reserveRules);
+
+  // The cockpit is the decision layer. Without it the dashboard is still the
+  // whole ledger -- revenue, profit, miles, what a mile cost, the chart and
+  // the loads -- and the panels that answer "what should I do next" are
+  // replaced by one panel that says where they live.
+  const cockpit = planAllows(dataset.subscription, "cockpit");
 
   const periodLoads = scoreLoads(
     withMetricsAll(loadsInPeriod(loads, period), ratingThresholds),
@@ -272,7 +280,7 @@ export default async function DashboardPage({
             <HeroMetrics
               summary={summary}
               previous={priorSummary}
-              ownerPay={ownerPay}
+              ownerPay={cockpit ? ownerPay : undefined}
               previousLabel={prior.shortLabel}
               deltas={{
                 revenue: pctChange(summary.grossRevenue, priorSummary.grossRevenue),
@@ -281,12 +289,19 @@ export default async function DashboardPage({
               }}
             />
           </div>
-          <SafeToPayCard
-            ownerPay={ownerPay}
-            periodLabel={period.label}
-            href={settlementHref}
-            className="min-w-0"
-          />
+          {cockpit ? (
+            <SafeToPayCard
+              ownerPay={ownerPay}
+              periodLabel={period.label}
+              href={settlementHref}
+              className="min-w-0"
+            />
+          ) : (
+            <PlanGate
+              capability="cockpit"
+              what="Set aside tax and maintenance as each half-month closes, and see what is genuinely free to take out."
+            />
+          )}
         </div>
       </Section>
 
@@ -331,12 +346,14 @@ export default async function DashboardPage({
             href={`/analytics/cost-per-mile?${query}`}
             className="min-w-0"
           />
-          <GoalProgressCard
-            goals={goalProgress}
-            projection={projection}
-            periodLabel={period.label}
-            className="min-w-0"
-          />
+          {cockpit ? (
+            <GoalProgressCard
+              goals={goalProgress}
+              projection={projection}
+              periodLabel={period.label}
+              className="min-w-0"
+            />
+          ) : null}
           <DeadheadMonitor report={deadhead} className="min-w-0" />
         </div>
       </Section>
@@ -379,22 +396,30 @@ export default async function DashboardPage({
       </Section>
 
       {/* ---- Operations intelligence ------------------------------------ */}
-      <Section title="Operations intelligence" description="Who pays, and where">
-        <div className="grid gap-3 lg:grid-cols-2">
-          <BrokerPanel brokers={brokers} href={`/analytics/brokers?${query}`} className="min-w-0" />
-          <LanePanel
-            lanes={lanes}
-            minLoads={LANE_MIN_LOADS}
-            href={`/analytics/lanes?${query}`}
-            className="min-w-0"
-          />
-        </div>
-      </Section>
+      {cockpit ? (
+        <Section title="Operations intelligence" description="Who pays, and where">
+          <div className="grid gap-3 lg:grid-cols-2">
+            <BrokerPanel
+              brokers={brokers}
+              href={`/analytics/brokers?${query}`}
+              className="min-w-0"
+            />
+            <LanePanel
+              lanes={lanes}
+              minLoads={LANE_MIN_LOADS}
+              href={`/analytics/lanes?${query}`}
+              className="min-w-0"
+            />
+          </div>
+        </Section>
+      ) : null}
 
       {/* ---- Reserves and the truck ------------------------------------- */}
       <Section title="Reserves and the truck" description="Am I setting enough aside">
         <div className="grid gap-3 lg:grid-cols-2">
-          <ReservesPanel balances={balances} periodLabel={period.label} className="min-w-0" />
+          {cockpit ? (
+            <ReservesPanel balances={balances} periodLabel={period.label} className="min-w-0" />
+          ) : null}
           <TruckHealthPanel health={maintenance} className="min-w-0" />
         </div>
       </Section>

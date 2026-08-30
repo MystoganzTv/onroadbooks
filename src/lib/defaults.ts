@@ -1,3 +1,4 @@
+import { DEFAULT_PLAN } from "./plans";
 import type { Expense, FinancialGoal, ReserveAccount, Subscription, Truck } from "./types";
 
 /**
@@ -72,7 +73,7 @@ export function defaultSubscription(
   return {
     id: "sub_001",
     businessId,
-    plan: "INDIVIDUAL",
+    plan: DEFAULT_PLAN,
     status: "TRIALING",
     currentPeriodEnd: null,
     providerCustomerId: null,

@@ -63,7 +63,7 @@ export function PlanCard({
       </CardHeader>
 
       <CardContent className="space-y-3 p-4">
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {PLAN_IDS.map((id) => {
             const plan = PLANS[id];
             const isCurrent = current.id === id;

@@ -2,8 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireWritableSession } from "@/lib/auth";
-import { getRepository } from "@/lib/db";
 import {
   buildSettlementSnapshot,
   settlementBounds,
@@ -13,6 +11,7 @@ import { settlementNotesSchema, settlementRefSchema } from "@/lib/schemas";
 import { todayISO } from "@/lib/periods";
 import type { SettlementHalf } from "@/lib/types";
 import { fieldErrorsFrom, type ActionResult } from "./types";
+import { repositoryWith } from "./guards";
 
 function revalidate() {
   revalidatePath("/settlements");
@@ -45,7 +44,7 @@ export async function closeSettlementAction(values: unknown): Promise<ActionResu
   const { month, half } = parsed.data as { month: string; half: SettlementHalf };
 
   try {
-    const repository = getRepository((await requireWritableSession()).businessId);
+    const repository = await repositoryWith("cockpit");
     const dataset = await repository.getDataset();
     const range = settlementBounds(month, half);
 
@@ -92,7 +91,7 @@ export async function closeSettlementAction(values: unknown): Promise<ActionResu
 /** Reopening clears the snapshot and reverses only the rows the close wrote. */
 export async function reopenSettlementAction(id: string): Promise<ActionResult> {
   try {
-    await getRepository((await requireWritableSession()).businessId).reopenSettlement(id);
+    await (await repositoryWith("cockpit")).reopenSettlement(id);
     revalidate();
     return { ok: true, id };
   } catch (error) {
@@ -111,7 +110,7 @@ export async function updateSettlementNotesAction(values: unknown): Promise<Acti
   }
 
   try {
-    await getRepository((await requireWritableSession()).businessId).updateSettlementNotes(
+    await (await repositoryWith("cockpit")).updateSettlementNotes(
       parsed.data.id,
       parsed.data.notes ?? null,
     );

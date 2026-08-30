@@ -2,10 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireWritableSession } from "@/lib/auth";
-import { getRepository } from "@/lib/db";
 import { reserveAccountSchema, reserveTransactionSchema } from "@/lib/schemas";
 import { fieldErrorsFrom, type ActionResult } from "./types";
+import { repositoryWith } from "./guards";
 
 function revalidate() {
   revalidatePath("/reserves");
@@ -29,9 +28,7 @@ export async function createReserveAccountAction(values: unknown): Promise<Actio
   }
 
   try {
-    const account = await getRepository(
-      (await requireWritableSession()).businessId,
-    ).createReserveAccount(parsed.data);
+    const account = await (await repositoryWith("cockpit")).createReserveAccount(parsed.data);
     revalidate();
     return { ok: true, id: account.id };
   } catch (error) {
@@ -53,7 +50,7 @@ export async function updateReserveAccountAction(
   }
 
   try {
-    await getRepository((await requireWritableSession()).businessId).updateReserveAccount(
+    await (await repositoryWith("cockpit")).updateReserveAccount(
       id,
       parsed.data,
     );
@@ -66,7 +63,7 @@ export async function updateReserveAccountAction(
 
 export async function deleteReserveAccountAction(id: string): Promise<ActionResult> {
   try {
-    await getRepository((await requireWritableSession()).businessId).deleteReserveAccount(id);
+    await (await repositoryWith("cockpit")).deleteReserveAccount(id);
     revalidate();
     return { ok: true };
   } catch (error) {
@@ -85,9 +82,7 @@ export async function createReserveTransactionAction(values: unknown): Promise<A
   }
 
   try {
-    const txn = await getRepository(
-      (await requireWritableSession()).businessId,
-    ).createReserveTransaction(parsed.data);
+    const txn = await (await repositoryWith("cockpit")).createReserveTransaction(parsed.data);
     revalidate();
     return { ok: true, id: txn.id };
   } catch (error) {
@@ -97,7 +92,7 @@ export async function createReserveTransactionAction(values: unknown): Promise<A
 
 export async function deleteReserveTransactionAction(id: string): Promise<ActionResult> {
   try {
-    await getRepository((await requireWritableSession()).businessId).deleteReserveTransaction(id);
+    await (await repositoryWith("cockpit")).deleteReserveTransaction(id);
     revalidate();
     return { ok: true };
   } catch (error) {

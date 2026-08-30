@@ -3,9 +3,12 @@ import { describe, it } from "node:test";
 
 import {
   PLANS,
+  PLAN_IDS,
   canWrite,
+  cheapestPlanWith,
   evaluatePlanChange,
   getPlan,
+  planAllows,
   planOf,
   truckAllowance,
 } from "../plans";
@@ -18,61 +21,128 @@ function sub(over: Partial<Subscription> = {}): Subscription {
 
 describe("the plan catalogue", () => {
   it("prices and limits match what is sold", () => {
-    assert.equal(PLANS.INDIVIDUAL.priceMonthly, 29);
-    assert.equal(PLANS.INDIVIDUAL.truckLimit, 1);
-    assert.equal(PLANS.FLEET.priceMonthly, 49);
-    assert.equal(PLANS.FLEET.truckLimit, 5);
+    assert.equal(PLANS.SOLO.priceMonthly, 19);
+    assert.equal(PLANS.SOLO.truckLimit, 1);
+    assert.equal(PLANS.OWNER.priceMonthly, 39);
+    assert.equal(PLANS.OWNER.truckLimit, 1);
+    assert.equal(PLANS.FLEET.priceMonthly, 89);
+    assert.equal(PLANS.FLEET.truckLimit, 8);
   });
 
-  it("falls back to Individual rather than throwing on an unknown plan", () => {
-    assert.equal(getPlan("SOMETHING_ELSE").id, "INDIVIDUAL");
-    assert.equal(getPlan(null).id, "INDIVIDUAL");
-    assert.equal(planOf(undefined).id, "INDIVIDUAL");
+  it("is offered cheapest first, and the ranks agree with the prices", () => {
+    assert.deepEqual(PLAN_IDS, ["SOLO", "OWNER", "FLEET"]);
+    const byRank = PLAN_IDS.map((id) => PLANS[id]);
+    for (let i = 1; i < byRank.length; i += 1) {
+      assert.ok(byRank[i].rank > byRank[i - 1].rank, "ranks ascend");
+      assert.ok(byRank[i].priceMonthly > byRank[i - 1].priceMonthly, "prices ascend");
+    }
+  });
+
+  it("sells nothing on the cheap tier that the dear one lacks", () => {
+    // Each tier is the one below plus something. A capability that appears
+    // lower down and vanishes higher up would make an upgrade a downgrade.
+    assert.ok(PLANS.SOLO.capabilities.every((c) => PLANS.OWNER.capabilities.includes(c)));
+    assert.ok(PLANS.OWNER.capabilities.every((c) => PLANS.FLEET.capabilities.includes(c)));
+  });
+
+  it("falls back to the default plan rather than throwing on an unknown one", () => {
+    assert.equal(getPlan("SOMETHING_ELSE").id, "OWNER");
+    assert.equal(getPlan(null).id, "OWNER");
+    assert.equal(planOf(undefined).id, "OWNER");
+  });
+
+  it("carries a business on the old Individual plan up to Owner-Operator", () => {
+    // Individual was the single-truck plan before the tiers were split by
+    // depth. It included the cockpit, so it must not land on Solo Starter.
+    const carried = getPlan("INDIVIDUAL");
+    assert.equal(carried.id, "OWNER");
+    assert.equal(planAllows(sub({ plan: "INDIVIDUAL" as Subscription["plan"] }), "cockpit"), true);
+  });
+});
+
+describe("planAllows", () => {
+  it("keeps the decision tools out of the ledger tier", () => {
+    assert.equal(planAllows(sub({ plan: "SOLO" }), "cockpit"), false);
+    assert.equal(planAllows(sub({ plan: "SOLO" }), "fleet"), false);
+  });
+
+  it("opens the cockpit on Owner-Operator, but not per-unit economics", () => {
+    assert.equal(planAllows(sub({ plan: "OWNER" }), "cockpit"), true);
+    assert.equal(planAllows(sub({ plan: "OWNER" }), "fleet"), false);
+  });
+
+  it("opens everything on Fleet", () => {
+    assert.equal(planAllows(sub({ plan: "FLEET" }), "cockpit"), true);
+    assert.equal(planAllows(sub({ plan: "FLEET" }), "fleet"), true);
+  });
+
+  it("treats a business with no subscription row as being on the default plan", () => {
+    assert.equal(planAllows(undefined, "cockpit"), true);
+  });
+
+  it("points an upsell at the cheapest plan that carries the capability", () => {
+    assert.equal(cheapestPlanWith("cockpit").id, "OWNER");
+    assert.equal(cheapestPlanWith("fleet").id, "FLEET");
   });
 });
 
 describe("truckAllowance", () => {
-  it("lets an Individual business have its one truck", () => {
+  it("lets a single-truck business have its one truck", () => {
     const allowance = truckAllowance(sub(), 0);
     assert.equal(allowance.limit, 1);
     assert.equal(allowance.canAdd, true);
     assert.equal(allowance.reason, null);
   });
 
-  it("refuses the second truck on Individual, and says how to fix it", () => {
-    const allowance = truckAllowance(sub(), 1);
-    assert.equal(allowance.canAdd, false);
-    assert.match(allowance.reason ?? "", /Fleet/);
+  it("refuses the second truck on a single-truck plan, and says how to fix it", () => {
+    for (const plan of ["SOLO", "OWNER"] as const) {
+      const allowance = truckAllowance(sub({ plan }), 1);
+      assert.equal(allowance.canAdd, false, plan);
+      assert.match(allowance.reason ?? "", /Small Fleet/);
+    }
   });
 
-  it("allows up to five on Fleet and refuses the sixth", () => {
-    assert.equal(truckAllowance(sub({ plan: "FLEET" }), 4).canAdd, true);
-    const full = truckAllowance(sub({ plan: "FLEET" }), 5);
+  it("allows up to eight on Fleet and refuses the ninth", () => {
+    assert.equal(truckAllowance(sub({ plan: "FLEET" }), 7).canAdd, true);
+    const full = truckAllowance(sub({ plan: "FLEET" }), 8);
     assert.equal(full.canAdd, false);
     assert.equal(full.remaining, 0);
     assert.match(full.reason ?? "", /larger plan/);
   });
 
   it("never reports negative headroom when somehow over the limit", () => {
-    assert.equal(truckAllowance(sub({ plan: "FLEET" }), 9).remaining, 0);
+    assert.equal(truckAllowance(sub({ plan: "FLEET" }), 12).remaining, 0);
   });
 });
 
 describe("evaluatePlanChange", () => {
   it("always allows moving up", () => {
-    const change = evaluatePlanChange(sub(), "FLEET", 1);
+    const change = evaluatePlanChange(sub({ plan: "SOLO" }), "OWNER", 1);
     assert.equal(change.allowed, true);
     assert.equal(change.direction, "upgrade");
   });
 
+  it("reads Solo to Owner as an upgrade even though both cover one truck", () => {
+    // Truck count no longer separates the two cheapest tiers; rank does.
+    assert.equal(PLANS.SOLO.truckLimit, PLANS.OWNER.truckLimit);
+    assert.equal(evaluatePlanChange(sub({ plan: "SOLO" }), "OWNER", 1).direction, "upgrade");
+    assert.equal(evaluatePlanChange(sub({ plan: "OWNER" }), "SOLO", 1).direction, "downgrade");
+  });
+
+  it("allows dropping the cockpit, because no row is touched", () => {
+    const change = evaluatePlanChange(sub({ plan: "OWNER" }), "SOLO", 1);
+    assert.equal(change.allowed, true);
+    assert.equal(change.reason, null);
+  });
+
   it("allows moving down when the trucks fit", () => {
-    const change = evaluatePlanChange(sub({ plan: "FLEET" }), "INDIVIDUAL", 1);
+    const change = evaluatePlanChange(sub({ plan: "FLEET" }), "OWNER", 1);
     assert.equal(change.allowed, true);
     assert.equal(change.direction, "downgrade");
   });
 
   it("refuses moving down while more trucks are running than fit", () => {
-    const change = evaluatePlanChange(sub({ plan: "FLEET" }), "INDIVIDUAL", 3);
+    const change = evaluatePlanChange(sub({ plan: "FLEET" }), "OWNER", 3);
     assert.equal(change.allowed, false);
     // The refusal has to tell them what to do, and promise the history stays.
     assert.match(change.reason ?? "", /Archive/);
@@ -80,7 +150,7 @@ describe("evaluatePlanChange", () => {
   });
 
   it("says so plainly when there is nothing to change", () => {
-    const change = evaluatePlanChange(sub(), "INDIVIDUAL", 1);
+    const change = evaluatePlanChange(sub(), "OWNER", 1);
     assert.equal(change.allowed, false);
     assert.equal(change.direction, "same");
   });
@@ -105,11 +175,12 @@ describe("canWrite", () => {
 });
 
 describe("a business created before subscriptions existed", () => {
-  it("defaults to Individual and trialing, never to lapsed", () => {
+  it("defaults to the trial of the full cockpit, never to lapsed", () => {
     const created = defaultSubscription("biz");
-    assert.equal(created.plan, "INDIVIDUAL");
+    assert.equal(created.plan, "OWNER");
     assert.equal(created.status, "TRIALING");
     assert.equal(canWrite(created), true);
+    assert.equal(planAllows(created, "cockpit"), true);
   });
 
   it("carries empty provider references, ready for billing later", () => {

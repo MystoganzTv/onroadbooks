@@ -14,6 +14,7 @@ import {
   migrateTruck,
 } from "../defaults";
 import { primaryTruck } from "../fleet";
+import { getPlan } from "../plans";
 import { buildSeedDataset, DEMO_DOCUMENTS } from "../seed/seed-data";
 import { buildStorageKey, getDocumentStorage } from "../storage";
 import type {
@@ -159,6 +160,10 @@ function migrate(dataset: Dataset): Dataset {
   dataset.subscription.providerCustomerId ??= null;
   dataset.subscription.providerSubscriptionId ??= null;
   dataset.subscription.currentPeriodEnd ??= null;
+  // The plan a ledger was written with may no longer be a plan we sell. The
+  // catalogue decides what it becomes -- Individual, the old single-truck
+  // plan, keeps the cockpit it was sold and becomes Owner-Operator.
+  dataset.subscription.plan = getPlan(dataset.subscription.plan).id;
   if (!Array.isArray(dataset.reserveAccounts) || dataset.reserveAccounts.length === 0) {
     dataset.reserveAccounts = defaultReserveAccounts(businessId);
   }
