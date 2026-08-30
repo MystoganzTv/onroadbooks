@@ -28,7 +28,7 @@ import type {
 } from "../types";
 import { defaultCategoryBehavior } from "../categories";
 import { defaultGoals, defaultReserveAccounts, defaultSubscription } from "../defaults";
-import { DEFAULT_PLAN } from "../plans";
+import { DEFAULT_PLAN, getPlan } from "../plans";
 import { DEMO_EMAIL } from "../auth/constants";
 import type {
   AuthStore,
@@ -520,7 +520,10 @@ export class PrismaRepository implements Repository {
       ? {
           id: subscriptionRow.id,
           businessId: subscriptionRow.businessId,
-          plan: subscriptionRow.plan,
+          // Production can still contain the legacy INDIVIDUAL enum value.
+          // Decode it through the catalogue so the rest of the application
+          // only ever sees a current PlanId (INDIVIDUAL maps to OWNER).
+          plan: getPlan(subscriptionRow.plan).id,
           status: subscriptionRow.status,
           currentPeriodEnd: subscriptionRow.currentPeriodEnd
             ? isoDate(subscriptionRow.currentPeriodEnd)

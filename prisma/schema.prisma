@@ -108,6 +108,10 @@ enum SettlementStatus {
 }
 
 enum PlanId {
+  /// Kept for rows created before the three-tier catalogue. The application
+  /// reads it as OWNER; removing it would make Prisma unable to decode those
+  /// existing subscriptions before they can be migrated.
+  INDIVIDUAL
   SOLO
   OWNER
   FLEET
