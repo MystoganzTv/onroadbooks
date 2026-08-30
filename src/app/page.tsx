@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { LandingPage } from "@/components/marketing/landing-page";
-import { getSession, needsSetup } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { LANDING_COPY } from "@/lib/marketing/copy";
 import { display, script } from "@/lib/marketing/fonts";
 
@@ -22,15 +22,11 @@ export default async function Home() {
   // Signed in: there is nothing to sell, go to work.
   if (await getSession()) redirect("/dashboard");
 
-  // Before the owner account exists every call to action opens setup;
-  // afterwards it opens the sign-in card.
-  const primaryHref = (await needsSetup()) ? "/setup" : "/login";
-
   // The two landing-only faces are attached here, so the app bundle never
   // pays for them.
   return (
     <div className={`${display.variable} ${script.variable}`}>
-      <LandingPage primaryHref={primaryHref} />
+      <LandingPage primaryHref="/setup" />
     </div>
   );
 }

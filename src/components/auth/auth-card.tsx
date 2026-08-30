@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 
 import { BrandLogo } from "@/components/shell/brand-logo";
+import { AuthOptions } from "@/components/auth/auth-options";
 
 import { Field } from "@/components/shared/field";
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,13 @@ import { APP_NAME } from "@/lib/utils";
  * Sign in, or create the owner account on first run. One component because
  * the two differ only by which fields are collected.
  */
-export function AuthCard({ mode }: { mode: "login" | "setup" }) {
+export function AuthCard({
+  mode,
+  initialError = null,
+}: {
+  mode: "login" | "setup";
+  initialError?: string | null;
+}) {
   const router = useRouter();
   const isSetup = mode === "setup";
 
@@ -26,7 +33,7 @@ export function AuthCard({ mode }: { mode: "login" | "setup" }) {
     email: "",
     password: "",
   });
-  const [error, setError] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(initialError);
   const [pending, setPending] = React.useState(false);
 
   const set = (key: keyof typeof values, value: string) =>
@@ -83,6 +90,8 @@ export function AuthCard({ mode }: { mode: "login" | "setup" }) {
           noValidate
           className="space-y-4 rounded-lg border border-border bg-card p-5"
         >
+          <AuthOptions showDemo={!isSetup} />
+
           {isSetup ? (
             <>
               <Field label="Business name" htmlFor="auth-business" required>
@@ -152,12 +161,15 @@ export function AuthCard({ mode }: { mode: "login" | "setup" }) {
           </Button>
         </form>
 
-        {isSetup ? (
-          <p className="mt-4 text-center text-2xs leading-relaxed text-muted-foreground">
-            This creates the owner account for this installation. The demo data
-            already in the app stays, so you can look around straight away.
-          </p>
-        ) : null}
+        <p className="mt-4 text-center text-2xs leading-relaxed text-muted-foreground">
+          {isSetup ? "Already have an account?" : "New to OnRoad Books?"}{" "}
+          <Link
+            href={isSetup ? "/login" : "/setup"}
+            className="font-medium text-primary hover:underline"
+          >
+            {isSetup ? "Log in" : "Create an account"}
+          </Link>
+        </p>
       </div>
     </div>
   );

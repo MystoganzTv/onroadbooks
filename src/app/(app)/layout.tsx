@@ -28,6 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       }
       hasFleet={hasFleet}
       userEmail={session.email}
+      isDemo={session.isDemo}
     >
       {children}
     </AppShell>

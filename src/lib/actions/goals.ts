@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireSession } from "@/lib/auth";
+import { requireWritableSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { goalSchema } from "@/lib/schemas";
 import { fieldErrorsFrom, type ActionResult } from "./types";
@@ -18,7 +18,7 @@ export async function updateGoalsAction(values: unknown): Promise<ActionResult> 
   }
 
   try {
-    await getRepository((await requireSession()).businessId).updateGoals({
+    await getRepository((await requireWritableSession()).businessId).updateGoals({
       monthlyRevenueTarget: parsed.data.monthlyRevenueTarget,
       monthlyProfitTarget: parsed.data.monthlyProfitTarget,
       targetProfitPerMile: parsed.data.targetProfitPerMile,

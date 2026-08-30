@@ -6,3 +6,6 @@
  */
 export const SESSION_COOKIE = "onroad_books_session";
 export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 days
+
+/** Public, read-only account backed by the seeded trucking dataset. */
+export const DEMO_EMAIL = "demo@onroadbooks.app";

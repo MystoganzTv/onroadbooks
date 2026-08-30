@@ -39,6 +39,9 @@ export async function POST(request: Request) {
   if (!session) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
+  if (session.isDemo) {
+    return NextResponse.json({ error: "The demo account is read-only." }, { status: 403 });
+  }
   if (!sameOrigin(request)) {
     return NextResponse.json({ error: "Cross-origin uploads are refused." }, { status: 403 });
   }

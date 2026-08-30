@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 
 import { BrandLogo } from "@/components/shell/brand-logo";
+import { AuthOptions } from "@/components/auth/auth-options";
 
 import { Field } from "@/components/shared/field";
 import { Button } from "@/components/ui/button";
@@ -104,6 +105,8 @@ export function SetupFlow() {
           noValidate
           className="space-y-4 rounded-lg border border-border bg-card p-5"
         >
+          <AuthOptions />
+
           <div className="space-y-4">
             <div>
               <h1 className="text-md font-semibold tracking-tight">Create your account</h1>
@@ -176,8 +179,10 @@ export function SetupFlow() {
         </form>
 
         <p className="mt-4 text-center text-2xs leading-relaxed text-muted-foreground">
-          You will set up your truck and business preferences next. Everything can be changed
-          later.
+          Already have an account?{" "}
+          <Link href="/login" className="font-medium text-primary hover:underline">
+            Log in
+          </Link>
         </p>
       </div>
     </div>

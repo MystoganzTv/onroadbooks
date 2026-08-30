@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireSession } from "@/lib/auth";
+import { requireWritableSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { maintenanceSchema } from "@/lib/schemas";
 import type { MaintenanceBasis, MaintenanceType } from "@/lib/types";
@@ -26,7 +26,7 @@ export async function createMaintenanceAction(values: unknown): Promise<ActionRe
   }
 
   try {
-    const record = await getRepository((await requireSession()).businessId).createMaintenance({
+    const record = await getRepository((await requireWritableSession()).businessId).createMaintenance({
       ...parsed.data,
       type: parsed.data.type as MaintenanceType,
       basis: parsed.data.basis as MaintenanceBasis,
@@ -55,7 +55,7 @@ export async function updateMaintenanceAction(
   }
 
   try {
-    await getRepository((await requireSession()).businessId).updateMaintenance(id, {
+    await getRepository((await requireWritableSession()).businessId).updateMaintenance(id, {
       ...parsed.data,
       type: parsed.data.type as MaintenanceType,
       basis: parsed.data.basis as MaintenanceBasis,
@@ -72,7 +72,7 @@ export async function updateMaintenanceAction(
 
 export async function deleteMaintenanceAction(id: string): Promise<ActionResult> {
   try {
-    await getRepository((await requireSession()).businessId).deleteMaintenance(id);
+    await getRepository((await requireWritableSession()).businessId).deleteMaintenance(id);
     revalidateAll();
     return { ok: true };
   } catch (error) {

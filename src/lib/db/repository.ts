@@ -255,9 +255,11 @@ export interface Repository {
 export interface AuthStore {
   countUsers(): Promise<number>;
   findUserByEmail(email: string): Promise<User | null>;
+  /** Returns the shared seeded account, creating only its login row when needed. */
+  ensureDemoUser(): Promise<User>;
   /**
-   * Creates the owner account. Attaches to the existing business when there
-   * is one (the seeded demo), otherwise creates it.
+   * Creates an owner with a separate business. Seeded data belongs only to
+   * the demo account and must never be attached to a real signup.
    */
   createOwner(input: {
     email: string;

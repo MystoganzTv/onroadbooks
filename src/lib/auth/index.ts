@@ -24,6 +24,15 @@ export async function requireSession(): Promise<SessionPayload> {
   return session;
 }
 
+/** A signed-in owner whose ledger may be changed. */
+export async function requireWritableSession(): Promise<SessionPayload> {
+  const session = await requireSession();
+  if (session.isDemo) {
+    throw new Error("The demo account is read-only. Create your own account to save changes.");
+  }
+  return session;
+}
+
 /** For route handlers, which must answer 401 rather than redirect. */
 export async function requireSessionOrNull(): Promise<SessionPayload | null> {
   return getSession();

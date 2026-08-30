@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireSession } from "@/lib/auth";
+import { requireWritableSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import {
   buildSettlementSnapshot,
@@ -45,7 +45,7 @@ export async function closeSettlementAction(values: unknown): Promise<ActionResu
   const { month, half } = parsed.data as { month: string; half: SettlementHalf };
 
   try {
-    const repository = getRepository((await requireSession()).businessId);
+    const repository = getRepository((await requireWritableSession()).businessId);
     const dataset = await repository.getDataset();
     const range = settlementBounds(month, half);
 
@@ -92,7 +92,7 @@ export async function closeSettlementAction(values: unknown): Promise<ActionResu
 /** Reopening clears the snapshot and reverses only the rows the close wrote. */
 export async function reopenSettlementAction(id: string): Promise<ActionResult> {
   try {
-    await getRepository((await requireSession()).businessId).reopenSettlement(id);
+    await getRepository((await requireWritableSession()).businessId).reopenSettlement(id);
     revalidate();
     return { ok: true, id };
   } catch (error) {
@@ -111,7 +111,7 @@ export async function updateSettlementNotesAction(values: unknown): Promise<Acti
   }
 
   try {
-    await getRepository((await requireSession()).businessId).updateSettlementNotes(
+    await getRepository((await requireWritableSession()).businessId).updateSettlementNotes(
       parsed.data.id,
       parsed.data.notes ?? null,
     );

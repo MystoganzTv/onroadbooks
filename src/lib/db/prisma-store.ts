@@ -28,6 +28,7 @@ import type {
 } from "../types";
 import { defaultCategoryBehavior } from "../categories";
 import { defaultGoals, defaultReserveAccounts, defaultSubscription } from "../defaults";
+import { DEMO_EMAIL } from "../auth/constants";
 import type {
   AuthStore,
   BusinessInput,
@@ -189,6 +190,57 @@ export class PrismaAuthStore implements AuthStore {
     };
   }
 
+  async ensureDemoUser(): Promise<User> {
+    const client = await getClient();
+    const existing = await client.user.findUnique({ where: { email: DEMO_EMAIL } });
+    if (existing?.businessId) {
+      return {
+        id: existing.id,
+        businessId: existing.businessId,
+        email: existing.email,
+        name: existing.name,
+        passwordHash: existing.passwordHash,
+        createdAt: existing.createdAt.toISOString(),
+      };
+    }
+
+    // The seeded business is the oldest ledger with real loads. New accounts
+    // start empty, so they cannot be mistaken for the demo even after years.
+    const business =
+      (await client.business.findFirst({
+        where: { loads: { some: {} } },
+        orderBy: { createdAt: "asc" },
+      })) ?? (await client.business.findFirst({ orderBy: { createdAt: "asc" } }));
+
+    if (!business) throw new Error("The demo dataset has not been seeded yet.");
+
+    const row = await client.user.upsert({
+      where: { email: DEMO_EMAIL },
+      update: {
+        name: "OnRoad Books Demo",
+        businessId: business.id,
+        passwordHash: "demo$disabled",
+      },
+      create: {
+        email: DEMO_EMAIL,
+        name: "OnRoad Books Demo",
+        // This is intentionally not a valid scrypt hash, so password login
+        // can never authenticate the public account.
+        passwordHash: "demo$disabled",
+        businessId: business.id,
+      },
+    });
+
+    return {
+      id: row.id,
+      businessId: business.id,
+      email: row.email,
+      name: row.name,
+      passwordHash: row.passwordHash,
+      createdAt: row.createdAt.toISOString(),
+    };
+  }
+
   async createOwner(input: {
     email: string;
     name?: string | null;
@@ -199,50 +251,39 @@ export class PrismaAuthStore implements AuthStore {
     const client = await getClient();
     const email = input.email.trim().toLowerCase();
 
-    // Attach to the existing business when there is one, so the seeded demo
-    // is not orphaned by creating the first account.
-    let business = await client.business.findFirst({ orderBy: { createdAt: "asc" } });
-    if (!business) {
-      business = await client.business.create({
+    return client.$transaction(async (tx) => {
+      if (await tx.user.findUnique({ where: { email } })) {
+        throw new Error("That email already has an account.");
+      }
+
+      const business = await tx.business.create({
         data: {
           name: input.businessName?.trim() || "My Trucking Business",
           currency: "USD",
           settings: { create: { categoryBehavior: defaultCategoryBehavior() } },
           trucks: { create: { name: "Truck 1" } },
+          subscription: { create: { plan: input.plan ?? "INDIVIDUAL" } },
         },
       });
-    } else if (input.businessName) {
-      business = await client.business.update({
-        where: { id: business.id },
-        data: { name: input.businessName.trim() },
+
+      const row = await tx.user.create({
+        data: {
+          email,
+          name: input.name?.trim() || null,
+          passwordHash: input.passwordHash,
+          businessId: business.id,
+        },
       });
-    }
 
-    // The plan chosen during onboarding. Upserted rather than created, so an
-    // existing business that predates subscriptions gains one here.
-    await client.subscription.upsert({
-      where: { businessId: business.id },
-      create: { businessId: business.id, plan: input.plan ?? "INDIVIDUAL" },
-      update: input.plan ? { plan: input.plan } : {},
-    });
-
-    const row = await client.user.create({
-      data: {
-        email,
-        name: input.name?.trim() || null,
-        passwordHash: input.passwordHash,
+      return {
+        id: row.id,
         businessId: business.id,
-      },
+        email: row.email,
+        name: row.name,
+        passwordHash: input.passwordHash,
+        createdAt: row.createdAt.toISOString(),
+      };
     });
-
-    return {
-      id: row.id,
-      businessId: business.id,
-      email: row.email,
-      name: row.name,
-      passwordHash: input.passwordHash,
-      createdAt: row.createdAt.toISOString(),
-    };
   }
 }
 

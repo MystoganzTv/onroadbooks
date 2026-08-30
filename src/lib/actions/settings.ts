@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireSession } from "@/lib/auth";
+import { requireWritableSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { settingsSchema, truckSchema } from "@/lib/schemas";
 import { fieldErrorsFrom, type ActionResult } from "./types";
@@ -18,7 +18,7 @@ export async function updateSettingsAction(values: unknown): Promise<ActionResul
   }
 
   try {
-    const repository = getRepository((await requireSession()).businessId);
+    const repository = getRepository((await requireWritableSession()).businessId);
     await repository.updateBusiness({
       name: parsed.data.businessName,
       currency: parsed.data.currency.toUpperCase(),
@@ -48,7 +48,7 @@ export async function updateTruckAction(values: unknown): Promise<ActionResult> 
   }
 
   try {
-    await getRepository((await requireSession()).businessId).updateTruck(parsed.data);
+    await getRepository((await requireWritableSession()).businessId).updateTruck(parsed.data);
     revalidateAll();
     return { ok: true };
   } catch (error) {

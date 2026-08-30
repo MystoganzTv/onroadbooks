@@ -27,6 +27,8 @@ export interface SessionPayload {
   userId: string;
   businessId: string;
   email: string;
+  /** Shared seeded account. Reads are allowed; writes are refused server-side. */
+  isDemo?: boolean;
   /** Unix seconds. */
   exp: number;
 }

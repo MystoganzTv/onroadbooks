@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireSession } from "@/lib/auth";
+import { requireWritableSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { reserveAccountSchema, reserveTransactionSchema } from "@/lib/schemas";
 import { fieldErrorsFrom, type ActionResult } from "./types";
@@ -30,7 +30,7 @@ export async function createReserveAccountAction(values: unknown): Promise<Actio
 
   try {
     const account = await getRepository(
-      (await requireSession()).businessId,
+      (await requireWritableSession()).businessId,
     ).createReserveAccount(parsed.data);
     revalidate();
     return { ok: true, id: account.id };
@@ -53,7 +53,7 @@ export async function updateReserveAccountAction(
   }
 
   try {
-    await getRepository((await requireSession()).businessId).updateReserveAccount(
+    await getRepository((await requireWritableSession()).businessId).updateReserveAccount(
       id,
       parsed.data,
     );
@@ -66,7 +66,7 @@ export async function updateReserveAccountAction(
 
 export async function deleteReserveAccountAction(id: string): Promise<ActionResult> {
   try {
-    await getRepository((await requireSession()).businessId).deleteReserveAccount(id);
+    await getRepository((await requireWritableSession()).businessId).deleteReserveAccount(id);
     revalidate();
     return { ok: true };
   } catch (error) {
@@ -86,7 +86,7 @@ export async function createReserveTransactionAction(values: unknown): Promise<A
 
   try {
     const txn = await getRepository(
-      (await requireSession()).businessId,
+      (await requireWritableSession()).businessId,
     ).createReserveTransaction(parsed.data);
     revalidate();
     return { ok: true, id: txn.id };
@@ -97,7 +97,7 @@ export async function createReserveTransactionAction(values: unknown): Promise<A
 
 export async function deleteReserveTransactionAction(id: string): Promise<ActionResult> {
   try {
-    await getRepository((await requireSession()).businessId).deleteReserveTransaction(id);
+    await getRepository((await requireWritableSession()).businessId).deleteReserveTransaction(id);
     revalidate();
     return { ok: true };
   } catch (error) {

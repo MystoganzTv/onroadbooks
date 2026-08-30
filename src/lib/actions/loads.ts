@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireSession } from "@/lib/auth";
+import { requireWritableSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { loadSchema } from "@/lib/schemas";
 import type { PaymentStatus } from "@/lib/types";
@@ -22,7 +22,7 @@ export async function createLoadAction(values: unknown): Promise<ActionResult> {
   }
 
   try {
-    const load = await getRepository((await requireSession()).businessId).createLoad(parsed.data);
+    const load = await getRepository((await requireWritableSession()).businessId).createLoad(parsed.data);
     revalidateAll();
     return { ok: true, id: load.id };
   } catch (error) {
@@ -37,7 +37,7 @@ export async function updateLoadAction(id: string, values: unknown): Promise<Act
   }
 
   try {
-    await getRepository((await requireSession()).businessId).updateLoad(id, parsed.data);
+    await getRepository((await requireWritableSession()).businessId).updateLoad(id, parsed.data);
     revalidateAll();
     revalidatePath(`/loads/${id}`);
     return { ok: true, id };
@@ -51,7 +51,7 @@ export async function updateLoadStatusAction(
   status: PaymentStatus,
 ): Promise<ActionResult> {
   try {
-    const repository = getRepository((await requireSession()).businessId);
+    const repository = getRepository((await requireWritableSession()).businessId);
     const dataset = await repository.getDataset();
     const load = dataset.loads.find((l) => l.id === id);
     if (!load) return { ok: false, error: "Load not found." };
@@ -67,7 +67,7 @@ export async function updateLoadStatusAction(
 
 export async function deleteLoadAction(id: string): Promise<ActionResult> {
   try {
-    await getRepository((await requireSession()).businessId).deleteLoad(id);
+    await getRepository((await requireWritableSession()).businessId).deleteLoad(id);
     revalidateAll();
     return { ok: true };
   } catch (error) {

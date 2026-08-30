@@ -17,10 +17,6 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   const store = getAuthStore();
 
-  if ((await store.countUsers()) > 0) {
-    return NextResponse.json({ error: "An account already exists. Sign in instead." }, { status: 409 });
-  }
-
   const parsed = setupSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(

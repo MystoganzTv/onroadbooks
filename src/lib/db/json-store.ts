@@ -3,6 +3,7 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
+import { DEMO_EMAIL } from "../auth/constants";
 import { roundMoney } from "../calculations";
 import { defaultCategoryBehavior } from "../categories";
 import {
@@ -569,6 +570,24 @@ export class JsonAuthStore implements AuthStore {
     const dataset = await serialise(readDataset);
     const normalized = email.trim().toLowerCase();
     return dataset.users.find((u) => u.email.toLowerCase() === normalized) ?? null;
+  }
+
+  async ensureDemoUser(): Promise<User> {
+    return mutate((dataset) => {
+      const existing = dataset.users.find((user) => user.email === DEMO_EMAIL);
+      if (existing) return existing;
+
+      const user: User = {
+        id: newId("user"),
+        businessId: dataset.business.id,
+        email: DEMO_EMAIL,
+        name: "OnRoad Books Demo",
+        passwordHash: "demo$disabled",
+        createdAt: new Date().toISOString(),
+      };
+      dataset.users.push(user);
+      return user;
+    });
   }
 
   async createOwner(input: {

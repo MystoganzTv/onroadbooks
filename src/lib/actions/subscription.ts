@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireSession } from "@/lib/auth";
+import { requireWritableSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { activeTrucks } from "@/lib/fleet";
 import { evaluatePlanChange } from "@/lib/plans";
@@ -29,7 +29,7 @@ export async function changePlanAction(values: unknown): Promise<ActionResult> {
   }
 
   try {
-    const repository = getRepository((await requireSession()).businessId);
+    const repository = getRepository((await requireWritableSession()).businessId);
     const dataset = await repository.getDataset();
 
     const decision = evaluatePlanChange(
