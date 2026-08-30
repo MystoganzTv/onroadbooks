@@ -143,36 +143,63 @@ accept the identical query string.
 
 ## Architecture
 
+> The reasoning behind the decisions below -- why cost per mile is never
+> prorated, why a closed settlement freezes, why trip fuel never enters a
+> period total -- is recorded as Architecture Decision Records in
+> [`docs/adr/`](docs/adr/README.md). Read them before changing anything in
+> `src/lib/finance`.
+
 ```
 src/
+  middleware.ts            the auth gate; edge runtime, cookie presence only
   app/
+    page.tsx               public landing page
+    login/ setup/ welcome/ owner account, first run, onboarding
     (app)/                 route group carrying the sidebar shell
-      dashboard/ loads/ expenses/ fuel/ reports/ truck/ settings/
+      dashboard/ loads/ expenses/ fuel/ truck/ (maintenance lives here)
+      calculator/ analytics/ reports/ settlements/ reserves/ fleet/ settings/
+    api/                   auth and private document serving only
   components/
     ui/                    shadcn-style primitives (compact, tabular-friendly)
     shell/                 sidebar, mobile drawer, theme
-    dashboard/ loads/ expenses/ fuel/ reports/ truck/ settings/
+    cockpit/               dashboard panels: cost per mile, owner pay, insights
+    dashboard/ loads/ expenses/ fuel/ truck/ maintenance/ settings/
+    calculator/ settlements/ reserves/ fleet/ documents/ reports/
     charts/                Recharts wrappers with shared tooltip + theming
+    print/                 the printed report
+    marketing/             landing page (its own fixed palette, see ADR-0019)
+    auth/ onboarding/      sign-in, setup and first-run flows
     shared/                page header, empty state, field, badges, metrics
   lib/
-    calculations.ts        every financial formula, divide-by-zero safe
-    formatters.ts          currency, miles, rates, percentages, dates
+    calculations.ts        the primitive layer: div, rounding, period totals
+    finance/               the product layer, one file per question (ADR-0008)
     periods.ts             month / half-month resolution and comparison
     categories.ts          expense taxonomy + fixed/variable defaults
+    formatters.ts          currency, miles, rates, percentages, dates
     schemas.ts             zod validation shared by forms and server actions
     actions/               server actions (create / update / delete)
+    auth/                  scrypt passwords, signed cookie sessions
     db/                    repository interface + JSON and Prisma stores
+    storage/               document storage adapter (local / Supabase)
+    plans.ts               the plan catalogue, in code (ADR-0017)
+    marketing/             landing page copy and figures
     seed/                  deterministic demo dataset
   generated/prisma/        generated Prisma client (git-ignored)
 prisma/
-  schema.prisma            User, Business, Truck, Load, Expense, FuelEntry,
-                           FinancialSettings
+  schema.prisma            User, Business, Subscription, Truck, Load, Expense,
+                           FuelEntry, MaintenanceRecord, Document,
+                           FinancialSettings, FinancialGoal, ReserveAccount,
+                           ReserveTransaction, Settlement
   seed.ts                  seeds Postgres with the same demo dataset
+docs/adr/                  architecture decision records
 ```
 
-**No formula is written inside a component.** Components call
-`lib/calculations.ts`, which is the only place a division happens -- and every
-division goes through `div()`, which returns `0` rather than `Infinity` or `NaN`.
+**No formula is written inside a component.** Components call the money code,
+which lives in two layers: `lib/calculations.ts` holds the primitives and
+`lib/finance/` holds the product's answers, one file per question. Those are the
+only places a division happens -- and every division goes through `div()`, which
+returns `0` rather than `Infinity` or `NaN`. See
+[ADR-0008](docs/adr/0008-two-calculation-layers.md).
 
 ### Formulas
 
@@ -377,10 +404,14 @@ every push and pull request.
 
 ## Not built yet (deliberately)
 
-Invoice generation, IFTA reporting, multi-user accounts (the auth model is
-single-owner: `/setup` closes once one account exists), and the multi-truck UI.
-The data model accommodates all of them; the MVP focuses on the financial
-product.
+Invoice generation, IFTA reporting, and multi-user accounts -- the auth model is
+single-owner, and `/setup` closes once one account exists. The data model
+accommodates all of them; the MVP focuses on the financial product.
+
+Billing is a seam rather than an integration: the plan catalogue is in code and
+the truck limit is enforced server-side, but no payment provider is wired up.
+`Subscription` carries empty provider references so adding one is a field being
+filled in rather than a model being reshaped.
 
 Two more honest gaps: the Supabase storage adapter is written and selected by
 `DOCUMENT_STORAGE=supabase`, but it has never been run against a live project,
