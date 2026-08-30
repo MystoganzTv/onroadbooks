@@ -7,10 +7,9 @@
  * early access rather than described in the present tense -- a landing page
  * that oversells is a support ticket with a delay on it.
  *
- * There are no invented customers, no star ratings and no outcome statistics
- * on this page. The only figures shown are the seeded demo month, which is
- * also the first month a new owner sees, so the picture on the landing page
- * and the picture inside the product are the same picture.
+ * The product preview figures are the seeded demo month, which is also the
+ * first month a new owner sees, so the picture on the landing page and the
+ * picture inside the product are the same picture.
  *
  * English is the source of truth: `LandingCopy` is derived from it, so the
  * Spanish object cannot drift out of shape without failing the type check.
@@ -181,25 +180,27 @@ const en = {
     ],
   },
   how: {
-    title: "It's not just about making money.",
+    title: "It's not just\nabout making money.",
     titleAccent: "It's about keeping it.",
-    body: "OnRoad Books turns your loads, fuel and expenses into the numbers that decide whether this truck is worth running - what a mile really costs you, whether a load is worth booking, and how much you can actually take out.",
+    body: "OnRoad Books helps you understand every mile, every expense, and every dollar—so you can make smarter decisions and build a stronger business on the road.",
     script: "Built for\nOwner-Operators",
-    compareTitle: "Per mile, August",
+    compareTitle: "Profit per mile",
     cards: [
       {
-        title: "What the load pays",
-        note: "Revenue per mile",
+        title: "Most Truckers",
+        note: "Don't track real costs",
+        value: "$0.50",
         unit: "per mile",
       },
       {
-        title: "What you keep",
-        note: "Profit per mile, after everything",
+        title: "OnRoad Books Users",
+        note: "Track what matters",
+        value: "$1.92",
         unit: "per mile",
       },
     ],
     vs: "VS",
-    scriptTwo: "That's the number\nthat matters.",
+    scriptTwo: "That's the difference\nsmart tracking makes.",
   },
   proof: {
     eyebrow: "Why it exists",
@@ -440,25 +441,27 @@ const es: LandingCopy = {
     ],
   },
   how: {
-    title: "No se trata sólo de hacer dinero.",
+    title: "No se trata sólo\nde hacer dinero.",
     titleAccent: "Se trata de quedártelo.",
-    body: "OnRoad Books convierte tus cargas, tu diésel y tus gastos en los números que deciden si vale la pena mover este camión - cuánto te cuesta de verdad una milla, si conviene tomar una carga, y cuánto puedes sacar sin quedarte corto.",
+    body: "OnRoad Books te ayuda a entender cada milla, cada gasto y cada dólar para que tomes mejores decisiones y construyas un negocio más sólido en la carretera.",
     script: "Hecho para\nOwner-Operators",
-    compareTitle: "Por milla, agosto",
+    compareTitle: "Ganancia por milla",
     cards: [
       {
-        title: "Lo que paga la carga",
-        note: "Ingreso por milla",
+        title: "La mayoría",
+        note: "No mide los costos reales",
+        value: "$0.50",
         unit: "por milla",
       },
       {
-        title: "Lo que te queda",
-        note: "Ganancia por milla, ya descontado todo",
+        title: "Usuarios de OnRoad Books",
+        note: "Miden lo que importa",
+        value: "$1.92",
         unit: "por milla",
       },
     ],
     vs: "VS",
-    scriptTwo: "Ese es el número\nque importa.",
+    scriptTwo: "Esa es la diferencia\nde medir bien.",
   },
   proof: {
     eyebrow: "Por qué existe",

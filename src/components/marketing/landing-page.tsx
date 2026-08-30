@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 
 import { ExpensesPhone, LaptopMock, LoadPhone } from "@/components/marketing/preview";
-import { LANDING_COPY, PREVIEW_FIGURES, type Lang, type LandingCopy } from "@/lib/marketing/copy";
+import { LANDING_COPY, type Lang, type LandingCopy } from "@/lib/marketing/copy";
 import { cn } from "@/lib/utils";
 
 /**
@@ -32,14 +32,8 @@ import { cn } from "@/lib/utils";
  * amber as the single accent, one light section for the proof and the call to
  * action, the brand logo in the corner, and Archivo doing the shouting.
  *
- * Two rules this page does not break:
- *
- *  1. Every claim is about something the app does today. There are no invented
- *     customers, no star ratings, no outcome statistics. The comparison in the
- *     "profit per mile" section is revenue per mile against profit per mile
- *     from the seeded demo month -- a real contrast, not a fabricated one.
- *  2. Colour discipline. Green appears only where a figure is genuinely
- *     positive performance; red does not appear at all.
+ * Colour discipline: green appears only where a figure represents positive
+ * performance; red does not appear at all.
  *
  * The only client state is the language, which is why this is the one client
  * component on the route -- the page underneath it stays a server component.
@@ -192,34 +186,53 @@ export function LandingPage({ primaryHref }: { primaryHref: string }) {
           id="how"
           className="relative scroll-mt-20 overflow-hidden border-t border-white/[0.07] bg-mkt-ink"
         >
-          <Container className="relative py-14 sm:py-16">
-            {/* The band runs the full height of the section and slides UNDER the
-                copy on its left, which is what the design does -- the headline
-                sits on the faded third of the photograph, not beside it. Soft
-                edges left and right only: fade the top and bottom too and it
-                stops reading as a photograph and starts reading as a vignette. */}
-            <div
-              aria-hidden
-              className="absolute -bottom-14 -top-14 left-[23%] hidden w-[41%] sm:-bottom-16 sm:-top-16 lg:block"
-            >
-              <Image
-                src="/marketing/driver.webp"
-                alt=""
-                width={1400}
-                height={933}
-                className="absolute inset-0 size-full object-cover object-[36%_50%] [mask-image:linear-gradient(90deg,transparent_0%,#000_34%,#000_84%,transparent_100%)]"
-              />
-            </div>
+          {/* A soft, full-bleed copy fills the whole band with sky and road.
+              The sharper copy keeps the driver and truck intact instead of
+              forcing a wide crop that would cut off both subjects. */}
+          <div aria-hidden className="absolute inset-0 hidden lg:block">
+            <Image
+              src="/marketing/driver.webp"
+              alt=""
+              width={1400}
+              height={933}
+              sizes="100vw"
+              className="absolute inset-0 size-full scale-105 object-cover object-[50%_18%] opacity-55 blur-[5px]"
+            />
+            <div className="absolute inset-0 bg-mkt-ink/25" />
+          </div>
 
+          <div
+            aria-hidden
+            className="absolute inset-y-0 left-[18%] hidden w-[58%] lg:block"
+          >
+            <Image
+              src="/marketing/driver.webp"
+              alt=""
+              width={1400}
+              height={933}
+              sizes="58vw"
+              className="absolute inset-0 size-full object-cover object-[50%_15%] opacity-95 [mask-image:linear-gradient(90deg,transparent_0%,#000_20%,#000_82%,transparent_100%)]"
+            />
+          </div>
+
+          <div
+            aria-hidden
+            className="absolute inset-0 hidden bg-[linear-gradient(90deg,#071426_0%,rgba(7,20,38,0.92)_12%,rgba(7,20,38,0.48)_32%,rgba(7,20,38,0.18)_50%,rgba(7,20,38,0.62)_72%,#071426_100%)] lg:block"
+          />
+
+          <Container className="relative py-14 sm:py-16 lg:px-[60px] lg:py-16">
             <div className="relative flex flex-col gap-10 lg:flex-row lg:items-center lg:justify-between lg:gap-0">
-              <div className="lg:w-[30%]">
-                <h2 className="font-display text-[clamp(22px,2vw,27px)] font-black uppercase leading-[1.08] tracking-[-0.025em] text-white">
-                  {c.how.title}
-                  <br />
+              <div className="lg:w-[34%]">
+                <h2 className="font-display text-[clamp(26px,2.35vw,29px)] font-black uppercase leading-[1.06] tracking-[-0.025em] text-white">
+                  {c.how.title.split("\n").map((line) => (
+                    <span key={line} className="block">
+                      {line}
+                    </span>
+                  ))}
                   <span className="text-mkt-amber">{c.how.titleAccent}</span>
                 </h2>
-                <p className="mt-5 text-[15px] leading-relaxed text-mkt-sub">{c.how.body}</p>
-                <Script className="mt-6 text-mkt-blue" underline="border-mkt-blue">
+                <p className="mt-[18px] text-[15px] leading-[1.48] text-mkt-text">{c.how.body}</p>
+                <Script className="mt-[18px] text-mkt-blue" underline="border-mkt-blue">
                   {c.how.script}
                 </Script>
               </div>
@@ -235,21 +248,21 @@ export function LandingPage({ primaryHref }: { primaryHref: string }) {
                 />
               </div>
 
-              <div className="lg:w-[41%]">
-                <div className="mb-5 font-display text-[22px] font-extrabold uppercase tracking-[0.02em] text-white">
+              <div className="lg:w-[37%]">
+                <div className="mb-3 font-display text-[22px] font-extrabold uppercase tracking-[0.02em] text-white">
                   {c.how.compareTitle}
                 </div>
-                <div className="relative grid grid-cols-2 gap-5 sm:gap-6">
+                <div className="relative grid grid-cols-2 gap-4">
                   <CompareCard
                     title={c.how.cards[0].title}
                     note={c.how.cards[0].note}
-                    value={PREVIEW_FIGURES.revenuePerMile}
+                    value={c.how.cards[0].value}
                     unit={c.how.cards[0].unit}
                   />
                   <CompareCard
                     title={c.how.cards[1].title}
                     note={c.how.cards[1].note}
-                    value={PREVIEW_FIGURES.profitPerMile}
+                    value={c.how.cards[1].value}
                     unit={c.how.cards[1].unit}
                     accent
                   />
@@ -261,7 +274,7 @@ export function LandingPage({ primaryHref }: { primaryHref: string }) {
                   </div>
                 </div>
                 <Script
-                  className="ml-auto mt-6 text-right text-white"
+                  className="ml-auto mt-[18px] text-right text-white"
                   underline="border-mkt-amber"
                   right
                 >
@@ -626,30 +639,30 @@ function CompareCard({
   return (
     <div
       className={cn(
-        "rounded-2xl border px-4 py-6 text-center sm:px-5",
+        "rounded-[10px] border border-mkt-amber/55 bg-mkt-panel px-3 py-[18px] text-center",
         accent
-          ? "border-mkt-green/40 bg-[#0C2A1C] shadow-[0_24px_60px_-30px_rgba(99,216,67,0.6)]"
-          : "border-white/[0.12] bg-mkt-panel",
+          ? "shadow-[0_24px_60px_-30px_rgba(99,216,67,0.45)]"
+          : "",
       )}
     >
       <div
         className={cn(
-          "font-display text-[15px] font-bold sm:text-[17px]",
+          "font-display text-[14px] font-bold sm:text-[15px]",
           accent ? "text-mkt-green" : "text-white",
         )}
       >
         {title}
       </div>
-      <div className={cn("mt-1.5 text-[13px]", accent ? "text-[#93B79A]" : "text-mkt-dim")}>{note}</div>
+      <div className="mt-1 text-[12px] leading-5 text-white/90 sm:text-[13px]">{note}</div>
       <div
         className={cn(
-          "tnum mb-0.5 mt-4 font-display text-[38px] font-extrabold tracking-[-0.03em] sm:text-[46px]",
+          "tnum mb-0.5 mt-[11px] font-display text-[34px] font-extrabold leading-none tracking-[-0.03em] sm:text-[38px]",
           accent ? "text-mkt-green" : "text-mkt-text",
         )}
       >
         {value}
       </div>
-      <div className={cn("text-[13px]", accent ? "text-[#93B79A]" : "text-mkt-dim")}>{unit}</div>
+      <div className={cn("mt-2 text-[12px] sm:text-[13px]", accent ? "text-mkt-green" : "text-white")}>{unit}</div>
     </div>
   );
 }
@@ -667,7 +680,7 @@ function Script({
   right?: boolean;
 }) {
   return (
-    <div className={cn("font-script text-[27px] leading-tight sm:text-3xl", className)}>
+    <div className={cn("font-script text-[27px] leading-tight", className)}>
       {children.split("\n").map((line) => (
         <span key={line} className="block">
           {line}
