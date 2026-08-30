@@ -30,7 +30,7 @@ export function HeroMetrics({
   const profitable = summary.netProfit >= 0;
 
   return (
-    <div className="grid h-full grid-cols-2 gap-3 xl:grid-cols-4">
+    <div className="grid h-full grid-cols-2 gap-3">
       <HeroTile
         label="Revenue"
         value={formatMoneyCompact(summary.grossRevenue)}

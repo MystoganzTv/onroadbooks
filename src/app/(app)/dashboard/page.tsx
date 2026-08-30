@@ -7,6 +7,7 @@ import { BestWorstLoads } from "@/components/cockpit/best-worst-loads";
 import { BrokerPanel } from "@/components/cockpit/broker-panel";
 import { CostPerMileCard } from "@/components/cockpit/cost-per-mile-card";
 import { DeadheadMonitor } from "@/components/cockpit/deadhead-monitor";
+import { EmptyCockpit } from "@/components/cockpit/empty-cockpit";
 import { GoalProgressCard } from "@/components/cockpit/goal-progress-card";
 import { HeroMetrics } from "@/components/cockpit/hero-metrics";
 import { InsightsPanel } from "@/components/cockpit/insights-panel";
@@ -193,6 +194,49 @@ export default async function DashboardPage({
     period.key === "first" || period.key === "second"
       ? `/settlements?month=${period.month}&half=${period.key === "first" ? "FIRST" : "SECOND"}`
       : undefined;
+  const hasLedgerHistory = allLoads.length > 0 || allExpenses.length > 0;
+
+  const loadAction = (
+    <LoadFormDialog
+      brokers={brokerNames}
+      trucks={trucks}
+      defaultTruckId={truckId}
+      defaultDate={defaultEntryDate(period)}
+      ratingThresholds={ratingThresholds}
+    />
+  );
+  const expenseAction = (
+    <ExpenseFormDialog
+      defaultDate={defaultEntryDate(period)}
+      loads={periodLoads}
+      trucks={trucks}
+      defaultTruckId={truckId}
+    />
+  );
+
+  if (!hasLedgerHistory) {
+    return (
+      <div className="space-y-5 p-4 lg:p-6">
+        <PageHeader
+          title="Financial Cockpit"
+          description="Drive the truck. Know the business."
+          actions={
+            <Button asChild variant="outline" size="sm">
+              <Link href="/calculator">
+                <Calculator className="size-4" />
+                Load calculator
+              </Link>
+            </Button>
+          }
+        />
+        <EmptyCockpit
+          businessName={dataset.business.name}
+          loadAction={loadAction}
+          expenseAction={expenseAction}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5 p-4 lg:p-6">
@@ -207,19 +251,8 @@ export default async function DashboardPage({
                 Load calculator
               </Link>
             </Button>
-            <ExpenseFormDialog
-              defaultDate={defaultEntryDate(period)}
-              loads={periodLoads}
-              trucks={trucks}
-              defaultTruckId={truckId}
-            />
-            <LoadFormDialog
-              brokers={brokerNames}
-              trucks={trucks}
-              defaultTruckId={truckId}
-              defaultDate={defaultEntryDate(period)}
-              ratingThresholds={ratingThresholds}
-            />
+            {expenseAction}
+            {loadAction}
           </>
         }
       />
