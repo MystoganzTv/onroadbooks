@@ -365,6 +365,7 @@ single-truck ledger written before any of this upgrades in place -- covered by
 | `npm run db:generate` | regenerate the Prisma client |
 | `npm run db:push` | push the schema to Postgres |
 | `npm run db:seed` | seed Postgres with the demo dataset |
+| `npm run smoke:postgres` | check the Prisma store against a live database |
 
 ---
 
@@ -464,7 +465,14 @@ paths per call rather than at import, which is what lets a test point it at a
 scratch directory.
 
 `.github/workflows/ci.yml` runs types, lint, tests and a production build on
-every push and pull request.
+every push and pull request, and then a second job against a real Postgres
+service: `prisma db push`, `npm run db:seed`, `npm run smoke:postgres`. That
+last one is `scripts/postgres-smoke.ts`, which asserts what only a server can
+prove -- that every reserve bucket handed out is a row, that closing a
+settlement stores the snapshot and posts its contributions, that reopening
+removes exactly those, that a fuel purchase keeps one linked ledger row, and
+that a repository bound to another business cannot read these rows. See
+[ADR-0021](docs/adr/0021-exercise-the-postgres-store-in-ci.md).
 
 ---
 
@@ -482,4 +490,4 @@ filled in rather than a model being reshaped.
 Two more honest gaps: the Supabase storage adapter is written and selected by
 `DOCUMENT_STORAGE=supabase`, but it has never been run against a live project,
 and there are no browser-level end-to-end tests in CI -- the suite below covers
-the logic, not the wiring.
+the logic, and the Postgres job covers the store, but neither drives a browser.

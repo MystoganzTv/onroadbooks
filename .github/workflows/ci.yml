@@ -52,3 +52,54 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  postgres:
+    name: The Postgres store, against a real database
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # The suite above proves the arithmetic against the JSON store, and
+    # `store-contract` only compares the two stores' method NAMES. Everything
+    # the Prisma store does differently -- foreign keys, transactions,
+    # generated ids, the snapshot JSON column -- is only ever exercised here.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: onroad_books
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATA_SOURCE: postgres
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/onroad_books?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/onroad_books?schema=public
+      DOCUMENT_STORAGE: local
+      AUTH_SECRET: ci-only-not-a-real-secret
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Create the schema
+        run: npx prisma db push --skip-generate
+
+      - name: Seed the demo dataset
+        run: npm run db:seed
+
+      - name: Smoke check the store
+        run: npm run smoke:postgres

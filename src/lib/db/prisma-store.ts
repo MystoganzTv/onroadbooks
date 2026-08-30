@@ -303,7 +303,7 @@ export class PrismaRepository implements Repository {
       maintenanceRows,
       goalRow,
       subscriptionRow,
-      reserveAccountRows,
+      storedReserveAccountRows,
       reserveTransactionRows,
       settlementRows,
     ] = await Promise.all([
@@ -347,21 +347,31 @@ export class PrismaRepository implements Repository {
 
     // The two built-in buckets are created on first read rather than in a
     // migration, so an existing database gains them without a data script.
-    const reserveAccounts: ReserveAccount[] =
-      reserveAccountRows.length > 0
-        ? reserveAccountRows.map((row) => ({
-            id: row.id,
-            businessId: row.businessId,
-            kind: row.kind,
-            name: row.name,
-            basis: row.basis,
-            contributionPct: numOrNull(row.contributionPct),
-            targetBalance: numOrNull(row.targetBalance),
-            active: row.active,
-            sortOrder: row.sortOrder,
-            createdAt: row.createdAt.toISOString(),
-          }))
-        : defaultReserveAccounts(business.id);
+    // They are WRITTEN, not synthesised: a bucket the caller can see but the
+    // database has never heard of cannot be referenced by a reserve
+    // transaction, and closing a settlement against one fails on the foreign
+    // key -- taking the whole close down with it.
+    let reserveAccountRows = storedReserveAccountRows;
+    if (reserveAccountRows.length === 0) {
+      await ensureReserveAccounts(client, business.id);
+      reserveAccountRows = await client.reserveAccount.findMany({
+        where: { businessId: business.id },
+        orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+      });
+    }
+
+    const reserveAccounts: ReserveAccount[] = reserveAccountRows.map((row) => ({
+      id: row.id,
+      businessId: row.businessId,
+      kind: row.kind,
+      name: row.name,
+      basis: row.basis,
+      contributionPct: numOrNull(row.contributionPct),
+      targetBalance: numOrNull(row.targetBalance),
+      active: row.active,
+      sortOrder: row.sortOrder,
+      createdAt: row.createdAt.toISOString(),
+    }));
 
     const subscription: Subscription = subscriptionRow
       ? {
@@ -1251,9 +1261,21 @@ export class PrismaRepository implements Repository {
           notes: input.notes?.trim() || existing.notes,
         },
       });
+      // Same guard the JSON store applies: a contribution naming a bucket that
+      // is no longer there is skipped, never allowed to fail the close.
+      const accountIds = new Set(
+        (
+          await tx.reserveAccount.findMany({
+            where: { businessId: business.id },
+            select: { id: true },
+          })
+        ).map((row) => row.id),
+      );
+
       for (const contribution of input.contributions) {
         const amount = roundMoney(contribution.amount);
         if (amount <= 0) continue;
+        if (!accountIds.has(contribution.accountId)) continue;
         await tx.reserveTransaction.create({
           data: {
             businessId: business.id,

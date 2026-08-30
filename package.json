@@ -12,6 +12,7 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "smoke:postgres": "node --conditions=react-server --import tsx scripts/postgres-smoke.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {
