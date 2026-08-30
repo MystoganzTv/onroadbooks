@@ -47,6 +47,7 @@ export function LandingPage({ primaryHref }: { primaryHref: string }) {
   const [lang, setLang] = useState<Lang>("en");
   const c = LANDING_COPY[lang];
   const year = new Date().getFullYear();
+  const isLogin = primaryHref === "/login";
 
   return (
     // overflow-x-clip, not hidden: the hero phone and the CTA phone deliberately
@@ -113,7 +114,7 @@ export function LandingPage({ primaryHref }: { primaryHref: string }) {
 
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <PrimaryButton href={primaryHref} size="lg">
-                  {c.hero.cta}
+                  {isLogin ? c.nav.signIn : c.hero.cta}
                   <ArrowRight className="size-[18px]" aria-hidden />
                 </PrimaryButton>
                 <a
@@ -331,7 +332,7 @@ export function LandingPage({ primaryHref }: { primaryHref: string }) {
                   ))}
                 </ul>
                 <PrimaryButton href={primaryHref} size="lg">
-                  {c.cta.button}
+                  {isLogin ? c.nav.signIn : c.cta.button}
                   <ArrowRight className="size-[18px]" aria-hidden />
                 </PrimaryButton>
               </div>
@@ -423,14 +424,14 @@ export function LandingPage({ primaryHref }: { primaryHref: string }) {
                 </ul>
                 {plan.featured ? (
                   <PrimaryButton href={primaryHref} block>
-                    {plan.cta}
+                    {isLogin ? c.nav.signIn : plan.cta}
                   </PrimaryButton>
                 ) : (
                   <Link
                     href={primaryHref}
                     className="block rounded-[10px] border border-white/25 px-4 py-3.5 text-center font-display text-base font-bold text-white transition-colors hover:bg-white/10"
                   >
-                    {plan.cta}
+                    {isLogin ? c.nav.signIn : plan.cta}
                   </Link>
                 )}
                 {plan.note ? (
@@ -469,7 +470,7 @@ export function LandingPage({ primaryHref }: { primaryHref: string }) {
                 {link.label}
               </a>
             ))}
-            <Link href={primaryHref} className="text-mkt-dim transition-colors hover:text-white">
+            <Link href="/login" className="text-mkt-dim transition-colors hover:text-white">
               {c.nav.signIn}
             </Link>
             <LangToggle label={c.nav.langLabel} lang={lang} onLang={setLang} />
@@ -499,6 +500,8 @@ function Header({
   onLang: (lang: Lang) => void;
   primaryHref: string;
 }) {
+  const isLogin = primaryHref === "/login";
+
   return (
     <header className="sticky top-0 z-50 border-b border-white/[0.07] bg-mkt-deep/85 backdrop-blur-md">
       <Container className="flex items-center gap-3 py-2.5 sm:gap-5 sm:py-3 lg:gap-8">
@@ -526,14 +529,14 @@ function Header({
             onLang={onLang}
           />
           <Link
-            href={primaryHref}
+            href="/login"
             className="hidden whitespace-nowrap rounded-lg border border-white/[0.22] px-5 py-2.5 font-display text-[14.5px] font-semibold text-mkt-text transition-colors hover:bg-white/10 hover:text-white sm:block"
           >
             {copy.nav.signIn}
           </Link>
           <PrimaryButton href={primaryHref}>
-            <span className="sm:hidden">{copy.nav.ctaShort}</span>
-            <span className="hidden sm:inline">{copy.nav.cta}</span>
+            <span className="sm:hidden">{isLogin ? copy.nav.signIn : copy.nav.ctaShort}</span>
+            <span className="hidden sm:inline">{isLogin ? copy.nav.signIn : copy.nav.cta}</span>
           </PrimaryButton>
         </div>
       </Container>
