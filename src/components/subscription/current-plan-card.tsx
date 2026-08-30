@@ -36,9 +36,26 @@ export function CurrentPlanCard({
           : "outline";
   const actionLabel = isProTrial
     ? "Keep OnRoad Pro"
-    : plan.id === "SOLO"
-      ? "Upgrade to Pro"
-      : "View plans & billing";
+    : subscription.status === "PAST_DUE"
+      ? "Fix billing"
+      : subscription.status === "CANCELED"
+        ? "Choose a plan"
+        : plan.id === "SOLO"
+          ? "Upgrade to Pro"
+          : "View plans & billing";
+  const statusMessage = trial
+    ? trial.expired
+      ? "Your trial has ended. Choose a monthly plan to keep using paid tools."
+      : trial.daysRemaining === 0
+        ? "Your free trial ends today."
+        : `${trial.daysRemaining} ${trial.daysRemaining === 1 ? "day" : "days"} left in your free trial.`
+    : subscription.status === "PAST_DUE"
+      ? "Your payment needs attention. Reading and exporting stay open while new entries are paused."
+      : subscription.status === "CANCELED"
+        ? "Your subscription has ended. Your existing books remain available to read and export."
+        : plan.id === "FLEET"
+          ? `Paid Fleet service for up to ${plan.truckLimit} trucks.`
+          : "Your current monthly plan for one truck.";
 
   return (
     <Card>
@@ -53,15 +70,7 @@ export function CurrentPlanCard({
         <div>
           <p className="text-sm font-semibold">{plan.name}</p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            {trial
-              ? trial.expired
-                ? "Your trial has ended. Choose a monthly plan to keep using paid tools."
-                : trial.daysRemaining === 0
-                  ? "Your free trial ends today."
-                  : `${trial.daysRemaining} ${trial.daysRemaining === 1 ? "day" : "days"} left in your free trial.`
-              : plan.id === "FLEET"
-                ? `Paid Fleet service for up to ${plan.truckLimit} trucks.`
-                : `Your current monthly plan for one truck.`}
+            {statusMessage}
           </p>
         </div>
         <Button asChild className="w-full" size="sm">

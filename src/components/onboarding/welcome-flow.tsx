@@ -357,8 +357,9 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
             {business.name} is set up
           </h1>
           <p className="mx-auto mt-1.5 max-w-md text-xs leading-relaxed text-muted-foreground">
-            You are on the {planName} plan. The app is loaded with demo data so nothing is empty
-            while you look around — add your first real load and the numbers become yours.
+            You are starting a 7-day {planName} trial. This workspace is private and empty by
+            design — add your first load when you are ready, or open the separate demo from the
+            login page whenever you want to explore sample numbers.
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             <Button type="button" onClick={finish}>

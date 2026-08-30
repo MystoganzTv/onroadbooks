@@ -132,6 +132,43 @@ function prettyMaintenance(type: string): string {
     .join(" ");
 }
 
+/** A submitted relationship may only point at a row in this workspace. */
+async function ownedLoadId(
+  client: PrismaClientType,
+  businessId: string,
+  requested: string | null | undefined,
+): Promise<string | null> {
+  const id = requested?.trim();
+  if (!id) return null;
+  const exists = await client.load.count({ where: { id, businessId } });
+  if (exists !== 1) throw new Error("That load does not belong to this workspace.");
+  return id;
+}
+
+async function assertDocumentTargets(
+  client: PrismaClientType,
+  business: { id: string; trucks: { id: string }[] },
+  input: DocumentInput,
+): Promise<void> {
+  const checks = await Promise.all([
+    input.loadId
+      ? client.load.count({ where: { id: input.loadId, businessId: business.id } })
+      : Promise.resolve(1),
+    input.expenseId
+      ? client.expense.count({ where: { id: input.expenseId, businessId: business.id } })
+      : Promise.resolve(1),
+    input.maintenanceId
+      ? client.maintenanceRecord.count({
+          where: { id: input.maintenanceId, businessId: business.id },
+        })
+      : Promise.resolve(1),
+  ]);
+  const truckOwned = !input.truckId || business.trucks.some((truck) => truck.id === input.truckId);
+  if (checks.some((count) => count !== 1) || !truckOwned) {
+    throw new Error("That document target does not belong to this workspace.");
+  }
+}
+
 /**
  * Materialises the two built-in buckets the first time one is needed, so an
  * existing database gains them without a data migration script.
@@ -782,17 +819,20 @@ export class PrismaRepository implements Repository {
   async updateLoad(id: string, input: LoadInput): Promise<Load> {
     const client = await getClient();
     const business = await this.business(client);
-    await client.load.update({
-      where: { id },
+    const updated = await client.load.updateMany({
+      where: { id, businessId: business.id },
       data: { ...this.loadData(input), truckId: truckIdFor(business, input.truckId) },
     });
+    if (updated.count !== 1) throw new Error("That load does not belong to this workspace.");
     const dataset = await this.getDataset();
     return dataset.loads.find((l) => l.id === id)!;
   }
 
   async deleteLoad(id: string): Promise<void> {
     const client = await getClient();
-    await client.load.delete({ where: { id } });
+    const business = await this.business(client);
+    const deleted = await client.load.deleteMany({ where: { id, businessId: business.id } });
+    if (deleted.count !== 1) throw new Error("That load does not belong to this workspace.");
   }
 
   private expenseData(input: ExpenseInput) {
@@ -813,9 +853,11 @@ export class PrismaRepository implements Repository {
     const client = await getClient();
     const business = await this.business(client);
     const scope = input.scope ?? "TRUCK";
+    const loadId = await ownedLoadId(client, business.id, input.loadId);
     const row = await client.expense.create({
       data: {
         ...this.expenseData(input),
+        loadId,
         businessId: business.id,
         scope,
         truckId: scope === "BUSINESS" ? null : truckIdFor(business, input.truckId),
@@ -829,21 +871,26 @@ export class PrismaRepository implements Repository {
     const client = await getClient();
     const business = await this.business(client);
     const scope = input.scope ?? "TRUCK";
-    await client.expense.update({
-      where: { id },
+    const loadId = await ownedLoadId(client, business.id, input.loadId);
+    const updated = await client.expense.updateMany({
+      where: { id, businessId: business.id },
       data: {
         ...this.expenseData(input),
+        loadId,
         scope,
         truckId: scope === "BUSINESS" ? null : truckIdFor(business, input.truckId),
       },
     });
+    if (updated.count !== 1) throw new Error("That expense does not belong to this workspace.");
     const dataset = await this.getDataset();
     return dataset.expenses.find((e) => e.id === id)!;
   }
 
   async deleteExpense(id: string): Promise<void> {
     const client = await getClient();
-    await client.expense.delete({ where: { id } });
+    const business = await this.business(client);
+    const deleted = await client.expense.deleteMany({ where: { id, businessId: business.id } });
+    if (deleted.count !== 1) throw new Error("That expense does not belong to this workspace.");
   }
 
   private fuelData(input: FuelEntryInput) {
@@ -863,7 +910,10 @@ export class PrismaRepository implements Repository {
     const client = await getClient();
     const business = await this.business(client);
     const truckId = truckIdFor(business, input.truckId);
-    const data = this.fuelData(input);
+    const data = {
+      ...this.fuelData(input),
+      loadId: await ownedLoadId(client, business.id, input.loadId),
+    };
 
     const row = await client.$transaction(async (tx) => {
       const created = await tx.fuelEntry.create({
@@ -903,12 +953,19 @@ export class PrismaRepository implements Repository {
   async updateFuelEntry(id: string, input: FuelEntryInput): Promise<FuelEntry> {
     const client = await getClient();
     const business = await this.business(client);
-    const data = this.fuelData(input);
+    const data = {
+      ...this.fuelData(input),
+      loadId: await ownedLoadId(client, business.id, input.loadId),
+    };
     const truckId = truckIdFor(business, input.truckId);
 
     await client.$transaction(async (tx) => {
-      const existing = await tx.fuelEntry.findUniqueOrThrow({ where: { id } });
-      await tx.fuelEntry.update({ where: { id }, data: { ...data, truckId } });
+      const existing = await tx.fuelEntry.findFirst({ where: { id, businessId: business.id } });
+      if (!existing) throw new Error("That fuel entry does not belong to this workspace.");
+      await tx.fuelEntry.updateMany({
+        where: { id, businessId: business.id },
+        data: { ...data, truckId },
+      });
 
       // Keep the ledger row in step, or the Fuel page and the Expenses page
       // permanently disagree about the same money.
@@ -922,7 +979,10 @@ export class PrismaRepository implements Repository {
       };
 
       if (existing.expenseId) {
-        await tx.expense.update({ where: { id: existing.expenseId }, data: mirror });
+        await tx.expense.updateMany({
+          where: { id: existing.expenseId, businessId: business.id },
+          data: mirror,
+        });
       } else {
         const created = await tx.expense.create({
           data: {
@@ -932,7 +992,10 @@ export class PrismaRepository implements Repository {
             recurring: false,
           },
         });
-        await tx.fuelEntry.update({ where: { id }, data: { expenseId: created.id } });
+        await tx.fuelEntry.updateMany({
+          where: { id, businessId: business.id },
+          data: { expenseId: created.id },
+        });
       }
     });
 
@@ -942,13 +1005,17 @@ export class PrismaRepository implements Repository {
 
   async deleteFuelEntry(id: string): Promise<void> {
     const client = await getClient();
+    const business = await this.business(client);
     await client.$transaction(async (tx) => {
-      const existing = await tx.fuelEntry.findUnique({ where: { id } });
-      await tx.fuelEntry.delete({ where: { id } });
+      const existing = await tx.fuelEntry.findFirst({ where: { id, businessId: business.id } });
+      if (!existing) throw new Error("That fuel entry does not belong to this workspace.");
+      await tx.fuelEntry.deleteMany({ where: { id, businessId: business.id } });
       // Without this the spend stays in operating expenses forever with no
       // fill-up left to trace it back to.
       if (existing?.expenseId) {
-        await tx.expense.deleteMany({ where: { id: existing.expenseId } });
+        await tx.expense.deleteMany({
+          where: { id: existing.expenseId, businessId: business.id },
+        });
       }
     });
   }
@@ -1017,7 +1084,10 @@ export class PrismaRepository implements Repository {
     const data = this.maintenanceData(input);
 
     await client.$transaction(async (tx) => {
-      const existing = await tx.maintenanceRecord.findUniqueOrThrow({ where: { id } });
+      const existing = await tx.maintenanceRecord.findFirst({
+        where: { id, businessId: business.id },
+      });
+      if (!existing) throw new Error("That service record does not belong to this workspace.");
       let expenseId = existing.expenseId;
 
       if (input.recordAsExpense && input.cost > 0) {
@@ -1029,7 +1099,10 @@ export class PrismaRepository implements Repository {
           amount: data.cost,
         };
         if (expenseId) {
-          await tx.expense.update({ where: { id: expenseId }, data: payload });
+          await tx.expense.updateMany({
+            where: { id: expenseId, businessId: business.id },
+            data: payload,
+          });
         } else {
           const created = await tx.expense.create({
             data: {
@@ -1043,11 +1116,14 @@ export class PrismaRepository implements Repository {
           expenseId = created.id;
         }
       } else if (expenseId) {
-        await tx.expense.delete({ where: { id: expenseId } });
+        await tx.expense.deleteMany({ where: { id: expenseId, businessId: business.id } });
         expenseId = null;
       }
 
-      await tx.maintenanceRecord.update({ where: { id }, data: { ...data, expenseId } });
+      await tx.maintenanceRecord.updateMany({
+        where: { id, businessId: business.id },
+        data: { ...data, expenseId },
+      });
     });
 
     return (await this.getDataset()).maintenanceRecords.find((m) => m.id === id)!;
@@ -1055,13 +1131,19 @@ export class PrismaRepository implements Repository {
 
   async deleteMaintenance(id: string): Promise<void> {
     const client = await getClient();
+    const business = await this.business(client);
     // One transaction: a half-applied delete would leave an orphaned ledger
     // row that is invisible in the UI but still counted in every total.
     await client.$transaction(async (tx) => {
-      const existing = await tx.maintenanceRecord.findUnique({ where: { id } });
-      await tx.maintenanceRecord.delete({ where: { id } });
+      const existing = await tx.maintenanceRecord.findFirst({
+        where: { id, businessId: business.id },
+      });
+      if (!existing) throw new Error("That service record does not belong to this workspace.");
+      await tx.maintenanceRecord.deleteMany({ where: { id, businessId: business.id } });
       if (existing?.expenseId) {
-        await tx.expense.deleteMany({ where: { id: existing.expenseId } });
+        await tx.expense.deleteMany({
+          where: { id: existing.expenseId, businessId: business.id },
+        });
       }
     });
   }
@@ -1071,6 +1153,7 @@ export class PrismaRepository implements Repository {
   async createDocument(input: DocumentInput): Promise<Document> {
     const client = await getClient();
     const business = await this.business(client);
+    await assertDocumentTargets(client, business, input);
     const row = await client.document.create({
       data: {
         businessId: business.id,
@@ -1091,9 +1174,12 @@ export class PrismaRepository implements Repository {
 
   async deleteDocument(id: string): Promise<string | null> {
     const client = await getClient();
-    const existing = await client.document.findUnique({ where: { id } });
+    const business = await this.business(client);
+    const existing = await client.document.findFirst({
+      where: { id, businessId: business.id },
+    });
     if (!existing) return null;
-    await client.document.delete({ where: { id } });
+    await client.document.deleteMany({ where: { id, businessId: business.id } });
     return existing.storageKey;
   }
 
@@ -1172,9 +1258,12 @@ export class PrismaRepository implements Repository {
     const client = await getClient();
     const business = await this.business(client);
     const targetId = id ?? business.trucks[0].id;
+    if (!business.trucks.some((truck) => truck.id === targetId)) {
+      throw new Error("That truck does not belong to this workspace.");
+    }
 
-    await client.truck.update({
-      where: { id: targetId },
+    await client.truck.updateMany({
+      where: { id: targetId, businessId: business.id },
       data: {
         name: input.name.trim(),
         ...(input.acquiredOn === undefined
@@ -1198,12 +1287,15 @@ export class PrismaRepository implements Repository {
   async archiveTruck(id: string, soldOn?: string | null): Promise<Truck> {
     const client = await getClient();
     const business = await this.business(client);
+    if (!business.trucks.some((truck) => truck.id === id)) {
+      throw new Error("That truck does not belong to this workspace.");
+    }
     const active = await client.truck.count({ where: { businessId: business.id, active: true } });
     if (active <= 1) {
       throw new Error("This is your only active truck. Add another one before retiring it.");
     }
-    await client.truck.update({
-      where: { id },
+    await client.truck.updateMany({
+      where: { id, businessId: business.id },
       data: { active: false, soldOn: soldOn ? toDate(soldOn) : null },
     });
     return requireTruck(await this.getDataset(), id);
@@ -1211,7 +1303,14 @@ export class PrismaRepository implements Repository {
 
   async restoreTruck(id: string): Promise<Truck> {
     const client = await getClient();
-    await client.truck.update({ where: { id }, data: { active: true, soldOn: null } });
+    const business = await this.business(client);
+    if (!business.trucks.some((truck) => truck.id === id)) {
+      throw new Error("That truck does not belong to this workspace.");
+    }
+    await client.truck.updateMany({
+      where: { id, businessId: business.id },
+      data: { active: true, soldOn: null },
+    });
     return requireTruck(await this.getDataset(), id);
   }
 

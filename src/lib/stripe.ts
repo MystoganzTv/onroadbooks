@@ -56,6 +56,11 @@ export function applicationUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim();
   if (explicit) return explicit.replace(/\/$/, "");
 
+  const deployment = process.env.VERCEL_URL?.trim();
+  if (process.env.VERCEL_ENV === "preview" && deployment) {
+    return `https://${deployment.replace(/\/$/, "")}`;
+  }
+
   const production = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
   if (production) return `https://${production.replace(/\/$/, "")}`;
 

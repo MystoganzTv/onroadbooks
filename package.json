@@ -11,6 +11,7 @@
     "test": "node --conditions=react-server --import tsx --test \"src/lib/__tests__/*.test.ts\"",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
+    "db:harden": "prisma db execute --file prisma/harden-data-api.sql --schema prisma/schema.prisma",
     "db:seed": "tsx prisma/seed.ts",
     "smoke:postgres": "node --conditions=react-server --import tsx scripts/postgres-smoke.ts",
     "postinstall": "prisma generate"
