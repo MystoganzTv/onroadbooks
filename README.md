@@ -39,10 +39,31 @@ deterministic insight cards.
 Gross Revenue
 - Operating Expenses
 = Operating Profit
-- Tax Reserve (default 20% of operating profit)
-- Maintenance Reserve (default 5% of gross revenue)
-= Available Cash
+- Tax Reserve            (default 20% of operating profit)
+- Maintenance Reserve    (default 5% of gross revenue)
+- Any other bucket the owner configured
+= SAFE TO PAY YOURSELF
 ```
+
+A reserve is charged against operating profit or against gross revenue,
+whichever that bucket is set to. Tax follows profit, and a losing month reserves
+nothing for it -- the base is floored at zero rather than going negative.
+Maintenance follows revenue, because the truck wears out whether or not the
+month was profitable. Safe to Pay Yourself is a planning figure: it is not a
+bank balance and it is not tax advice.
+
+**True cost per mile** -- every operating expense dated in the window divided by
+every mile driven in it, loaded *plus* empty, split into fixed and variable
+lines. Nothing is prorated: if the truck note posts on the 1st, the first half
+of the month really did carry it. Forward-looking tools use a separate rolling
+90-day basis instead, so one annual bill inside the selected period cannot
+change the answer to "what should I quote".
+
+**Load calculator** -- two questions on one cost model. *Evaluate*: the broker is
+offering $700, is it worth running? *Target*: I want $1.50/mile of profit, what
+do I quote? Fuel from miles, MPG and price; tolls, dispatch and factoring as a
+percentage or a flat amount; and the truck's own overhead per mile, which
+excludes those four precisely because the form already asks for them.
 
 **Loads** -- dense sortable table with search and broker / status / rating /
 date-range filters, a totals row, and a detail page per load carrying the trip
@@ -94,6 +115,34 @@ MPG, segment MPG per fill, average price and fuel cost per mile. Every fuel entr
 also writes a matching `FUEL` row to the expense ledger, so operating costs stay
 complete without double entry.
 
+**Settlements** -- the half-month review, 1-15 and 16-end. An open settlement
+recomputes live; closing it freezes a snapshot and posts the reserve
+contributions for the period. Reopening clears the snapshot and reverses exactly
+those contributions, leaving manual movements alone. If the rows underneath a
+closed settlement later change, it shows a drift notice rather than silently
+rewriting the number the owner already paid themselves on.
+
+**Reserve buckets** -- virtual buckets, not bank accounts: tax, maintenance, and
+any others the owner adds. A balance is always the running sum of its signed
+transactions, so it can be explained line by line. Contributions post on
+settlement close; manual contributions, withdrawals and corrections are always
+available.
+
+**Goals and pace** -- monthly targets for revenue, profit, profit per mile,
+maximum deadhead and load count, with progress, pace and an end-of-month
+projection. A shorter window compares against a share of the monthly target
+scaled by working days, and always says that it was pro-rated. Rates and
+ceilings never scale with the length of the window.
+
+**Lane and broker intelligence** -- directional state-to-state lanes (`VA>NJ` is
+not `NJ>VA`, and the two are never averaged), ranked only once a lane has run at
+least three times. Two loads is an anecdote.
+
+**Fleet** -- up to five trucks on the Fleet plan, each with its own contribution
+and cost per mile. A truck is never charged a share of the phone bill; business
+overhead is subtracted once, visibly, at the fleet level, so the fleet view ties
+back exactly to the net profit on the dashboard.
+
 **Reports** -- current vs previous period across twelve metrics, half-month split,
 fixed vs variable analysis, and four trend charts (revenue vs expenses, net profit,
 revenue per mile, cost per mile). Adds a Year-to-Date period option.
@@ -101,10 +150,10 @@ revenue per mile, cost per mile). Adds a Year-to-Date period option.
 **Truck** -- profile plus lifetime revenue, expenses, profit, miles and cost per
 mile.
 
-**Settings** -- business name, currency, both reserve percentages (with a live
-preview against real period numbers), the load profitability thresholds with a
-visual scale, the deadhead and maintenance warning thresholds, and the
-fixed/variable classification matrix.
+**Settings** -- business name, currency, both built-in reserve percentages (with
+a live preview against real period numbers), monthly goals and the working week,
+the load profitability thresholds with a visual scale, the deadhead and
+maintenance warning thresholds, and the fixed/variable classification matrix.
 
 ---
 
@@ -221,9 +270,13 @@ returns `0` rather than `Infinity` or `NaN`. See
 | Deadhead cost / total mile | Deadhead Cost / Total Miles |
 | Rate dilution | Revenue per Loaded Mile - Revenue per Total Mile |
 | Load rating | GREAT >= $2.00, GOOD >= $1.50, MARGINAL >= $1.00, else BAD (profit per **total** mile, thresholds editable) |
-| Tax Reserve | max(Operating Profit, 0) x tax % |
-| Maintenance Reserve | Gross Revenue x maintenance % |
-| Available Cash | Operating Profit - Tax Reserve - Maintenance Reserve |
+| True cost per mile | Period Expenses / Period Total Miles (loaded + deadhead), never prorated |
+| Trailing cost basis | the same, over a rolling 90 days -- used by the calculator, target rate and deadhead costing |
+| Overhead per mile | trailing cost per mile minus fuel, tolls, dispatch and factoring (subtracted as dollars, divided once) |
+| Reserve amount | max(Operating Profit, 0) x % for an operating-profit bucket, Gross Revenue x % for a revenue bucket |
+| Safe to Pay Yourself | Operating Profit - every configured reserve |
+| Load score | 50 pts profit/mile (full at 1.25x the GREAT floor) + 30 pts margin (full at 60%) + 20 pts deadhead (nothing at 2x the warn level); it never overrules the rating |
+| Truck contribution | the unit's revenue - the unit's own costs; business overhead is subtracted once at the fleet level |
 
 ### Revenue and expense accounting
 
@@ -250,10 +303,11 @@ against each other.
 
 Documents follow the same pattern as rows. `lib/storage/` defines a
 `DocumentStorage` adapter; the MVP ships `LocalDocumentStorage`, which writes to
-`data/uploads/` and serves through `/api/documents/[id]`. A Supabase Storage
-implementation is a drop-in -- the shape is written out in a comment in that
-file. Only metadata lives in the database, so moving buckets never touches
-application code.
+`data/uploads/` and serves through `/api/documents/[id]`. `SupabaseDocumentStorage`
+is written and selected by `DOCUMENT_STORAGE=supabase`; it talks to the Storage
+REST API with plain `fetch`, so switching adds no dependency -- but it has never
+been exercised against a live project. Only metadata lives in the database, so
+moving buckets never touches application code.
 
 `Document` rows carry four optional owner columns (`loadId`, `expenseId`,
 `truckId`, `maintenanceId`) with exactly one set, which is why one upload path
@@ -288,11 +342,14 @@ No application code changes. If `DATA_SOURCE` is anything other than `postgres`,
 or `DATABASE_URL` is not a Postgres URL, the app falls back to the JSON store
 rather than failing to boot.
 
-### Multi-truck readiness
+### Fleet
 
-Every `Load`, `Expense` and `FuelEntry` already carries `businessId` and
-`truckId`, and `Business` has a `trucks` relation. Adding a fleet later is a
-filter and a selector, not a migration. The UI stays deliberately single-truck.
+Every `Load`, `Expense` and `FuelEntry` carries `businessId` and `truckId`, and
+an expense carries a scope: `TRUCK` charges a unit, `BUSINESS` is overhead and
+carries no truck. The Fleet plan raises the truck limit to five, enforced
+server-side in the action that creates one rather than by hiding a button. A
+single-truck ledger written before any of this upgrades in place -- covered by
+`fleet-migration.test.ts`.
 
 ---
 
@@ -327,8 +384,10 @@ numerals so columns stay aligned at every scale.
 
 Dark-first operations console: dark sidebar, dark neutral content surfaces, 8-9px
 row padding, tabular-figure numerics so columns align, and a strict colour
-semantic -- green = profit, red = expense, amber = attention, blue = neutral
-operational metric. Light mode is fully supported via the toggle in the header.
+semantic: **green only for positive financial performance, red only for negative
+or critical**, amber for attention, blue for neutral operational metrics. A
+relative ranking is not performance -- the weakest lane in a list of good lanes
+is not painted red. Light mode is fully supported via the toggle in the header.
 Desktop is the priority; tables scroll horizontally on small screens and the
 sidebar becomes a drawer.
 
@@ -338,9 +397,13 @@ sidebar becomes a drawer.
   alone: scrypt password hashing with a per-user salt, constant-time
   comparison, and an HMAC-SHA256 signed session cookie (`httpOnly`,
   `sameSite=lax`, `secure` in production). `middleware.ts` gates every route
-  except `/login`, `/setup` and `/api/auth/*` -- pages redirect, API routes
-  get a 401. `AUTH_SECRET` signs the cookie; if it is unset a key is
-  generated once into `data/.auth-secret` (mode 0600), which is fine locally
+  except the landing page `/` (matched exactly, never by prefix), `/login`,
+  `/setup`, `/api/auth/*` and static assets outside `/api/` -- pages redirect,
+  API routes get a 401. The middleware only checks that the cookie is present;
+  the signature and expiry are verified server-side by `getSession()`, because
+  the edge runtime has no `node:crypto`. `AUTH_SECRET` signs the cookie and is
+  **ignored unless it is at least 32 characters**; with no usable value a key
+  is generated once into `data/.auth-secret` (mode 0600), which is fine locally
   and wrong for a deployment, because a restart on new hardware signs
   everyone out.
 - **Every repository instance is bound to a `businessId`** taken from the
@@ -377,12 +440,15 @@ Everything found in the audit is fixed:
 npm test
 ```
 
-77 tests on `node:test`, no framework. They cover the parts where a quiet
+196 tests on `node:test`, no framework. They cover the parts where a quiet
 mistake costs money rather than throwing an error:
 
 | File | What it pins down |
 | --- | --- |
 | `calculations.test.ts` | division by zero and non-finite input, `roundMoney` symmetry and the `-$0.00` case, trip costs counted once, profit rated per mile *driven* (a $4.00/loaded-mile load with 300 empty miles rates MARGINAL against a plain $3.00 run at GREAT), reserve maths including a losing month |
+| `finance.test.ts` | the product layer: cost per mile refusing to prorate a monthly cost across the halves, the trailing basis falling back when the window is thin, overhead per mile excluding what the calculator asks for directly, reserves and safe-to-pay always reconstructing operating profit, the score never disagreeing with the rating about which load is better, a target rate that really does clear the target after fees, lanes staying directional and unranked below three loads, and a pro-rated goal saying that it was pro-rated |
+| `fleet-migration.test.ts` | a single-truck ledger upgrading in place, and the fleet reconciliation: contributions minus overhead equals the dashboard's net profit, to the cent |
+| `plans.test.ts` | prices and limits matching what is sold, the second truck refused on Individual and the sixth on Fleet, downgrades blocked while too many trucks are running, a lapsed subscription closing writes, and a business created before subscriptions existed defaulting to Individual and trialing rather than lapsed |
 | `periods.test.ts` | every period key, leap years, year rollover on the previous-period comparison, week anchoring, a reversed custom range, impossible dates like `2026-02-30`, and that the two halves of a month sum exactly to the full month |
 | `maintenance.test.ts` | overdue on either measure, `BOTH` meaning whichever comes first, urgency scored against the user's own thresholds rather than an assumed miles-per-day, and zero thresholds |
 | `export.test.ts` | CSV formula neutralisation, RFC 4180 quoting, no row wider than its header, and summary labels staying out of numeric columns |
