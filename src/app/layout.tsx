@@ -40,6 +40,7 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://onroadbooks.com"),
   title: {
     default: `${APP_NAME} | Bookkeeping Built for the Road`,
     template: `%s | ${APP_NAME}`,

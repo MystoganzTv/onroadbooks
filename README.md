@@ -1,6 +1,6 @@
 # OnRoad Books
 
-Production: [onroadbooks.vercel.app](https://onroadbooks.vercel.app/)
+Production: [onroadbooks.com](https://onroadbooks.com/)
 
 A financial operating console for a **single box truck business**. It answers one
 question on every screen: *is the truck actually making money?*
