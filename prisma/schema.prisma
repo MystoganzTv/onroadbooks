@@ -8,10 +8,13 @@
 // rounding once a real database is connected.
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   // Custom output keeps the generated client inside the repo (the
   // direction Prisma is moving in) and out of node_modules.
-  output   = "../src/generated/prisma"
+  output        = "../src/generated/prisma"
+  // Vercel functions run on Linux with OpenSSL 3. Generate that engine even
+  // when prisma generate is executed locally on an Apple Silicon Mac.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {

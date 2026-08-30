@@ -1,6 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Prisma Client is generated outside node_modules. Explicitly trace its
+  // native query engine so Vercel copies it into every server function that
+  // may access the database.
+  outputFileTracingIncludes: {
+    "/*": ["./src/generated/prisma/libquery_engine-*.node"],
+  },
   experimental: {
     serverActions: { bodySizeLimit: "2mb" },
   },
