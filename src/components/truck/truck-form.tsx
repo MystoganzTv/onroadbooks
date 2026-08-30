@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/shared/field";
@@ -43,7 +43,15 @@ const FIELD_LABELS: Record<string, string> = {
   currentOdometer: "Current odometer",
 };
 
-export function TruckForm({ truck }: { truck: Truck }) {
+export function TruckForm({
+  truck,
+  onCancel,
+  onSaved,
+}: {
+  truck: Truck;
+  onCancel?: () => void;
+  onSaved?: () => void;
+}) {
   const router = useRouter();
   const [values, setValues] = React.useState(() => initialState(truck));
   const [errors, setErrors] = React.useState<Record<string, string>>({});
@@ -93,6 +101,7 @@ export function TruckForm({ truck }: { truck: Truck }) {
       const result = await updateTruckAction(payload);
       if (result.ok) {
         toast.success("Truck details saved");
+        onSaved?.();
         router.refresh();
       } else {
         setErrors(result.fieldErrors ?? {});
@@ -231,7 +240,13 @@ export function TruckForm({ truck }: { truck: Truck }) {
             </Field>
           </div>
         </CardContent>
-      <CardFooter className="justify-end">
+      <CardFooter className="justify-end gap-2">
+        {onCancel ? (
+          <Button type="button" size="sm" variant="outline" disabled={pending} onClick={onCancel}>
+            <X className="size-4" />
+            Cancel
+          </Button>
+        ) : null}
         <Button type="submit" size="sm" disabled={pending}>
           {pending ? <Loader2 className="animate-spin" /> : <Save />}
           Save truck

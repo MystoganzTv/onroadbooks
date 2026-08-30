@@ -4,9 +4,7 @@ import {
   ArrowRight,
   Building2,
   FileText,
-  Gauge,
   Settings2,
-  ShieldCheck,
   TruckIcon,
 } from "lucide-react";
 
@@ -18,11 +16,9 @@ import { MaintenanceTable } from "@/components/maintenance/maintenance-table";
 import { UpcomingMaintenance } from "@/components/maintenance/upcoming-maintenance";
 import { TruckHealthPanel } from "@/components/cockpit/truck-health-panel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Metric } from "@/components/shared/metric";
 import { PageHeader } from "@/components/shared/page-header";
-import { TruckForm } from "@/components/truck/truck-form";
+import { TruckOverview } from "@/components/truck/truck-overview";
 import { TruckDialog } from "@/components/fleet/truck-dialog";
-import { TruckRetireButton } from "@/components/fleet/truck-retire-button";
 import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,13 +33,7 @@ import { thresholdsFrom, upcomingMaintenance } from "@/lib/maintenance";
 import { calculateMaintenanceHealth } from "@/lib/finance/maintenance-health";
 import { calculateReserveBalances, reserveBalanceFor } from "@/lib/finance/reserves";
 import { todayISO } from "@/lib/periods";
-import {
-  formatMoney,
-  formatMoneyCompact,
-  formatNumber,
-  formatOdometer,
-  formatRate,
-} from "@/lib/formatters";
+import { formatMoneyCompact, formatNumber, formatRate } from "@/lib/formatters";
 
 export const metadata: Metadata = { title: "Truck" };
 
@@ -159,7 +149,7 @@ export default async function TruckPage({
               </p>
             </div>
             <Button asChild variant="outline" size="sm">
-              <Link href="/settings">
+              <Link href="/plans">
                 <Settings2 className="size-4" />
                 Manage plan
               </Link>
@@ -313,97 +303,13 @@ export default async function TruckPage({
         </TabsContent>
 
         <TabsContent value="overview" className="mt-4">
-      <div className="grid gap-4 xl:grid-cols-3">
-        <div className="min-w-0 xl:col-span-2">
-          <TruckForm truck={truck} />
-        </div>
-
-        <div className="min-w-0 space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Gauge className="size-3.5 text-muted-foreground" />
-                <CardTitle>Odometer & Fuel</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4 p-4">
-              <Metric label="Starting" value={formatOdometer(truck.startingOdometer)} sub="mi" />
-              <Metric label="Current" value={formatOdometer(truck.currentOdometer)} sub="mi" />
-              <Metric
-                label="Miles Driven"
-                value={formatNumber(lifetime.odometerMiles)}
-                sub="since purchase"
-              />
-              <Metric
-                label="Lifetime MPG"
-                value={fuel.milesPerGallon ? fuel.milesPerGallon.toFixed(1) : "--"}
-                sub={fuel.milesPerGallon ? "tank to tank" : "needs 2 readings"}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <TruckIcon className="size-3.5 text-muted-foreground" />
-                <CardTitle>Ownership</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4 p-4">
-              <Metric
-                label="Purchase Price"
-                value={truck.purchasePrice ? formatMoney(truck.purchasePrice) : "--"}
-              />
-              <Metric
-                label="Monthly Payment"
-                value={truck.monthlyPayment ? formatMoney(truck.monthlyPayment) : "--"}
-              />
-              <Metric
-                label="Monthly Insurance"
-                value={truck.monthlyInsurance ? formatMoney(truck.monthlyInsurance) : "--"}
-              />
-              <Metric label="VIN" value={truck.vin ?? "--"} valueClassName="text-xs font-mono" />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="size-3.5 text-muted-foreground" />
-                <CardTitle>Unit Status</CardTitle>
-              </div>
-              <Badge variant={truck.active ? "positive" : "outline"}>
-                {truck.active ? "In service" : "Out of service"}
-              </Badge>
-            </CardHeader>
-            <CardContent className="space-y-3 p-4">
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                {truck.active
-                  ? "This unit is available for new loads, expenses and service entries."
-                  : "This unit remains available in historical reports, but no new work can be assigned to it."}
-              </p>
-              {running > 1 || !truck.active ? (
-                <div className="rounded-lg border border-border bg-surface-sunken/60 p-3">
-                  <p className="mb-2.5 text-2xs leading-relaxed text-muted-foreground">
-                    {truck.active
-                      ? "Taking a unit out of service never deletes its records. You can return it to service later."
-                      : "Returning this unit to service makes it selectable for new activity and uses one available plan slot."}
-                  </p>
-                  <TruckRetireButton truck={truck} canRestore={allowance.canAdd} />
-                </div>
-              ) : (
-                <div className="flex items-start gap-2 rounded-lg border border-info/25 bg-info-soft p-3">
-                  <ShieldCheck className="mt-0.5 size-4 shrink-0 text-info" />
-                  <p className="text-2xs leading-relaxed text-muted-foreground">
-                    This is your only active truck, so it stays in service. Add another active unit
-                    before taking this one out of service.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+          <TruckOverview
+            truck={truck}
+            odometerMiles={lifetime.odometerMiles}
+            milesPerGallon={fuel.milesPerGallon}
+            activeTruckCount={running}
+            canRestore={allowance.canAdd}
+          />
         </TabsContent>
       </Tabs>
     </div>

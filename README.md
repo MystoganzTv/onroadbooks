@@ -149,8 +149,9 @@ back exactly to the net profit on the dashboard.
 fixed vs variable analysis, and four trend charts (revenue vs expenses, net profit,
 revenue per mile, cost per mile). Adds a Year-to-Date period option.
 
-**Truck** -- profile plus lifetime revenue, expenses, profit, miles and cost per
-mile.
+**Truck** -- a read-first profile with full-width odometer, ownership and unit
+status cards, an explicit Update truck editor, plus lifetime revenue, expenses,
+profit, miles and cost per mile.
 
 **Settings** -- business name, currency, both built-in reserve percentages (with
 a live preview against real period numbers), monthly goals and the working week,
