@@ -255,6 +255,7 @@ export interface Repository {
 export interface AuthStore {
   countUsers(): Promise<number>;
   findUserByEmail(email: string): Promise<User | null>;
+  findUserById(id: string): Promise<User | null>;
   /** Returns the shared seeded account, creating only its login row when needed. */
   ensureDemoUser(): Promise<User>;
   /**
@@ -269,6 +270,10 @@ export interface AuthStore {
     /** Chosen during onboarding. Defaults to Individual. */
     plan?: PlanId;
   }): Promise<User>;
+  /** Removes ledger data but preserves the owner, business and subscription. */
+  resetBusinessData(userId: string, businessId: string): Promise<string[]>;
+  /** Removes the owner and, when they are the last owner, their whole business. */
+  deleteAccount(userId: string, businessId: string): Promise<{ email: string; storageKeys: string[] }>;
 }
 
 export function newId(prefix: string): string {

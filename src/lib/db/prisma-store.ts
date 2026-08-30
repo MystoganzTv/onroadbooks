@@ -190,6 +190,20 @@ export class PrismaAuthStore implements AuthStore {
     };
   }
 
+  async findUserById(id: string): Promise<User | null> {
+    const client = await getClient();
+    const row = await client.user.findUnique({ where: { id } });
+    if (!row || !row.businessId || !row.passwordHash) return null;
+    return {
+      id: row.id,
+      businessId: row.businessId,
+      email: row.email,
+      name: row.name,
+      passwordHash: row.passwordHash,
+      createdAt: row.createdAt.toISOString(),
+    };
+  }
+
   async ensureDemoUser(): Promise<User> {
     const client = await getClient();
     const existing = await client.user.findUnique({ where: { email: DEMO_EMAIL } });
@@ -282,6 +296,93 @@ export class PrismaAuthStore implements AuthStore {
         name: row.name,
         passwordHash: input.passwordHash,
         createdAt: row.createdAt.toISOString(),
+      };
+    });
+  }
+
+  async resetBusinessData(userId: string, businessId: string): Promise<string[]> {
+    const client = await getClient();
+
+    return client.$transaction(async (tx) => {
+      const owner = await tx.user.findFirst({ where: { id: userId, businessId } });
+      if (!owner) throw new Error("This account no longer exists.");
+      if (owner.email === DEMO_EMAIL) throw new Error("The demo account cannot be reset.");
+
+      const documents = await tx.document.findMany({
+        where: { businessId },
+        select: { storageKey: true },
+      });
+
+      await tx.document.deleteMany({ where: { businessId } });
+      await tx.fuelEntry.deleteMany({ where: { businessId } });
+      await tx.maintenanceRecord.deleteMany({ where: { businessId } });
+      await tx.expense.deleteMany({ where: { businessId } });
+      await tx.load.deleteMany({ where: { businessId } });
+      await tx.truck.deleteMany({ where: { businessId } });
+      await tx.reserveTransaction.deleteMany({ where: { businessId } });
+      await tx.settlement.deleteMany({ where: { businessId } });
+      await tx.reserveAccount.deleteMany({ where: { businessId } });
+      await tx.financialGoal.deleteMany({ where: { businessId } });
+      await tx.financialSettings.deleteMany({ where: { businessId } });
+
+      await tx.truck.create({ data: { businessId, name: "Truck 1" } });
+      await tx.financialSettings.create({
+        data: { businessId, categoryBehavior: defaultCategoryBehavior() },
+      });
+      const goals = defaultGoals(businessId, new Date().toISOString());
+      await tx.financialGoal.create({
+        data: {
+          businessId,
+          monthlyRevenueTarget: goals.monthlyRevenueTarget,
+          monthlyProfitTarget: goals.monthlyProfitTarget,
+          targetProfitPerMile: goals.targetProfitPerMile,
+          maxDeadheadPct: goals.maxDeadheadPct,
+          targetLoads: goals.targetLoads,
+          workingDaysPerWeek: goals.workingDaysPerWeek,
+        },
+      });
+      for (const account of defaultReserveAccounts(businessId, new Date().toISOString())) {
+        await tx.reserveAccount.create({
+          data: {
+            businessId,
+            kind: account.kind,
+            name: account.name,
+            basis: account.basis,
+            contributionPct: account.contributionPct,
+            targetBalance: account.targetBalance,
+            active: account.active,
+            sortOrder: account.sortOrder,
+          },
+        });
+      }
+
+      return documents.map((document) => document.storageKey);
+    });
+  }
+
+  async deleteAccount(
+    userId: string,
+    businessId: string,
+  ): Promise<{ email: string; storageKeys: string[] }> {
+    const client = await getClient();
+
+    return client.$transaction(async (tx) => {
+      const owner = await tx.user.findFirst({ where: { id: userId, businessId } });
+      if (!owner) throw new Error("This account no longer exists.");
+      if (owner.email === DEMO_EMAIL) throw new Error("The demo account cannot be deleted.");
+
+      const ownerCount = await tx.user.count({ where: { businessId } });
+      const documents =
+        ownerCount === 1
+          ? await tx.document.findMany({ where: { businessId }, select: { storageKey: true } })
+          : [];
+
+      await tx.user.delete({ where: { id: userId } });
+      if (ownerCount === 1) await tx.business.delete({ where: { id: businessId } });
+
+      return {
+        email: owner.email,
+        storageKeys: documents.map((document) => document.storageKey),
       };
     });
   }

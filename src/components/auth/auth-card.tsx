@@ -20,9 +20,11 @@ import { APP_NAME } from "@/lib/utils";
 export function AuthCard({
   mode,
   initialError = null,
+  initialNotice = null,
 }: {
   mode: "login" | "setup";
   initialError?: string | null;
+  initialNotice?: string | null;
 }) {
   const router = useRouter();
   const isSetup = mode === "setup";
@@ -152,6 +154,15 @@ export function AuthCard({
               role="alert"
             >
               {error}
+            </p>
+          ) : null}
+
+          {!error && initialNotice ? (
+            <p
+              className="rounded-md border border-pos/30 bg-pos-soft px-3 py-2 text-xs text-pos"
+              role="status"
+            >
+              {initialNotice}
             </p>
           ) : null}
 

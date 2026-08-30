@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Database, FileText } from "lucide-react";
 
 import { DisplaySettings } from "@/components/settings/display-settings";
+import { AccountDangerZone } from "@/components/settings/account-danger-zone";
 import { GoalsForm } from "@/components/settings/goals-form";
 import { PlanCard } from "@/components/settings/plan-card";
 import { SettingsForm } from "@/components/settings/settings-form";
@@ -75,8 +76,8 @@ export default async function SettingsPage({
             <CardContent className="space-y-2 p-4 text-xs leading-relaxed text-muted-foreground">
               {mode === "postgres" ? (
                 <p>
-                  Connected to PostgreSQL through Prisma. Schema changes go through{" "}
-                  <code className="rounded bg-surface-sunken px-1">prisma migrate</code>.
+                  Your account has its own isolated business workspace in PostgreSQL. Every load,
+                  expense, truck and document is scoped to that workspace on the server.
                 </p>
               ) : (
                 <>
@@ -118,6 +119,8 @@ export default async function SettingsPage({
           </Card>
         </div>
       </div>
+
+      <AccountDangerZone email={session.email} isDemo={Boolean(session.isDemo)} />
     </div>
   );
 }

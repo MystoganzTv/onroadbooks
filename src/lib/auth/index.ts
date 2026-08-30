@@ -8,8 +8,22 @@ import { decodeSession, SESSION_COOKIE, type SessionPayload } from "./session";
 
 /** The signed-in user, or null. Never throws. */
 export async function getSession(): Promise<SessionPayload | null> {
-  const store = await cookies();
-  return decodeSession(store.get(SESSION_COOKIE)?.value);
+  try {
+    const store = await cookies();
+    const session = await decodeSession(store.get(SESSION_COOKIE)?.value);
+    if (!session) return null;
+
+    // A signed cookie alone is not enough after an account is deleted. Check
+    // the authoritative owner row so deletion immediately revokes every app
+    // session, including cookies held by another browser.
+    const owner = await getAuthStore().findUserById(session.userId);
+    if (!owner || owner.businessId !== session.businessId || owner.email !== session.email) {
+      return null;
+    }
+    return session;
+  } catch {
+    return null;
+  }
 }
 
 /**

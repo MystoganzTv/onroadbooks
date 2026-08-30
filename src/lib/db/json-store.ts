@@ -572,6 +572,11 @@ export class JsonAuthStore implements AuthStore {
     return dataset.users.find((u) => u.email.toLowerCase() === normalized) ?? null;
   }
 
+  async findUserById(id: string): Promise<User | null> {
+    const dataset = await serialise(readDataset);
+    return dataset.users.find((user) => user.id === id) ?? null;
+  }
+
   async ensureDemoUser(): Promise<User> {
     return mutate((dataset) => {
       const existing = dataset.users.find((user) => user.email === DEMO_EMAIL);
@@ -622,6 +627,86 @@ export class JsonAuthStore implements AuthStore {
       dataset.users.push(user);
       return user;
     });
+  }
+
+  async resetBusinessData(userId: string, businessId: string): Promise<string[]> {
+    return mutate((dataset) => {
+      const owner = dataset.users.find(
+        (user) => user.id === userId && user.businessId === businessId,
+      );
+      if (!owner) throw new Error("This account no longer exists.");
+      if (owner.email === DEMO_EMAIL) throw new Error("The demo account cannot be reset.");
+
+      const now = new Date().toISOString();
+      const storageKeys = dataset.documents.map((document) => document.storageKey);
+      dataset.loads = [];
+      dataset.expenses = [];
+      dataset.fuelEntries = [];
+      dataset.documents = [];
+      dataset.maintenanceRecords = [];
+      dataset.reserveTransactions = [];
+      dataset.settlements = [];
+      dataset.trucks = [
+        {
+          id: newId("truck"),
+          businessId,
+          name: "Truck 1",
+          year: null,
+          make: null,
+          model: null,
+          vin: null,
+          purchasePrice: null,
+          monthlyPayment: null,
+          monthlyInsurance: null,
+          startingOdometer: 0,
+          currentOdometer: 0,
+          active: true,
+          acquiredOn: null,
+          soldOn: null,
+          createdAt: now,
+        },
+      ];
+      dataset.settings = {
+        id: newId("settings"),
+        businessId,
+        taxReservePct: 20,
+        maintenanceReservePct: 5,
+        categoryBehavior: defaultCategoryBehavior(),
+        ratingGreatPerMile: 2,
+        ratingGoodPerMile: 1.5,
+        ratingMarginalPerMile: 1,
+        deadheadWarnPct: 20,
+        maintenanceWarnMiles: 2000,
+        maintenanceWarnDays: 30,
+        updatedAt: now,
+      };
+      dataset.goals = defaultGoals(businessId, now);
+      dataset.reserveAccounts = defaultReserveAccounts(businessId, now).map((account) => ({
+        ...account,
+        id: newId("reserve"),
+      }));
+      return storageKeys;
+    }, businessId);
+  }
+
+  async deleteAccount(
+    userId: string,
+    businessId: string,
+  ): Promise<{ email: string; storageKeys: string[] }> {
+    return mutate((dataset) => {
+      const owner = dataset.users.find(
+        (user) => user.id === userId && user.businessId === businessId,
+      );
+      if (!owner) throw new Error("This account no longer exists.");
+      if (owner.email === DEMO_EMAIL) throw new Error("The demo account cannot be deleted.");
+
+      const lastOwner = dataset.users.filter((user) => user.businessId === businessId).length === 1;
+      const storageKeys = lastOwner
+        ? dataset.documents.map((document) => document.storageKey)
+        : [];
+      dataset.users = dataset.users.filter((user) => user.id !== userId);
+      return { email: owner.email, storageKeys };
+    }, businessId);
   }
 }
 

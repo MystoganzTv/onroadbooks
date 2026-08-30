@@ -13,14 +13,17 @@ export const metadata: Metadata = { title: "Sign in" };
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; account?: string }>;
 }) {
   if (await getSession()) redirect("/dashboard");
-  const { error } = await searchParams;
+  const { error, account } = await searchParams;
   return (
     <AuthCard
       mode="login"
       initialError={error === "google" ? "Google sign-in could not be completed. Try again." : null}
+      initialNotice={
+        account === "deleted" ? "Your account and business data were permanently deleted." : null
+      }
     />
   );
 }

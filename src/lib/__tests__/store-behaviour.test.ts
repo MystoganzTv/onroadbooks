@@ -17,7 +17,14 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdtempSync, existsSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
+import {
+  mkdtempSync,
+  existsSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+  mkdirSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, before, describe, it } from "node:test";
@@ -369,6 +376,51 @@ describe("accounts", () => {
     assert.ok(await auth.findUserByEmail("OWNER@EXAMPLE.COM"));
     assert.ok(await auth.findUserByEmail(" owner@example.com "));
     assert.equal(await auth.findUserByEmail("nobody@example.com"), null);
+  });
+
+  it("resets only ledger data, then invalidates the owner when the account is deleted", async () => {
+    const original = readFileSync(DATA_FILE, "utf8");
+    try {
+      const owner = await auth.findUserByEmail("owner@example.com");
+      assert.ok(owner);
+      assert.deepEqual(await auth.findUserById(owner.id), owner);
+
+      const before = await repo.getDataset();
+      const keys = await auth.resetBusinessData(owner.id, owner.businessId);
+      const reset = await repo.getDataset();
+
+      assert.equal(keys.length, before.documents.length);
+      assert.equal(reset.loads.length, 0);
+      assert.equal(reset.expenses.length, 0);
+      assert.equal(reset.documents.length, 0);
+      assert.equal(reset.trucks.length, 1);
+      assert.equal(reset.subscription.plan, before.subscription.plan, "the plan is preserved");
+      assert.equal(reset.business.name, before.business.name, "the business identity is preserved");
+      assert.ok(await auth.findUserById(owner.id), "reset keeps the login active");
+
+      const deleted = await auth.deleteAccount(owner.id, owner.businessId);
+      assert.equal(deleted.email, owner.email);
+      assert.equal(await auth.findUserById(owner.id), null);
+    } finally {
+      writeFileSync(DATA_FILE, original, "utf8");
+    }
+  });
+
+  it("never permits destructive operations on the shared demo", async () => {
+    const original = readFileSync(DATA_FILE, "utf8");
+    try {
+      const demo = await auth.ensureDemoUser();
+      await assert.rejects(
+        () => auth.resetBusinessData(demo.id, demo.businessId),
+        /demo account cannot be reset/,
+      );
+      await assert.rejects(
+        () => auth.deleteAccount(demo.id, demo.businessId),
+        /demo account cannot be deleted/,
+      );
+    } finally {
+      writeFileSync(DATA_FILE, original, "utf8");
+    }
   });
 });
 
