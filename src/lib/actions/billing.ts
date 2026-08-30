@@ -1,5 +1,7 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+
 import { redirect } from "next/navigation";
 
 import { requireSession } from "@/lib/auth";
@@ -88,13 +90,11 @@ export async function createCheckoutAction(plan: PlanId): Promise<void> {
       },
     },
     {
-      idempotencyKey: [
-        "onroad-checkout",
-        session.businessId,
-        plan,
-        providerCustomerId,
-        subscription.currentPeriodEnd ?? "no-period",
-      ].join("-"),
+      // A Checkout Session is intentionally fresh on every visit. Reusing a
+      // business-level key traps customers in an expired session and also
+      // conflicts when a Preview deployment has a different return URL.
+      // Stripe reuses this request-scoped key only for transport retries.
+      idempotencyKey: `onroad-checkout-${randomUUID()}`,
     },
   );
 
