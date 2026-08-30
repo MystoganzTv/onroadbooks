@@ -211,7 +211,7 @@ export function LandingPage({ primaryHref }: { primaryHref: string }) {
               width={1400}
               height={933}
               sizes="58vw"
-              className="absolute inset-0 size-full object-cover object-[50%_15%] opacity-95 [mask-image:linear-gradient(90deg,transparent_0%,#000_20%,#000_82%,transparent_100%)]"
+              className="absolute inset-0 size-full object-contain opacity-95 [mask-image:linear-gradient(90deg,transparent_0%,#000_20%,#000_82%,transparent_100%)]"
             />
           </div>
 
@@ -220,7 +220,7 @@ export function LandingPage({ primaryHref }: { primaryHref: string }) {
             className="absolute inset-0 hidden bg-[linear-gradient(90deg,#071426_0%,rgba(7,20,38,0.92)_12%,rgba(7,20,38,0.48)_32%,rgba(7,20,38,0.18)_50%,rgba(7,20,38,0.62)_72%,#071426_100%)] lg:block"
           />
 
-          <Container className="relative py-14 sm:py-16 lg:px-[60px] lg:py-16">
+          <Container className="relative py-16 sm:py-20 lg:px-[60px] lg:py-28">
             <div className="relative flex flex-col gap-10 lg:flex-row lg:items-center lg:justify-between lg:gap-0">
               <div className="lg:w-[34%]">
                 <h2 className="font-display text-[clamp(26px,2.35vw,29px)] font-black uppercase leading-[1.06] tracking-[-0.025em] text-white">
