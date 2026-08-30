@@ -1064,6 +1064,14 @@ export class JsonRepository implements Repository {
           input.currentPeriodEnd === undefined
             ? dataset.subscription.currentPeriodEnd
             : input.currentPeriodEnd,
+        providerCustomerId:
+          input.providerCustomerId === undefined
+            ? dataset.subscription.providerCustomerId
+            : input.providerCustomerId,
+        providerSubscriptionId:
+          input.providerSubscriptionId === undefined
+            ? dataset.subscription.providerSubscriptionId
+            : input.providerSubscriptionId,
         updatedAt: new Date().toISOString(),
       };
       return dataset.subscription;

@@ -26,7 +26,7 @@ export default async function SettingsPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { business, settings, goals, subscription, loads, expenses } =
+  const { business, settings, goals, subscription, loads, expenses, reserveAccounts } =
     await getRepository(session.businessId).getDataset();
   const period = periodFromSearchParams(params);
   const preview = summarizePeriod(loads, expenses, period, settings);
@@ -46,6 +46,7 @@ export default async function SettingsPage({
             settings={settings}
             preview={preview}
             previewLabel={period.label}
+            reserveAccounts={reserveAccounts}
           />
 
           <div className="mt-4">

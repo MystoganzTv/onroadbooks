@@ -9,12 +9,13 @@ import {
   moneyBreakdown,
   rateLoad,
   roundMoney,
+  summarizeFuel,
   summarizePeriod,
   thresholdsFromSettings,
   withMetricsAll,
 } from "../calculations";
 import { resolvePeriod } from "../periods";
-import type { Expense, FinancialSettings, Load } from "../types";
+import type { Expense, FinancialSettings, FuelEntry, Load } from "../types";
 
 const settings: FinancialSettings = {
   id: "s", businessId: "b", taxReservePct: 20, maintenanceReservePct: 5,
@@ -55,6 +56,18 @@ describe("roundMoney", () => {
   it("rounds half away from zero, symmetrically", () => {
     assert.equal(roundMoney(2.675), 2.68);
     assert.equal(roundMoney(-2.675), -2.68);
+  });
+  it("rounds the half cent up at every magnitude, not just below $2", () => {
+    // Each of these is x.xx5 in decimal but sits just BELOW the half in
+    // binary floating point; the old Number.EPSILON nudge was too small to
+    // rescue them and they rounded down.
+    assert.equal(roundMoney(1.005), 1.01);
+    assert.equal(roundMoney(10.075), 10.08);
+    assert.equal(roundMoney(8.575), 8.58);
+    assert.equal(roundMoney(1.255), 1.26);
+    assert.equal(roundMoney(-1.005), -1.01);
+    // And a genuine below-half value still rounds down.
+    assert.equal(roundMoney(1.0049), 1.0);
   });
   it("never produces negative zero", () => {
     assert.ok(Object.is(roundMoney(-0.004), 0));
@@ -245,5 +258,72 @@ describe("brokerPerformance", () => {
     const groups = brokerPerformance(rows);
     assert.equal(groups.length, 1);
     assert.equal(groups[0].broker, "No broker");
+  });
+});
+
+describe("summarizeFuel", () => {
+  const entry = (over: Partial<FuelEntry>): FuelEntry => ({
+    id: "f",
+    businessId: "b",
+    truckId: "t1",
+    loadId: null,
+    date: "2026-08-01",
+    gallons: 100,
+    pricePerGallon: 4,
+    totalCost: 400,
+    odometer: null,
+    location: null,
+    expenseId: null,
+    notes: null,
+    createdAt: "2026-08-01T00:00:00.000Z",
+    ...over,
+  });
+
+  it("derives MPG from one truck's odometer span, excluding the first fill", () => {
+    const fuel = summarizeFuel(
+      [
+        entry({ id: "a", odometer: 150000, gallons: 90 }),
+        entry({ id: "b", odometer: 150700, gallons: 100, date: "2026-08-10" }),
+      ],
+      1400,
+    );
+    // 700 miles on the 100 gallons bought at the second stop.
+    assert.equal(fuel.milesPerGallon, 7);
+    assert.equal(fuel.odometerMiles, 700);
+  });
+
+  it("never subtracts one truck's odometer from another's", () => {
+    // Two trucks, each genuinely at 7 MPG. The old implementation sorted all
+    // readings together and computed (150700 - 80000) / gallons = 235 MPG.
+    const fuel = summarizeFuel(
+      [
+        entry({ id: "a", truckId: "t1", odometer: 150000 }),
+        entry({ id: "b", truckId: "t1", odometer: 150700, date: "2026-08-10" }),
+        entry({ id: "c", truckId: "t2", odometer: 80000 }),
+        entry({ id: "d", truckId: "t2", odometer: 80700, date: "2026-08-11" }),
+      ],
+      2800,
+    );
+    assert.equal(fuel.milesPerGallon, 7);
+    assert.equal(fuel.odometerMiles, 1400);
+  });
+
+  it("reports no MPG while any single truck has fewer than two readings", () => {
+    const fuel = summarizeFuel(
+      [
+        entry({ id: "a", truckId: "t1", odometer: 150000 }),
+        entry({ id: "b", truckId: "t2", odometer: 80000 }),
+      ],
+      700,
+    );
+    assert.equal(fuel.milesPerGallon, null);
+    assert.equal(fuel.odometerMiles, null);
+  });
+
+  it("totals cost and gallons regardless of odometer data", () => {
+    const fuel = summarizeFuel([entry({ id: "a" }), entry({ id: "b", totalCost: 300.5 })], 1000);
+    assert.equal(fuel.totalCost, 700.5);
+    assert.equal(fuel.totalGallons, 200);
+    assert.equal(fuel.entryCount, 2);
   });
 });

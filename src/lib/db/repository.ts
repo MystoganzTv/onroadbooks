@@ -191,6 +191,8 @@ export interface SubscriptionInput {
   /** Omitted leaves the current status untouched. */
   status?: Subscription["status"];
   currentPeriodEnd?: string | null;
+  providerCustomerId?: string | null;
+  providerSubscriptionId?: string | null;
 }
 
 export interface Repository {

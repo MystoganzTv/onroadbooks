@@ -182,13 +182,28 @@ describe("evaluatePlanChange", () => {
 
 describe("canWrite", () => {
   it("lets a trialing or active business work", () => {
-    assert.equal(canWrite(sub({ status: "TRIALING" })), true);
+    assert.equal(
+      canWrite(
+        sub({ status: "TRIALING", currentPeriodEnd: "2026-09-05" }),
+        "2026-08-30",
+      ),
+      true,
+    );
     assert.equal(canWrite(sub({ status: "ACTIVE" })), true);
   });
 
   it("closes writing once a subscription lapses", () => {
     assert.equal(canWrite(sub({ status: "PAST_DUE" })), false);
     assert.equal(canWrite(sub({ status: "CANCELED" })), false);
+  });
+
+  it("closes writing the day after a trial ends, but not on its final day", () => {
+    const trial = sub({
+      status: "TRIALING",
+      currentPeriodEnd: "2026-09-05",
+    });
+    assert.equal(canWrite(trial, "2026-09-05"), true);
+    assert.equal(canWrite(trial, "2026-09-06"), false);
   });
 
   it("treats a business with no subscription row as able to work", () => {
@@ -203,7 +218,7 @@ describe("a business created before subscriptions existed", () => {
     const created = defaultSubscription("biz");
     assert.equal(created.plan, "OWNER");
     assert.equal(created.status, "TRIALING");
-    assert.equal(canWrite(created), true);
+    assert.equal(canWrite(created, created.startedAt.slice(0, 10)), true);
     assert.equal(planAllows(created, "cockpit"), true);
   });
 

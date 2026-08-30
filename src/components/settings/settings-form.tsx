@@ -11,11 +11,17 @@ import { Button } from "@/components/ui/button";
 import { CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { updateSettingsAction } from "@/lib/actions/settings";
-import { moneyBreakdown } from "@/lib/calculations";
+import { calculateSafeOwnerPay, resolveReserveRules } from "@/lib/finance/owner-pay";
 import { categoryColor, defaultCategoryBehavior, EXPENSE_CATEGORIES } from "@/lib/categories";
 import { formatMoney } from "@/lib/formatters";
 import { settingsSchema } from "@/lib/schemas";
-import type { Business, ExpenseBehavior, FinancialSettings, PeriodSummary } from "@/lib/types";
+import type {
+  Business,
+  ExpenseBehavior,
+  FinancialSettings,
+  PeriodSummary,
+  ReserveAccount,
+} from "@/lib/types";
 import { cn, toNumber, toRequiredNumber } from "@/lib/utils";
 
 interface SettingsFormProps {
@@ -24,6 +30,8 @@ interface SettingsFormProps {
   /** Live period figures so the reserve preview uses real numbers. */
   preview: PeriodSummary;
   previewLabel: string;
+  /** Every bucket, so the preview shows the same Safe to Pay as the app. */
+  reserveAccounts: ReserveAccount[];
 }
 
 const FIELD_LABELS: Record<string, string> = {
@@ -39,7 +47,13 @@ const FIELD_LABELS: Record<string, string> = {
   maintenanceWarnDays: "Maintenance due (days)",
 };
 
-export function SettingsForm({ business, settings, preview, previewLabel }: SettingsFormProps) {
+export function SettingsForm({
+  business,
+  settings,
+  preview,
+  previewLabel,
+  reserveAccounts,
+}: SettingsFormProps) {
   const router = useRouter();
   const [businessName, setBusinessName] = React.useState(business.name);
   // Fixed at USD until a second currency exists; kept in state so the
@@ -64,10 +78,19 @@ export function SettingsForm({ business, settings, preview, previewLabel }: Sett
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [pending, startTransition] = React.useTransition();
 
-  const livePreview = moneyBreakdown(preview, {
-    taxReservePct: toNumber(taxPct),
-    maintenanceReservePct: toNumber(maintenancePct),
-  });
+  // The same engine the dashboard and settlements use, fed the values being
+  // typed: every active bucket appears, not just the two built-ins, so the
+  // preview's bottom line matches the Safe to Pay shown everywhere else.
+  const livePreview = calculateSafeOwnerPay(
+    preview,
+    resolveReserveRules(
+      {
+        taxReservePct: toNumber(taxPct),
+        maintenanceReservePct: toNumber(maintenancePct),
+      },
+      reserveAccounts,
+    ),
+  );
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -209,22 +232,20 @@ export function SettingsForm({ business, settings, preview, previewLabel }: Sett
             <p className="label-xs">Live preview</p>
             <ul className="mt-2 space-y-1 text-sm">
               <PreviewRow label="Operating profit" value={formatMoney(livePreview.operatingProfit)} />
-              <PreviewRow
-                label={`Tax reserve ${toNumber(taxPct)}%`}
-                value={`-${formatMoney(livePreview.taxReserve)}`}
-                tone="neg"
-              />
-              <PreviewRow
-                label={`Maintenance reserve ${toNumber(maintenancePct)}%`}
-                value={`-${formatMoney(livePreview.maintenanceReserve)}`}
-                tone="neg"
-              />
+              {livePreview.reserves.map((reserve) => (
+                <PreviewRow
+                  key={reserve.accountId}
+                  label={`${reserve.name} ${reserve.pct}%`}
+                  value={`-${formatMoney(reserve.amount)}`}
+                  tone="neg"
+                />
+              ))}
             </ul>
             <div className="mt-2 border-t border-border pt-2">
               <PreviewRow
-                label="Available cash"
-                value={formatMoney(livePreview.availableCash)}
-                tone={livePreview.availableCash >= 0 ? "pos" : "neg"}
+                label="Safe to pay yourself"
+                value={formatMoney(livePreview.safeToPay)}
+                tone={livePreview.safeToPay >= 0 ? "pos" : "neg"}
                 strong
               />
             </div>

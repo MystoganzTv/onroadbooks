@@ -53,7 +53,10 @@ export function monthlyTargetShare(period: Period, goals: FinancialGoal): number
   if (period.key === "ytd") return Math.max(1, monthIndex + 1);
   if (period.key === "full") return 1;
 
-  return Math.min(1, div(workingDaysIn(period, goals.workingDaysPerWeek), monthDays));
+  // Deliberately NOT capped at 1: a custom range can span several months,
+  // and its target is that many months' worth of the monthly figure. Windows
+  // inside one month come out below 1 on their own.
+  return div(workingDaysIn(period, goals.workingDaysPerWeek), monthDays);
 }
 
 export type GoalFormat = "money" | "rate" | "percent" | "count";

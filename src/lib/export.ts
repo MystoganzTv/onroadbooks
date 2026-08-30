@@ -7,19 +7,20 @@
  */
 
 import {
-  analyzeDeadhead,
   behaviorTotals,
   brokerPerformance,
   categoryTotals,
   expensesInPeriod,
   fuelInPeriod,
   loadsInPeriod,
-  moneyBreakdown,
   summarizeFuel,
   summarizePeriod,
   thresholdsFromSettings,
   withMetricsAll,
 } from "./calculations";
+import { calculateTrueCostPerMile } from "./finance/cost-per-mile";
+import { calculateDeadheadCost } from "./finance/deadhead";
+import { calculateSafeOwnerPay, resolveReserveRules } from "./finance/owner-pay";
 import { behaviorOf, categoryLabel } from "./categories";
 import { maintenanceLabel } from "./maintenance";
 import type { Period } from "./periods";
@@ -166,7 +167,14 @@ export function buildReport(id: ReportId, dataset: Dataset, period: Period): Rep
     }
 
     case "profit-loss": {
-      const breakdown = moneyBreakdown(summary, settings);
+      // Same reserve engine as the dashboard and settlements: every active
+      // bucket at its configured rate and basis. The legacy two-bucket
+      // breakdown ignored custom buckets, so this export disagreed with the
+      // app's Safe to Pay whenever one existed.
+      const pay = calculateSafeOwnerPay(
+        summary,
+        resolveReserveRules(settings, dataset.reserveAccounts),
+      );
       const behavior = behaviorTotals(periodExpenses, settings);
       const categories = categoryTotals(periodExpenses, settings);
 
@@ -196,9 +204,14 @@ export function buildReport(id: ReportId, dataset: Dataset, period: Period): Rep
           ["Net profit", money(summary.netProfit), rate(summary.profitPerMile), `${summary.netMargin.toFixed(1)}% margin`],
           [],
           ["RESERVES", "", "", ""],
-          ["Tax reserve", money(breakdown.taxReserve), "", `${breakdown.taxReservePct}% of operating profit`],
-          ["Maintenance reserve", money(breakdown.maintenanceReserve), "", `${breakdown.maintenanceReservePct}% of gross revenue`],
-          ["Available cash", money(breakdown.availableCash), "", "After expenses and reserves"],
+          ...pay.reserves.map((reserve) => [
+            reserve.name,
+            money(reserve.amount),
+            "",
+            `${reserve.pct}% of ${reserve.basis === "OPERATING_PROFIT" ? "operating profit" : "gross revenue"}`,
+          ]),
+          ["Total reserves", money(pay.reserveTotal), "", "Every active bucket"],
+          ["Safe to pay yourself", money(pay.safeToPay), "", "After expenses and reserves"],
           [],
           ["BROKERS", "", "", ""],
           ...brokerPerformance(periodLoads, thresholds).map((broker) => [
@@ -212,7 +225,11 @@ export function buildReport(id: ReportId, dataset: Dataset, period: Period): Rep
     }
 
     case "mileage": {
-      const deadhead = analyzeDeadhead(summary, settings);
+      // Priced exactly like the dashboard's deadhead card: the period's true
+      // cost per mile, rounded to the cent. The old variable-cost-only figure
+      // printed a different "deadhead cost" than the app showed on screen.
+      const basis = calculateTrueCostPerMile(loads, expenses, period, settings, period.label);
+      const deadhead = calculateDeadheadCost(summary, basis, settings, null);
       return {
         title: `Mileage - ${period.label}`,
         columns: ["Date", "Load Number", "Origin", "Destination", "Loaded Miles", "Deadhead Miles", "Total Miles", "Deadhead %"],
@@ -229,9 +246,9 @@ export function buildReport(id: ReportId, dataset: Dataset, period: Period): Rep
           ]),
           [],
           ["TOTALS", "", "", "", summary.loadedMiles, summary.deadheadMiles, summary.totalMiles, Number(summary.deadheadPct.toFixed(1))],
-          [`Deadhead cost: ${money(deadhead.deadheadCost)}`, "", "", "", "", "", "", ""],
+          [`Deadhead cost (${rate(deadhead.costPerMile)}/mi true cost): ${money(deadhead.cost)}`, "", "", "", "", "", "", ""],
           [
-            `Deadhead cost per total mile: ${rate(deadhead.costPerTotalMile)}`,
+            `Deadhead cost per total mile: ${rate(deadhead.dragPerTotalMile)}`,
             "", "", "", "", "", "", "",
           ],
         ],

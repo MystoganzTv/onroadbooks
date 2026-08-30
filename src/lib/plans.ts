@@ -237,9 +237,16 @@ const WRITABLE: SubscriptionStatus[] = ["TRIALING", "ACTIVE"];
  * access to is a reason not to trust the product with your books in the first
  * place.
  */
-export function canWrite(subscription: Subscription | undefined): boolean {
+export function canWrite(
+  subscription: Subscription | undefined,
+  today = new Date().toISOString().slice(0, 10),
+): boolean {
   if (!subscription) return true;
-  return WRITABLE.includes(subscription.status);
+  if (!WRITABLE.includes(subscription.status)) return false;
+  if (subscription.status === "TRIALING") {
+    return !trialState(subscription, today)?.expired;
+  }
+  return true;
 }
 
 export interface TruckAllowance {

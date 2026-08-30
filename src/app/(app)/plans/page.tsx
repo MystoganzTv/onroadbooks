@@ -4,14 +4,19 @@ import { PlanCard } from "@/components/settings/plan-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
-import { activeTrucks } from "@/lib/fleet";
 import { todayISO } from "@/lib/periods";
+import { stripeBillingConfigured } from "@/lib/stripe";
 
 export const metadata: Metadata = { title: "Plans & Billing" };
 
-export default async function PlansPage() {
+export default async function PlansPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ checkout?: string; billing?: string }>;
+}) {
+  const params = await searchParams;
   const session = await requireSession();
-  const { subscription, trucks } = await getRepository(session.businessId).getDataset();
+  const { subscription } = await getRepository(session.businessId).getDataset();
 
   return (
     <div className="space-y-5 p-4 lg:p-6">
@@ -22,8 +27,10 @@ export default async function PlansPage() {
       <div className="mx-auto max-w-5xl">
         <PlanCard
           subscription={subscription}
-          activeTruckCount={activeTrucks(trucks).length}
           today={todayISO()}
+          billingReady={stripeBillingConfigured()}
+          checkoutState={params.checkout}
+          billingState={params.billing}
         />
       </div>
     </div>

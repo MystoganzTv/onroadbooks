@@ -10,7 +10,7 @@ import { SESSION_COOKIE } from "@/lib/auth/constants";
  * which is where the secret lives. The middleware exists so an unauthenticated
  * request never reaches a page render at all.
  */
-const PUBLIC_PATHS = ["/login", "/setup", "/api/auth"];
+const PUBLIC_PATHS = ["/login", "/setup", "/api/auth", "/api/stripe/webhook"];
 
 /**
  * The marketing landing page. It is matched exactly and never by prefix --

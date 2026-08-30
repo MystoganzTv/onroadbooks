@@ -1,18 +1,19 @@
 "use client";
 
-import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
+import { useFormStatus } from "react-dom";
 import { Check, CreditCard, Loader2, Sparkles, Truck } from "lucide-react";
-import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { changePlanAction } from "@/lib/actions/subscription";
+import {
+  createCheckoutAction,
+  openBillingPortalAction,
+} from "@/lib/actions/billing";
 import {
   PLANS,
-  evaluatePlanChange,
   hasFleetAccess,
   planOf,
   trialState,
@@ -20,7 +21,6 @@ import {
 import type { PlanId, Subscription } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const SUPPORT_EMAIL = "enrique.padron853@gmail.com";
 const ONE_TRUCK_PLANS: PlanId[] = ["SOLO", "OWNER"];
 
 const STATUS_COPY: Record<
@@ -33,34 +33,81 @@ const STATUS_COPY: Record<
   CANCELED: { label: "Canceled", tone: "outline" },
 };
 
-function activationEmail(service: string): string {
-  const subject = encodeURIComponent(`Activate ${service}`);
-  const body = encodeURIComponent(
-    `Hi, I would like to activate ${service} for my OnRoad Books account.`,
+function BillingSubmit({
+  children,
+  disabled = false,
+  variant = "default",
+}: {
+  children: ReactNode;
+  disabled?: boolean;
+  variant?: "default" | "outline";
+}) {
+  const { pending } = useFormStatus();
+  return (
+    <Button
+      type="submit"
+      size="sm"
+      variant={variant}
+      className="w-full"
+      disabled={disabled || pending}
+    >
+      {pending ? <Loader2 className="animate-spin" aria-hidden /> : null}
+      {children}
+    </Button>
   );
-  return `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`;
+}
+
+function CheckoutForm({
+  plan,
+  children,
+  disabled = false,
+  variant = "default",
+}: {
+  plan: PlanId;
+  children: ReactNode;
+  disabled?: boolean;
+  variant?: "default" | "outline";
+}) {
+  return (
+    <form action={createCheckoutAction.bind(null, plan)}>
+      <BillingSubmit disabled={disabled} variant={variant}>
+        {children}
+      </BillingSubmit>
+    </form>
+  );
+}
+
+function PortalForm({
+  children = "Manage billing",
+  variant = "outline",
+}: {
+  children?: ReactNode;
+  variant?: "default" | "outline";
+}) {
+  return (
+    <form action={openBillingPortalAction}>
+      <BillingSubmit variant={variant}>{children}</BillingSubmit>
+    </form>
+  );
 }
 
 interface OneTruckPlanProps {
   id: PlanId;
   subscription: Subscription;
-  activeTruckCount: number;
-  pending: boolean;
-  onChange: (plan: PlanId) => void;
+  billingReady: boolean;
+  managedBilling: boolean;
 }
 
 function OneTruckPlan({
   id,
   subscription,
-  activeTruckCount,
-  pending,
-  onChange,
+  billingReady,
+  managedBilling,
 }: OneTruckPlanProps) {
   const plan = PLANS[id];
   const current = planOf(subscription);
   const isCurrent = current.id === id;
-  const decision = evaluatePlanChange(subscription, id, activeTruckCount);
-  const requiresActivation = id === "OWNER" && decision.direction === "upgrade";
+  const showAction = managedBilling ? !isCurrent : subscription.status !== "ACTIVE" || !isCurrent;
 
   return (
     <div
@@ -94,29 +141,16 @@ function OneTruckPlan({
         ))}
       </ul>
 
-      {!isCurrent ? (
-        <>
-          {requiresActivation ? (
-            <Button asChild type="button" size="sm" className="mt-3 w-full">
-              <a href={activationEmail("OnRoad Pro")}>Upgrade to OnRoad Pro</a>
-            </Button>
+      {showAction ? (
+        <div className="mt-3">
+          {managedBilling ? (
+            <PortalForm>Change in billing portal</PortalForm>
           ) : (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="mt-3 w-full"
-              disabled={pending || !decision.allowed}
-              onClick={() => onChange(id)}
-            >
-              {pending ? <Loader2 className="animate-spin" /> : null}
-              Go back to {plan.name}
-            </Button>
+            <CheckoutForm plan={id} disabled={!billingReady} variant={isCurrent ? "default" : "outline"}>
+              {isCurrent ? `Keep ${plan.name}` : `Choose ${plan.name}`}
+            </CheckoutForm>
           )}
-          {decision.reason ? (
-            <p className="mt-1.5 text-2xs leading-relaxed text-warn">{decision.reason}</p>
-          ) : null}
-        </>
+        </div>
       ) : null}
     </div>
   );
@@ -125,32 +159,27 @@ function OneTruckPlan({
 /** Plan conversion stays visible while Fleet remains a genuinely separate service. */
 export function PlanCard({
   subscription,
-  activeTruckCount,
   today,
+  billingReady,
+  checkoutState,
+  billingState,
 }: {
   subscription: Subscription;
-  activeTruckCount: number;
   today: string;
+  billingReady: boolean;
+  checkoutState?: string;
+  billingState?: string;
 }) {
-  const router = useRouter();
-  const [pending, startTransition] = React.useTransition();
   const current = planOf(subscription);
   const status = STATUS_COPY[subscription.status];
   const trial = current.id === "OWNER" ? trialState(subscription, today) : null;
   const fleet = PLANS.FLEET;
   const fleetActive = hasFleetAccess(subscription);
-
-  function change(plan: PlanId) {
-    startTransition(async () => {
-      const result = await changePlanAction({ plan });
-      if (result.ok) {
-        toast.success(`Switched to ${PLANS[plan].name}`);
-        router.refresh();
-      } else {
-        toast.error(result.error);
-      }
-    });
-  }
+  const managedBilling = Boolean(
+    subscription.providerCustomerId &&
+      subscription.providerSubscriptionId &&
+      subscription.status !== "CANCELED",
+  );
 
   return (
     <Card id="plan" className="scroll-mt-20">
@@ -163,6 +192,36 @@ export function PlanCard({
       </CardHeader>
 
       <CardContent className="space-y-4 p-4">
+        {checkoutState === "success" ? (
+          <div className="rounded-lg border border-pos/30 bg-pos-soft p-3 text-xs text-pos">
+            Stripe received your subscription. Your plan updates automatically as soon as the
+            signed billing event arrives.
+          </div>
+        ) : checkoutState === "canceled" ? (
+          <div className="rounded-lg border border-border bg-surface-sunken p-3 text-xs text-muted-foreground">
+            Checkout was canceled. Nothing was charged and your current access did not change.
+          </div>
+        ) : billingState === "managed" ? (
+          <div className="rounded-lg border border-warn/30 bg-warn-soft p-3 text-xs text-warn">
+            This account already has a Stripe subscription. Use the billing portal to change it
+            without creating a duplicate.
+          </div>
+        ) : null}
+
+        {managedBilling ? (
+          <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface-sunken p-3.5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold">{current.name}</p>
+              <p className="mt-0.5 text-2xs text-muted-foreground">
+                Update the card, switch plans, download invoices or cancel securely in Stripe.
+              </p>
+            </div>
+            <div className="w-full shrink-0 sm:w-44">
+              <PortalForm>Manage billing</PortalForm>
+            </div>
+          </div>
+        ) : null}
+
         {trial ? (
           <div className="rounded-lg border border-primary/30 bg-primary/10 p-3.5">
             <div className="flex items-start gap-2.5">
@@ -181,9 +240,11 @@ export function PlanCard({
                 </p>
               </div>
             </div>
-            <Button asChild size="sm" className="mt-3 w-full">
-              <a href={activationEmail("OnRoad Pro")}>Activate OnRoad Pro</a>
-            </Button>
+            <div className="mt-3">
+              <CheckoutForm plan="OWNER" disabled={!billingReady}>
+                Keep OnRoad Pro
+              </CheckoutForm>
+            </div>
           </div>
         ) : null}
 
@@ -202,9 +263,8 @@ export function PlanCard({
                 key={id}
                 id={id}
                 subscription={subscription}
-                activeTruckCount={activeTruckCount}
-                pending={pending}
-                onChange={change}
+                billingReady={billingReady}
+                managedBilling={managedBilling}
               />
             ))}
           </div>
@@ -243,17 +303,25 @@ export function PlanCard({
               Up to {fleet.truckLimit} trucks with separate economics for every unit.
             </p>
             {!fleetActive ? (
-              <Button asChild type="button" size="sm" variant="outline" className="mt-3 w-full">
-                <a href={activationEmail("OnRoad Fleet")}>Request Fleet access</a>
-              </Button>
+              <div className="mt-3">
+                {managedBilling ? (
+                  <PortalForm>Change to OnRoad Fleet</PortalForm>
+                ) : (
+                  <CheckoutForm plan="FLEET" disabled={!billingReady} variant="outline">
+                    Choose OnRoad Fleet
+                  </CheckoutForm>
+                )}
+              </div>
             ) : null}
           </div>
         </section>
 
         <p className="text-2xs leading-relaxed text-muted-foreground">
-          Online checkout is not connected yet, so activation requests open an email and no card
-          is charged automatically. Your books remain yours if a subscription lapses: reading and
-          exporting stay open while writing closes.{" "}
+          {billingReady
+            ? "Checkout and billing management are secured by Stripe. "
+            : "Online billing is being configured; checkout is temporarily unavailable. "}
+          Your books remain yours if a subscription lapses: reading and exporting stay open while
+          writing closes.{" "}
           <Link href="/welcome" className="text-primary underline-offset-2 hover:underline">
             Run through setup again
           </Link>

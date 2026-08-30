@@ -40,8 +40,12 @@ export function roundMoney(value: number): number {
   if (!Number.isFinite(value)) return 0;
   // Round half away from zero so +2.675 and -2.675 are treated alike, and
   // normalise -0 to 0 so a rounded-away loss never prints as "-$0.00".
-  const scaled = value * 100;
-  const rounded = Math.sign(scaled) * Math.round(Math.abs(scaled) + Number.EPSILON);
+  // The scaled value is re-quantised through 12 significant digits first:
+  // 1.005 * 100 is 100.49999999999999 in binary floating point, and adding
+  // Number.EPSILON cannot rescue a number that size, so without this step
+  // the half-cent case silently rounded DOWN at most magnitudes.
+  const scaled = Number((Math.abs(value) * 100).toPrecision(12));
+  const rounded = Math.sign(value) * Math.round(scaled);
   const result = rounded / 100;
   return result === 0 ? 0 : result;
 }
@@ -276,6 +280,12 @@ export interface DeadheadAnalysis {
  * Deadhead has two costs: the variable money spent running empty, and the
  * revenue those miles would have earned if they had been loaded. Both are
  * reported because owner-operators trade them off differently.
+ *
+ * LEGACY: every screen and export now uses finance/deadhead.ts
+ * (`calculateDeadheadCost`), which prices empty miles at the TRUE cost per
+ * mile so the number matches the dashboard card. Do not wire this variant
+ * into new surfaces -- two definitions of "deadhead cost" on screen at once
+ * was an audit finding.
  */
 export function analyzeDeadhead(
   summary: PeriodSummary,
@@ -391,6 +401,12 @@ export function emptySummary(): PeriodSummary {
  * Gross revenue - operating expenses = operating profit.
  * Reserves come off operating profit / gross revenue, and what is left is
  * the number the owner can actually spend.
+ *
+ * LEGACY: only knows the two built-in buckets at their default bases. The
+ * app, the exports and the Settings preview all use finance/owner-pay.ts
+ * (`resolveReserveRules` + `calculateSafeOwnerPay`), which honours every
+ * active bucket -- this one disagreed with Safe to Pay the moment a custom
+ * bucket existed. Do not wire it into new surfaces.
  */
 export function moneyBreakdown(
   summary: PeriodSummary,
@@ -477,21 +493,38 @@ export function summarizeFuel(entries: FuelEntry[], totalMiles: number): FuelSum
   const totalCost = roundMoney(sum(entries, (f) => f.totalCost));
 
   // MPG architecture: consecutive odometer readings bound the distance
-  // covered by the gallons purchased between them.
-  const withOdometer = entries
-    .filter((f) => typeof f.odometer === "number" && f.odometer! > 0)
-    .sort((a, b) => a.odometer! - b.odometer!);
+  // covered by the gallons purchased between them. An odometer is a fact
+  // about ONE vehicle, so entries are grouped by truck first -- subtracting
+  // one truck's reading from another's produced triple-digit "MPG" on any
+  // fleet view. The combined figure is total span miles over total gallons
+  // burned across each truck's own span.
+  const byTruck = new Map<string, FuelEntry[]>();
+  for (const entry of entries) {
+    if (typeof entry.odometer !== "number" || entry.odometer <= 0) continue;
+    const key = entry.truckId ?? "";
+    const group = byTruck.get(key);
+    if (group) group.push(entry);
+    else byTruck.set(key, [entry]);
+  }
 
   let milesPerGallon: number | null = null;
   let odometerMiles: number | null = null;
+  let spanMiles = 0;
+  let spanGallons = 0;
+  let spans = 0;
 
-  if (withOdometer.length >= 2) {
-    const first = withOdometer[0];
-    const last = withOdometer[withOdometer.length - 1];
-    odometerMiles = last.odometer! - first.odometer!;
-    // Gallons that fuelled that distance exclude the first fill-up.
-    const gallonsBurned = sum(withOdometer.slice(1), (f) => f.gallons);
-    const mpg = div(odometerMiles, gallonsBurned);
+  for (const group of byTruck.values()) {
+    if (group.length < 2) continue;
+    const ordered = [...group].sort((a, b) => a.odometer! - b.odometer!);
+    spanMiles += ordered[ordered.length - 1].odometer! - ordered[0].odometer!;
+    // Gallons that fuelled each span exclude that truck's first fill-up.
+    spanGallons += sum(ordered.slice(1), (f) => f.gallons);
+    spans += 1;
+  }
+
+  if (spans > 0 && spanMiles > 0) {
+    odometerMiles = spanMiles;
+    const mpg = div(spanMiles, spanGallons);
     milesPerGallon = mpg > 0 ? mpg : null;
   }
 

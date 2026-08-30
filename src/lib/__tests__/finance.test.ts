@@ -20,6 +20,7 @@ import {
   calculateProjection,
   dailyProfitTarget,
   isWorkingDay,
+  monthlyTargetShare,
   workingDaysIn,
 } from "../finance/goals";
 import { calculateReserveBalances } from "../finance/reserves";
@@ -728,6 +729,30 @@ describe("calculateGoalProgress", () => {
     )!;
     assert.equal(deadheadGoal.lowerIsBetter, true);
     assert.equal(deadheadGoal.onTrack, summary.deadheadPct <= 15);
+  });
+
+  it("scales a multi-month custom range to that many months of target", () => {
+    // July + August 2026 with a 7-day week: exactly two months of working
+    // days, so the window owes two months of the monthly target. The old
+    // implementation capped the share at 1 and quietly compared two months
+    // of revenue against one month of target.
+    const twoMonths = resolvePeriod("2026-07", "custom", {
+      from: "2026-07-01",
+      to: "2026-08-31",
+    });
+    const share = monthlyTargetShare(twoMonths, { ...goals, workingDaysPerWeek: 7 });
+    assert.equal(share, 2);
+
+    const revenue = calculateGoalProgress(summary, { ...goals, workingDaysPerWeek: 7 }, twoMonths).find(
+      (g) => g.key === "revenue",
+    )!;
+    assert.equal(revenue.target, 30000);
+    assert.equal(revenue.prorated, true);
+  });
+
+  it("still caps nothing but scales nothing inside one month", () => {
+    const inside = resolvePeriod("2026-08", "custom", { from: "2026-08-01", to: "2026-08-31" });
+    assert.equal(monthlyTargetShare(inside, { ...goals, workingDaysPerWeek: 7 }), 1);
   });
 
   it("shows nothing for a target that is not set", () => {

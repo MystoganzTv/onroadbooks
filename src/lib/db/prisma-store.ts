@@ -1226,6 +1226,12 @@ export class PrismaRepository implements Repository {
       ...(input.currentPeriodEnd === undefined
         ? {}
         : { currentPeriodEnd: input.currentPeriodEnd ? toDate(input.currentPeriodEnd) : null }),
+      ...(input.providerCustomerId === undefined
+        ? {}
+        : { providerCustomerId: input.providerCustomerId }),
+      ...(input.providerSubscriptionId === undefined
+        ? {}
+        : { providerSubscriptionId: input.providerSubscriptionId }),
     };
     await client.subscription.upsert({
       where: { businessId: business.id },
