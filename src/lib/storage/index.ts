@@ -67,7 +67,7 @@ export function getDocumentStorage(): DocumentStorage {
 
   if (process.env.DOCUMENT_STORAGE === "supabase") {
     const url = process.env.SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const key = process.env.SUPABASE_SECRET_KEY;
     const bucket = process.env.SUPABASE_STORAGE_BUCKET || "documents";
 
     if (url && key) {
@@ -75,7 +75,7 @@ export function getDocumentStorage(): DocumentStorage {
       return storage;
     }
     console.warn(
-      "[storage] DOCUMENT_STORAGE=supabase but SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are not set. Falling back to local disk.",
+      "[storage] DOCUMENT_STORAGE=supabase but SUPABASE_URL / SUPABASE_SECRET_KEY are not set. Falling back to local disk.",
     );
   }
 
