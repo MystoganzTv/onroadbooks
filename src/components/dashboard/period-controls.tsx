@@ -19,7 +19,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  FLOATING_PERIODS,
   monthOptions,
   PERIOD_OPTIONS,
   shiftMonth,
@@ -93,15 +92,11 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
     [pathname, router, searchParams],
   );
 
-  // Today / This Week / Custom ignore the month selector entirely, so it is
-  // actually disabled rather than merely dimmed -- clicking a control that
-  // looks dead should not silently change the period.
-  const monthDisabled = FLOATING_PERIODS.includes(period.key);
-
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center gap-2 print:hidden",
+        "flex max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-border bg-card p-1 print:hidden",
+        "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         // Dimmed while navigating, but NOT pointer-events-none.
         //
         // Next aborts a router push that lands while it is still prefetching
@@ -114,30 +109,23 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
         className,
       )}
     >
-      <div
-        className={cn(
-          "flex items-center rounded-md border border-border bg-card transition-opacity",
-          monthDisabled && "opacity-50",
-        )}
-      >
+      <div className="flex shrink-0 items-center rounded-md bg-surface-sunken/70">
         <Button
           variant="ghost"
           size="icon-sm"
-          className="rounded-r-none"
-          disabled={monthDisabled}
+          className="h-7 w-7 rounded-r-none"
           onClick={() => push({ month: shiftMonth(period.month, -1), period: "full" })}
           aria-label="Previous month"
-          title={monthDisabled ? "Pick a month-based period first" : "Previous month"}
+          title="Previous month"
         >
           <ChevronLeft />
         </Button>
         <Select
           value={period.month}
-          disabled={monthDisabled}
-          onValueChange={(value) => push({ month: value, period: period.key })}
+          onValueChange={(value) => push({ month: value, period: "full" })}
         >
           <SelectTrigger
-            className="h-8 w-[10.5rem] rounded-none border-x border-y-0 border-border shadow-none focus:ring-0 focus:ring-offset-0"
+            className="h-7 w-[8.75rem] rounded-none border-x border-y-0 border-border/70 bg-transparent text-xs shadow-none focus:ring-0 focus:ring-offset-0"
             aria-label="Select month"
           >
             <SelectValue />
@@ -153,23 +141,18 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
         <Button
           variant="ghost"
           size="icon-sm"
-          className="rounded-l-none"
-          disabled={monthDisabled}
+          className="h-7 w-7 rounded-l-none"
           onClick={() => push({ month: shiftMonth(period.month, 1), period: "full" })}
           aria-label="Next month"
-          title={monthDisabled ? "Pick a month-based period first" : "Next month"}
+          title="Next month"
         >
           <ChevronRight />
         </Button>
       </div>
 
-      <div
-        // min-h, not h: with a fixed height the second row of wrapped pills
-        // rendered on top of the Custom button on a phone.
-        className="inline-flex min-h-8 flex-wrap items-center gap-0.5 rounded-md border border-border bg-surface-sunken p-0.5"
-        role="group"
-        aria-label="Period"
-      >
+      <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden />
+
+      <div className="inline-flex shrink-0 items-center gap-0.5" role="group" aria-label="Period">
         {PERIOD_OPTIONS.filter((o) => o.key !== "custom").map((option, index, all) => (
           <span key={option.key} className="flex items-center">
             {index > 0 && all[index - 1].group !== option.group ? (
@@ -179,16 +162,15 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
               type="button"
               onClick={() => push({ period: option.key })}
               aria-pressed={period.key === option.key}
+              title={option.label}
               className={cn(
-                "rounded px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "h-7 rounded-md px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 period.key === option.key
-                  ? "bg-card text-foreground shadow-sm"
+                  ? "bg-accent text-accent-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              {/* The abbreviations keep the group on one row on a phone. */}
-              <span className="sm:hidden">{option.short}</span>
-              <span className="hidden sm:inline">{option.label}</span>
+              {option.short}
             </button>
           </span>
         ))}
@@ -197,8 +179,12 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
       <Popover open={customOpen} onOpenChange={setCustomOpen}>
         <PopoverTrigger asChild>
           <Button
-            variant={period.key === "custom" ? "secondary" : "outline"}
+            variant="ghost"
             size="sm"
+            className={cn(
+              "h-7 shrink-0 px-2.5",
+              period.key === "custom" && "bg-accent text-accent-foreground shadow-sm",
+            )}
             aria-pressed={period.key === "custom"}
           >
             <CalendarRange />
@@ -240,10 +226,6 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
           </div>
         </PopoverContent>
       </Popover>
-
-      <span className="ml-auto hidden whitespace-nowrap text-2xs text-muted-foreground sm:block">
-        {period.label}
-      </span>
     </div>
   );
 }

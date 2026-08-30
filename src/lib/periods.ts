@@ -36,11 +36,11 @@ export interface Period extends DateRange {
 
 export const PERIOD_OPTIONS: { key: PeriodKey; label: string; short: string; group: "quick" | "month" | "long" }[] = [
   { key: "today", label: "Today", short: "Today", group: "quick" },
-  { key: "week", label: "This Week", short: "This Week", group: "quick" },
+  { key: "week", label: "This Week", short: "Week", group: "quick" },
   { key: "first", label: "1 - 15", short: "1-15", group: "month" },
   { key: "second", label: "16 - End", short: "16-End", group: "month" },
   { key: "full", label: "Full Month", short: "Month", group: "month" },
-  { key: "quarter", label: "Quarter", short: "Quarter", group: "long" },
+  { key: "quarter", label: "Quarter", short: "Qtr", group: "long" },
   { key: "ytd", label: "Year to Date", short: "YTD", group: "long" },
   { key: "custom", label: "Custom", short: "Custom", group: "long" },
 ];
