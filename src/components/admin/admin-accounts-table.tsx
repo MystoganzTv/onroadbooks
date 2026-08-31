@@ -4,11 +4,13 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
   Activity,
+  ChevronDown,
   Eye,
   FileText,
   Fuel,
   Gift,
   Loader2,
+  MoreHorizontal,
   ReceiptText,
   RotateCcw,
   Search,
@@ -31,6 +33,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -307,60 +316,65 @@ export function AdminAccountsTable({
                     </td>
                     <td className="px-4 py-4 text-xs text-muted-foreground">{dateLabel(account.createdAt)}</td>
                     <td className="px-4 py-4">
-                      <div className="flex flex-wrap justify-end gap-2">
+                      <div className="flex flex-wrap items-center justify-end gap-2">
                         <Button size="sm" variant="outline" onClick={() => setDetails(account)}>
                           <Eye /> Details
                         </Button>
+
                         {!account.hasProviderSubscription ? (
-                          <>
-                            {!complimentaryPro ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setOperation({ kind: "grant-pro", account })}
-                              >
-                                <Gift /> Grant Pro
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="sm" variant="outline">
+                                <Gift /> Access <ChevronDown className="size-3.5 opacity-60" />
                               </Button>
-                            ) : null}
-                            {!complimentaryFleet ? (
-                              <Button
-                                size="sm"
-                                onClick={() => setOperation({ kind: "grant-fleet", account })}
-                              >
-                                <Truck /> Grant Fleet
-                              </Button>
-                            ) : null}
-                            {account.accessSource === "complimentary" ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setOperation({ kind: "end", account })}
-                              >
-                                End access
-                              </Button>
-                            ) : null}
-                          </>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-52">
+                              {!complimentaryPro ? (
+                                <DropdownMenuItem onSelect={() => setOperation({ kind: "grant-pro", account })}>
+                                  <Gift className="size-4" /> Grant Pro
+                                </DropdownMenuItem>
+                              ) : null}
+                              {!complimentaryFleet ? (
+                                <DropdownMenuItem onSelect={() => setOperation({ kind: "grant-fleet", account })}>
+                                  <Truck className="size-4" /> Grant Fleet
+                                </DropdownMenuItem>
+                              ) : null}
+                              {account.accessSource === "complimentary" ? (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onSelect={() => setOperation({ kind: "end", account })}>
+                                    End complimentary access
+                                  </DropdownMenuItem>
+                                </>
+                              ) : null}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         ) : null}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={destructiveActionsProtected}
-                          aria-label={`Reset ${account.businessName}`}
-                          title="Reset workspace data"
-                          onClick={() => setOperation({ kind: "reset", account })}
-                        >
-                          <RotateCcw />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          disabled={destructiveActionsProtected || account.hasProviderSubscription}
-                          aria-label={`Delete ${account.businessName}`}
-                          title={account.hasProviderSubscription ? "Cancel Stripe billing first" : "Delete account"}
-                          onClick={() => setOperation({ kind: "delete", account })}
-                        >
-                          <Trash2 />
-                        </Button>
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline" aria-label={`More actions for ${account.businessName}`}>
+                              <MoreHorizontal />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-52">
+                            <DropdownMenuItem
+                              disabled={destructiveActionsProtected}
+                              onSelect={() => setOperation({ kind: "reset", account })}
+                            >
+                              <RotateCcw className="size-4" /> Reset workspace data
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              disabled={destructiveActionsProtected || account.hasProviderSubscription}
+                              title={account.hasProviderSubscription ? "Cancel Stripe billing first" : undefined}
+                              className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                              onSelect={() => setOperation({ kind: "delete", account })}
+                            >
+                              <Trash2 className="size-4" /> Delete account
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </td>
                   </tr>
