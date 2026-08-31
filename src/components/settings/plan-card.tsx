@@ -1,9 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { useFormStatus } from "react-dom";
-import { Check, CreditCard, Loader2, Sparkles, Truck } from "lucide-react";
+import {
+  BookOpen,
+  Check,
+  CreditCard,
+  Gauge,
+  Loader2,
+  Sparkles,
+  Truck,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +31,13 @@ import type { PlanId, Subscription } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const ONE_TRUCK_PLANS: PlanId[] = ["SOLO", "OWNER"];
+
+/** SOLO is the book, OWNER is the cockpit, FLEET is the units -- see plans.ts. */
+const PLAN_ICONS: Record<PlanId, ComponentType<{ className?: string; "aria-hidden"?: boolean }>> = {
+  SOLO: BookOpen,
+  OWNER: Gauge,
+  FLEET: Truck,
+};
 
 const STATUS_COPY: Record<
   Subscription["status"],
@@ -49,7 +64,7 @@ function BillingSubmit({
       type="submit"
       size="sm"
       variant={variant}
-      className="w-full"
+      className="w-full rounded-full"
       disabled={disabled || pending}
     >
       {pending ? <Loader2 className="animate-spin" aria-hidden /> : null}
@@ -93,9 +108,12 @@ function PortalForm({
 }
 
 /**
- * One plan, presented the same way wherever it is offered -- the one-truck
- * plans and Fleet all render through this so a real, purchasable tier never
- * looks like a lesser or disabled option next to the others.
+ * One plan, presented the same way wherever it is offered. A slim accent bar
+ * on top, a pill for what it covers and (when relevant) a pill for its
+ * status, an icon tile, circled checkmarks, and a full-width pill CTA --
+ * so a real, purchasable tier never looks like a lesser or disabled option
+ * next to the others, and the current/active one reads as clearly ahead of
+ * the rest rather than merely outlined.
  */
 function PlanTile({
   anchorId,
@@ -114,43 +132,68 @@ function PlanTile({
   featureLimit?: number;
   action?: ReactNode;
 }) {
+  const Icon = PLAN_ICONS[plan.id];
+
   return (
     <div
       id={anchorId}
       className={cn(
-        "rounded-lg border p-3.5",
-        highlighted ? "border-primary bg-primary/5" : "border-border",
+        "relative overflow-hidden rounded-xl border pt-4",
+        highlighted ? "border-primary bg-primary/[0.06]" : "border-border bg-card",
       )}
     >
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-sm font-semibold">{plan.name}</span>
-        {statusLabel ? (
-          <span className="text-2xs font-medium uppercase tracking-wide text-primary">
-            {statusLabel}
+      <div className={cn("absolute inset-x-0 top-0 h-1", highlighted ? "bg-primary" : "bg-border")} />
+
+      <div className="px-4">
+        <div className="flex items-center justify-between gap-2">
+          <span className="inline-flex items-center rounded-full border border-border bg-surface-sunken px-2.5 py-0.5 text-2xs font-medium text-muted-foreground">
+            {truckLabel}
           </span>
+          {statusLabel ? (
+            <span className="inline-flex items-center rounded-full bg-primary px-2.5 py-0.5 text-2xs font-semibold text-primary-foreground">
+              {statusLabel}
+            </span>
+          ) : null}
+        </div>
+
+        <span
+          className={cn(
+            "mt-3 flex size-9 items-center justify-center rounded-lg",
+            highlighted ? "bg-primary text-primary-foreground" : "bg-surface-sunken text-muted-foreground",
+          )}
+        >
+          <Icon className="size-4.5" aria-hidden />
+        </span>
+
+        <p className="mt-3 text-sm font-semibold">{plan.name}</p>
+        <p className="mt-1 tnum text-2xl font-bold tracking-tight">
+          ${plan.priceMonthly}
+          <span className="text-2xs font-normal text-muted-foreground"> / month</span>
+        </p>
+        <p className="mt-1 text-2xs text-muted-foreground">{plan.tagline}</p>
+
+        <ul className="mt-3 space-y-1.5">
+          {plan.features.slice(0, featureLimit).map((feature) => (
+            <li key={feature} className="flex items-start gap-2 text-2xs text-muted-foreground">
+              <span
+                className={cn(
+                  "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full",
+                  highlighted ? "bg-primary/15 text-primary" : "bg-pos-soft text-pos",
+                )}
+              >
+                <Check className="size-2.5" aria-hidden />
+              </span>
+              <span>{feature}</span>
+            </li>
+          ))}
+        </ul>
+
+        {plan.note ? (
+          <p className="mt-2.5 text-2xs italic leading-relaxed text-muted-foreground">{plan.note}</p>
         ) : null}
       </div>
-      <p className="mt-1 tnum text-xl font-semibold tracking-tight">
-        ${plan.priceMonthly}
-        <span className="text-2xs font-normal text-muted-foreground"> / month</span>
-      </p>
-      <p className="mt-1 text-2xs font-medium text-foreground">{truckLabel}</p>
-      <p className="mt-0.5 text-2xs text-muted-foreground">{plan.tagline}</p>
 
-      <ul className="mt-2.5 space-y-1">
-        {plan.features.slice(0, featureLimit).map((feature) => (
-          <li key={feature} className="flex items-start gap-1.5 text-2xs text-muted-foreground">
-            <Check className="mt-0.5 size-3 shrink-0 text-pos" />
-            <span>{feature}</span>
-          </li>
-        ))}
-      </ul>
-
-      {plan.note ? (
-        <p className="mt-2 text-2xs italic leading-relaxed text-muted-foreground">{plan.note}</p>
-      ) : null}
-
-      {action ? <div className="mt-3">{action}</div> : null}
+      {action ? <div className="mt-4 px-4 pb-4">{action}</div> : <div className="pb-4" />}
     </div>
   );
 }
@@ -310,20 +353,15 @@ export function PlanCard({
         </section>
 
         <section aria-labelledby="fleet-service" className="border-t border-border pt-4">
-          <div className="mb-2.5 flex items-start gap-2.5">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-surface-sunken text-muted-foreground">
-              <Truck className="size-4" aria-hidden />
-            </span>
-            <div>
-              <h4 id="fleet-service" className="text-xs font-semibold">
-                Fleet service
-              </h4>
-              <p className="mt-0.5 text-2xs leading-relaxed text-muted-foreground">
-                A separate workspace, activated by a Fleet subscription or a complimentary admin
-                grant. Its navigation, truck switcher and reports stay hidden until access is
-                active.
-              </p>
-            </div>
+          <div className="mb-2.5">
+            <h4 id="fleet-service" className="text-xs font-semibold">
+              Fleet service
+            </h4>
+            <p className="mt-0.5 text-2xs leading-relaxed text-muted-foreground">
+              A separate workspace, activated by a Fleet subscription or a complimentary admin
+              grant. Its navigation, truck switcher and reports stay hidden until access is
+              active.
+            </p>
           </div>
 
           <PlanTile
