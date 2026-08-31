@@ -18,6 +18,7 @@ import {
   planOf,
   trialState,
 } from "@/lib/plans";
+import type { Plan } from "@/lib/plans";
 import type { PlanId, Subscription } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -91,6 +92,69 @@ function PortalForm({
   );
 }
 
+/**
+ * One plan, presented the same way wherever it is offered -- the one-truck
+ * plans and Fleet all render through this so a real, purchasable tier never
+ * looks like a lesser or disabled option next to the others.
+ */
+function PlanTile({
+  anchorId,
+  plan,
+  truckLabel,
+  highlighted,
+  statusLabel,
+  featureLimit = 4,
+  action,
+}: {
+  anchorId?: string;
+  plan: Plan;
+  truckLabel: string;
+  highlighted: boolean;
+  statusLabel?: string;
+  featureLimit?: number;
+  action?: ReactNode;
+}) {
+  return (
+    <div
+      id={anchorId}
+      className={cn(
+        "rounded-lg border p-3.5",
+        highlighted ? "border-primary bg-primary/5" : "border-border",
+      )}
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-sm font-semibold">{plan.name}</span>
+        {statusLabel ? (
+          <span className="text-2xs font-medium uppercase tracking-wide text-primary">
+            {statusLabel}
+          </span>
+        ) : null}
+      </div>
+      <p className="mt-1 tnum text-xl font-semibold tracking-tight">
+        ${plan.priceMonthly}
+        <span className="text-2xs font-normal text-muted-foreground"> / month</span>
+      </p>
+      <p className="mt-1 text-2xs font-medium text-foreground">{truckLabel}</p>
+      <p className="mt-0.5 text-2xs text-muted-foreground">{plan.tagline}</p>
+
+      <ul className="mt-2.5 space-y-1">
+        {plan.features.slice(0, featureLimit).map((feature) => (
+          <li key={feature} className="flex items-start gap-1.5 text-2xs text-muted-foreground">
+            <Check className="mt-0.5 size-3 shrink-0 text-pos" />
+            <span>{feature}</span>
+          </li>
+        ))}
+      </ul>
+
+      {plan.note ? (
+        <p className="mt-2 text-2xs italic leading-relaxed text-muted-foreground">{plan.note}</p>
+      ) : null}
+
+      {action ? <div className="mt-3">{action}</div> : null}
+    </div>
+  );
+}
+
 interface OneTruckPlanProps {
   id: PlanId;
   subscription: Subscription;
@@ -110,49 +174,24 @@ function OneTruckPlan({
   const showAction = managedBilling ? !isCurrent : subscription.status !== "ACTIVE" || !isCurrent;
 
   return (
-    <div
-      id={id === "OWNER" ? "plan-pro" : undefined}
-      className={cn(
-        "rounded-lg border p-3.5",
-        isCurrent ? "border-primary bg-primary/5" : "border-border",
-      )}
-    >
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-sm font-semibold">{plan.name}</span>
-        {isCurrent ? (
-          <span className="text-2xs font-medium uppercase tracking-wide text-primary">
-            Current
-          </span>
-        ) : null}
-      </div>
-      <p className="mt-1 tnum text-xl font-semibold tracking-tight">
-        ${plan.priceMonthly}
-        <span className="text-2xs font-normal text-muted-foreground"> / month</span>
-      </p>
-      <p className="mt-1 text-2xs font-medium text-foreground">One truck</p>
-      <p className="mt-0.5 text-2xs text-muted-foreground">{plan.tagline}</p>
-
-      <ul className="mt-2.5 space-y-1">
-        {plan.features.slice(0, 4).map((feature) => (
-          <li key={feature} className="flex items-start gap-1.5 text-2xs text-muted-foreground">
-            <Check className="mt-0.5 size-3 shrink-0 text-pos" />
-            <span>{feature}</span>
-          </li>
-        ))}
-      </ul>
-
-      {showAction ? (
-        <div className="mt-3">
-          {managedBilling ? (
+    <PlanTile
+      anchorId={id === "OWNER" ? "plan-pro" : undefined}
+      plan={plan}
+      truckLabel="One truck"
+      highlighted={isCurrent}
+      statusLabel={isCurrent ? "Current" : undefined}
+      action={
+        showAction ? (
+          managedBilling ? (
             <PortalForm>Change in billing portal</PortalForm>
           ) : (
             <CheckoutForm plan={id} disabled={!billingReady} variant={isCurrent ? "default" : "outline"}>
               {isCurrent ? `Keep ${plan.name}` : `Choose ${plan.name}`}
             </CheckoutForm>
-          )}
-        </div>
-      ) : null}
-    </div>
+          )
+        ) : undefined
+      }
+    />
   );
 }
 
@@ -276,44 +315,35 @@ export function PlanCard({
               <Truck className="size-4" aria-hidden />
             </span>
             <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h4 id="fleet-service" className="text-xs font-semibold">
-                  Separate Fleet service
-                </h4>
-                <Badge variant={fleetActive ? "positive" : "outline"}>
-                  {fleetActive ? "Active" : "Paid add-on"}
-                </Badge>
-              </div>
+              <h4 id="fleet-service" className="text-xs font-semibold">
+                Fleet service
+              </h4>
               <p className="mt-0.5 text-2xs leading-relaxed text-muted-foreground">
-                Fleet is only for businesses paying to manage multiple trucks. Its navigation,
-                truck switcher and reports stay hidden until Fleet is activated.
+                A separate workspace, activated by a Fleet subscription or a complimentary admin
+                grant. Its navigation, truck switcher and reports stay hidden until access is
+                active.
               </p>
             </div>
           </div>
 
-          <div className="rounded-lg border border-dashed border-border p-3.5">
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-sm font-semibold">{fleet.name}</span>
-              <span className="tnum text-sm font-semibold">
-                ${fleet.priceMonthly}
-                <span className="text-2xs font-normal text-muted-foreground"> / month</span>
-              </span>
-            </div>
-            <p className="mt-1 text-2xs text-muted-foreground">
-              Up to {fleet.truckLimit} trucks with separate economics for every unit.
-            </p>
-            {!fleetActive ? (
-              <div className="mt-3">
-                {managedBilling ? (
+          <PlanTile
+            plan={fleet}
+            truckLabel={`Up to ${fleet.truckLimit} trucks`}
+            highlighted={fleetActive}
+            statusLabel={fleetActive ? "Active" : undefined}
+            featureLimit={5}
+            action={
+              !fleetActive ? (
+                managedBilling ? (
                   <PortalForm>Change to OnRoad Fleet</PortalForm>
                 ) : (
                   <CheckoutForm plan="FLEET" disabled={!billingReady} variant="outline">
                     Choose OnRoad Fleet
                   </CheckoutForm>
-                )}
-              </div>
-            ) : null}
-          </div>
+                )
+              ) : undefined
+            }
+          />
         </section>
 
         <p className="text-2xs leading-relaxed text-muted-foreground">
