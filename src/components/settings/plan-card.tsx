@@ -330,16 +330,18 @@ export function PlanCard({
           </div>
         ) : null}
 
-        <section aria-labelledby="one-truck-plans">
+        <section aria-labelledby="plans">
           <div className="mb-2.5">
-            <h4 id="one-truck-plans" className="text-xs font-semibold">
-              One-truck plans
+            <h4 id="plans" className="text-xs font-semibold">
+              Plans
             </h4>
-            <p className="mt-0.5 text-2xs text-muted-foreground">
-              Your account stays centered on one truck. Fleet tools do not appear here.
+            <p className="mt-0.5 text-2xs leading-relaxed text-muted-foreground">
+              Solo Starter and OnRoad Pro cover one truck. OnRoad Fleet is a separate workspace
+              for two to eight, unlocked by its own subscription -- its navigation, truck switcher
+              and reports stay hidden until then.
             </p>
           </div>
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-3">
             {ONE_TRUCK_PLANS.map((id) => (
               <OneTruckPlan
                 key={id}
@@ -349,39 +351,24 @@ export function PlanCard({
                 managedBilling={managedBilling}
               />
             ))}
+            <PlanTile
+              plan={fleet}
+              truckLabel={`Up to ${fleet.truckLimit} trucks`}
+              highlighted={fleetActive}
+              statusLabel={fleetActive ? "Active" : undefined}
+              action={
+                !fleetActive ? (
+                  managedBilling ? (
+                    <PortalForm>Change to OnRoad Fleet</PortalForm>
+                  ) : (
+                    <CheckoutForm plan="FLEET" disabled={!billingReady} variant="outline">
+                      Choose OnRoad Fleet
+                    </CheckoutForm>
+                  )
+                ) : undefined
+              }
+            />
           </div>
-        </section>
-
-        <section aria-labelledby="fleet-service" className="border-t border-border pt-4">
-          <div className="mb-2.5">
-            <h4 id="fleet-service" className="text-xs font-semibold">
-              Fleet service
-            </h4>
-            <p className="mt-0.5 text-2xs leading-relaxed text-muted-foreground">
-              A separate workspace, activated by a Fleet subscription or a complimentary admin
-              grant. Its navigation, truck switcher and reports stay hidden until access is
-              active.
-            </p>
-          </div>
-
-          <PlanTile
-            plan={fleet}
-            truckLabel={`Up to ${fleet.truckLimit} trucks`}
-            highlighted={fleetActive}
-            statusLabel={fleetActive ? "Active" : undefined}
-            featureLimit={5}
-            action={
-              !fleetActive ? (
-                managedBilling ? (
-                  <PortalForm>Change to OnRoad Fleet</PortalForm>
-                ) : (
-                  <CheckoutForm plan="FLEET" disabled={!billingReady} variant="outline">
-                    Choose OnRoad Fleet
-                  </CheckoutForm>
-                )
-              ) : undefined
-            }
-          />
         </section>
 
         <p className="text-2xs leading-relaxed text-muted-foreground">
