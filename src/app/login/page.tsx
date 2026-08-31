@@ -20,7 +20,13 @@ export default async function LoginPage({
   return (
     <AuthCard
       mode="login"
-      initialError={error === "google" ? "Google sign-in could not be completed. Try again." : null}
+      initialError={
+        error === "google"
+          ? "Google sign-in could not be completed. Try again."
+          : error === "invite"
+            ? "That invitation is invalid, expired or has been removed. Ask the workspace owner for a new invitation."
+            : null
+      }
       initialNotice={
         account === "deleted" ? "Your account and business data were permanently deleted." : null
       }

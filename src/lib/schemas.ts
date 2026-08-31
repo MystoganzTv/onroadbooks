@@ -3,6 +3,7 @@ import { z } from "zod";
 import { CATEGORY_IDS } from "./categories";
 import { DOCUMENT_TYPE_IDS } from "./documents";
 import { MAINTENANCE_TYPE_IDS } from "./maintenance";
+import { ASSIGNABLE_ROLES } from "./roles";
 
 const isoDate = z
   .string()
@@ -18,13 +19,33 @@ const miles = z
   .min(0, "Cannot be negative")
   .max(100_000, "That looks too large");
 
+export const memberInviteSchema = z.object({
+  email: z.string().trim().email("Enter a valid email address").max(254),
+  name: z.string().trim().max(120).optional().nullable(),
+  role: z.enum(ASSIGNABLE_ROLES),
+});
+
+export const memberRoleSchema = z.object({
+  userId: z.string().trim().min(1),
+  role: z.enum(ASSIGNABLE_ROLES),
+});
+
 /** TRUCK charges a unit; BUSINESS is fleet overhead and carries no truck. */
 export const expenseScopeValues = ["TRUCK", "BUSINESS"] as const;
 
 export const loadSchema = z
   .object({
     truckId: z.string().trim().optional().nullable(),
+    driverId: z.string().trim().optional().nullable(),
     date: isoDate,
+    deliveryDate: isoDate.optional().nullable(),
+    endingOdometer: z
+      .number({ invalid_type_error: "Enter a number" })
+      .int("Use a whole-number odometer reading")
+      .min(0, "Cannot be negative")
+      .max(5_000_000, "That odometer reading looks too large")
+      .optional()
+      .nullable(),
     originCity: z.string().trim().min(1, "Origin city is required").max(80),
     originState: z
       .string()
@@ -39,6 +60,26 @@ export const loadSchema = z
       .regex(/^[A-Za-z]{2}$/, "Use a 2-letter state"),
     broker: z.string().trim().max(120).optional().nullable(),
     loadNumber: z.string().trim().max(60).optional().nullable(),
+    equipmentType: z
+      .enum(["BOX_TRUCK", "DRY_VAN", "REEFER", "FLATBED", "POWER_ONLY", "SPRINTER_VAN", "OTHER"])
+      .optional()
+      .nullable(),
+    loadCapacity: z.enum(["FULL", "PARTIAL"]).optional().nullable(),
+    equipmentLengthFt: z
+      .number({ invalid_type_error: "Enter a number" })
+      .int("Use a whole number")
+      .min(1, "Must be at least 1 ft")
+      .max(100, "Use 100 ft or fewer")
+      .optional()
+      .nullable(),
+    weightLbs: z
+      .number({ invalid_type_error: "Enter a number" })
+      .int("Use whole pounds")
+      .min(1, "Must be at least 1 lb")
+      .max(200_000, "That weight looks too large")
+      .optional()
+      .nullable(),
+    commodity: z.string().trim().max(120).optional().nullable(),
     loadedMiles: miles.min(1, "Loaded miles must be greater than 0"),
     deadheadMiles: miles,
     grossRate: money.min(0.01, "Gross rate is required"),
@@ -47,8 +88,13 @@ export const loadSchema = z
     dispatchFee: money,
     factoringFee: money,
     otherExpenses: money,
+    costsPosted: z.boolean().optional(),
     status: z.enum(["PENDING", "INVOICED", "PAID"]),
     notes: z.string().trim().max(2000).optional().nullable(),
+  })
+  .refine((value) => !value.deliveryDate || value.deliveryDate >= value.date, {
+    message: "Delivery cannot be before pickup",
+    path: ["deliveryDate"],
   })
   .refine(
     (value) =>
@@ -223,6 +269,44 @@ export const truckSchema = z.object({
   currentOdometer: z.number().int().min(0).max(5_000_000),
 });
 
+export const driverSchema = z
+  .object({
+    name: z.string().trim().min(1, "Driver name is required").max(120),
+    reference: z.string().trim().max(40).optional().nullable(),
+    defaultTruckId: z.string().trim().optional().nullable(),
+    payType: z.enum([
+      "PERCENT_GROSS",
+      "PER_LOADED_MILE",
+      "PER_TOTAL_MILE",
+      "FLAT_PER_LOAD",
+    ]),
+    payRate: z
+      .number({ invalid_type_error: "Enter a pay rate" })
+      .min(0.01, "Pay rate must be greater than zero")
+      .max(100_000, "That pay rate looks too large"),
+  })
+  .refine((value) => value.payType !== "PERCENT_GROSS" || value.payRate <= 100, {
+    message: "Percent of gross cannot exceed 100%",
+    path: ["payRate"],
+  });
+
+export const driverSettlementSchema = z
+  .object({
+    driverId: z.string().trim().min(1, "Choose a driver"),
+    periodStart: isoDate,
+    periodEnd: isoDate,
+    notes: z.string().trim().max(2000).optional().nullable(),
+  })
+  .refine((value) => value.periodEnd >= value.periodStart, {
+    message: "End date cannot be before start date",
+    path: ["periodEnd"],
+  });
+
+export const driverSettlementPaymentSchema = z.object({
+  id: z.string().trim().min(1),
+  paidOn: isoDate,
+});
+
 /* ---- Goals ----------------------------------------------------------- */
 
 export const goalSchema = z.object({
@@ -275,6 +359,8 @@ export type FuelFormValues = z.infer<typeof fuelSchema>;
 export type SettingsFormValues = z.infer<typeof settingsSchema>;
 export type MaintenanceFormValues = z.infer<typeof maintenanceSchema>;
 export type TruckFormValues = z.infer<typeof truckSchema>;
+export type DriverFormValues = z.infer<typeof driverSchema>;
+export type DriverSettlementFormValues = z.infer<typeof driverSettlementSchema>;
 
 export const credentialsSchema = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email").max(200),

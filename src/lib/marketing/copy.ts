@@ -7,19 +7,19 @@
  * early access rather than described in the present tense -- a landing page
  * that oversells is a support ticket with a delay on it.
  *
- * The product preview figures are the seeded demo month, which is also the
+ * The product preview figures are the deterministic reference month, which is also the
  * first month a new owner sees, so the picture on the landing page and the
  * picture inside the product are the same picture.
  *
  * English is the source of truth: `LandingCopy` is derived from it, so the
  * Spanish object cannot drift out of shape without failing the type check.
- * The demo figures live in `PREVIEW_FIGURES` because numbers do not translate.
+ * The preview figures live in `PREVIEW_FIGURES` because numbers do not translate.
  */
 
 export type Lang = "en" | "es";
 
 /**
- * The figures in the marketing mock-ups. These are the seeded demo month
+ * The figures in the marketing mock-ups. These are the reference month
  * (`?month=2026-08&period=full`) and they tie to the cent:
  *
  *   revenue 9,795.00 - expenses 6,143.90            = net 3,651.10
@@ -235,7 +235,7 @@ const en = {
   pricing: {
     eyebrow: "Pricing",
     title: "Less than one bad load a year.",
-    sub: "Every plan includes the full profit engine. Fourteen days free, no card up front.",
+    sub: "Every plan includes the full profit engine. Seven days free, no card up front.",
     per: "/month",
     plans: [
       {
@@ -509,7 +509,7 @@ const es: LandingCopy = {
   pricing: {
     eyebrow: "Precios",
     title: "Menos que una carga mala al año.",
-    sub: "Todos los planes traen el motor completo. Catorce días gratis, sin tarjeta por delante.",
+    sub: "Todos los planes traen el motor completo. Siete días gratis, sin tarjeta por delante.",
     per: "/mes",
     plans: [
       {

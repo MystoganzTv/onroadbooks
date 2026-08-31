@@ -19,6 +19,7 @@ import { Section } from "@/components/cockpit/section";
 import { TodayCard } from "@/components/cockpit/today-card";
 import { TruckHealthPanel } from "@/components/cockpit/truck-health-panel";
 import { MiniStat } from "@/components/dashboard/mini-stat";
+import { BookkeepingAlerts } from "@/components/dashboard/bookkeeping-alerts";
 import { PeriodControls } from "@/components/dashboard/period-controls";
 import { RecentLoads } from "@/components/dashboard/recent-loads";
 import { ExpenseFormDialog } from "@/components/expenses/expense-form-dialog";
@@ -41,7 +42,7 @@ import {
 } from "@/lib/calculations";
 import { periodBuckets } from "@/lib/chart-data";
 import { getRepository } from "@/lib/db";
-import { planAllows } from "@/lib/plans";
+import { hasFleetAccess, planAllows } from "@/lib/plans";
 import {
   expensesForTruck,
   loadsForTruck,
@@ -81,7 +82,9 @@ import {
   truckFromSearchParams,
   type SearchParams,
 } from "@/lib/period-params";
-import { defaultEntryDate, previousPeriod, todayISO } from "@/lib/periods";
+import { defaultEntryDate, monthLabel, previousPeriod, todayISO } from "@/lib/periods";
+import { recurringExpenseSuggestions } from "@/lib/recurring-expenses";
+import { roleCan } from "@/lib/roles";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -124,6 +127,7 @@ export default async function DashboardPage({
     maintenanceRecords,
     reserveAccounts,
     reserveTransactions,
+    drivers,
   } = dataset;
 
   // PeriodControls sends the browser's calendar date for "Today", so that
@@ -156,6 +160,7 @@ export default async function DashboardPage({
   );
   const periodExpenses = expensesInPeriod(expenses, period);
   const categories = categoryTotals(periodExpenses, settings);
+  const monthlySuggestions = recurringExpenseSuggestions(dataset, period.month, truckId);
 
   const costBasis = calculateTrueCostPerMile(loads, expenses, period, settings, period.label);
   const deadhead = calculateDeadheadCost(summary, costBasis, settings, goals.maxDeadheadPct);
@@ -205,33 +210,39 @@ export default async function DashboardPage({
       : undefined;
   const hasLedgerHistory = allLoads.length > 0 || allExpenses.length > 0;
 
-  const loadAction = (
+  const role = session.role ?? "VIEWER";
+  const loadAction = roleCan(role, "manage_loads") ? (
     <LoadFormDialog
       brokers={brokerNames}
       trucks={trucks}
+      drivers={hasFleetAccess(dataset.subscription) ? drivers : []}
       defaultTruckId={truckId}
       defaultDate={defaultEntryDate(period)}
       ratingThresholds={ratingThresholds}
     />
-  );
-  const expenseAction = (
+  ) : null;
+  const expenseAction = roleCan(role, "manage_expenses") ? (
     <ExpenseFormDialog
       defaultDate={defaultEntryDate(period)}
       loads={periodLoads}
       trucks={trucks}
       defaultTruckId={truckId}
     />
-  );
-  const subscriptionStatus = session.isDemo ? null : (
-    <DashboardSubscriptionStatus subscription={dataset.subscription} today={today} />
+  ) : null;
+  const subscriptionStatus = (
+    <DashboardSubscriptionStatus
+      subscription={dataset.subscription}
+      today={today}
+      canManage={role === "OWNER"}
+    />
   );
 
   if (!hasLedgerHistory) {
     return (
       <div className="space-y-5 p-4 lg:p-6">
         <PageHeader
-          title="Financial Cockpit"
-          description="Drive the truck. Know the business."
+          title="Business Overview"
+          description="Revenue, costs, mileage, and cash available in one place."
           actions={
             <Button asChild variant="outline" size="sm">
               <Link href="/calculator">
@@ -254,8 +265,8 @@ export default async function DashboardPage({
   return (
     <div className="space-y-5 p-4 lg:p-6">
       <PageHeader
-        title="Financial Cockpit"
-        description="Drive the truck. Know the business."
+        title="Business Overview"
+        description="Revenue, costs, mileage, and cash available in one place."
         actions={
           <>
             <Button asChild variant="outline" size="sm">
@@ -275,6 +286,14 @@ export default async function DashboardPage({
         <PeriodControls period={period} />
         <TruckSwitcher trucks={orderedTrucks(trucks)} selectedId={truckId} />
       </div>
+
+      <BookkeepingAlerts
+        monthlyCount={monthlySuggestions.length}
+        monthlyTotal={monthlySuggestions.reduce((total, expense) => total + expense.amount, 0)}
+        month={period.month}
+        monthLabel={monthLabel(period.month)}
+        truckId={truckId}
+      />
 
       {/* ---- The bottom line ------------------------------------------- */}
       <Section
@@ -424,7 +443,12 @@ export default async function DashboardPage({
       <Section title="Reserves and the truck" description="Am I setting enough aside">
         <div className="grid gap-3 lg:grid-cols-2">
           {cockpit ? (
-            <ReservesPanel balances={balances} periodLabel={period.label} className="min-w-0" />
+            <ReservesPanel
+              balances={balances}
+              planned={ownerPay.reserves}
+              periodLabel={period.label}
+              className="min-w-0"
+            />
           ) : null}
           <TruckHealthPanel health={maintenance} className="min-w-0" />
         </div>

@@ -7,6 +7,7 @@ import { MiniStat } from "@/components/dashboard/mini-stat";
 import { PageHeader } from "@/components/shared/page-header";
 import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import {
+  isDeadheadElevated,
   loadsInPeriod,
   summarizePeriod,
   thresholdsFromSettings,
@@ -22,6 +23,7 @@ import {
 } from "@/lib/formatters";
 import { expensesForTruck, loadsForTruck, orderedTrucks } from "@/lib/fleet";
 import { defaultEntryDate } from "@/lib/periods";
+import { hasFleetAccess } from "@/lib/plans";
 import {
   periodFromSearchParams,
   truckFromSearchParams,
@@ -37,7 +39,7 @@ export default async function LoadsPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { trucks, loads, expenses, settings } = await getRepository(
+  const { trucks, loads, expenses, settings, drivers, subscription } = await getRepository(
     session.businessId,
   ).getDataset();
   const period = periodFromSearchParams(params);
@@ -62,6 +64,7 @@ export default async function LoadsPage({
         actions={<LoadFormDialog
             brokers={brokers}
             trucks={trucks}
+            drivers={hasFleetAccess(subscription) ? drivers : []}
             defaultTruckId={scopeTruckId}
             defaultDate={defaultEntryDate(period)}
             ratingThresholds={ratingThresholds}
@@ -87,13 +90,13 @@ export default async function LoadsPage({
         <MiniStat
           label="Deadhead %"
           value={formatPercent(summary.deadheadPct)}
-          tone={summary.deadheadPct > (settings.deadheadWarnPct ?? 20) ? "warning" : "positive"}
+          tone={isDeadheadElevated(summary.deadheadPct, settings.deadheadWarnPct) ? "warning" : "positive"}
         />
         <MiniStat
           label="Trip Expenses"
           value={formatMoneyCompact(tripExpenses)}
           tone="negative"
-          sub="fuel + tolls + other"
+          sub="trip costs + paid driver"
         />
         <MiniStat
           label="Revenue / Mile"
@@ -107,9 +110,11 @@ export default async function LoadsPage({
         loads={periodLoads}
         brokers={brokers}
         trucks={trucks}
+        drivers={hasFleetAccess(subscription) ? drivers : []}
         defaultTruckId={scopeTruckId}
         defaultDate={defaultEntryDate(period)}
         ratingThresholds={ratingThresholds}
+        deadheadWarnPct={settings.deadheadWarnPct}
         emptyDescription={`No loads are dated inside ${period.label}. Try another period or add one.`}
       />
     </div>

@@ -11,14 +11,14 @@ import { BrandLogo } from "./brand-logo";
 import { SidebarNav } from "./sidebar-nav";
 import { DisplayMenu } from "./display-menu";
 import { isNavActive, PRIMARY_NAV } from "./nav-items";
+import type { MemberRole } from "@/lib/types";
 
 interface AppShellProps {
   businessName: string;
   truckName: string;
   hasFleet?: boolean;
-  userEmail: string;
-  isDemo?: boolean;
   isAdmin?: boolean;
+  role?: MemberRole;
   children: React.ReactNode;
 }
 
@@ -26,9 +26,8 @@ export function AppShell({
   businessName,
   truckName,
   hasFleet = false,
-  userEmail,
-  isDemo = false,
   isAdmin = false,
+  role = "VIEWER",
   children,
 }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -45,7 +44,7 @@ export function AppShell({
           truckName={truckName}
           hasFleet={hasFleet}
           isAdmin={isAdmin}
-          userEmail={userEmail}
+          role={role}
         />
       </aside>
 
@@ -58,17 +57,17 @@ export function AppShell({
             truckName={truckName}
             hasFleet={hasFleet}
             isAdmin={isAdmin}
-            userEmail={userEmail}
+            role={role}
             onNavigate={() => setMobileOpen(false)}
           />
         </DialogContent>
       </Dialog>
 
       <div className="flex min-w-0 flex-1 flex-col lg:pl-60 print:block">
-        {isDemo ? (
-          <div className="border-b border-primary/25 bg-primary/10 px-4 py-2 text-center text-xs text-foreground print:hidden">
-            <span className="font-semibold">Demo account</span>
-            <span className="text-muted-foreground"> — sample data is read-only.</span>
+        {role === "VIEWER" ? (
+          <div className="border-b border-info/25 bg-info-soft px-4 py-2 text-center text-xs text-info print:hidden">
+            <span className="font-semibold">Viewer access</span>
+            <span> — this workspace is read-only for your role.</span>
           </div>
         ) : null}
         <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:hidden">

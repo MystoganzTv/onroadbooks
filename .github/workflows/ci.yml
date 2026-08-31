@@ -50,6 +50,12 @@ jobs:
       - name: Tests
         run: npm test
 
+      - name: Install browser
+        run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+
+      - name: Browser tests
+        run: npm run test:e2e
+
       - name: Build
         run: npm run build
 

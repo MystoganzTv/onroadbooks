@@ -6,7 +6,7 @@
  * share one upload/serve/delete path.
  */
 
-import type { DocumentOwner, DocumentType } from "./types";
+import type { Dataset, DocumentOwner, DocumentType } from "./types";
 
 export interface DocumentTypeDefinition {
   id: DocumentType;
@@ -47,8 +47,14 @@ export function documentTypeShort(id: string): string {
   return BY_ID.get(id as DocumentType)?.short ?? "Doc";
 }
 
-/** 10 MB, matching the upload route's own guard. */
+/** Final stored-file limit; production uploads bypass the Vercel Function body. */
 export const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
+
+/** Large scans may enter the browser optimizer, but never reach our server. */
+export const MAX_DOCUMENT_SOURCE_BYTES = 50 * 1024 * 1024;
+
+/** Multipart fallback only; leaves room for boundaries under Vercel's 4.5 MB cap. */
+export const MAX_FUNCTION_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 /**
  * Strict allowlist. Deliberately excludes SVG: an SVG is a script-bearing
@@ -96,4 +102,30 @@ export function formatBytes(bytes: number): string {
 
 export function isImage(contentType: string): boolean {
   return contentType.startsWith("image/") && contentType !== "image/svg+xml";
+}
+
+type DocumentOwnershipDataset = Pick<
+  Dataset,
+  "loads" | "expenses" | "maintenanceRecords" | "trucks"
+>;
+
+/**
+ * Confirms that the target belongs to this workspace. Truck ownership checks
+ * every unit in the Fleet, not merely whichever unit is marked primary.
+ */
+export function documentOwnerExists(
+  dataset: DocumentOwnershipDataset,
+  owner: DocumentOwner,
+  entityId: string,
+): boolean {
+  switch (owner) {
+    case "LOAD":
+      return dataset.loads.some((record) => record.id === entityId);
+    case "EXPENSE":
+      return dataset.expenses.some((record) => record.id === entityId);
+    case "MAINTENANCE":
+      return dataset.maintenanceRecords.some((record) => record.id === entityId);
+    case "TRUCK":
+      return dataset.trucks.some((record) => record.id === entityId);
+  }
 }

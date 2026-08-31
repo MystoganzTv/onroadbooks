@@ -8,14 +8,16 @@ import { cn } from "@/lib/utils";
 import { BrandLogo } from "./brand-logo";
 import { DisplayMenu } from "./display-menu";
 import { isNavActive, NAV_GROUPS } from "./nav-items";
+import { ROLE_DEFINITIONS } from "@/lib/roles";
+import type { MemberRole } from "@/lib/types";
 
 interface SidebarNavProps {
   businessName: string;
   truckName: string;
   /** Fleet-only destinations stay hidden until paid Fleet access is active. */
   hasFleet?: boolean;
-  userEmail?: string;
   isAdmin?: boolean;
+  role?: MemberRole;
   onNavigate?: () => void;
 }
 
@@ -23,8 +25,8 @@ export function SidebarNav({
   businessName,
   truckName,
   hasFleet = false,
-  userEmail,
   isAdmin = false,
+  role = "VIEWER",
   onNavigate,
 }: SidebarNavProps) {
   const pathname = usePathname();
@@ -107,16 +109,13 @@ export function SidebarNav({
               {businessName}
             </p>
             <p className="truncate text-2xs text-sidebar-foreground">
-              Business Settings
+              {role === "OWNER" ? "Business Settings" : `${ROLE_DEFINITIONS[role].label} access`}
             </p>
           </div>
           <ChevronRight className="size-4 shrink-0 text-sidebar-foreground transition-transform group-hover:translate-x-0.5" />
         </Link>
 
-        <div className="mt-1 flex items-center gap-2 px-2.5">
-          <span className="min-w-0 flex-1 truncate text-2xs text-sidebar-foreground">
-            {userEmail}
-          </span>
+        <div className="mt-1 flex justify-end px-2.5">
           <button
             type="button"
             onClick={async () => {

@@ -9,6 +9,7 @@ import {
   evaluatePlanChange,
   getPlan,
   hasFleetAccess,
+  isComplimentaryAccess,
   planAllows,
   planOf,
   trialEndsOn,
@@ -27,6 +28,16 @@ function paidFleet(over: Partial<Subscription> = {}): Subscription {
     plan: "FLEET",
     status: "ACTIVE",
     providerSubscriptionId: "sub_fleet_001",
+    ...over,
+  });
+}
+
+function complimentaryFleet(over: Partial<Subscription> = {}): Subscription {
+  return sub({
+    plan: "FLEET",
+    status: "ACTIVE",
+    currentPeriodEnd: null,
+    providerSubscriptionId: null,
     ...over,
   });
 }
@@ -83,7 +94,7 @@ describe("planAllows", () => {
     assert.equal(planAllows(sub({ plan: "OWNER" }), "fleet"), false);
   });
 
-  it("only opens Fleet for an active, paid Fleet subscription", () => {
+  it("opens Fleet only for active Stripe billing or an explicit complimentary grant", () => {
     assert.equal(planAllows(sub({ plan: "FLEET" }), "cockpit"), true);
     assert.equal(hasFleetAccess(sub({ plan: "FLEET" })), false);
     assert.equal(planAllows(sub({ plan: "FLEET" }), "fleet"), false);
@@ -91,6 +102,10 @@ describe("planAllows", () => {
     assert.equal(planAllows(paidFleet(), "fleet"), true);
     assert.equal(hasFleetAccess(paidFleet({ status: "PAST_DUE" })), false);
     assert.equal(hasFleetAccess(paidFleet({ providerSubscriptionId: null })), false);
+    assert.equal(isComplimentaryAccess(complimentaryFleet()), true);
+    assert.equal(hasFleetAccess(complimentaryFleet()), true);
+    assert.equal(planAllows(complimentaryFleet(), "fleet"), true);
+    assert.equal(hasFleetAccess(complimentaryFleet({ currentPeriodEnd: "2026-09-30" })), false);
   });
 
   it("treats a business with no subscription row as being on the default plan", () => {
@@ -125,6 +140,11 @@ describe("truckAllowance", () => {
     assert.equal(full.canAdd, false);
     assert.equal(full.remaining, 0);
     assert.match(full.reason ?? "", /larger plan/);
+  });
+
+  it("gives a complimentary Fleet grant the same truck allowance", () => {
+    assert.equal(truckAllowance(complimentaryFleet(), 7).canAdd, true);
+    assert.equal(truckAllowance(complimentaryFleet(), 8).canAdd, false);
   });
 
   it("never reports negative headroom when somehow over the limit", () => {

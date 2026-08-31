@@ -83,6 +83,11 @@ export interface RatingThresholds {
   marginal: number;
 }
 
+/** One shared comparison for every deadhead warning shown in the product. */
+export function isDeadheadElevated(deadheadPct: number, warnPct: number = 20): boolean {
+  return deadheadPct > warnPct;
+}
+
 export function thresholdsFromSettings(
   settings?: Pick<
     FinancialSettings,
@@ -122,6 +127,7 @@ export function tripExpenseLines(load: Load): { key: string; label: string; amou
     { key: "dispatch", label: "Dispatch", amount: load.dispatchFee },
     { key: "factoring", label: "Factoring", amount: load.factoringFee },
     { key: "other", label: "Other", amount: load.otherExpenses },
+    { key: "driverPay", label: "Driver Pay", amount: load.driverPay },
   ];
 }
 
@@ -134,7 +140,8 @@ export function loadMetrics(load: Load, thresholds?: RatingThresholds): LoadMetr
     num(load.tolls) +
     num(load.dispatchFee) +
     num(load.factoringFee) +
-    num(load.otherExpenses);
+    num(load.otherExpenses) +
+    num(load.driverPay);
   const tripProfit = num(load.grossRate) - tripExpenses;
   const profitPerMile = div(tripProfit, totalMiles);
 
@@ -179,10 +186,9 @@ export function fuelInPeriod(entries: FuelEntry[], range: DateRange): FuelEntry[
  * The single source of truth for "how did the truck do in this window".
  *
  * Revenue comes from loads dated inside the window. Operating expenses come
- * from the expense ledger dated inside the window -- trip-level fuel/tolls
- * recorded on a load are treated as detail for per-load profitability and
- * are NOT double counted here, because real spend is entered once in the
- * expense ledger (see docs in README).
+ * from the expense ledger dated inside the window. Load costs opted into the
+ * ledger, detailed fuel purchases, and maintenance costs all maintain their
+ * own linked rows there, so every screen reads the same dollars exactly once.
  */
 export function summarizePeriod(
   loads: Load[],
@@ -299,7 +305,7 @@ export function analyzeDeadhead(
     loadedMiles: summary.loadedMiles,
     totalMiles: summary.totalMiles,
     deadheadPct: summary.deadheadPct,
-    elevated: summary.deadheadPct > warnPct,
+    elevated: isDeadheadElevated(summary.deadheadPct, warnPct),
     warnPct,
     deadheadCost,
     costPerTotalMile: div(deadheadCost, summary.totalMiles),

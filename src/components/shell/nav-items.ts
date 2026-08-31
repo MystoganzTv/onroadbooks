@@ -10,7 +10,10 @@ import {
   Settings,
   ShieldCheck,
   Truck,
+  Users,
   Wallet,
+  UserRound,
+  ClipboardList,
   type LucideIcon,
 } from "lucide-react";
 
@@ -44,12 +47,14 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/calculator", label: "Load Calculator", icon: Calculator },
       { href: "/expenses", label: "Expenses", icon: Receipt },
       { href: "/fuel", label: "Fuel", icon: Fuel },
+      { href: "/drivers", label: "Drivers", icon: UserRound, fleetOnly: true },
     ],
   },
   {
     label: "Money",
     items: [
-      { href: "/settlements", label: "Settlements", icon: Wallet },
+      { href: "/settlements", label: "Owner Settlements", icon: Wallet },
+      { href: "/driver-settlements", label: "Driver Pay", icon: ClipboardList, fleetOnly: true },
       { href: "/reserves", label: "Reserves", icon: Landmark },
     ],
   },
@@ -59,6 +64,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/analytics/cost-per-mile", label: "Analytics", icon: BarChart3, matches: ["/analytics"] },
       { href: "/reports", label: "Reports", icon: BarChart3 },
       { href: "/fleet", label: "Fleet", icon: Truck, fleetOnly: true },
+      { href: "/team", label: "Team", icon: Users, fleetOnly: true },
       { href: "/truck", label: "Truck", icon: Truck },
     ],
   },

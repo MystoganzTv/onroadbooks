@@ -59,7 +59,11 @@ export default async function SettingsPage({
         </div>
 
         <div className="min-w-0 space-y-4">
-          <CurrentPlanCard subscription={subscription} today={todayISO()} />
+          <CurrentPlanCard
+            subscription={subscription}
+            today={todayISO()}
+            canManage={(session.role ?? "VIEWER") === "OWNER"}
+          />
 
           <Card>
             <CardHeader>
@@ -118,7 +122,9 @@ export default async function SettingsPage({
         </div>
       </div>
 
-      <AccountDangerZone email={session.email} isDemo={Boolean(session.isDemo)} />
+      {(session.role ?? "VIEWER") === "OWNER" ? (
+        <AccountDangerZone email={session.email} />
+      ) : null}
     </div>
   );
 }

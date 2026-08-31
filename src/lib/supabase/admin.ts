@@ -8,6 +8,23 @@ function adminConfig(): { url: string; key: string } | null {
   return url && key ? { url, key } : null;
 }
 
+function adminClient() {
+  const config = adminConfig();
+  if (!config) throw new Error("Supabase invitations are not configured on this server.");
+  return createClient(config.url, config.key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+/** Sends Supabase's verified invite email. Workspace and role stay in our database. */
+export async function inviteSupabaseAuthUser(email: string, redirectTo: string): Promise<void> {
+  const { error } = await adminClient().auth.admin.inviteUserByEmail(
+    email.trim().toLowerCase(),
+    { redirectTo },
+  );
+  if (error) throw error;
+}
+
 /** Removes a matching Google identity without ever exposing the admin key. */
 export async function deleteSupabaseAuthUserByEmail(email: string): Promise<void> {
   const config = adminConfig();

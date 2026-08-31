@@ -2,13 +2,14 @@ import { NextResponse } from "next/server";
 
 import { getSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
-import { primaryTruck } from "@/lib/fleet";
 import {
   documentTypeLabel,
   isAcceptedType,
-  MAX_DOCUMENT_BYTES,
+  MAX_FUNCTION_UPLOAD_BYTES,
 } from "@/lib/documents";
+import { documentUploadRefusal } from "@/lib/document-upload-policy";
 import { documentMetaSchema } from "@/lib/schemas";
+import { isSameOriginRequest } from "@/lib/request-origin";
 import { buildStorageKey, getDocumentStorage } from "@/lib/storage";
 import type { DocumentOwner, DocumentType } from "@/lib/types";
 
@@ -24,34 +25,23 @@ export const runtime = "nodejs";
  * actions, and a multipart POST is a CORS "simple request" -- so any site
  * could otherwise make a visitor's browser upload here.
  */
-function sameOrigin(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  if (!origin) return true; // Same-origin navigations and curl send none.
-  try {
-    return new URL(origin).host === new URL(request.url).host;
-  } catch {
-    return false;
-  }
-}
-
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
-  if (session.isDemo) {
-    return NextResponse.json({ error: "The demo account is read-only." }, { status: 403 });
-  }
-  if (!sameOrigin(request)) {
+  if (!isSameOriginRequest(request)) {
     return NextResponse.json({ error: "Cross-origin uploads are refused." }, { status: 403 });
   }
 
+  const repository = getRepository(session.businessId);
+  const dataset = await repository.getDataset();
   // request.formData() buffers the entire body, so the size guard has to run
   // before it -- checking file.size afterwards is already too late.
   const declaredLength = Number(request.headers.get("content-length") ?? 0);
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_DOCUMENT_BYTES + 64 * 1024) {
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_FUNCTION_UPLOAD_BYTES + 64 * 1024) {
     return NextResponse.json(
-      { error: `Files must be ${Math.round(MAX_DOCUMENT_BYTES / (1024 * 1024))} MB or smaller.` },
+      { error: "This upload must use direct document storage." },
       { status: 413 },
     );
   }
@@ -70,9 +60,9 @@ export async function POST(request: Request) {
   if (file.size === 0) {
     return NextResponse.json({ error: "That file is empty." }, { status: 400 });
   }
-  if (file.size > MAX_DOCUMENT_BYTES) {
+  if (file.size > MAX_FUNCTION_UPLOAD_BYTES) {
     return NextResponse.json(
-      { error: `Files must be ${Math.round(MAX_DOCUMENT_BYTES / (1024 * 1024))} MB or smaller.` },
+      { error: "This upload must use direct document storage." },
       { status: 413 },
     );
   }
@@ -99,21 +89,17 @@ export async function POST(request: Request) {
     type: DocumentType;
   };
 
-  const repository = getRepository(session.businessId);
-  const dataset = await repository.getDataset();
-
-  // Never let an upload create an orphan pointing at a record that is gone.
-  const ownerExists =
-    owner === "LOAD"
-      ? dataset.loads.some((l) => l.id === entityId)
-      : owner === "EXPENSE"
-        ? dataset.expenses.some((e) => e.id === entityId)
-        : owner === "MAINTENANCE"
-          ? dataset.maintenanceRecords.some((m) => m.id === entityId)
-          : primaryTruck(dataset.trucks).id === entityId;
-
-  if (!ownerExists) {
-    return NextResponse.json({ error: "That record no longer exists." }, { status: 404 });
+  const refusal = documentUploadRefusal(dataset, session.role ?? "VIEWER", {
+    owner,
+    entityId,
+    type,
+    label: parsed.data.label,
+    fileName: file.name,
+    contentType: file.type,
+    sizeBytes: file.size,
+  });
+  if (refusal) {
+    return NextResponse.json({ error: refusal.error }, { status: refusal.status });
   }
 
   const bytes = Buffer.from(await file.arrayBuffer());

@@ -37,8 +37,7 @@ const STEPS = ["Your truck", "How you run", "Done"] as const;
  * Every step is skippable and every step writes through the same server
  * actions the Settings page uses -- there is no separate onboarding write
  * path that could drift from the real one. Nothing here is required, because
- * an owner who wants to look around first should be able to, and the demo
- * data means the app is never empty while they decide.
+ * an owner who wants to look around first should be able to.
  */
 export function WelcomeFlow({ business, truck, settings, goals, planName }: WelcomeFlowProps) {
   const router = useRouter();
@@ -358,8 +357,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
           </h1>
           <p className="mx-auto mt-1.5 max-w-md text-xs leading-relaxed text-muted-foreground">
             You are starting a 7-day {planName} trial. This workspace is private and empty by
-            design — add your first load when you are ready, or open the separate demo from the
-            login page whenever you want to explore sample numbers.
+            design — add your first load when you are ready.
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             <Button type="button" onClick={finish}>

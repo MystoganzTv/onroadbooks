@@ -1,20 +1,28 @@
 import "server-only";
 
+import type { Prisma } from "@/generated/prisma";
+
 import { roundMoney } from "../calculations";
+import { calculateDriverPay } from "../driver-pay";
 import type {
   Business,
   User,
   Dataset,
+  Driver,
+  DriverSettlement,
   Document,
   DocumentType,
   Expense,
   ExpenseCategoryId,
+  EquipmentType,
   FinancialSettings,
   FuelEntry,
   Load,
+  LoadCapacity,
   MaintenanceBasis,
   MaintenanceRecord,
   MaintenanceType,
+  MemberRole,
   PaymentStatus,
   FinancialGoal,
   ReserveAccount,
@@ -28,13 +36,22 @@ import type {
 } from "../types";
 import { defaultCategoryBehavior } from "../categories";
 import { defaultGoals, defaultReserveAccounts, defaultSubscription } from "../defaults";
-import { DEFAULT_PLAN, getPlan, trialEndsOn } from "../plans";
-import { DEMO_EMAIL } from "../auth/constants";
+import { DEFAULT_PLAN, getPlan, isComplimentaryAccess, trialEndsOn } from "../plans";
+import {
+  LOAD_EXPENSE_KEYS,
+  loadExpenseDescription,
+  loadExpenseId,
+  loadExpenseSpecs,
+  reconcileLoadExpenseLedger,
+} from "../load-expenses";
+import { resolveTruckId } from "../fleet";
 import type {
   AdminAccountSummary,
   AuthStore,
   BusinessInput,
   DocumentInput,
+  DriverInput,
+  DriverSettlementInput,
   ExpenseInput,
   FuelEntryInput,
   LoadInput,
@@ -62,6 +79,31 @@ import type {
  */
 
 type PrismaClientType = InstanceType<typeof import("@/generated/prisma").PrismaClient>;
+
+function domainUser(row: {
+  id: string;
+  businessId: string | null;
+  email: string;
+  name: string | null;
+  passwordHash: string;
+  role: MemberRole;
+  invitedAt: Date | null;
+  joinedAt: Date | null;
+  createdAt: Date;
+}): User | null {
+  if (!row.businessId || !row.passwordHash) return null;
+  return {
+    id: row.id,
+    businessId: row.businessId,
+    email: row.email,
+    name: row.name,
+    passwordHash: row.passwordHash,
+    role: row.role,
+    invitedAt: row.invitedAt?.toISOString() ?? null,
+    joinedAt: row.joinedAt?.toISOString() ?? null,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClientType };
 
@@ -106,6 +148,63 @@ function fuelDescription(gallons: number, pricePerGallon: number): string {
   return `Fuel - ${gallons.toFixed(1)} gal @ ${pricePerGallon.toFixed(3)}/gal`;
 }
 
+interface LoadLedgerSource {
+  id: string;
+  truckId: string;
+  date: Date;
+  loadNumber: string | null;
+  originState: string;
+  destinationState: string;
+  fuelCost: DecimalLike;
+  tolls: DecimalLike;
+  dispatchFee: DecimalLike;
+  factoringFee: DecimalLike;
+  otherExpenses: DecimalLike;
+  costsPosted: boolean;
+}
+
+/** Keep generated load-cost ledger rows complete, current, and idempotent. */
+async function syncPrismaLoadExpenses(
+  tx: Prisma.TransactionClient,
+  businessId: string,
+  load: LoadLedgerSource,
+): Promise<void> {
+  const detailedFuel = await tx.fuelEntry.count({ where: { loadId: load.id, businessId } });
+  const specs = loadExpenseSpecs({
+    fuelCost: num(load.fuelCost),
+    tolls: num(load.tolls),
+    dispatchFee: num(load.dispatchFee),
+    factoringFee: num(load.factoringFee),
+    otherExpenses: num(load.otherExpenses),
+  });
+
+  for (const spec of specs) {
+    const id = loadExpenseId(load.id, spec.key);
+    const shouldPost = spec.amount > 0 && !(spec.key === "fuel" && detailedFuel > 0);
+
+    if (!shouldPost) {
+      await tx.expense.deleteMany({ where: { id, businessId } });
+      continue;
+    }
+
+    const values = {
+      businessId,
+      truckId: load.truckId,
+      scope: "TRUCK" as const,
+      loadId: load.id,
+      date: load.date,
+      category: spec.category,
+      description: loadExpenseDescription(load, spec.label),
+      vendor: null,
+      amount: spec.amount,
+      recurring: false,
+      receiptNumber: null,
+      notes: "Posted automatically from the load. Edit the load to change this amount.",
+    };
+    await tx.expense.upsert({ where: { id }, create: { id, ...values }, update: values });
+  }
+}
+
 /** Ledger category a logged service books under. */
 function maintenanceExpenseCategory(type: MaintenanceType): ExpenseCategoryId {
   switch (type) {
@@ -138,11 +237,29 @@ async function ownedLoadId(
   client: PrismaClientType,
   businessId: string,
   requested: string | null | undefined,
+  truckId: string | null,
+  scope: "TRUCK" | "BUSINESS" = "TRUCK",
 ): Promise<string | null> {
   const id = requested?.trim();
   if (!id) return null;
-  const exists = await client.load.count({ where: { id, businessId } });
-  if (exists !== 1) throw new Error("That load does not belong to this workspace.");
+  const load = await client.load.findFirst({ where: { id, businessId }, select: { truckId: true } });
+  if (!load) throw new Error("That load does not belong to this workspace.");
+  if (scope === "BUSINESS") throw new Error("Business overhead cannot be linked to a load.");
+  if (!truckId || load.truckId !== truckId) {
+    throw new Error("The linked load belongs to another truck.");
+  }
+  return id;
+}
+
+async function ownedDriverId(
+  client: PrismaClientType | Prisma.TransactionClient,
+  businessId: string,
+  requested: string | null | undefined,
+): Promise<string | null> {
+  const id = requested?.trim();
+  if (!id) return null;
+  const count = await client.driver.count({ where: { id, businessId } });
+  if (count !== 1) throw new Error("That driver does not belong to this workspace.");
   return id;
 }
 
@@ -151,6 +268,11 @@ async function assertDocumentTargets(
   business: { id: string; trucks: { id: string }[] },
   input: DocumentInput,
 ): Promise<void> {
+  const targets = [input.loadId, input.expenseId, input.truckId, input.maintenanceId]
+    .filter((id): id is string => Boolean(id?.trim()));
+  if (targets.length !== 1) {
+    throw new Error("A document must belong to exactly one record.");
+  }
   const checks = await Promise.all([
     input.loadId
       ? client.load.count({ where: { id: input.loadId, businessId: business.id } })
@@ -213,13 +335,32 @@ export class PrismaAuthStore implements AuthStore {
   async listAccounts(): Promise<AdminAccountSummary[]> {
     const client = await getClient();
     const rows = await client.user.findMany({
-      where: { businessId: { not: null } },
+      where: { businessId: { not: null }, role: "OWNER" },
       orderBy: { createdAt: "desc" },
       include: {
         business: {
           include: {
             subscription: true,
-            _count: { select: { trucks: true, loads: true, expenses: true, documents: true } },
+            trucks: { select: { active: true } },
+            loads: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
+            expenses: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
+            fuelEntries: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
+            documents: { orderBy: { uploadedAt: "desc" }, take: 1, select: { uploadedAt: true } },
+            maintenance: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
+            reserveTransactions: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
+            settlements: { orderBy: { createdAt: "desc" }, take: 1, select: { createdAt: true } },
+            _count: {
+              select: {
+                trucks: true,
+                loads: true,
+                expenses: true,
+                fuelEntries: true,
+                documents: true,
+                maintenance: true,
+                reserveTransactions: true,
+                settlements: true,
+              },
+            },
           },
         },
       },
@@ -228,6 +369,22 @@ export class PrismaAuthStore implements AuthStore {
     return rows.flatMap((row) => {
       if (!row.business || !row.businessId) return [];
       const subscription = row.business.subscription;
+      const activityDates = [
+        row.business.loads[0]?.createdAt,
+        row.business.expenses[0]?.createdAt,
+        row.business.fuelEntries[0]?.createdAt,
+        row.business.documents[0]?.uploadedAt,
+        row.business.maintenance[0]?.createdAt,
+        row.business.reserveTransactions[0]?.createdAt,
+        row.business.settlements[0]?.createdAt,
+      ].filter((value): value is Date => Boolean(value));
+      const lastActivityAt = activityDates.length > 0
+        ? new Date(Math.max(...activityDates.map((value) => value.getTime()))).toISOString()
+        : null;
+      const subscriptionStatus = subscription?.status ?? "TRIALING";
+      const hasProviderSubscription = Boolean(
+        subscription?.providerSubscriptionId && subscriptionStatus !== "CANCELED",
+      );
       return [{
         userId: row.id,
         businessId: row.businessId,
@@ -236,20 +393,38 @@ export class PrismaAuthStore implements AuthStore {
         businessName: row.business.name,
         createdAt: row.createdAt.toISOString(),
         plan: getPlan(subscription?.plan).id,
-        subscriptionStatus: subscription?.status ?? "TRIALING",
+        subscriptionStatus,
         currentPeriodEnd: subscription?.currentPeriodEnd
           ? isoDate(subscription.currentPeriodEnd)
           : subscription?.status === "TRIALING"
             ? trialEndsOn(subscription.startedAt.toISOString())
             : null,
-        hasProviderSubscription: Boolean(subscription?.providerSubscriptionId),
+        hasProviderSubscription,
+        accessSource: hasProviderSubscription
+          ? "stripe"
+          : subscriptionStatus === "TRIALING"
+            ? "trial"
+            : isComplimentaryAccess({
+                status: subscriptionStatus,
+                providerSubscriptionId: subscription?.providerSubscriptionId ?? null,
+                currentPeriodEnd: subscription?.currentPeriodEnd
+                  ? isoDate(subscription.currentPeriodEnd)
+                  : null,
+              })
+              ? "complimentary"
+              : "inactive",
+        lastActivityAt,
         counts: {
           trucks: row.business._count.trucks,
+          activeTrucks: row.business.trucks.filter((truck) => truck.active).length,
           loads: row.business._count.loads,
           expenses: row.business._count.expenses,
+          fuelEntries: row.business._count.fuelEntries,
           documents: row.business._count.documents,
+          maintenance: row.business._count.maintenance,
+          reserveTransactions: row.business._count.reserveTransactions,
+          settlements: row.business._count.settlements,
         },
-        isDemo: row.email.trim().toLowerCase() === DEMO_EMAIL,
       }];
     });
   }
@@ -262,80 +437,91 @@ export class PrismaAuthStore implements AuthStore {
   async findUserByEmail(email: string): Promise<User | null> {
     const client = await getClient();
     const row = await client.user.findUnique({ where: { email: email.trim().toLowerCase() } });
-    if (!row || !row.businessId || !row.passwordHash) return null;
-    return {
-      id: row.id,
-      businessId: row.businessId,
-      email: row.email,
-      name: row.name,
-      passwordHash: row.passwordHash,
-      createdAt: row.createdAt.toISOString(),
-    };
+    return row ? domainUser(row) : null;
   }
 
   async findUserById(id: string): Promise<User | null> {
     const client = await getClient();
     const row = await client.user.findUnique({ where: { id } });
-    if (!row || !row.businessId || !row.passwordHash) return null;
-    return {
-      id: row.id,
-      businessId: row.businessId,
-      email: row.email,
-      name: row.name,
-      passwordHash: row.passwordHash,
-      createdAt: row.createdAt.toISOString(),
-    };
+    return row ? domainUser(row) : null;
   }
 
-  async ensureDemoUser(): Promise<User> {
+  async listMembers(businessId: string): Promise<User[]> {
     const client = await getClient();
-    const existing = await client.user.findUnique({ where: { email: DEMO_EMAIL } });
-    if (existing?.businessId) {
-      return {
-        id: existing.id,
-        businessId: existing.businessId,
-        email: existing.email,
-        name: existing.name,
-        passwordHash: existing.passwordHash,
-        createdAt: existing.createdAt.toISOString(),
-      };
+    const rows = await client.user.findMany({
+      where: { businessId },
+      orderBy: [{ role: "asc" }, { createdAt: "asc" }],
+    });
+    return rows.flatMap((row) => {
+      const user = domainUser(row);
+      return user ? [user] : [];
+    });
+  }
+
+  async createMember(input: {
+    businessId: string;
+    email: string;
+    name?: string | null;
+    role: Exclude<MemberRole, "OWNER">;
+  }): Promise<User> {
+    const client = await getClient();
+    const email = input.email.trim().toLowerCase();
+    const business = await client.business.findUnique({ where: { id: input.businessId }, select: { id: true } });
+    if (!business) throw new Error("This workspace no longer exists.");
+    if (await client.user.findUnique({ where: { email } })) {
+      throw new Error("That email already belongs to an OnRoad Books account.");
     }
-
-    // The seeded business is the oldest ledger with real loads. New accounts
-    // start empty, so they cannot be mistaken for the demo even after years.
-    const business =
-      (await client.business.findFirst({
-        where: { loads: { some: {} } },
-        orderBy: { createdAt: "asc" },
-      })) ?? (await client.business.findFirst({ orderBy: { createdAt: "asc" } }));
-
-    if (!business) throw new Error("The demo dataset has not been seeded yet.");
-
-    const row = await client.user.upsert({
-      where: { email: DEMO_EMAIL },
-      update: {
-        name: "OnRoad Books Demo",
-        businessId: business.id,
-        passwordHash: "demo$disabled",
-      },
-      create: {
-        email: DEMO_EMAIL,
-        name: "OnRoad Books Demo",
-        // This is intentionally not a valid scrypt hash, so password login
-        // can never authenticate the public account.
-        passwordHash: "demo$disabled",
-        businessId: business.id,
+    const now = new Date();
+    const row = await client.user.create({
+      data: {
+        businessId: input.businessId,
+        email,
+        name: input.name?.trim() || null,
+        passwordHash: "invite$supabase",
+        role: input.role,
+        invitedAt: now,
+        joinedAt: null,
       },
     });
+    const user = domainUser(row);
+    if (!user) throw new Error("The member could not be created.");
+    return user;
+  }
 
-    return {
-      id: row.id,
-      businessId: business.id,
-      email: row.email,
-      name: row.name,
-      passwordHash: row.passwordHash,
-      createdAt: row.createdAt.toISOString(),
-    };
+  async updateMemberRole(
+    userId: string,
+    businessId: string,
+    role: Exclude<MemberRole, "OWNER">,
+  ): Promise<User> {
+    const client = await getClient();
+    const existing = await client.user.findFirst({ where: { id: userId, businessId } });
+    if (!existing) throw new Error("That team member was not found.");
+    if (existing.role === "OWNER") throw new Error("The owner role cannot be changed here.");
+    const row = await client.user.update({ where: { id: userId }, data: { role } });
+    const user = domainUser(row);
+    if (!user) throw new Error("The member could not be updated.");
+    return user;
+  }
+
+  async markMemberJoined(userId: string, businessId: string): Promise<User> {
+    const client = await getClient();
+    const existing = await client.user.findFirst({ where: { id: userId, businessId } });
+    if (!existing) throw new Error("That invitation no longer exists.");
+    const row = existing.joinedAt
+      ? existing
+      : await client.user.update({ where: { id: userId }, data: { joinedAt: new Date() } });
+    const user = domainUser(row);
+    if (!user) throw new Error("The member could not be activated.");
+    return user;
+  }
+
+  async removeMember(userId: string, businessId: string): Promise<{ email: string }> {
+    const client = await getClient();
+    const existing = await client.user.findFirst({ where: { id: userId, businessId } });
+    if (!existing) throw new Error("That team member was not found.");
+    if (existing.role === "OWNER") throw new Error("The workspace owner cannot be removed.");
+    await client.user.delete({ where: { id: userId } });
+    return { email: existing.email };
   }
 
   async createOwner(input: {
@@ -377,17 +563,14 @@ export class PrismaAuthStore implements AuthStore {
           name: input.name?.trim() || null,
           passwordHash: input.passwordHash,
           businessId: business.id,
+          role: "OWNER",
+          joinedAt: trialStartedAt,
         },
       });
 
-      return {
-        id: row.id,
-        businessId: business.id,
-        email: row.email,
-        name: row.name,
-        passwordHash: input.passwordHash,
-        createdAt: row.createdAt.toISOString(),
-      };
+      const user = domainUser(row);
+      if (!user) throw new Error("The owner account could not be created.");
+      return user;
     });
   }
 
@@ -397,7 +580,7 @@ export class PrismaAuthStore implements AuthStore {
     return client.$transaction(async (tx) => {
       const owner = await tx.user.findFirst({ where: { id: userId, businessId } });
       if (!owner) throw new Error("This account no longer exists.");
-      if (owner.email === DEMO_EMAIL) throw new Error("The demo account cannot be reset.");
+      if (owner.role !== "OWNER") throw new Error("Only the workspace owner can reset this account.");
 
       const documents = await tx.document.findMany({
         where: { businessId },
@@ -407,8 +590,10 @@ export class PrismaAuthStore implements AuthStore {
       await tx.document.deleteMany({ where: { businessId } });
       await tx.fuelEntry.deleteMany({ where: { businessId } });
       await tx.maintenanceRecord.deleteMany({ where: { businessId } });
+      await tx.driverSettlement.deleteMany({ where: { businessId } });
       await tx.expense.deleteMany({ where: { businessId } });
       await tx.load.deleteMany({ where: { businessId } });
+      await tx.driver.deleteMany({ where: { businessId } });
       await tx.truck.deleteMany({ where: { businessId } });
       await tx.reserveTransaction.deleteMany({ where: { businessId } });
       await tx.settlement.deleteMany({ where: { businessId } });
@@ -460,16 +645,17 @@ export class PrismaAuthStore implements AuthStore {
     return client.$transaction(async (tx) => {
       const owner = await tx.user.findFirst({ where: { id: userId, businessId } });
       if (!owner) throw new Error("This account no longer exists.");
-      if (owner.email === DEMO_EMAIL) throw new Error("The demo account cannot be deleted.");
+      if (owner.role !== "OWNER") throw new Error("Only the workspace owner can delete this account.");
 
-      const ownerCount = await tx.user.count({ where: { businessId } });
-      const documents =
-        ownerCount === 1
-          ? await tx.document.findMany({ where: { businessId }, select: { storageKey: true } })
-          : [];
+      const documents = await tx.document.findMany({
+        where: { businessId },
+        select: { storageKey: true },
+      });
 
-      await tx.user.delete({ where: { id: userId } });
-      if (ownerCount === 1) await tx.business.delete({ where: { id: businessId } });
+      // There is one immutable owner. Deleting that owner's account means
+      // deleting the workspace, not leaving members attached to ownerless books.
+      await tx.user.deleteMany({ where: { businessId } });
+      await tx.business.delete({ where: { id: businessId } });
 
       return {
         email: owner.email,
@@ -489,12 +675,10 @@ export class PrismaAuthStore implements AuthStore {
  * disagree about where a row landed.
  */
 function truckIdFor(
-  business: { trucks: { id: string }[] },
+  business: { trucks: { id: string; active: boolean }[] },
   requested: string | null | undefined,
 ): string {
-  const wanted = requested?.trim();
-  if (wanted && business.trucks.some((t) => t.id === wanted)) return wanted;
-  return business.trucks[0].id;
+  return resolveTruckId(business.trucks, requested);
 }
 
 export class PrismaRepository implements Repository {
@@ -539,6 +723,8 @@ export class PrismaRepository implements Repository {
       storedReserveAccountRows,
       reserveTransactionRows,
       settlementRows,
+      driverRows,
+      driverSettlementRows,
     ] = await Promise.all([
       // Tie-break on id so same-day rows have a defined order, matching the
       // JSON store rather than whatever Postgres happens to return.
@@ -574,6 +760,15 @@ export class PrismaRepository implements Repository {
       }),
       client.settlement.findMany({
         where: { businessId: business.id },
+        orderBy: [{ periodStart: "desc" }, { id: "desc" }],
+      }),
+      client.driver.findMany({
+        where: { businessId: business.id },
+        orderBy: [{ active: "desc" }, { name: "asc" }, { id: "asc" }],
+      }),
+      client.driverSettlement.findMany({
+        where: { businessId: business.id },
+        include: { lines: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
         orderBy: [{ periodStart: "desc" }, { id: "desc" }],
       }),
     ]);
@@ -683,7 +878,7 @@ export class PrismaRepository implements Repository {
       createdAt: row.createdAt.toISOString(),
     }));
 
-    return {
+    const dataset: Dataset = {
       users: [],
       business: {
         id: business.id,
@@ -724,18 +919,66 @@ export class PrismaRepository implements Repository {
           createdAt: row.createdAt.toISOString(),
         }),
       ),
+      drivers: driverRows.map(
+        (row): Driver => ({
+          id: row.id,
+          businessId: row.businessId,
+          name: row.name,
+          reference: row.reference,
+          defaultTruckId: row.defaultTruckId,
+          payType: row.payType,
+          payRate: num(row.payRate),
+          active: row.active,
+          createdAt: row.createdAt.toISOString(),
+        }),
+      ),
+      driverSettlements: driverSettlementRows.map(
+        (row): DriverSettlement => ({
+          id: row.id,
+          businessId: row.businessId,
+          driverId: row.driverId,
+          periodStart: isoDate(row.periodStart),
+          periodEnd: isoDate(row.periodEnd),
+          status: row.status,
+          paidOn: row.paidOn ? isoDate(row.paidOn) : null,
+          notes: row.notes,
+          createdAt: row.createdAt.toISOString(),
+          lines: row.lines.map((line) => ({
+            id: line.id,
+            settlementId: line.settlementId,
+            loadId: line.loadId,
+            truckId: line.truckId,
+            grossRevenue: num(line.grossRevenue),
+            loadedMiles: line.loadedMiles,
+            totalMiles: line.totalMiles,
+            payType: line.payType,
+            payRate: num(line.payRate),
+            payAmount: num(line.payAmount),
+            expenseId: line.expenseId,
+            createdAt: line.createdAt.toISOString(),
+          })),
+        }),
+      ),
       loads: loadRows.map(
         (row): Load => ({
           id: row.id,
           businessId: row.businessId,
           truckId: row.truckId,
+          driverId: row.driverId,
           date: isoDate(row.date),
+          deliveryDate: row.deliveryDate ? isoDate(row.deliveryDate) : null,
+          endingOdometer: row.endingOdometer,
           originCity: row.originCity,
           originState: row.originState,
           destinationCity: row.destinationCity,
           destinationState: row.destinationState,
           broker: row.broker,
           loadNumber: row.loadNumber,
+          equipmentType: row.equipmentType as EquipmentType | null,
+          loadCapacity: row.loadCapacity as LoadCapacity | null,
+          equipmentLengthFt: row.equipmentLengthFt,
+          weightLbs: row.weightLbs,
+          commodity: row.commodity,
           loadedMiles: row.loadedMiles,
           deadheadMiles: row.deadheadMiles,
           grossRate: num(row.grossRate),
@@ -744,6 +987,8 @@ export class PrismaRepository implements Repository {
           dispatchFee: num(row.dispatchFee),
           factoringFee: num(row.factoringFee),
           otherExpenses: num(row.otherExpenses),
+          driverPay: num(row.driverPay),
+          costsPosted: row.costsPosted,
           status: row.status as PaymentStatus,
           notes: row.notes,
           createdAt: row.createdAt.toISOString(),
@@ -820,17 +1065,26 @@ export class PrismaRepository implements Repository {
         }),
       ),
     };
+    reconcileLoadExpenseLedger(dataset);
+    return dataset;
   }
 
   private loadData(input: LoadInput) {
     return {
       date: toDate(input.date),
+      deliveryDate: input.deliveryDate ? toDate(input.deliveryDate) : null,
+      endingOdometer: input.endingOdometer ?? null,
       originCity: input.originCity.trim(),
       originState: input.originState.trim().toUpperCase(),
       destinationCity: input.destinationCity.trim(),
       destinationState: input.destinationState.trim().toUpperCase(),
       broker: input.broker?.trim() || null,
       loadNumber: input.loadNumber?.trim() || null,
+      equipmentType: input.equipmentType ?? null,
+      loadCapacity: input.loadCapacity ?? null,
+      equipmentLengthFt: input.equipmentLengthFt ?? null,
+      weightLbs: input.weightLbs ?? null,
+      commodity: input.commodity?.trim() || null,
       loadedMiles: Math.round(input.loadedMiles),
       deadheadMiles: Math.round(input.deadheadMiles),
       grossRate: roundMoney(input.grossRate),
@@ -839,6 +1093,7 @@ export class PrismaRepository implements Repository {
       dispatchFee: roundMoney(input.dispatchFee),
       factoringFee: roundMoney(input.factoringFee),
       otherExpenses: roundMoney(input.otherExpenses),
+      costsPosted: input.costsPosted ?? true,
       status: input.status,
       notes: input.notes?.trim() || null,
     };
@@ -850,12 +1105,20 @@ export class PrismaRepository implements Repository {
     // Match by id, never by position: the list is ordered by date, so a load
     // dated in the past is not dataset.loads[0], and returning the wrong id
     // would file the caller's attachments against someone else's load.
-    const row = await client.load.create({
-      data: {
-        ...this.loadData(input),
-        businessId: business.id,
-        truckId: truckIdFor(business, input.truckId),
-      },
+    const truckId = truckIdFor(business, input.truckId);
+    const row = await client.$transaction(async (tx) => {
+      const driverId = await ownedDriverId(tx, business.id, input.driverId);
+      const created = await tx.load.create({
+        data: { ...this.loadData(input), businessId: business.id, truckId, driverId },
+      });
+      await syncPrismaLoadExpenses(tx, business.id, created);
+      if (created.endingOdometer) {
+        await tx.truck.updateMany({
+          where: { id: truckId, businessId: business.id, currentOdometer: { lt: created.endingOdometer } },
+          data: { currentOdometer: created.endingOdometer },
+        });
+      }
+      return created;
     });
     const dataset = await this.getDataset();
     return dataset.loads.find((l) => l.id === row.id)!;
@@ -864,11 +1127,52 @@ export class PrismaRepository implements Repository {
   async updateLoad(id: string, input: LoadInput): Promise<Load> {
     const client = await getClient();
     const business = await this.business(client);
-    const updated = await client.load.updateMany({
-      where: { id, businessId: business.id },
-      data: { ...this.loadData(input), truckId: truckIdFor(business, input.truckId) },
+    const truckId = truckIdFor(business, input.truckId);
+    await client.$transaction(async (tx) => {
+      const driverId = await ownedDriverId(tx, business.id, input.driverId);
+      const existing = await tx.load.findFirst({ where: { id, businessId: business.id } });
+      if (!existing) throw new Error("That load does not belong to this workspace.");
+      if (existing.truckId !== truckId || existing.driverId !== driverId) {
+        const frozen = await tx.driverSettlementLine.count({ where: { loadId: id } });
+        if (frozen > 0) {
+          throw new Error(
+            "This load is already on a driver settlement. Delete the draft before changing its driver or truck.",
+          );
+        }
+      }
+      if (existing.truckId !== truckId) {
+        const generatedIds = LOAD_EXPENSE_KEYS.map((key) => loadExpenseId(id, key));
+        const [linkedExpenses, linkedFuel] = await Promise.all([
+          tx.expense.count({
+            where: {
+              businessId: business.id,
+              loadId: id,
+              id: { notIn: generatedIds },
+              OR: [{ scope: "BUSINESS" }, { truckId: { not: truckId } }],
+            },
+          }),
+          tx.fuelEntry.count({
+            where: { businessId: business.id, loadId: id, truckId: { not: truckId } },
+          }),
+        ]);
+        if (linkedExpenses > 0 || linkedFuel > 0) {
+          throw new Error(
+            "This load has linked costs on another truck. Reassign or unlink them before moving the load.",
+          );
+        }
+      }
+      const row = await tx.load.update({
+        where: { id },
+        data: { ...this.loadData(input), truckId, driverId },
+      });
+      await syncPrismaLoadExpenses(tx, business.id, row);
+      if (row.endingOdometer) {
+        await tx.truck.updateMany({
+          where: { id: truckId, businessId: business.id, currentOdometer: { lt: row.endingOdometer } },
+          data: { currentOdometer: row.endingOdometer },
+        });
+      }
     });
-    if (updated.count !== 1) throw new Error("That load does not belong to this workspace.");
     const dataset = await this.getDataset();
     return dataset.loads.find((l) => l.id === id)!;
   }
@@ -876,8 +1180,196 @@ export class PrismaRepository implements Repository {
   async deleteLoad(id: string): Promise<void> {
     const client = await getClient();
     const business = await this.business(client);
-    const deleted = await client.load.deleteMany({ where: { id, businessId: business.id } });
-    if (deleted.count !== 1) throw new Error("That load does not belong to this workspace.");
+    await client.$transaction(async (tx) => {
+      const existing = await tx.load.findFirst({ where: { id, businessId: business.id } });
+      if (!existing) throw new Error("That load does not belong to this workspace.");
+      const frozen = await tx.driverSettlementLine.count({ where: { loadId: id } });
+      if (frozen > 0) {
+        throw new Error(
+          "This load is already on a driver settlement. Delete the draft first; paid statements cannot be changed.",
+        );
+      }
+      await tx.expense.deleteMany({
+        where: {
+          businessId: business.id,
+          id: { in: LOAD_EXPENSE_KEYS.map((key) => loadExpenseId(id, key)) },
+        },
+      });
+      await tx.load.delete({ where: { id } });
+    });
+  }
+
+  async createDriver(input: DriverInput): Promise<Driver> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const defaultTruckId = input.defaultTruckId
+      ? truckIdFor(business, input.defaultTruckId)
+      : null;
+    const row = await client.driver.create({
+      data: {
+        businessId: business.id,
+        name: input.name.trim(),
+        reference: input.reference?.trim() || null,
+        defaultTruckId,
+        payType: input.payType,
+        payRate: input.payRate,
+      },
+    });
+    const dataset = await this.getDataset();
+    return dataset.drivers.find((driver) => driver.id === row.id)!;
+  }
+
+  async updateDriver(id: string, input: DriverInput): Promise<Driver> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const defaultTruckId = input.defaultTruckId
+      ? truckIdFor(business, input.defaultTruckId)
+      : null;
+    const updated = await client.driver.updateMany({
+      where: { id, businessId: business.id },
+      data: {
+        name: input.name.trim(),
+        reference: input.reference?.trim() || null,
+        defaultTruckId,
+        payType: input.payType,
+        payRate: input.payRate,
+      },
+    });
+    if (updated.count !== 1) throw new Error("That driver does not belong to this workspace.");
+    const dataset = await this.getDataset();
+    return dataset.drivers.find((driver) => driver.id === id)!;
+  }
+
+  async setDriverActive(id: string, active: boolean): Promise<Driver> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const updated = await client.driver.updateMany({
+      where: { id, businessId: business.id },
+      data: { active },
+    });
+    if (updated.count !== 1) throw new Error("That driver does not belong to this workspace.");
+    const dataset = await this.getDataset();
+    return dataset.drivers.find((driver) => driver.id === id)!;
+  }
+
+  async createDriverSettlement(input: DriverSettlementInput): Promise<DriverSettlement> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const row = await client.$transaction(async (tx) => {
+      const driver = await tx.driver.findFirst({
+        where: { id: input.driverId, businessId: business.id },
+      });
+      if (!driver) throw new Error("That driver does not belong to this workspace.");
+      const loads = await tx.load.findMany({
+        where: {
+          businessId: business.id,
+          driverId: driver.id,
+          date: { gte: toDate(input.periodStart), lte: toDate(input.periodEnd) },
+          driverSettlementLine: { is: null },
+        },
+        orderBy: [{ date: "asc" }, { id: "asc" }],
+      });
+      if (loads.length === 0) {
+        throw new Error("No unsettled loads are assigned to that driver in this period.");
+      }
+      return tx.driverSettlement.create({
+        data: {
+          businessId: business.id,
+          driverId: driver.id,
+          periodStart: toDate(input.periodStart),
+          periodEnd: toDate(input.periodEnd),
+          notes: input.notes?.trim() || null,
+          lines: {
+            create: loads.map((load) => ({
+              loadId: load.id,
+              truckId: load.truckId,
+              grossRevenue: load.grossRate,
+              loadedMiles: load.loadedMiles,
+              totalMiles: load.loadedMiles + load.deadheadMiles,
+              payType: driver.payType,
+              payRate: driver.payRate,
+              payAmount: calculateDriverPay(driver.payType, num(driver.payRate), {
+                grossRate: num(load.grossRate),
+                loadedMiles: load.loadedMiles,
+                deadheadMiles: load.deadheadMiles,
+              }),
+            })),
+          },
+        },
+      });
+    });
+    const dataset = await this.getDataset();
+    return dataset.driverSettlements.find((settlement) => settlement.id === row.id)!;
+  }
+
+  async payDriverSettlement(id: string, paidOn: string): Promise<DriverSettlement> {
+    const client = await getClient();
+    const business = await this.business(client);
+    await client.$transaction(async (tx) => {
+      const settlement = await tx.driverSettlement.findFirst({
+        where: { id, businessId: business.id },
+        include: { driver: true, lines: { include: { load: true } } },
+      });
+      if (!settlement) {
+        throw new Error("That driver settlement does not belong to this workspace.");
+      }
+      if (settlement.status === "PAID") throw new Error("That driver settlement is already paid.");
+
+      for (const line of settlement.lines) {
+        if (
+          line.load.truckId !== line.truckId ||
+          line.load.driverId !== settlement.driverId
+        ) {
+          throw new Error("A load on this draft no longer matches its driver and truck.");
+        }
+        const expenseId = `expdriver_${line.id}`;
+        await tx.expense.upsert({
+          where: { id: expenseId },
+          create: {
+            id: expenseId,
+            businessId: business.id,
+            truckId: line.truckId,
+            scope: "TRUCK",
+            loadId: line.loadId,
+            date: toDate(paidOn),
+            category: "DRIVER_PAY",
+            description: `Driver pay · ${settlement.driver.name}`,
+            vendor: settlement.driver.name,
+            amount: line.payAmount,
+            recurring: false,
+            notes: `Posted automatically from driver settlement ${settlement.id}.`,
+          },
+          update: {},
+        });
+        await tx.driverSettlementLine.update({
+          where: { id: line.id },
+          data: { expenseId },
+        });
+        await tx.load.update({
+          where: { id: line.loadId },
+          data: { driverPay: line.payAmount },
+        });
+      }
+      await tx.driverSettlement.update({
+        where: { id: settlement.id },
+        data: { status: "PAID", paidOn: toDate(paidOn) },
+      });
+    });
+    const dataset = await this.getDataset();
+    return dataset.driverSettlements.find((settlement) => settlement.id === id)!;
+  }
+
+  async deleteDriverSettlement(id: string): Promise<void> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const settlement = await client.driverSettlement.findFirst({
+      where: { id, businessId: business.id },
+    });
+    if (!settlement) throw new Error("That driver settlement does not belong to this workspace.");
+    if (settlement.status === "PAID") {
+      throw new Error("Paid driver settlements are permanent accounting records.");
+    }
+    await client.driverSettlement.delete({ where: { id } });
   }
 
   private expenseData(input: ExpenseInput) {
@@ -898,14 +1390,15 @@ export class PrismaRepository implements Repository {
     const client = await getClient();
     const business = await this.business(client);
     const scope = input.scope ?? "TRUCK";
-    const loadId = await ownedLoadId(client, business.id, input.loadId);
+    const truckId = scope === "BUSINESS" ? null : truckIdFor(business, input.truckId);
+    const loadId = await ownedLoadId(client, business.id, input.loadId, truckId, scope);
     const row = await client.expense.create({
       data: {
         ...this.expenseData(input),
         loadId,
         businessId: business.id,
         scope,
-        truckId: scope === "BUSINESS" ? null : truckIdFor(business, input.truckId),
+        truckId,
       },
     });
     const dataset = await this.getDataset();
@@ -915,15 +1408,19 @@ export class PrismaRepository implements Repository {
   async updateExpense(id: string, input: ExpenseInput): Promise<Expense> {
     const client = await getClient();
     const business = await this.business(client);
+    if (await client.driverSettlementLine.count({ where: { expenseId: id, settlement: { businessId: business.id } } })) {
+      throw new Error("Driver Pay expenses are controlled by their paid statement and cannot be edited.");
+    }
     const scope = input.scope ?? "TRUCK";
-    const loadId = await ownedLoadId(client, business.id, input.loadId);
+    const truckId = scope === "BUSINESS" ? null : truckIdFor(business, input.truckId);
+    const loadId = await ownedLoadId(client, business.id, input.loadId, truckId, scope);
     const updated = await client.expense.updateMany({
       where: { id, businessId: business.id },
       data: {
         ...this.expenseData(input),
         loadId,
         scope,
-        truckId: scope === "BUSINESS" ? null : truckIdFor(business, input.truckId),
+        truckId,
       },
     });
     if (updated.count !== 1) throw new Error("That expense does not belong to this workspace.");
@@ -934,6 +1431,9 @@ export class PrismaRepository implements Repository {
   async deleteExpense(id: string): Promise<void> {
     const client = await getClient();
     const business = await this.business(client);
+    if (await client.driverSettlementLine.count({ where: { expenseId: id, settlement: { businessId: business.id } } })) {
+      throw new Error("Driver Pay expenses are controlled by their paid statement and cannot be deleted.");
+    }
     const deleted = await client.expense.deleteMany({ where: { id, businessId: business.id } });
     if (deleted.count !== 1) throw new Error("That expense does not belong to this workspace.");
   }
@@ -957,7 +1457,7 @@ export class PrismaRepository implements Repository {
     const truckId = truckIdFor(business, input.truckId);
     const data = {
       ...this.fuelData(input),
-      loadId: await ownedLoadId(client, business.id, input.loadId),
+      loadId: await ownedLoadId(client, business.id, input.loadId, truckId),
     };
 
     const row = await client.$transaction(async (tx) => {
@@ -982,6 +1482,12 @@ export class PrismaRepository implements Repository {
         },
       });
       await tx.fuelEntry.update({ where: { id: created.id }, data: { expenseId: mirror.id } });
+      if (data.loadId) {
+        const load = await tx.load.findFirst({
+          where: { id: data.loadId, businessId: business.id },
+        });
+        if (load) await syncPrismaLoadExpenses(tx, business.id, load);
+      }
       if (data.odometer) {
         await tx.truck.updateMany({
           where: { id: truckId, currentOdometer: { lt: data.odometer } },
@@ -998,11 +1504,11 @@ export class PrismaRepository implements Repository {
   async updateFuelEntry(id: string, input: FuelEntryInput): Promise<FuelEntry> {
     const client = await getClient();
     const business = await this.business(client);
+    const truckId = truckIdFor(business, input.truckId);
     const data = {
       ...this.fuelData(input),
-      loadId: await ownedLoadId(client, business.id, input.loadId),
+      loadId: await ownedLoadId(client, business.id, input.loadId, truckId),
     };
-    const truckId = truckIdFor(business, input.truckId);
 
     await client.$transaction(async (tx) => {
       const existing = await tx.fuelEntry.findFirst({ where: { id, businessId: business.id } });
@@ -1042,6 +1548,16 @@ export class PrismaRepository implements Repository {
           data: { expenseId: created.id },
         });
       }
+      if (data.odometer) {
+        await tx.truck.updateMany({
+          where: { id: truckId, businessId: business.id, currentOdometer: { lt: data.odometer } },
+          data: { currentOdometer: data.odometer },
+        });
+      }
+      for (const loadId of new Set([existing.loadId, data.loadId].filter(Boolean))) {
+        const load = await tx.load.findFirst({ where: { id: loadId!, businessId: business.id } });
+        if (load) await syncPrismaLoadExpenses(tx, business.id, load);
+      }
     });
 
     const dataset = await this.getDataset();
@@ -1061,6 +1577,12 @@ export class PrismaRepository implements Repository {
         await tx.expense.deleteMany({
           where: { id: existing.expenseId, businessId: business.id },
         });
+      }
+      if (existing.loadId) {
+        const load = await tx.load.findFirst({
+          where: { id: existing.loadId, businessId: business.id },
+        });
+        if (load) await syncPrismaLoadExpenses(tx, business.id, load);
       }
     });
   }

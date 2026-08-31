@@ -37,7 +37,7 @@ export function DeadheadMonitor({
               : "border-pos/40 bg-pos-soft text-pos",
           )}
         >
-          {formatPercent(report.deadheadPct)}
+          {formatPercent(report.deadheadPct)} / {formatPercent(report.warnPct, 0)} warn
         </span>
       </CardHeader>
 

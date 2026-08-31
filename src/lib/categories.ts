@@ -25,6 +25,7 @@ export const EXPENSE_CATEGORIES: CategoryDefinition[] = [
   { id: "OFFICE", label: "Office", defaultBehavior: "FIXED", color: "#a855f7" },
   { id: "PHONE", label: "Phone", defaultBehavior: "FIXED", color: "#06b6d4" },
   { id: "ACCOUNTING", label: "Accounting", defaultBehavior: "FIXED", color: "#64748b" },
+  { id: "DRIVER_PAY", label: "Driver Pay", defaultBehavior: "VARIABLE", color: "#10b981" },
   { id: "OTHER", label: "Other", defaultBehavior: "VARIABLE", color: "#94a3b8" },
 ];
 

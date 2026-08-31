@@ -28,7 +28,7 @@ browser, against a real database. Two defects had been sitting in it:
 2. **The Postgres seed was two releases behind.** It never wrote reserve
    buckets, settlements, reserve movements, goals or a subscription, and it
    dropped the `expenseId` link that ties a fuel purchase to its ledger row. The
-   same demo showed Safe to Pay of $2,431.13 on Postgres and $2,235.23 on JSON
+   same fixture showed Safe to Pay of $2,431.13 on Postgres and $2,235.23 on JSON
    -- the missing emergency bucket, to the cent.
 
 Neither is visible to a test suite that only runs against JSON, and neither is

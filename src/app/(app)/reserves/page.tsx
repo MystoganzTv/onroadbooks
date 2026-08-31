@@ -13,9 +13,10 @@ import { PageHeader } from "@/components/shared/page-header";
 import { PlanGate } from "@/components/shared/plan-gate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireSession } from "@/lib/auth";
+import { summarizePeriod } from "@/lib/calculations";
 import { getRepository } from "@/lib/db";
 import { calculateReserveBalances, totalReserved } from "@/lib/finance/reserves";
-import { resolveReserveRules } from "@/lib/finance/owner-pay";
+import { calculateSafeOwnerPay, resolveReserveRules } from "@/lib/finance/owner-pay";
 import {
   formatDateShort,
   formatMoney,
@@ -42,9 +43,8 @@ export default async function ReservesPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { settings, reserveAccounts, reserveTransactions, subscription } = await getRepository(
-    session.businessId,
-  ).getDataset();
+  const { loads, expenses, settings, reserveAccounts, reserveTransactions, subscription } =
+    await getRepository(session.businessId).getDataset();
 
   if (!planAllows(subscription, "cockpit")) {
     return (
@@ -64,6 +64,10 @@ export default async function ReservesPage({
 
   const balances = calculateReserveBalances(reserveAccounts, reserveTransactions, period);
   const rules = resolveReserveRules(settings, reserveAccounts);
+  const ownerPay = calculateSafeOwnerPay(
+    summarizePeriod(loads, expenses, period, settings),
+    rules,
+  );
   const total = totalReserved(balances);
   const periodIn = balances.reduce((sum, b) => sum + b.periodContributions, 0);
   const periodOut = balances.reduce((sum, b) => sum + b.periodWithdrawals, 0);
@@ -83,8 +87,14 @@ export default async function ReservesPage({
 
       <PeriodControls period={period} />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <MiniStat label="Total reserved" value={formatMoneyCompact(total)} sub="all buckets" />
+        <MiniStat
+          label="Suggested"
+          value={formatMoneyCompact(ownerPay.reserveTotal)}
+          sub={period.shortLabel}
+          tone="warning"
+        />
         <MiniStat
           label="Added"
           value={formatMoneyCompact(periodIn)}
@@ -107,6 +117,9 @@ export default async function ReservesPage({
       <div className="grid gap-4 lg:grid-cols-2">
         {balances.map((balance) => {
           const rule = rules.find((r) => r.accountId === balance.account.id);
+          const recommendation = ownerPay.reserves.find(
+            (reserve) => reserve.accountId === balance.account.id,
+          );
           const builtIn =
             balance.account.kind === "TAX" || balance.account.kind === "MAINTENANCE";
 
@@ -154,6 +167,9 @@ export default async function ReservesPage({
                       </p>
                     </div>
                     <div className="text-right text-2xs text-muted-foreground tnum">
+                      <p className="text-warn">
+                        {formatMoney(recommendation?.amount ?? 0)} suggested
+                      </p>
                       <p className="text-pos">+{formatMoney(balance.contributions)} in</p>
                       <p className="text-warn">-{formatMoney(balance.withdrawals)} out</p>
                     </div>

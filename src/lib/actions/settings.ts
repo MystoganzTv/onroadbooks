@@ -18,7 +18,7 @@ export async function updateSettingsAction(values: unknown): Promise<ActionResul
   }
 
   try {
-    const repository = getRepository((await requireWritableSession()).businessId);
+    const repository = getRepository((await requireWritableSession("manage_business")).businessId);
     await repository.updateBusiness({
       name: parsed.data.businessName,
       currency: parsed.data.currency.toUpperCase(),
@@ -48,7 +48,7 @@ export async function updateTruckAction(values: unknown): Promise<ActionResult> 
   }
 
   try {
-    await getRepository((await requireWritableSession()).businessId).updateTruck(parsed.data);
+    await getRepository((await requireWritableSession("manage_fleet")).businessId).updateTruck(parsed.data);
     revalidateAll();
     return { ok: true };
   } catch (error) {

@@ -3,23 +3,30 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { DEMO_EMAIL } from "../auth/constants";
 import { roundMoney } from "../calculations";
 import { defaultCategoryBehavior } from "../categories";
+import { dataDirectory } from "../data-directory";
 import {
   defaultGoals,
   defaultReserveAccounts,
   defaultSubscription,
   migrateExpense,
+  migrateLoad,
   migrateTruck,
 } from "../defaults";
-import { primaryTruck } from "../fleet";
-import { DEFAULT_PLAN, getPlan, trialEndsOn } from "../plans";
-import { buildSeedDataset, DEMO_DOCUMENTS } from "../seed/seed-data";
-import { buildStorageKey, getDocumentStorage } from "../storage";
+import { assertLoadTruckLink, primaryTruck, resolveTruckId } from "../fleet";
+import {
+  LOAD_EXPENSE_KEYS,
+  loadExpenseId,
+  reconcileLoadExpenseLedger,
+} from "../load-expenses";
+import { DEFAULT_PLAN, getPlan, isComplimentaryAccess, trialEndsOn } from "../plans";
+import { calculateDriverPay } from "../driver-pay";
 import type {
   Business,
   Dataset,
+  Driver,
+  DriverSettlement,
   ExpenseScope,
   User,
   Document,
@@ -30,6 +37,7 @@ import type {
   FuelEntry,
   Load,
   MaintenanceRecord,
+  MemberRole,
   PlanId,
   ReserveAccount,
   ReserveTransaction,
@@ -44,6 +52,8 @@ import {
   type AuthStore,
   type BusinessInput,
   type DocumentInput,
+  type DriverInput,
+  type DriverSettlementInput,
   type ExpenseInput,
   type FuelEntryInput,
   type GoalInput,
@@ -61,12 +71,12 @@ import {
 /**
  * Local JSON store.
  *
- * Zero-setup persistence for the MVP: the file is seeded on first read and
+ * Zero-setup persistence for the MVP: an empty workspace is created on first read and
  * every mutation rewrites it atomically. Writes are serialised through a
  * promise chain so concurrent server actions cannot interleave.
  *
- * This is deliberately simple -- it exists so the product can be used and
- * demoed before a Postgres instance is provisioned, not as a database.
+ * This is deliberately simple -- it exists so the product can be used before
+ * a Postgres instance is provisioned, not as a database.
  */
 
 /**
@@ -75,7 +85,7 @@ import {
  * store impossible to point at a scratch directory, which is exactly what
  * the behavioural tests need to do.
  */
-const dataDir = () => path.join(process.cwd(), "data");
+const dataDir = () => dataDirectory();
 const dataFile = () => path.join(dataDir(), "onroad-books.json");
 
 let writeChain: Promise<unknown> = Promise.resolve();
@@ -114,18 +124,71 @@ async function readDataset(): Promise<Dataset> {
     throw new Error(
       `data/onroad-books.json could not be read (${(error as Error).message}). ` +
         `The file has been moved to ${quarantine} and left untouched. ` +
-        `Restore it or delete it to start from seed data.`,
+        `Restore it or delete it to start with an empty workspace.`,
     );
   }
 }
 
-/** First boot: write the demo dataset and materialise its demo documents. */
+/** First boot: create a private, empty workspace. */
 async function seedFresh(): Promise<Dataset> {
-  const seeded = buildSeedDataset();
-  await persist(seeded);
-  await materializeDemoDocuments(seeded);
-  await persist(seeded);
-  return seeded;
+  const now = new Date().toISOString();
+  const businessId = newId("business");
+  const truckId = newId("truck");
+  const dataset: Dataset = {
+    users: [],
+    business: {
+      id: businessId,
+      name: "My Trucking Business",
+      currency: "USD",
+      createdAt: now,
+    },
+    settings: {
+      id: newId("settings"),
+      businessId,
+      taxReservePct: 20,
+      maintenanceReservePct: 5,
+      categoryBehavior: defaultCategoryBehavior(),
+      ratingGreatPerMile: 2,
+      ratingGoodPerMile: 1.5,
+      ratingMarginalPerMile: 1,
+      deadheadWarnPct: 20,
+      maintenanceWarnMiles: 2000,
+      maintenanceWarnDays: 30,
+      updatedAt: now,
+    },
+    goals: defaultGoals(businessId, now),
+    subscription: defaultSubscription(businessId, now),
+    trucks: [{
+      id: truckId,
+      businessId,
+      name: "Truck 1",
+      acquiredOn: null,
+      soldOn: null,
+      year: null,
+      make: null,
+      model: null,
+      vin: null,
+      purchasePrice: null,
+      monthlyPayment: null,
+      monthlyInsurance: null,
+      startingOdometer: 0,
+      currentOdometer: 0,
+      active: true,
+      createdAt: now,
+    }],
+    loads: [],
+    expenses: [],
+    fuelEntries: [],
+    documents: [],
+    maintenanceRecords: [],
+    reserveAccounts: defaultReserveAccounts(businessId, now),
+    reserveTransactions: [],
+    settlements: [],
+    drivers: [],
+    driverSettlements: [],
+  };
+  await persist(dataset);
+  return dataset;
 }
 
 /**
@@ -135,6 +198,12 @@ async function seedFresh(): Promise<Dataset> {
  */
 function migrate(dataset: Dataset): Dataset {
   dataset.users ??= [];
+  dataset.users = dataset.users.map((user) => ({
+    ...user,
+    role: user.role ?? "OWNER",
+    invitedAt: user.invitedAt ?? null,
+    joinedAt: user.joinedAt ?? user.createdAt,
+  }));
 
   // A ledger written before the fleet existed carries `truck`, not `trucks`.
   // The one unit becomes the fleet's first member and every expense it ever
@@ -154,6 +223,8 @@ function migrate(dataset: Dataset): Dataset {
   dataset.maintenanceRecords ??= [];
   dataset.reserveTransactions ??= [];
   dataset.settlements ??= [];
+  dataset.drivers ??= [];
+  dataset.driverSettlements ??= [];
 
   const businessId = dataset.business?.id ?? "";
   dataset.goals ??= defaultGoals(businessId);
@@ -198,11 +269,14 @@ function migrate(dataset: Dataset): Dataset {
   };
 
   for (const load of dataset.loads) {
+    migrateLoad(load);
     load.dispatchFee ??= 0;
     load.factoringFee ??= 0;
     load.fuelCost ??= 0;
     load.tolls ??= 0;
     load.otherExpenses ??= 0;
+    load.driverId ??= null;
+    load.driverPay ??= 0;
   }
   const fallbackTruckId = dataset.trucks[0]?.id ?? "";
   for (const expense of dataset.expenses) {
@@ -215,87 +289,9 @@ function migrate(dataset: Dataset): Dataset {
   for (const entry of dataset.fuelEntries) {
     entry.expenseId ??= fuelExpenseId(entry.id);
   }
+  reconcileLoadExpenseLedger(dataset);
 
   return dataset;
-}
-
-/**
- * The demo dataset ships with a couple of real (tiny, generated) PDFs so the
- * attachment flow can be seen working before anyone uploads anything.
- */
-async function materializeDemoDocuments(dataset: Dataset): Promise<void> {
-  const storage = getDocumentStorage();
-
-  for (const demo of DEMO_DOCUMENTS) {
-    const exists =
-      demo.owner === "LOAD"
-        ? dataset.loads.some((l) => l.id === demo.targetId)
-        : demo.owner === "EXPENSE"
-          ? dataset.expenses.some((e) => e.id === demo.targetId)
-          : true;
-    if (!exists) continue;
-
-    const bytes = demoPdf(demo.title, demo.body);
-    const key = buildStorageKey(demo.owner, demo.targetId, demo.fileName);
-    try {
-      await storage.put(key, bytes, "application/pdf");
-    } catch {
-      continue;
-    }
-
-    dataset.documents.push({
-      id: newId("doc"),
-      businessId: dataset.business.id,
-      loadId: demo.owner === "LOAD" ? demo.targetId : null,
-      expenseId: demo.owner === "EXPENSE" ? demo.targetId : null,
-      truckId: demo.owner === "TRUCK" ? primaryTruck(dataset.trucks).id : null,
-      maintenanceId: demo.owner === "MAINTENANCE" ? demo.targetId : null,
-      type: demo.type,
-      label: demo.title
-        .toLowerCase()
-        .replace(/(^|\s)\w/g, (c) => c.toUpperCase()),
-      fileName: demo.fileName,
-      contentType: "application/pdf",
-      sizeBytes: bytes.byteLength,
-      storageKey: key,
-      uploadedAt: new Date().toISOString(),
-    });
-  }
-}
-
-/** A minimal, valid single-page PDF. Enough to open in any viewer. */
-function demoPdf(title: string, lines: string[]): Buffer {
-  const escape = (text: string) => text.replace(/([()\\])/g, "\\$1");
-  const content = [
-    "BT /F1 18 Tf 60 720 Td (" + escape(title) + ") Tj ET",
-    ...lines.map(
-      (line, i) => `BT /F1 11 Tf 60 ${685 - i * 20} Td (${escape(line)}) Tj ET`,
-    ),
-    "BT /F1 8 Tf 60 80 Td (Generated demo document - OnRoad Books) Tj ET",
-  ].join("\n");
-
-  const objects = [
-    "<< /Type /Catalog /Pages 2 0 R >>",
-    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
-    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
-    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-  ];
-
-  let pdf = "%PDF-1.4\n";
-  const offsets: number[] = [];
-  objects.forEach((body, i) => {
-    offsets.push(pdf.length);
-    pdf += `${i + 1} 0 obj\n${body}\nendobj\n`;
-  });
-  const xref = pdf.length;
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  for (const offset of offsets) {
-    pdf += `${offset.toString().padStart(10, "0")} 00000 n \n`;
-  }
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
-
-  return Buffer.from(pdf, "latin1");
 }
 
 async function persist(dataset: Dataset): Promise<void> {
@@ -336,23 +332,41 @@ async function mutate<T>(
     dataset.settlements.sort(
       (a, b) => b.periodStart.localeCompare(a.periodStart) || b.id.localeCompare(a.id),
     );
+    dataset.drivers.sort(
+      (a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name),
+    );
+    dataset.driverSettlements.sort(
+      (a, b) => b.periodStart.localeCompare(a.periodStart) || b.id.localeCompare(a.id),
+    );
     await persist(dataset);
     return result;
   });
 }
 
 function loadFromInput(input: LoadInput, dataset: Dataset, id: string, createdAt: string): Load {
+  const driverId = input.driverId?.trim() || null;
+  if (driverId && !dataset.drivers.some((driver) => driver.id === driverId)) {
+    throw new Error("That driver does not belong to this workspace.");
+  }
   return {
     id,
     businessId: dataset.business.id,
-    truckId: input.truckId?.trim() || primaryTruck(dataset.trucks).id,
+    truckId: resolveTruckId(dataset.trucks, input.truckId),
+    driverId,
     date: input.date,
+    deliveryDate: input.deliveryDate || null,
+    endingOdometer: input.endingOdometer ?? null,
     originCity: input.originCity.trim(),
     originState: input.originState.trim().toUpperCase(),
     destinationCity: input.destinationCity.trim(),
     destinationState: input.destinationState.trim().toUpperCase(),
     broker: input.broker?.trim() || null,
     loadNumber: input.loadNumber?.trim() || null,
+    equipmentType: input.equipmentType ?? null,
+    loadCapacity: input.loadCapacity ?? null,
+    equipmentLengthFt: input.equipmentLengthFt ?? null,
+    weightLbs: input.weightLbs ?? null,
+    commodity: input.commodity?.trim() || null,
     loadedMiles: Math.round(input.loadedMiles),
     deadheadMiles: Math.round(input.deadheadMiles),
     grossRate: roundMoney(input.grossRate),
@@ -361,6 +375,8 @@ function loadFromInput(input: LoadInput, dataset: Dataset, id: string, createdAt
     dispatchFee: roundMoney(input.dispatchFee),
     factoringFee: roundMoney(input.factoringFee),
     otherExpenses: roundMoney(input.otherExpenses),
+    driverPay: 0,
+    costsPosted: input.costsPosted ?? true,
     status: input.status,
     notes: input.notes?.trim() || null,
     createdAt,
@@ -375,11 +391,12 @@ function expenseFromInput(
 ): Expense {
   // Overhead belongs to the business, so it deliberately carries no truck.
   const scope: ExpenseScope = input.scope ?? "TRUCK";
+  const truckId = scope === "BUSINESS" ? null : resolveTruckId(dataset.trucks, input.truckId);
+  assertLoadTruckLink(dataset.loads, input.loadId, truckId, scope);
   return {
     id,
     businessId: dataset.business.id,
-    truckId:
-      scope === "BUSINESS" ? null : input.truckId?.trim() || primaryTruck(dataset.trucks).id,
+    truckId,
     scope,
     loadId: input.loadId || null,
     date: input.date,
@@ -400,10 +417,12 @@ function fuelFromInput(
   id: string,
   createdAt: string,
 ): FuelEntry {
+  const truckId = resolveTruckId(dataset.trucks, input.truckId);
+  assertLoadTruckLink(dataset.loads, input.loadId, truckId);
   return {
     id,
     businessId: dataset.business.id,
-    truckId: input.truckId?.trim() || primaryTruck(dataset.trucks).id,
+    truckId,
     loadId: input.loadId || null,
     date: input.date,
     gallons: Math.round(input.gallons * 1000) / 1000,
@@ -438,6 +457,8 @@ function syncFuelExpense(dataset: Dataset, entry: FuelEntry): void {
   const existing = dataset.expenses.find((e) => e.id === expenseId);
 
   if (existing) {
+    existing.truckId = entry.truckId;
+    existing.scope = "TRUCK";
     existing.date = entry.date;
     existing.amount = entry.totalCost;
     existing.description = description;
@@ -464,6 +485,44 @@ function syncFuelExpense(dataset: Dataset, entry: FuelEntry): void {
   });
 }
 
+/**
+ * Load costs and the expense ledger are one accounting fact. Deterministic
+ * ids make this an idempotent mirror: editing a load updates the same rows,
+ * setting a cost to zero removes it, and detailed Fuel entries take priority
+ * over the load's fuel amount so the same purchase is never counted twice.
+ */
+function syncLoadExpenses(dataset: Dataset, load: Load): void {
+  reconcileLoadExpenseLedger({
+    business: dataset.business,
+    loads: [load],
+    expenses: dataset.expenses,
+    fuelEntries: dataset.fuelEntries,
+  });
+}
+
+/**
+ * Moving a load may move its generated rows, but never somebody's manually
+ * linked expense or fill-up. Those records must be reassigned explicitly so
+ * the owner sees the accounting consequence.
+ */
+function assertLoadCanMove(dataset: Dataset, loadId: string, targetTruckId: string): void {
+  const generated = new Set(LOAD_EXPENSE_KEYS.map((key) => loadExpenseId(loadId, key)));
+  const linkedExpense = dataset.expenses.some(
+    (expense) =>
+      expense.loadId === loadId &&
+      !generated.has(expense.id) &&
+      (expense.scope === "BUSINESS" || expense.truckId !== targetTruckId),
+  );
+  const linkedFuel = dataset.fuelEntries.some(
+    (entry) => entry.loadId === loadId && entry.truckId !== targetTruckId,
+  );
+  if (linkedExpense || linkedFuel) {
+    throw new Error(
+      "This load has linked costs on another truck. Reassign or unlink them before moving the load.",
+    );
+  }
+}
+
 
 /** Maps a maintenance type onto the ledger category it should book under. */
 const MAINTENANCE_EXPENSE_CATEGORY: Record<string, ExpenseCategoryId> = {
@@ -487,7 +546,7 @@ function maintenanceFromInput(
   return {
     id,
     businessId: dataset.business.id,
-    truckId: input.truckId?.trim() || primaryTruck(dataset.trucks).id,
+    truckId: resolveTruckId(dataset.trucks, input.truckId),
     type: input.type,
     basis: input.basis,
     serviceDate: input.serviceDate,
@@ -572,7 +631,33 @@ function newSettlement(businessId: string, month: string, half: SettlementHalf):
 export class JsonAuthStore implements AuthStore {
   async listAccounts(): Promise<AdminAccountSummary[]> {
     const dataset = await serialise(readDataset);
-    return dataset.users.map((user) => ({
+    const activityDates = [
+      ...dataset.loads.map((row) => row.createdAt),
+      ...dataset.expenses.map((row) => row.createdAt),
+      ...dataset.fuelEntries.map((row) => row.createdAt),
+      ...dataset.documents.map((row) => row.uploadedAt),
+      ...dataset.maintenanceRecords.map((row) => row.createdAt),
+      ...dataset.reserveTransactions.map((row) => row.createdAt),
+      ...dataset.settlements.map((row) => row.createdAt),
+    ];
+    const validActivityTimes = activityDates
+      .map((value) => Date.parse(value))
+      .filter((value) => Number.isFinite(value));
+    const lastActivityAt = validActivityTimes.length > 0
+      ? new Date(Math.max(...validActivityTimes)).toISOString()
+      : null;
+    const hasProviderSubscription = Boolean(
+      dataset.subscription.providerSubscriptionId && dataset.subscription.status !== "CANCELED",
+    );
+    const accessSource = hasProviderSubscription
+      ? "stripe" as const
+      : dataset.subscription.status === "TRIALING"
+        ? "trial" as const
+        : isComplimentaryAccess(dataset.subscription)
+          ? "complimentary" as const
+          : "inactive" as const;
+
+    return dataset.users.filter((user) => user.role === "OWNER").map((user) => ({
       userId: user.id,
       businessId: user.businessId,
       email: user.email,
@@ -582,14 +667,20 @@ export class JsonAuthStore implements AuthStore {
       plan: getPlan(dataset.subscription.plan).id,
       subscriptionStatus: dataset.subscription.status,
       currentPeriodEnd: dataset.subscription.currentPeriodEnd,
-      hasProviderSubscription: Boolean(dataset.subscription.providerSubscriptionId),
+      hasProviderSubscription,
+      accessSource,
+      lastActivityAt,
       counts: {
         trucks: dataset.trucks.length,
+        activeTrucks: dataset.trucks.filter((truck) => truck.active).length,
         loads: dataset.loads.length,
         expenses: dataset.expenses.length,
+        fuelEntries: dataset.fuelEntries.length,
         documents: dataset.documents.length,
+        maintenance: dataset.maintenanceRecords.length,
+        reserveTransactions: dataset.reserveTransactions.length,
+        settlements: dataset.settlements.length,
       },
-      isDemo: user.email.trim().toLowerCase() === DEMO_EMAIL,
     }));
   }
 
@@ -609,22 +700,73 @@ export class JsonAuthStore implements AuthStore {
     return dataset.users.find((user) => user.id === id) ?? null;
   }
 
-  async ensureDemoUser(): Promise<User> {
-    return mutate((dataset) => {
-      const existing = dataset.users.find((user) => user.email === DEMO_EMAIL);
-      if (existing) return existing;
+  async listMembers(businessId: string): Promise<User[]> {
+    const dataset = await serialise(readDataset);
+    return dataset.users
+      .filter((user) => user.businessId === businessId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
 
+  async createMember(input: {
+    businessId: string;
+    email: string;
+    name?: string | null;
+    role: Exclude<MemberRole, "OWNER">;
+  }): Promise<User> {
+    return mutate((dataset) => {
+      const email = input.email.trim().toLowerCase();
+      if (dataset.business.id !== input.businessId) throw new Error("This workspace no longer exists.");
+      if (dataset.users.some((user) => user.email.toLowerCase() === email)) {
+        throw new Error("That email already belongs to an OnRoad Books account.");
+      }
+      const now = new Date().toISOString();
       const user: User = {
         id: newId("user"),
-        businessId: dataset.business.id,
-        email: DEMO_EMAIL,
-        name: "OnRoad Books Demo",
-        passwordHash: "demo$disabled",
-        createdAt: new Date().toISOString(),
+        businessId: input.businessId,
+        email,
+        name: input.name?.trim() || null,
+        passwordHash: "invite$supabase",
+        role: input.role,
+        invitedAt: now,
+        joinedAt: null,
+        createdAt: now,
       };
       dataset.users.push(user);
       return user;
-    });
+    }, input.businessId);
+  }
+
+  async updateMemberRole(
+    userId: string,
+    businessId: string,
+    role: Exclude<MemberRole, "OWNER">,
+  ): Promise<User> {
+    return mutate((dataset) => {
+      const user = dataset.users.find((candidate) => candidate.id === userId && candidate.businessId === businessId);
+      if (!user) throw new Error("That team member was not found.");
+      if (user.role === "OWNER") throw new Error("The owner role cannot be changed here.");
+      user.role = role;
+      return user;
+    }, businessId);
+  }
+
+  async markMemberJoined(userId: string, businessId: string): Promise<User> {
+    return mutate((dataset) => {
+      const user = dataset.users.find((candidate) => candidate.id === userId && candidate.businessId === businessId);
+      if (!user) throw new Error("That invitation no longer exists.");
+      user.joinedAt ??= new Date().toISOString();
+      return user;
+    }, businessId);
+  }
+
+  async removeMember(userId: string, businessId: string): Promise<{ email: string }> {
+    return mutate((dataset) => {
+      const user = dataset.users.find((candidate) => candidate.id === userId && candidate.businessId === businessId);
+      if (!user) throw new Error("That team member was not found.");
+      if (user.role === "OWNER") throw new Error("The workspace owner cannot be removed.");
+      dataset.users = dataset.users.filter((candidate) => candidate.id !== userId);
+      return { email: user.email };
+    }, businessId);
   }
 
   async createOwner(input: {
@@ -656,6 +798,9 @@ export class JsonAuthStore implements AuthStore {
         email,
         name: input.name?.trim() || null,
         passwordHash: input.passwordHash,
+        role: "OWNER",
+        invitedAt: null,
+        joinedAt: new Date().toISOString(),
         createdAt: new Date().toISOString(),
       };
       dataset.users.push(user);
@@ -669,7 +814,7 @@ export class JsonAuthStore implements AuthStore {
         (user) => user.id === userId && user.businessId === businessId,
       );
       if (!owner) throw new Error("This account no longer exists.");
-      if (owner.email === DEMO_EMAIL) throw new Error("The demo account cannot be reset.");
+      if (owner.role !== "OWNER") throw new Error("Only the workspace owner can reset this account.");
 
       const now = new Date().toISOString();
       const storageKeys = dataset.documents.map((document) => document.storageKey);
@@ -680,6 +825,8 @@ export class JsonAuthStore implements AuthStore {
       dataset.maintenanceRecords = [];
       dataset.reserveTransactions = [];
       dataset.settlements = [];
+      dataset.drivers = [];
+      dataset.driverSettlements = [];
       dataset.trucks = [
         {
           id: newId("truck"),
@@ -732,13 +879,10 @@ export class JsonAuthStore implements AuthStore {
         (user) => user.id === userId && user.businessId === businessId,
       );
       if (!owner) throw new Error("This account no longer exists.");
-      if (owner.email === DEMO_EMAIL) throw new Error("The demo account cannot be deleted.");
+      if (owner.role !== "OWNER") throw new Error("Only the workspace owner can delete this account.");
 
-      const lastOwner = dataset.users.filter((user) => user.businessId === businessId).length === 1;
-      const storageKeys = lastOwner
-        ? dataset.documents.map((document) => document.storageKey)
-        : [];
-      dataset.users = dataset.users.filter((user) => user.id !== userId);
+      const storageKeys = dataset.documents.map((document) => document.storageKey);
+      dataset.users = dataset.users.filter((user) => user.businessId !== businessId);
       return { email: owner.email, storageKeys };
     }, businessId);
   }
@@ -767,6 +911,8 @@ export class JsonRepository implements Repository {
     return mutate((dataset) => {
       const load = loadFromInput(input, dataset, newId("load"), new Date().toISOString());
       dataset.loads.push(load);
+      syncLoadExpenses(dataset, load);
+      bumpOdometer(dataset, load.truckId, load.endingOdometer);
       return load;
     }, this.businessId);
   }
@@ -776,21 +922,207 @@ export class JsonRepository implements Repository {
       const index = dataset.loads.findIndex((l) => l.id === id);
       if (index === -1) throw new Error(`Load ${id} not found`);
       const updated = loadFromInput(input, dataset, id, dataset.loads[index].createdAt);
+      updated.driverPay = dataset.loads[index].driverPay;
+      const frozenLine = dataset.driverSettlements
+        .flatMap((settlement) => settlement.lines)
+        .find((line) => line.loadId === id);
+      if (
+        frozenLine &&
+        (updated.truckId !== dataset.loads[index].truckId ||
+          updated.driverId !== dataset.loads[index].driverId)
+      ) {
+        throw new Error(
+          "This load is already on a driver settlement. Delete the draft before changing its driver or truck.",
+        );
+      }
+      if (updated.truckId !== dataset.loads[index].truckId) {
+        assertLoadCanMove(dataset, id, updated.truckId);
+      }
       dataset.loads[index] = updated;
+      syncLoadExpenses(dataset, updated);
+      bumpOdometer(dataset, updated.truckId, updated.endingOdometer);
       return updated;
     }, this.businessId);
   }
 
   async deleteLoad(id: string): Promise<void> {
     await mutate((dataset) => {
+      if (
+        dataset.driverSettlements.some((settlement) =>
+          settlement.lines.some((line) => line.loadId === id),
+        )
+      ) {
+        throw new Error(
+          "This load is already on a driver settlement. Delete the draft first; paid statements cannot be changed.",
+        );
+      }
+      const generatedIds = LOAD_EXPENSE_KEYS.map((key) => loadExpenseId(id, key));
       dataset.loads = dataset.loads.filter((l) => l.id !== id);
-      dataset.expenses = dataset.expenses.map((e) =>
-        e.loadId === id ? { ...e, loadId: null } : e,
-      );
+      dataset.expenses = dataset.expenses
+        .filter((expense) => !generatedIds.includes(expense.id))
+        .map((expense) => (expense.loadId === id ? { ...expense, loadId: null } : expense));
       dataset.fuelEntries = dataset.fuelEntries.map((f) =>
         f.loadId === id ? { ...f, loadId: null } : f,
       );
       dataset.documents = dataset.documents.filter((d) => d.loadId !== id);
+      dataset.documents = dataset.documents.filter(
+        (document) => !document.expenseId || !generatedIds.includes(document.expenseId),
+      );
+    }, this.businessId);
+  }
+
+  async createDriver(input: DriverInput): Promise<Driver> {
+    return mutate((dataset) => {
+      const defaultTruckId = input.defaultTruckId?.trim() || null;
+      if (defaultTruckId && !dataset.trucks.some((truck) => truck.id === defaultTruckId)) {
+        throw new Error("That default truck does not belong to this workspace.");
+      }
+      const driver: Driver = {
+        id: newId("driver"),
+        businessId: dataset.business.id,
+        name: input.name.trim(),
+        reference: input.reference?.trim() || null,
+        defaultTruckId,
+        payType: input.payType,
+        payRate: roundMoney(input.payRate),
+        active: true,
+        createdAt: new Date().toISOString(),
+      };
+      dataset.drivers.push(driver);
+      return driver;
+    }, this.businessId);
+  }
+
+  async updateDriver(id: string, input: DriverInput): Promise<Driver> {
+    return mutate((dataset) => {
+      const index = dataset.drivers.findIndex((driver) => driver.id === id);
+      if (index < 0) throw new Error("That driver does not belong to this workspace.");
+      const defaultTruckId = input.defaultTruckId?.trim() || null;
+      if (defaultTruckId && !dataset.trucks.some((truck) => truck.id === defaultTruckId)) {
+        throw new Error("That default truck does not belong to this workspace.");
+      }
+      const driver: Driver = {
+        ...dataset.drivers[index],
+        name: input.name.trim(),
+        reference: input.reference?.trim() || null,
+        defaultTruckId,
+        payType: input.payType,
+        payRate: roundMoney(input.payRate),
+      };
+      dataset.drivers[index] = driver;
+      return driver;
+    }, this.businessId);
+  }
+
+  async setDriverActive(id: string, active: boolean): Promise<Driver> {
+    return mutate((dataset) => {
+      const driver = dataset.drivers.find((row) => row.id === id);
+      if (!driver) throw new Error("That driver does not belong to this workspace.");
+      driver.active = active;
+      return driver;
+    }, this.businessId);
+  }
+
+  async createDriverSettlement(input: DriverSettlementInput): Promise<DriverSettlement> {
+    return mutate((dataset) => {
+      const driver = dataset.drivers.find((row) => row.id === input.driverId);
+      if (!driver) throw new Error("That driver does not belong to this workspace.");
+      const attachedLoadIds = new Set(
+        dataset.driverSettlements.flatMap((settlement) =>
+          settlement.lines.map((line) => line.loadId),
+        ),
+      );
+      const loads = dataset.loads.filter(
+        (load) =>
+          load.driverId === driver.id &&
+          load.date >= input.periodStart &&
+          load.date <= input.periodEnd &&
+          !attachedLoadIds.has(load.id),
+      );
+      if (loads.length === 0) {
+        throw new Error("No unsettled loads are assigned to that driver in this period.");
+      }
+      const createdAt = new Date().toISOString();
+      const settlementId = newId("dstl");
+      const settlement: DriverSettlement = {
+        id: settlementId,
+        businessId: dataset.business.id,
+        driverId: driver.id,
+        periodStart: input.periodStart,
+        periodEnd: input.periodEnd,
+        status: "DRAFT",
+        paidOn: null,
+        notes: input.notes?.trim() || null,
+        lines: loads.map((load) => ({
+          id: newId("dline"),
+          settlementId,
+          loadId: load.id,
+          truckId: load.truckId,
+          grossRevenue: load.grossRate,
+          loadedMiles: load.loadedMiles,
+          totalMiles: load.loadedMiles + load.deadheadMiles,
+          payType: driver.payType,
+          payRate: driver.payRate,
+          payAmount: calculateDriverPay(driver.payType, driver.payRate, load),
+          expenseId: null,
+          createdAt,
+        })),
+        createdAt,
+      };
+      dataset.driverSettlements.push(settlement);
+      return settlement;
+    }, this.businessId);
+  }
+
+  async payDriverSettlement(id: string, paidOn: string): Promise<DriverSettlement> {
+    return mutate((dataset) => {
+      const settlement = dataset.driverSettlements.find((row) => row.id === id);
+      if (!settlement) throw new Error("That driver settlement does not belong to this workspace.");
+      if (settlement.status === "PAID") throw new Error("That driver settlement is already paid.");
+      const driver = dataset.drivers.find((row) => row.id === settlement.driverId);
+      if (!driver) throw new Error("The driver on this settlement no longer exists.");
+
+      for (const line of settlement.lines) {
+        const load = dataset.loads.find((row) => row.id === line.loadId);
+        if (!load || load.truckId !== line.truckId || load.driverId !== settlement.driverId) {
+          throw new Error("A load on this draft no longer matches its driver and truck.");
+        }
+        const expenseId = `expdriver_${line.id}`;
+        if (!dataset.expenses.some((expense) => expense.id === expenseId)) {
+          dataset.expenses.push({
+            id: expenseId,
+            businessId: dataset.business.id,
+            truckId: line.truckId,
+            scope: "TRUCK",
+            loadId: line.loadId,
+            date: paidOn,
+            category: "DRIVER_PAY",
+            description: `Driver pay · ${driver.name}`,
+            vendor: driver.name,
+            amount: line.payAmount,
+            recurring: false,
+            receiptNumber: null,
+            notes: `Posted automatically from driver settlement ${settlement.id}.`,
+            createdAt: new Date().toISOString(),
+          });
+        }
+        line.expenseId = expenseId;
+        load.driverPay = line.payAmount;
+      }
+      settlement.status = "PAID";
+      settlement.paidOn = paidOn;
+      return settlement;
+    }, this.businessId);
+  }
+
+  async deleteDriverSettlement(id: string): Promise<void> {
+    await mutate((dataset) => {
+      const settlement = dataset.driverSettlements.find((row) => row.id === id);
+      if (!settlement) throw new Error("That driver settlement does not belong to this workspace.");
+      if (settlement.status === "PAID") {
+        throw new Error("Paid driver settlements are permanent accounting records.");
+      }
+      dataset.driverSettlements = dataset.driverSettlements.filter((row) => row.id !== id);
     }, this.businessId);
   }
 
@@ -804,6 +1136,9 @@ export class JsonRepository implements Repository {
 
   async updateExpense(id: string, input: ExpenseInput): Promise<Expense> {
     return mutate((dataset) => {
+      if (dataset.driverSettlements.some((settlement) => settlement.lines.some((line) => line.expenseId === id))) {
+        throw new Error("Driver Pay expenses are controlled by their paid statement and cannot be edited.");
+      }
       const index = dataset.expenses.findIndex((e) => e.id === id);
       if (index === -1) throw new Error(`Expense ${id} not found`);
       const updated = expenseFromInput(input, dataset, id, dataset.expenses[index].createdAt);
@@ -814,6 +1149,9 @@ export class JsonRepository implements Repository {
 
   async deleteExpense(id: string): Promise<void> {
     await mutate((dataset) => {
+      if (dataset.driverSettlements.some((settlement) => settlement.lines.some((line) => line.expenseId === id))) {
+        throw new Error("Driver Pay expenses are controlled by their paid statement and cannot be deleted.");
+      }
       dataset.expenses = dataset.expenses.filter((e) => e.id !== id);
       dataset.documents = dataset.documents.filter((d) => d.expenseId !== id);
       for (const record of dataset.maintenanceRecords) {
@@ -902,6 +1240,21 @@ export class JsonRepository implements Repository {
 
   async createDocument(input: DocumentInput): Promise<Document> {
     return mutate((dataset) => {
+      const targets = [input.loadId, input.expenseId, input.truckId, input.maintenanceId]
+        .filter((id): id is string => Boolean(id?.trim()));
+      if (targets.length !== 1) {
+        throw new Error("A document must belong to exactly one record.");
+      }
+      const targetOwned = input.loadId
+        ? dataset.loads.some((row) => row.id === input.loadId)
+        : input.expenseId
+          ? dataset.expenses.some((row) => row.id === input.expenseId)
+          : input.truckId
+            ? dataset.trucks.some((row) => row.id === input.truckId)
+            : dataset.maintenanceRecords.some((row) => row.id === input.maintenanceId);
+      if (!targetOwned) {
+        throw new Error("That document target does not belong to this workspace.");
+      }
       const document: Document = {
         id: newId("doc"),
         businessId: dataset.business.id,
@@ -936,6 +1289,8 @@ export class JsonRepository implements Repository {
       const entry = fuelFromInput(input, dataset, newId("fuel"), new Date().toISOString());
       dataset.fuelEntries.push(entry);
       syncFuelExpense(dataset, entry);
+      const load = entry.loadId ? dataset.loads.find((item) => item.id === entry.loadId) : null;
+      if (load) syncLoadExpenses(dataset, load);
       bumpOdometer(dataset, entry.truckId, entry.odometer);
       return entry;
     }, this.businessId);
@@ -945,9 +1300,15 @@ export class JsonRepository implements Repository {
     return mutate((dataset) => {
       const index = dataset.fuelEntries.findIndex((f) => f.id === id);
       if (index === -1) throw new Error(`Fuel entry ${id} not found`);
+      const previousLoadId = dataset.fuelEntries[index].loadId;
       const updated = fuelFromInput(input, dataset, id, dataset.fuelEntries[index].createdAt);
       dataset.fuelEntries[index] = updated;
       syncFuelExpense(dataset, updated);
+      for (const loadId of new Set([previousLoadId, updated.loadId].filter(Boolean))) {
+        const load = dataset.loads.find((item) => item.id === loadId);
+        if (load) syncLoadExpenses(dataset, load);
+      }
+      bumpOdometer(dataset, updated.truckId, updated.odometer);
       return updated;
     }, this.businessId);
   }
@@ -959,6 +1320,8 @@ export class JsonRepository implements Repository {
       dataset.fuelEntries = dataset.fuelEntries.filter((f) => f.id !== id);
       dataset.expenses = dataset.expenses.filter((e) => e.id !== expenseId);
       dataset.documents = dataset.documents.filter((d) => d.expenseId !== expenseId);
+      const load = entry?.loadId ? dataset.loads.find((item) => item.id === entry.loadId) : null;
+      if (load) syncLoadExpenses(dataset, load);
     }, this.businessId);
   }
 

@@ -1,0 +1,66 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+
+import { repositoryWith } from "./guards";
+import {
+  driverSettlementPaymentSchema,
+  driverSettlementSchema,
+} from "@/lib/schemas";
+import { fieldErrorsFrom, type ActionResult } from "./types";
+
+function revalidateAccounting() {
+  revalidatePath("/driver-settlements");
+  revalidatePath("/drivers");
+  revalidatePath("/loads");
+  revalidatePath("/expenses");
+  revalidatePath("/dashboard");
+  revalidatePath("/fleet");
+  revalidatePath("/reports");
+}
+
+export async function createDriverSettlementAction(values: unknown): Promise<ActionResult> {
+  const parsed = driverSettlementSchema.safeParse(values);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: "Check the highlighted fields.",
+      fieldErrors: fieldErrorsFrom(parsed.error.issues),
+    };
+  }
+  try {
+    const settlement = await (
+      await repositoryWith("fleet", "manage_driver_settlements")
+    ).createDriverSettlement(parsed.data);
+    revalidateAccounting();
+    return { ok: true, id: settlement.id };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not create that statement." };
+  }
+}
+
+export async function payDriverSettlementAction(values: unknown): Promise<ActionResult> {
+  const parsed = driverSettlementPaymentSchema.safeParse(values);
+  if (!parsed.success) return { ok: false, error: "Choose a valid payment date." };
+  try {
+    await (await repositoryWith("fleet", "manage_driver_settlements")).payDriverSettlement(
+      parsed.data.id,
+      parsed.data.paidOn,
+    );
+    revalidateAccounting();
+    revalidatePath(`/driver-settlements/${parsed.data.id}`);
+    return { ok: true, id: parsed.data.id };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not pay that statement." };
+  }
+}
+
+export async function deleteDriverSettlementAction(id: string): Promise<ActionResult> {
+  try {
+    await (await repositoryWith("fleet", "manage_driver_settlements")).deleteDriverSettlement(id);
+    revalidateAccounting();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not delete that draft." };
+  }
+}

@@ -3,6 +3,7 @@ import { CalendarClock, CircleAlert, CircleCheck, Clock, Wrench } from "lucide-r
 import { EmptyState } from "@/components/shared/empty-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatNumber } from "@/lib/formatters";
+import type { DueThresholds } from "@/lib/maintenance";
 import type { DueStatus, MaintenanceDue } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -44,9 +45,11 @@ export const DUE_STYLE: Record<
 export function UpcomingMaintenance({
   items,
   currentOdometer,
+  thresholds,
 }: {
   items: MaintenanceDue[];
   currentOdometer: number;
+  thresholds: DueThresholds;
 }) {
   const overdue = items.filter((i) => i.status === "OVERDUE").length;
   const soon = items.filter((i) => i.status === "DUE_SOON").length;
@@ -108,7 +111,7 @@ export function UpcomingMaintenance({
       </CardContent>
 
       <div className="border-t border-border px-4 py-2 text-2xs text-muted-foreground tnum">
-        Measured against {formatNumber(currentOdometer)} mi on the odometer.
+        Approaching within {formatNumber(thresholds.warnMiles)} mi or {formatNumber(thresholds.warnDays)} days · odometer {formatNumber(currentOdometer)} mi.
       </div>
     </Card>
   );

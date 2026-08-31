@@ -39,13 +39,16 @@ import { formatMiles, formatMoney, formatRateValue } from "@/lib/formatters";
 import { loadSchema } from "@/lib/schemas";
 import { todayISO } from "@/lib/periods";
 import { orderedTrucks } from "@/lib/fleet";
-import type { Load, PaymentStatus, Truck } from "@/lib/types";
+import { EQUIPMENT_TYPES, LOAD_CAPACITIES } from "@/lib/load-details";
+import type { Driver, EquipmentType, Load, LoadCapacity, PaymentStatus, Truck } from "@/lib/types";
 import { toNumber } from "@/lib/utils";
 
 const FIELD_LABELS: Record<string, string> = {
   broker: "Broker",
   loadNumber: "Load number",
   notes: "Notes",
+  deliveryDate: "Delivery date",
+  endingOdometer: "Ending odometer",
   originCity: "Origin city",
   originState: "Origin state",
   destinationCity: "Destination city",
@@ -58,18 +61,29 @@ const FIELD_LABELS: Record<string, string> = {
   dispatchFee: "Dispatch",
   factoringFee: "Factoring",
   otherExpenses: "Other",
-  date: "Date",
+  date: "Pickup date",
+  equipmentLengthFt: "Equipment length",
+  weightLbs: "Weight",
+  commodity: "Commodity",
 };
 
 interface FormState {
   truckId: string;
+  driverId: string;
   date: string;
+  deliveryDate: string;
   originCity: string;
   originState: string;
   destinationCity: string;
   destinationState: string;
   broker: string;
   loadNumber: string;
+  equipmentType: EquipmentType | "UNSPECIFIED";
+  loadCapacity: LoadCapacity | "UNSPECIFIED";
+  equipmentLengthFt: string;
+  weightLbs: string;
+  commodity: string;
+  endingOdometer: string;
   loadedMiles: string;
   deadheadMiles: string;
   grossRate: string;
@@ -85,13 +99,21 @@ interface FormState {
 function emptyState(defaultDate: string, truckId: string): FormState {
   return {
     truckId,
+    driverId: "UNASSIGNED",
     date: defaultDate,
+    deliveryDate: "",
     originCity: "",
     originState: "",
     destinationCity: "",
     destinationState: "",
     broker: "",
     loadNumber: "",
+    equipmentType: "BOX_TRUCK",
+    loadCapacity: "FULL",
+    equipmentLengthFt: "26",
+    weightLbs: "",
+    commodity: "",
+    endingOdometer: "",
     loadedMiles: "",
     deadheadMiles: "0",
     grossRate: "",
@@ -108,13 +130,21 @@ function emptyState(defaultDate: string, truckId: string): FormState {
 function stateFromLoad(load: Load): FormState {
   return {
     truckId: load.truckId,
+    driverId: load.driverId ?? "UNASSIGNED",
     date: load.date,
+    deliveryDate: load.deliveryDate ?? "",
     originCity: load.originCity,
     originState: load.originState,
     destinationCity: load.destinationCity,
     destinationState: load.destinationState,
     broker: load.broker ?? "",
     loadNumber: load.loadNumber ?? "",
+    equipmentType: load.equipmentType ?? "UNSPECIFIED",
+    loadCapacity: load.loadCapacity ?? "UNSPECIFIED",
+    equipmentLengthFt: load.equipmentLengthFt ? String(load.equipmentLengthFt) : "",
+    weightLbs: load.weightLbs ? String(load.weightLbs) : "",
+    commodity: load.commodity ?? "",
+    endingOdometer: load.endingOdometer ? String(load.endingOdometer) : "",
     loadedMiles: String(load.loadedMiles),
     deadheadMiles: String(load.deadheadMiles),
     grossRate: String(load.grossRate),
@@ -171,6 +201,7 @@ interface LoadFormDialogProps {
   load?: Load;
   brokers?: string[];
   trucks?: Truck[];
+  drivers?: Driver[];
   /** Preselects the unit the page is currently scoped to. */
   defaultTruckId?: string | null;
   defaultDate?: string;
@@ -189,6 +220,7 @@ export function LoadFormDialog({
   load,
   brokers = [],
   trucks = [],
+  drivers = [],
   defaultTruckId,
   defaultDate,
   ratingThresholds,
@@ -211,6 +243,10 @@ export function LoadFormDialog({
   // One truck ran it. Asking would be a question with a single answer.
   const showTruck = truckOptions.length > 1;
   const defaultTruck = defaultTruckId ?? truckOptions.find((t) => t.active)?.id ?? "";
+  const driverOptions = React.useMemo(
+    () => drivers.filter((driver) => driver.active || driver.id === load?.driverId),
+    [drivers, load?.driverId],
+  );
 
   const initial = React.useMemo(
     () =>
@@ -250,7 +286,8 @@ export function LoadFormDialog({
       toNumber(values.tolls) +
       toNumber(values.dispatchFee) +
       toNumber(values.factoringFee) +
-      toNumber(values.otherExpenses),
+      toNumber(values.otherExpenses) +
+      (load?.driverPay ?? 0),
   );
   const totalMiles = loadedMiles + deadheadMiles;
   const tripProfit = roundMoney(grossRate - tripExpenses);
@@ -264,13 +301,25 @@ export function LoadFormDialog({
       // Empty when the business has one truck: the store bills the unit that
       // exists rather than the form guessing at an id.
       truckId: values.truckId || null,
+      driverId: values.driverId === "UNASSIGNED" ? null : values.driverId,
       date: values.date,
+      deliveryDate: values.deliveryDate || null,
       originCity: values.originCity,
       originState: values.originState,
       destinationCity: values.destinationCity,
       destinationState: values.destinationState,
       broker: values.broker || null,
       loadNumber: values.loadNumber || null,
+      equipmentType: values.equipmentType === "UNSPECIFIED" ? null : values.equipmentType,
+      loadCapacity: values.loadCapacity === "UNSPECIFIED" ? null : values.loadCapacity,
+      equipmentLengthFt: values.equipmentLengthFt
+        ? Math.round(toNumber(values.equipmentLengthFt))
+        : null,
+      weightLbs: values.weightLbs ? Math.round(toNumber(values.weightLbs)) : null,
+      commodity: values.commodity || null,
+      endingOdometer: values.endingOdometer
+        ? Math.round(toNumber(values.endingOdometer))
+        : null,
       loadedMiles,
       deadheadMiles,
       grossRate,
@@ -279,6 +328,7 @@ export function LoadFormDialog({
       dispatchFee: toNumber(values.dispatchFee),
       factoringFee: toNumber(values.factoringFee),
       otherExpenses: toNumber(values.otherExpenses),
+      costsPosted: true,
       status: values.status,
       notes: values.notes || null,
     };
@@ -370,8 +420,30 @@ export function LoadFormDialog({
               </Field>
             ) : null}
 
+            {driverOptions.length > 0 ? (
+              <Field
+                label="Driver"
+                htmlFor="load-driver"
+                hint="The person whose pay statement this load belongs to"
+              >
+                <Select value={values.driverId} onValueChange={(value) => set("driverId", value)}>
+                  <SelectTrigger id="load-driver">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="UNASSIGNED">Unassigned</SelectItem>
+                    {driverOptions.map((driver) => (
+                      <SelectItem key={driver.id} value={driver.id}>
+                        {driver.name}{driver.active ? "" : " (inactive)"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            ) : null}
+
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Field label="Date" htmlFor="load-date" required error={errors.date}>
+              <Field label="Pickup date" htmlFor="load-date" required error={errors.date}>
                 <Input
                   id="load-date"
                   type="date"
@@ -379,6 +451,16 @@ export function LoadFormDialog({
                   onChange={(e) => set("date", e.target.value)}
                   aria-invalid={Boolean(errors.date)}
                   required
+                />
+              </Field>
+              <Field label="Delivery date" htmlFor="load-delivery-date" error={errors.deliveryDate}>
+                <Input
+                  id="load-delivery-date"
+                  type="date"
+                  min={values.date || undefined}
+                  value={values.deliveryDate}
+                  onChange={(e) => set("deliveryDate", e.target.value)}
+                  aria-invalid={Boolean(errors.deliveryDate)}
                 />
               </Field>
               <Field label="Status" htmlFor="load-status">
@@ -398,7 +480,7 @@ export function LoadFormDialog({
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Broker" htmlFor="load-broker" className="col-span-2" error={errors.broker}>
+              <Field label="Broker" htmlFor="load-broker" error={errors.broker}>
                 <Input
                   id="load-broker"
                   list="broker-list"
@@ -475,7 +557,84 @@ export function LoadFormDialog({
               </Field>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
+              <Field label="Equipment" htmlFor="load-equipment" className="sm:col-span-2">
+                <Select
+                  value={values.equipmentType}
+                  onValueChange={(value) => set("equipmentType", value as FormState["equipmentType"])}
+                >
+                  <SelectTrigger id="load-equipment">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="UNSPECIFIED">Not specified</SelectItem>
+                    {EQUIPMENT_TYPES.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Load type" htmlFor="load-capacity">
+                <Select
+                  value={values.loadCapacity}
+                  onValueChange={(value) => set("loadCapacity", value as FormState["loadCapacity"])}
+                >
+                  <SelectTrigger id="load-capacity">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="UNSPECIFIED">Not specified</SelectItem>
+                    {LOAD_CAPACITIES.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Length (ft)" htmlFor="load-length" error={errors.equipmentLengthFt}>
+                <Input
+                  id="load-length"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={100}
+                  step={1}
+                  value={values.equipmentLengthFt}
+                  onChange={(e) => set("equipmentLengthFt", e.target.value)}
+                  aria-invalid={Boolean(errors.equipmentLengthFt)}
+                  placeholder="26"
+                />
+              </Field>
+              <Field label="Weight (lb)" htmlFor="load-weight" error={errors.weightLbs}>
+                <Input
+                  id="load-weight"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={200000}
+                  step={1}
+                  value={values.weightLbs}
+                  onChange={(e) => set("weightLbs", e.target.value)}
+                  aria-invalid={Boolean(errors.weightLbs)}
+                  placeholder="Optional"
+                />
+              </Field>
+              <Field label="Commodity" htmlFor="load-commodity" error={errors.commodity}>
+                <Input
+                  id="load-commodity"
+                  maxLength={120}
+                  value={values.commodity}
+                  onChange={(e) => set("commodity", e.target.value)}
+                  aria-invalid={Boolean(errors.commodity)}
+                  placeholder="General freight"
+                />
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               <Field
                 label="Loaded miles"
                 htmlFor="load-loaded"
@@ -510,6 +669,25 @@ export function LoadFormDialog({
                   onChange={(e) => set("deadheadMiles", e.target.value)}
                   aria-invalid={Boolean(errors.deadheadMiles)}
                   required
+                />
+              </Field>
+              <Field
+                label="Ending odometer"
+                htmlFor="load-ending-odometer"
+                error={errors.endingOdometer}
+                hint="Actual dashboard reading"
+              >
+                <Input
+                  id="load-ending-odometer"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={5_000_000}
+                  step={1}
+                  value={values.endingOdometer}
+                  onChange={(e) => set("endingOdometer", e.target.value)}
+                  aria-invalid={Boolean(errors.endingOdometer)}
+                  placeholder="Optional"
                 />
               </Field>
               <Field label="Gross rate" htmlFor="load-rate" required error={errors.grossRate}>
@@ -599,6 +777,11 @@ export function LoadFormDialog({
                 />
               </Field>
             </div>
+
+            <p className="rounded-md border border-border bg-surface-sunken px-3 py-2.5 text-2xs leading-relaxed text-muted-foreground">
+              Trip costs are included automatically in Operating Expenses. A detailed Fuel entry
+              linked to this load replaces its fuel amount to prevent double counting.
+            </p>
 
             <Field label="Notes" htmlFor="load-notes" error={errors.notes}>
               <Textarea

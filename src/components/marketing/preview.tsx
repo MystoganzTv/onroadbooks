@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
  * 600px wide on a desktop and 340px on a phone, and the same markup has to
  * read at both.
  *
- * Every figure comes from `PREVIEW_FIGURES`, which is the seeded demo month --
+ * Every figure comes from `PREVIEW_FIGURES`, which is the reference month --
  * the same month a new owner sees on their first visit. Nothing here is
  * invented for the sake of a nicer number.
  */

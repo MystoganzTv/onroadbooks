@@ -15,6 +15,7 @@ import type { Truck } from "@/lib/types";
 interface TruckOverviewProps {
   truck: Truck;
   odometerMiles: number;
+  loadMiles: number;
   milesPerGallon: number | null;
   activeTruckCount: number;
   canRestore: boolean;
@@ -24,6 +25,7 @@ interface TruckOverviewProps {
 export function TruckOverview({
   truck,
   odometerMiles,
+  loadMiles,
   milesPerGallon,
   activeTruckCount,
   canRestore,
@@ -67,7 +69,11 @@ export function TruckOverview({
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-x-5 gap-y-6 p-4 lg:p-5">
             <Metric label="Starting" value={formatOdometer(truck.startingOdometer)} sub="mi" />
-            <Metric label="Current" value={formatOdometer(truck.currentOdometer)} sub="mi" />
+            <Metric
+              label="Current"
+              value={formatOdometer(truck.currentOdometer)}
+              sub="latest recorded reading"
+            />
             <Metric
               label="Miles Driven"
               value={formatNumber(odometerMiles)}
@@ -96,10 +102,12 @@ export function TruckOverview({
             <Metric
               label="Monthly Payment"
               value={truck.monthlyPayment ? formatMoney(truck.monthlyPayment) : "--"}
+              sub={truck.monthlyPayment ? "used by monthly expense prompts" : undefined}
             />
             <Metric
               label="Monthly Insurance"
               value={truck.monthlyInsurance ? formatMoney(truck.monthlyInsurance) : "--"}
+              sub={truck.monthlyInsurance ? "used by monthly expense prompts" : undefined}
             />
             <Metric label="VIN" value={truck.vin ?? "--"} valueClassName="text-xs font-mono" />
           </CardContent>
@@ -142,6 +150,11 @@ export function TruckOverview({
           </CardContent>
         </Card>
       </div>
+      <p className="text-2xs leading-relaxed text-muted-foreground">
+        Load miles ({formatNumber(loadMiles)}) track work performed. The odometer changes only from
+        an Ending odometer on a load, a Fuel or Service reading, or Update truck—never by adding an
+        estimated route automatically.
+      </p>
     </section>
   );
 }

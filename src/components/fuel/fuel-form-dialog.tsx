@@ -126,11 +126,14 @@ export function FuelFormDialog({
 
   React.useEffect(() => {
     if (open) {
+      setTruckId(
+        entry?.truckId ?? defaultTruckId ?? truckOptions.find((truck) => truck.active)?.id ?? "",
+      );
       setValues(initial);
       setErrors({});
       setCostEdited(Boolean(entry));
     }
-  }, [open, initial, entry]);
+  }, [open, initial, entry, defaultTruckId, truckOptions]);
 
   const gallons = toNumber(values.gallons);
   const price = toNumber(values.pricePerGallon);
@@ -143,12 +146,24 @@ export function FuelFormDialog({
   // Same as the expense form: a link made in another period must stay
   // visible, or the select renders empty and looks unlinked.
   const linkOptions = React.useMemo(() => {
-    const visible = loads.slice(0, 40);
+    const matching = loads.filter((load) => load.truckId === truckId);
+    const visible = matching.slice(0, 40);
     const linkedId = entry?.loadId;
     if (!linkedId || visible.some((l) => l.id === linkedId)) return visible;
-    const linked = loads.find((l) => l.id === linkedId);
+    const linked = matching.find((l) => l.id === linkedId);
     return linked ? [linked, ...visible] : visible;
-  }, [loads, entry?.loadId]);
+  }, [loads, entry?.loadId, truckId]);
+
+  function changeTruck(nextTruckId: string) {
+    setTruckId(nextTruckId);
+    setValues((prev) => {
+      const linked = loads.find((load) => load.id === prev.loadId);
+      return {
+        ...prev,
+        loadId: linked?.truckId === nextTruckId ? prev.loadId : "none",
+      };
+    });
+  }
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -223,7 +238,7 @@ export function FuelFormDialog({
                 required
                 hint="Sets the odometer this reading belongs to"
               >
-                <Select value={truckId} onValueChange={setTruckId}>
+                <Select value={truckId} onValueChange={changeTruck}>
                   <SelectTrigger id="fuel-truck">
                     <SelectValue />
                   </SelectTrigger>
@@ -333,7 +348,11 @@ export function FuelFormDialog({
                   placeholder={lastOdometer ? String(lastOdometer + 400) : ""}
                 />
               </Field>
-              <Field label="Link to load" htmlFor="fuel-load">
+              <Field
+                label="Link to load"
+                htmlFor="fuel-load"
+                hint="Only loads assigned to this truck are shown"
+              >
                 <Select value={values.loadId} onValueChange={(value) => set("loadId", value)}>
                   <SelectTrigger id="fuel-load">
                     <SelectValue />

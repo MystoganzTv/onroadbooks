@@ -66,8 +66,7 @@ export default function TermsPage() {
         <p>
           You may not use OnRoad Books to violate law, facilitate fraud, misrepresent financial or
           transportation records, infringe another person&apos;s rights, or assist conduct that
-          creates a material risk of harm. The public demo is provided for evaluation and is
-          read-only.
+          creates a material risk of harm.
         </p>
 
         <h3>Respect accounts and access controls</h3>

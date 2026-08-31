@@ -1,8 +1,8 @@
 import { AppShell } from "@/components/shell/app-shell";
 import { requireSession } from "@/lib/auth";
-import { isAdminEmail } from "@/lib/auth/admin";
 import { getRepository } from "@/lib/db";
 import { activeTrucks, primaryTruck } from "@/lib/fleet";
+import { isPlatformAdminEmail } from "@/lib/platform-admin";
 import { hasFleetAccess } from "@/lib/plans";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -25,9 +25,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             : `${running.length} trucks`
       }
       hasFleet={hasFleet}
-      userEmail={session.email}
-      isDemo={session.isDemo}
-      isAdmin={isAdminEmail(session.email)}
+      isAdmin={isPlatformAdminEmail(session.email)}
+      role={session.role ?? "VIEWER"}
     >
       {children}
     </AppShell>

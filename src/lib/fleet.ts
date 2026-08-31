@@ -1,4 +1,4 @@
-import type { Dataset, Expense, Load, Truck } from "./types";
+import type { Dataset, Expense, ExpenseScope, Load, Truck } from "./types";
 
 /**
  * Reading a fleet.
@@ -26,6 +26,49 @@ export function activeTrucks(trucks: Truck[]): Truck[] {
 export function truckById(trucks: Truck[], id: string | null | undefined): Truck | undefined {
   if (!id) return undefined;
   return trucks.find((t) => t.id === id);
+}
+
+/**
+ * Resolves an optional unit id without silently accepting a forged or stale
+ * id. Omitting the id only means "the truck" when there is one active answer.
+ * Once a fleet has multiple active units, guessing would quietly post money
+ * and mileage to whichever truck happens to sort first.
+ */
+export function resolveTruckId(
+  trucks: Pick<Truck, "id" | "active">[],
+  requested: string | null | undefined,
+): string {
+  const wanted = requested?.trim();
+  if (!wanted) {
+    const active = trucks.filter((truck) => truck.active);
+    if (active.length > 1) {
+      throw new Error("Choose which truck this record belongs to.");
+    }
+    const onlyAnswer = active[0] ?? (trucks.length === 1 ? trucks[0] : undefined);
+    if (!onlyAnswer) throw new Error("This workspace has no active truck.");
+    return onlyAnswer.id;
+  }
+  if (trucks.some((truck) => truck.id === wanted)) return wanted;
+  throw new Error("That truck does not belong to this workspace.");
+}
+
+/** A load-linked cost must belong to the same unit that ran the load. */
+export function assertLoadTruckLink(
+  loads: Pick<Load, "id" | "truckId">[],
+  loadId: string | null | undefined,
+  truckId: string | null,
+  scope: ExpenseScope = "TRUCK",
+): void {
+  const linkedId = loadId?.trim();
+  if (!linkedId) return;
+  const load = loads.find((candidate) => candidate.id === linkedId);
+  if (!load) throw new Error("That load does not belong to this workspace.");
+  if (scope === "BUSINESS") {
+    throw new Error("Business overhead cannot be linked to a load.");
+  }
+  if (!truckId || load.truckId !== truckId) {
+    throw new Error("The linked load belongs to another truck.");
+  }
 }
 
 /** A stable ordering for pickers and tables: active first, then by name. */

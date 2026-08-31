@@ -29,6 +29,21 @@ enum PaymentStatus {
   PAID
 }
 
+enum EquipmentType {
+  BOX_TRUCK
+  DRY_VAN
+  REEFER
+  FLATBED
+  POWER_ONLY
+  SPRINTER_VAN
+  OTHER
+}
+
+enum LoadCapacity {
+  FULL
+  PARTIAL
+}
+
 enum ExpenseBehavior {
   FIXED
   VARIABLE
@@ -107,6 +122,21 @@ enum SettlementStatus {
   CLOSED
 }
 
+/// How a driver's pay is calculated for each load. The rate is stored on the
+/// driver and copied into every settlement line so changing a contract never
+/// rewrites a statement that was already prepared or paid.
+enum DriverPayType {
+  PERCENT_GROSS
+  PER_LOADED_MILE
+  PER_TOTAL_MILE
+  FLAT_PER_LOAD
+}
+
+enum DriverSettlementStatus {
+  DRAFT
+  PAID
+}
+
 enum PlanId {
   /// Kept for rows created before the three-tier catalogue. The application
   /// reads it as OWNER; removing it would make Prisma unable to decode those
@@ -140,19 +170,33 @@ enum ExpenseCategory {
   OFFICE
   PHONE
   ACCOUNTING
+  DRIVER_PAY
   OTHER
 }
 
+enum MemberRole {
+  OWNER
+  ADMIN
+  BOOKKEEPER
+  DISPATCHER
+  VIEWER
+}
+
 model User {
-  id         String    @id @default(cuid())
-  email      String    @unique
-  name       String?
+  id           String     @id @default(cuid())
+  email        String     @unique
+  name         String?
   /// scrypt$<salt>$<hash>. Never selected into anything the client sees.
   passwordHash String
-  businessId String?
-  business   Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  role         MemberRole @default(OWNER)
+  /// Set while an owner-created invitation is waiting to be accepted.
+  invitedAt    DateTime?
+  /// Null until the invited person completes a verified Supabase sign-in.
+  joinedAt     DateTime?  @default(now())
+  businessId   String?
+  business     Business?  @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   @@index([businessId])
 }
@@ -164,19 +208,21 @@ model Business {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users      User[]
-  trucks     Truck[]
-  loads       Load[]
-  expenses    Expense[]
-  fuelEntries FuelEntry[]
-  documents   Document[]
-  maintenance MaintenanceRecord[]
-  settings    FinancialSettings?
+  users               User[]
+  trucks              Truck[]
+  loads               Load[]
+  expenses            Expense[]
+  fuelEntries         FuelEntry[]
+  documents           Document[]
+  maintenance         MaintenanceRecord[]
+  settings            FinancialSettings?
   goals               FinancialGoal?
   subscription        Subscription?
   reserveAccounts     ReserveAccount[]
   reserveTransactions ReserveTransaction[]
   settlements         Settlement[]
+  drivers             Driver[]
+  driverSettlements   DriverSettlement[]
 }
 
 /// What the owner is aiming at. One row per business; targets are monthly and
@@ -204,8 +250,8 @@ model FinancialGoal {
 /// Prices and truck limits are NOT stored: they live in lib/plans.ts, because
 /// a price is a product decision that ships with a release rather than a row
 /// someone can edit into an inconsistent state. The provider columns are
-/// deliberately present and empty -- there is no payment integration yet, and
-/// when one arrives it fills these in rather than reshaping the model.
+/// null for an explicit complimentary admin grant. Stripe fills both provider
+/// columns; the application never invents a provider subscription id.
 model Subscription {
   id         String   @id @default(cuid())
   businessId String   @unique
@@ -253,9 +299,9 @@ model ReserveAccount {
 /// A movement in a bucket. `amount` is signed: contributions positive,
 /// withdrawals negative. A balance is always the running sum, never a column.
 model ReserveTransaction {
-  id         String   @id @default(cuid())
+  id         String         @id @default(cuid())
   businessId String
-  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business   Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
   accountId  String
   account    ReserveAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
@@ -287,7 +333,7 @@ model Settlement {
   business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   /// Anchor month, "2026-08".
-  month String   @db.VarChar(7)
+  month String         @db.VarChar(7)
   half  SettlementHalf
 
   periodStart DateTime @db.Date
@@ -309,36 +355,36 @@ model Settlement {
 }
 
 model FinancialSettings {
-  id                    String   @id @default(cuid())
-  businessId            String   @unique
-  business              Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  businessId String   @unique
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   /// Percent of operating profit set aside for taxes (20 = 20%).
-  taxReservePct         Decimal  @default(20) @db.Decimal(5, 2)
+  taxReservePct         Decimal @default(20) @db.Decimal(5, 2)
   /// Percent of gross revenue set aside for maintenance (5 = 5%).
-  maintenanceReservePct Decimal  @default(5) @db.Decimal(5, 2)
+  maintenanceReservePct Decimal @default(5) @db.Decimal(5, 2)
   /// Map of ExpenseCategory -> ExpenseBehavior overrides.
-  categoryBehavior      Json     @default("{}")
+  categoryBehavior      Json    @default("{}")
 
   /// Profit-per-total-mile floors for the load profitability rating.
-  ratingGreatPerMile    Decimal  @default(2) @db.Decimal(8, 2)
-  ratingGoodPerMile     Decimal  @default(1.5) @db.Decimal(8, 2)
-  ratingMarginalPerMile Decimal  @default(1) @db.Decimal(8, 2)
+  ratingGreatPerMile    Decimal @default(2) @db.Decimal(8, 2)
+  ratingGoodPerMile     Decimal @default(1.5) @db.Decimal(8, 2)
+  ratingMarginalPerMile Decimal @default(1) @db.Decimal(8, 2)
 
   /// Deadhead share of total miles that triggers a warning.
-  deadheadWarnPct       Decimal  @default(20) @db.Decimal(5, 2)
+  deadheadWarnPct      Decimal @default(20) @db.Decimal(5, 2)
   /// Remaining service life that flags maintenance as due soon.
-  maintenanceWarnMiles  Int      @default(2000)
-  maintenanceWarnDays   Int      @default(30)
+  maintenanceWarnMiles Int     @default(2000)
+  maintenanceWarnDays  Int     @default(30)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model Truck {
-  id               String   @id @default(cuid())
-  businessId       String
-  business         Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   name             String
   year             Int?
@@ -361,11 +407,13 @@ model Truck {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  loads       Load[]
-  expenses    Expense[]
-  fuelEntries FuelEntry[]
-  documents   Document[]
-  maintenance MaintenanceRecord[]
+  loads                 Load[]
+  expenses              Expense[]
+  fuelEntries           FuelEntry[]
+  documents             Document[]
+  maintenance           MaintenanceRecord[]
+  defaultDrivers        Driver[]               @relation("DriverDefaultTruck")
+  driverSettlementLines DriverSettlementLine[]
 
   @@index([businessId])
 }
@@ -376,26 +424,45 @@ model Load {
   business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   truckId    String
   truck      Truck    @relation(fields: [truckId], references: [id], onDelete: Cascade)
+  driverId   String?
+  driver     Driver?  @relation(fields: [driverId], references: [id], onDelete: SetNull)
 
-  /// Service date -- the date the period filters key off.
-  date              DateTime @db.Date
-  originCity        String
-  originState       String   @db.VarChar(2)
-  destinationCity   String
-  destinationState  String   @db.VarChar(2)
-  broker            String?
-  loadNumber        String?
+  /// Pickup date -- the date financial period filters key off.
+  date             DateTime  @db.Date
+  deliveryDate     DateTime? @db.Date
+  endingOdometer   Int?
+  originCity       String
+  originState      String    @db.VarChar(2)
+  destinationCity  String
+  destinationState String    @db.VarChar(2)
+  broker           String?
+  loadNumber       String?
+
+  equipmentType     EquipmentType?
+  loadCapacity      LoadCapacity?
+  equipmentLengthFt Int?
+  weightLbs         Int?
+  commodity         String?
 
   loadedMiles   Int
   deadheadMiles Int     @default(0)
   grossRate     Decimal @db.Decimal(12, 2)
 
   /// Trip-level costs, used for per-load profitability.
-  fuelCost       Decimal @default(0) @db.Decimal(12, 2)
-  tolls          Decimal @default(0) @db.Decimal(12, 2)
-  dispatchFee    Decimal @default(0) @db.Decimal(12, 2)
-  factoringFee   Decimal @default(0) @db.Decimal(12, 2)
-  otherExpenses  Decimal @default(0) @db.Decimal(12, 2)
+  fuelCost      Decimal @default(0) @db.Decimal(12, 2)
+  tolls         Decimal @default(0) @db.Decimal(12, 2)
+  dispatchFee   Decimal @default(0) @db.Decimal(12, 2)
+  factoringFee  Decimal @default(0) @db.Decimal(12, 2)
+  otherExpenses Decimal @default(0) @db.Decimal(12, 2)
+  /// Frozen when a driver settlement is paid. The matching ledger expense is
+  /// linked through DriverSettlementLine, so load profitability and the P&L
+  /// show the same dollars without double-counting them.
+  driverPay     Decimal @default(0) @db.Decimal(12, 2)
+  /// True when the trip-cost fields are mirrored into the expense ledger.
+  /// Defaults to FALSE so that adding this column to a database with existing
+  /// loads never posts their costs retroactively -- the app sets it true
+  /// explicitly for every load it creates.
+  costsPosted   Boolean @default(false)
 
   status PaymentStatus @default(PENDING)
   notes  String?
@@ -403,12 +470,14 @@ model Load {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  expenses    Expense[]
-  fuelEntries FuelEntry[]
-  documents   Document[]
+  expenses             Expense[]
+  fuelEntries          FuelEntry[]
+  documents            Document[]
+  driverSettlementLine DriverSettlementLine?
 
   @@index([businessId, date])
   @@index([truckId, date])
+  @@index([driverId, date])
   @@index([status])
 }
 
@@ -421,11 +490,11 @@ model Expense {
   loadId     String?
   load       Load?    @relation(fields: [loadId], references: [id], onDelete: SetNull)
 
-  date        DateTime        @db.Date
-  scope       ExpenseScope    @default(TRUCK)
-  category    ExpenseCategory
-  description String
-  vendor      String?
+  date          DateTime        @db.Date
+  scope         ExpenseScope    @default(TRUCK)
+  category      ExpenseCategory
+  description   String
+  vendor        String?
   amount        Decimal         @db.Decimal(12, 2)
   recurring     Boolean         @default(false)
   receiptNumber String?
@@ -434,14 +503,93 @@ model Expense {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  documents   Document[]
-  maintenance MaintenanceRecord[]
-  fuelEntry   FuelEntry?         @relation("FuelEntryExpense")
+  documents            Document[]
+  maintenance          MaintenanceRecord[]
+  fuelEntry            FuelEntry?            @relation("FuelEntryExpense")
+  driverSettlementLine DriverSettlementLine? @relation("DriverSettlementExpense")
 
   @@index([businessId, date])
   @@index([category])
   @@index([loadId])
   @@index([truckId, date])
+}
+
+/// Operational driver profile. We deliberately do not store SSNs, bank
+/// details, licence scans or tax-withholding data here: this is a load-pay
+/// ledger, not a payroll processor.
+model Driver {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  name           String
+  reference      String?
+  defaultTruckId String?
+  defaultTruck   Truck?        @relation("DriverDefaultTruck", fields: [defaultTruckId], references: [id], onDelete: SetNull)
+  payType        DriverPayType
+  payRate        Decimal       @db.Decimal(12, 4)
+  active         Boolean       @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  loads       Load[]
+  settlements DriverSettlement[]
+
+  @@index([businessId, active])
+  @@index([defaultTruckId])
+}
+
+/// A driver-pay statement. Lines are frozen when the draft is created and a
+/// load can appear in only one statement, which makes double payment a
+/// database constraint rather than a UI promise.
+model DriverSettlement {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  driverId   String
+  driver     Driver   @relation(fields: [driverId], references: [id], onDelete: Restrict)
+
+  periodStart DateTime               @db.Date
+  periodEnd   DateTime               @db.Date
+  status      DriverSettlementStatus @default(DRAFT)
+  paidOn      DateTime?              @db.Date
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines DriverSettlementLine[]
+
+  @@index([businessId, periodStart])
+  @@index([driverId, periodStart])
+}
+
+model DriverSettlementLine {
+  id           String           @id @default(cuid())
+  settlementId String
+  settlement   DriverSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+  loadId       String           @unique
+  load         Load             @relation(fields: [loadId], references: [id], onDelete: Restrict)
+  truckId      String
+  truck        Truck            @relation(fields: [truckId], references: [id], onDelete: Restrict)
+
+  grossRevenue Decimal       @db.Decimal(12, 2)
+  loadedMiles  Int
+  totalMiles   Int
+  payType      DriverPayType
+  payRate      Decimal       @db.Decimal(12, 4)
+  payAmount    Decimal       @db.Decimal(12, 2)
+
+  /// Created only when the statement is marked PAID. Unique makes retrying
+  /// the payment action idempotent at the database boundary.
+  expenseId String?  @unique
+  expense   Expense? @relation("DriverSettlementExpense", fields: [expenseId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([settlementId])
+  @@index([truckId])
 }
 
 model FuelEntry {

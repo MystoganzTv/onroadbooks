@@ -34,14 +34,15 @@ import {
   TableRow,
   TableWrapper,
 } from "@/components/ui/table";
-import { div, type RatingThresholds } from "@/lib/calculations";
+import { div, isDeadheadElevated, type RatingThresholds } from "@/lib/calculations";
 import {
   formatDateShort,
   formatMoney,
   formatNumber,
   formatRateValue,
 } from "@/lib/formatters";
-import type { LoadWithMetrics, Truck } from "@/lib/types";
+import { equipmentTypeLabel, loadCapacityLabel } from "@/lib/load-details";
+import type { Driver, LoadWithMetrics, Truck } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { LoadFormDialog } from "./load-form-dialog";
 import { RatingBadge } from "./rating-badge";
@@ -72,7 +73,7 @@ interface Column {
 }
 
 const COLUMNS: Column[] = [
-  { key: "date", label: "Date" },
+  { key: "date", label: "Pickup" },
   { key: "broker", label: "Broker" },
   { key: "loadedMiles", label: "Loaded", numeric: true },
   { key: "deadheadMiles", label: "DH", numeric: true },
@@ -124,10 +125,12 @@ interface LoadsTableProps {
   loads: LoadWithMetrics[];
   brokers: string[];
   trucks?: Truck[];
+  drivers?: Driver[];
   defaultTruckId?: string | null;
   /** Same default the page header uses, so both entry points agree. */
   defaultDate?: string;
   ratingThresholds?: RatingThresholds;
+  deadheadWarnPct?: number;
   /** Shown when filters are cleared and there is genuinely no data. */
   emptyDescription?: string;
 }
@@ -136,9 +139,11 @@ export function LoadsTable({
   loads,
   brokers,
   trucks = [],
+  drivers = [],
   defaultTruckId,
   defaultDate,
   ratingThresholds,
+  deadheadWarnPct = 20,
   emptyDescription,
 }: LoadsTableProps) {
   // Only worth a line on the row once there is more than one unit it could
@@ -175,6 +180,9 @@ export function LoadsTable({
         load.destinationState,
         load.broker ?? "",
         load.loadNumber ?? "",
+        load.commodity ?? "",
+        equipmentTypeLabel(load.equipmentType),
+        loadCapacityLabel(load.loadCapacity),
         load.notes ?? "",
       ]
         .join(" ")
@@ -242,7 +250,7 @@ export function LoadsTable({
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search route, broker, load number..."
+            placeholder="Search route, broker, equipment, commodity..."
             className="pl-7"
             aria-label="Search loads"
           />
@@ -336,6 +344,7 @@ export function LoadsTable({
               <LoadFormDialog
                 brokers={brokers}
                 trucks={trucks}
+                drivers={drivers}
                 defaultTruckId={defaultTruckId}
                 defaultDate={defaultDate}
                 ratingThresholds={ratingThresholds}
@@ -406,8 +415,19 @@ export function LoadsTable({
                       </span>
                     ) : null}
                   </TableCell>
-                  <TableCell className="max-w-[13rem] truncate text-muted-foreground">
-                    {load.broker ?? "--"}
+                  <TableCell className="max-w-[13rem] text-muted-foreground">
+                    <span className="block truncate">{load.broker ?? "--"}</span>
+                    {load.equipmentType || load.loadCapacity || load.commodity ? (
+                      <span className="block truncate text-2xs text-muted-foreground/80">
+                        {[
+                          load.equipmentType ? equipmentTypeLabel(load.equipmentType) : null,
+                          load.loadCapacity ? loadCapacityLabel(load.loadCapacity) : null,
+                          load.commodity,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    ) : null}
                   </TableCell>
                   <TableCell className="text-right tnum">
                     {formatNumber(load.loadedMiles)}
@@ -415,7 +435,9 @@ export function LoadsTable({
                   <TableCell
                     className={cn(
                       "text-right tnum",
-                      load.metrics.deadheadPct > 25 ? "text-warn" : "text-muted-foreground",
+                      isDeadheadElevated(load.metrics.deadheadPct, deadheadWarnPct)
+                        ? "text-warn"
+                        : "text-muted-foreground",
                     )}
                   >
                     {formatNumber(load.deadheadMiles)}

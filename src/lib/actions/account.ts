@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 
-import { requireSession } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { SESSION_COOKIE } from "@/lib/auth/session";
 import { getAuthStore } from "@/lib/db";
 import { getDocumentStorage } from "@/lib/storage";
@@ -21,7 +21,7 @@ export async function resetAccountData(confirmation: string): Promise<ActionResu
     // Data ownership controls must remain available after a trial or
     // subscription ends. Billing can lock bookkeeping writes, but it must not
     // prevent an authenticated owner from resetting or deleting their data.
-    const session = await requireSession();
+    const session = await requirePermission("manage_account");
     if (confirmation.trim() !== "RESET") {
       return { ok: false, error: "Type RESET to confirm." };
     }
@@ -40,7 +40,7 @@ export async function resetAccountData(confirmation: string): Promise<ActionResu
 
 export async function deleteCurrentAccount(confirmation: string): Promise<ActionResult> {
   try {
-    const session = await requireSession();
+    const session = await requirePermission("manage_account");
     if (confirmation.trim() !== session.email) {
       return { ok: false, error: "Type your email address exactly to confirm." };
     }

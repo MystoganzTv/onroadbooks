@@ -9,6 +9,7 @@ import { ExportMenu } from "@/components/reports/export-menu";
 import { HalfMonthSplit } from "@/components/reports/half-month-split";
 import { ReportSummary } from "@/components/reports/report-summary";
 import { PageHeader } from "@/components/shared/page-header";
+import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import {
   PrintBarChart,
   PrintLineChart,
@@ -34,15 +35,31 @@ import {
 import { halfMonthComparison } from "@/lib/chart-data";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
-import { activeTrucks } from "@/lib/fleet";
+import {
+  activeTrucks,
+  expensesForTruck,
+  loadsForTruck,
+  orderedTrucks,
+  truckById,
+} from "@/lib/fleet";
 import { formatDateMedium } from "@/lib/formatters";
-import { periodFromSearchParams, periodQuery, type SearchParams } from "@/lib/period-params";
+import {
+  periodFromSearchParams,
+  scopeQuery,
+  truckFromSearchParams,
+  type SearchParams,
+} from "@/lib/period-params";
 import { monthLabel, previousPeriod, trailingHalfMonths, trailingMonths } from "@/lib/periods";
 
 export const metadata: Metadata = { title: "Reports" };
 
 /** One truck is named; a fleet is counted. */
-function fleetLabel(trucks: Parameters<typeof activeTrucks>[0]): string {
+function fleetLabel(
+  trucks: Parameters<typeof activeTrucks>[0],
+  truckId: string | null,
+): string {
+  const selected = truckById(trucks, truckId);
+  if (selected) return selected.name;
   const active = activeTrucks(trucks);
   if (active.length === 1) return active[0].name;
   if (active.length === 0) return "No active truck";
@@ -61,21 +78,28 @@ export default async function ReportsPage({
   ).getDataset();
   const period = periodFromSearchParams(params);
   const prior = previousPeriod(period);
+  const truckId = truckFromSearchParams(params, trucks);
+  const scopedLoads = loadsForTruck(loads, truckId);
+  const scopedExpenses = expensesForTruck(expenses, truckId);
 
-  const summary = summarizePeriod(loads, expenses, period, settings);
-  const priorSummary = summarizePeriod(loads, expenses, prior, settings);
-  const categories = categoryTotals(expensesInPeriod(expenses, period), settings);
-  const halves = halfMonthComparison(loads, expenses, period.month);
+  const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings);
+  const priorSummary = summarizePeriod(scopedLoads, scopedExpenses, prior, settings);
+  const categories = categoryTotals(expensesInPeriod(scopedExpenses, period), settings);
+  const halves = halfMonthComparison(scopedLoads, scopedExpenses, period.month);
   const thresholds = thresholdsFromSettings(settings);
   const brokers = brokerPerformance(
-    withMetricsAll(loadsInPeriod(loads, period), thresholds),
+    withMetricsAll(loadsInPeriod(scopedLoads, period), thresholds),
     thresholds,
   );
-  const query = periodQuery(period);
+  const query = scopeQuery(period, truckId);
 
   // Trend windows: half-months read the operational rhythm, months read the trajectory.
-  const halfTrend = buildTrend(loads, expenses, trailingHalfMonths(period.month, 8));
-  const monthTrend = buildTrend(loads, expenses, trailingMonths(period.month, 6));
+  const halfTrend = buildTrend(
+    scopedLoads,
+    scopedExpenses,
+    trailingHalfMonths(period.month, 8),
+  );
+  const monthTrend = buildTrend(scopedLoads, scopedExpenses, trailingMonths(period.month, 6));
 
   // Printed on the letterhead. Rendered on the server so the document states
   // when it was produced, rather than whenever a reader happens to open it.
@@ -91,17 +115,18 @@ export default async function ReportsPage({
         <PageHeader
           title="Reports"
           description={`${period.label} - compared against ${prior.label}`}
-          actions={<ExportMenu periodQuery={query} />}
+          actions={<ExportMenu query={query} />}
         />
       </div>
 
-      <div className="print:hidden">
+      <div className="flex flex-wrap items-center gap-2 print:hidden">
         <PeriodControls period={period} />
+        <TruckSwitcher trucks={orderedTrucks(trucks)} selectedId={truckId} />
       </div>
 
       <ReportLetterhead
         businessName={business.name}
-        truckName={fleetLabel(trucks)}
+        truckName={fleetLabel(trucks, truckId)}
         periodLabel={period.label}
         comparisonLabel={prior.label}
         rangeLabel={rangeLabel}
@@ -227,7 +252,7 @@ export default async function ReportsPage({
       </div>
 
       <div className="print-break-before">
-        <BrokerTable brokers={brokers} />
+        <BrokerTable brokers={brokers} deadheadWarnPct={settings.deadheadWarnPct} />
       </div>
 
       <div className="print-break-before grid gap-4 xl:grid-cols-3 print:gap-3">

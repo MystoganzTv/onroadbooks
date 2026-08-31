@@ -60,8 +60,12 @@ export function SafeToPayCard({ ownerPay, periodLabel, href, className }: SafeTo
           <Row label="Gross revenue" value={formatMoney(ownerPay.grossRevenue)} />
           <Row
             label="Operating expenses"
-            value={`-${formatMoney(ownerPay.operatingExpenses)}`}
-            tone="neg"
+            value={
+              ownerPay.operatingExpenses > 0
+                ? `-${formatMoney(ownerPay.operatingExpenses)}`
+                : formatMoney(0)
+            }
+            tone={ownerPay.operatingExpenses > 0 ? "neg" : undefined}
           />
           <Row
             label="Operating profit"
@@ -76,8 +80,8 @@ export function SafeToPayCard({ ownerPay, periodLabel, href, className }: SafeTo
               hint={`${reserve.pct}% of ${
                 reserve.basis === "OPERATING_PROFIT" ? "operating profit" : "gross revenue"
               }`}
-              value={`-${formatMoney(reserve.amount)}`}
-              tone="warn"
+              value={reserve.amount > 0 ? `-${formatMoney(reserve.amount)}` : formatMoney(0)}
+              tone={reserve.amount > 0 ? "warn" : undefined}
             />
           ))}
         </dl>

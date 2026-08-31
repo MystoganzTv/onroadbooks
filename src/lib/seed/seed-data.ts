@@ -1,5 +1,5 @@
 /**
- * Demo dataset.
+ * Deterministic reference fixture.
  *
  * August 2026 is hand-authored so the numbers tell a coherent operational
  * story (real regional lanes, matching fuel stops, odometer continuity).
@@ -37,14 +37,14 @@ const BUSINESS_ID = "biz_boxtruck";
 const TRUCK_ID = "truck_001";
 const CREATED = "2026-01-15T12:00:00.000Z";
 
-export const DEMO_BUSINESS: Business = {
+export const FIXTURE_BUSINESS: Business = {
   id: BUSINESS_ID,
   name: "Padron Freight LLC",
   currency: "USD",
   createdAt: CREATED,
 };
 
-export const DEMO_SETTINGS: FinancialSettings = {
+export const FIXTURE_SETTINGS: FinancialSettings = {
   id: "fin_001",
   businessId: BUSINESS_ID,
   taxReservePct: 20,
@@ -59,7 +59,7 @@ export const DEMO_SETTINGS: FinancialSettings = {
   updatedAt: CREATED,
 };
 
-export const DEMO_TRUCK: Truck = {
+export const FIXTURE_TRUCK: Truck = {
   id: TRUCK_ID,
   acquiredOn: "2026-01-15",
   soldOn: null,
@@ -287,13 +287,21 @@ function generateMonth(
       id: `load_${month}_${pad(i + 1)}`,
       businessId: BUSINESS_ID,
       truckId: TRUCK_ID,
+      driverId: null,
       date,
+      deliveryDate: date,
+      endingOdometer: null,
       originCity: lane[0],
       originState: lane[1],
       destinationCity: lane[2],
       destinationState: lane[3],
       broker: BROKERS[Math.floor(rand() * BROKERS.length)],
       loadNumber: `GEN-${month.replace("-", "")}${pad(i + 1)}`,
+      equipmentType: "BOX_TRUCK",
+      loadCapacity: "FULL",
+      equipmentLengthFt: 26,
+      weightLbs: 6_000 + Math.round(rand() * 6_000),
+      commodity: "General freight",
       loadedMiles,
       deadheadMiles,
       grossRate,
@@ -302,6 +310,8 @@ function generateMonth(
       dispatchFee: roundMoney(grossRate * 0.05),
       factoringFee: roundMoney(grossRate * 0.025),
       otherExpenses: rand() > 0.88 ? roundMoney(Math.round(rand() * 30)) : 0,
+      driverPay: 0,
+      costsPosted: false,
       status: "PAID",
       notes: null,
       createdAt: `${date}T18:00:00.000Z`,
@@ -487,13 +497,21 @@ export function buildSeedDataset(): Dataset {
       id: `load_aug_${pad(i + 1)}`,
       businessId: BUSINESS_ID,
       truckId: TRUCK_ID,
+      driverId: null,
       date,
+      deliveryDate: date,
+      endingOdometer: null,
       originCity,
       originState,
       destinationCity,
       destinationState,
       broker,
       loadNumber,
+      equipmentType: "BOX_TRUCK",
+      loadCapacity: "FULL",
+      equipmentLengthFt: 26,
+      weightLbs: 8_000,
+      commodity: "General freight",
       loadedMiles,
       deadheadMiles,
       grossRate,
@@ -502,6 +520,8 @@ export function buildSeedDataset(): Dataset {
       dispatchFee,
       factoringFee,
       otherExpenses,
+      driverPay: 0,
+      costsPosted: false,
       status,
       notes: notes || null,
       createdAt: `${date}T18:00:00.000Z`,
@@ -645,7 +665,7 @@ export function buildSeedDataset(): Dataset {
       sortedLoads,
       sortedExpenses,
       bounds,
-      DEMO_SETTINGS,
+      FIXTURE_SETTINGS,
       reserveAccounts,
     );
     const id = settlementId(window.month, window.half);
@@ -698,16 +718,15 @@ export function buildSeedDataset(): Dataset {
     b.date.localeCompare(a.date) || b.id.localeCompare(a.id);
 
   return {
-    business: DEMO_BUSINESS,
-    settings: DEMO_SETTINGS,
+    business: FIXTURE_BUSINESS,
+    settings: FIXTURE_SETTINGS,
     goals: defaultGoals(BUSINESS_ID, CREATED),
     subscription: defaultSubscription(BUSINESS_ID, CREATED),
-    trucks: [DEMO_TRUCK],
+    trucks: [FIXTURE_TRUCK],
     loads: sortedLoads,
     expenses: sortedExpenses,
     fuelEntries: fuelEntries.sort(byDateDesc),
-    // No user is seeded: first boot sends you to /setup to create the owner
-    // account, which then attaches to this demo business.
+    // No user is present: this object is a test fixture, never an account.
     users: [],
     documents: [] as Document[],
     maintenanceRecords: maintenanceRecords.sort((a, b) =>
@@ -718,54 +737,7 @@ export function buildSeedDataset(): Dataset {
     settlements: settlements.sort(
       (a, b) => b.periodStart.localeCompare(a.periodStart) || b.id.localeCompare(a.id),
     ),
+    drivers: [],
+    driverSettlements: [],
   };
 }
-
-/**
- * Demo documents, materialised on first boot by the JSON store so the
- * attachment pipeline is exercised end to end rather than shown empty.
- * Each entry is a tiny generated PDF -- see `demoPdf` in the store.
- */
-export const DEMO_DOCUMENTS: {
-  owner: "LOAD" | "EXPENSE" | "TRUCK" | "MAINTENANCE";
-  targetId: string;
-  type: Document["type"];
-  fileName: string;
-  title: string;
-  body: string[];
-}[] = [
-  {
-    owner: "LOAD",
-    targetId: "load_aug_16",
-    type: "RATE_CONFIRMATION",
-    fileName: "rate-confirmation-SL-3452.pdf",
-    title: "RATE CONFIRMATION",
-    body: [
-      "Broker: Summit Line Brokerage",
-      "Load #: SL-3452",
-      "Richmond, VA  ->  Harrisburg, PA",
-      "Agreed rate: $935.00",
-    ],
-  },
-  {
-    owner: "LOAD",
-    targetId: "load_aug_16",
-    type: "POD",
-    fileName: "pod-SL-3452.pdf",
-    title: "PROOF OF DELIVERY",
-    body: ["Load #: SL-3452", "Delivered: 2026-08-25", "Received by: J. Alvarez", "Pieces: 14 pallets"],
-  },
-  {
-    owner: "EXPENSE",
-    targetId: "exp_aug_12",
-    type: "RECEIPT",
-    fileName: "receipt-winchester-fleet-repair.pdf",
-    title: "REPAIR RECEIPT",
-    body: [
-      "Winchester Fleet Repair",
-      "Rear roll-door roller + seal",
-      "Invoice: WFR-88214",
-      "Total: $412.80",
-    ],
-  },
-];

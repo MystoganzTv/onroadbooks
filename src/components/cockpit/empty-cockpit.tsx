@@ -33,44 +33,41 @@ export function EmptyCockpit({
 }) {
   return (
     <section
-      className="relative isolate overflow-hidden rounded-xl border border-border bg-card"
+      className="overflow-hidden rounded-xl border border-border bg-card"
       aria-labelledby="empty-cockpit-title"
     >
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-52 bg-[radial-gradient(circle_at_18%_0%,hsl(var(--primary)/0.14),transparent_48%),radial-gradient(circle_at_82%_0%,hsl(var(--info)/0.10),transparent_45%)]"
-        aria-hidden
-      />
+      <div className="bg-[radial-gradient(circle_at_12%_0%,hsl(var(--primary)/0.14),transparent_38%),radial-gradient(circle_at_88%_0%,hsl(var(--info)/0.08),transparent_34%)] px-5 py-8 sm:px-8 sm:py-10 lg:px-10">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+          <div className="max-w-2xl">
+            <span className="inline-flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-primary">
+              <BarChart3 className="size-3.5" />
+              Getting started
+            </span>
+            <h2
+              id="empty-cockpit-title"
+              className="mt-3 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl"
+            >
+              Add your first load to build your overview.
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              {businessName} is ready. Record a load and its costs to see revenue, profit, cost per
+              mile, and cash available in one place.
+            </p>
+          </div>
 
-      <div className="px-5 py-8 sm:px-8 sm:py-10 lg:px-10">
-        <div className="max-w-2xl">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-2.5 py-1 text-2xs font-semibold uppercase tracking-[0.12em] text-primary">
-            <BarChart3 className="size-3.5" />
-            Fresh workspace
-          </span>
-          <h2
-            id="empty-cockpit-title"
-            className="mt-4 max-w-xl text-2xl font-semibold tracking-tight sm:text-3xl"
-          >
-            Your numbers start with the first load.
-          </h2>
-          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-            {businessName} is ready. Add real activity and this page will become your financial
-            cockpit—not a wall of meaningless zeroes.
-          </p>
-
-          <div className="mt-6 flex flex-wrap items-center gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center lg:justify-end [&_button]:w-full sm:[&_button]:w-auto">
             {loadAction}
             {expenseAction}
           </div>
         </div>
 
-        <div className="mt-9 grid gap-3 md:grid-cols-3">
+        <div className="mt-8 grid gap-3 border-t border-border/70 pt-6 md:grid-cols-3">
           {STEPS.map((step) => {
             const Icon = step.icon;
             return (
               <div
                 key={step.number}
-                className="rounded-lg border border-border/80 bg-background/65 p-4 backdrop-blur-sm"
+                className="rounded-lg border border-border/80 bg-background/70 p-4"
               >
                 <div className="flex items-center justify-between gap-3">
                   <span className="flex size-8 items-center justify-center rounded-md border border-border bg-surface-sunken text-primary">
@@ -93,7 +90,7 @@ export function EmptyCockpit({
       <div className="flex items-start gap-2 border-t border-border bg-surface-sunken/45 px-5 py-3 text-xs text-muted-foreground sm:px-8 lg:px-10">
         <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-pos" />
         <p>
-          This workspace is private to your account. Demo records are never mixed into your books.
+          This workspace is private to your account. Only records entered by your team appear here.
         </p>
       </div>
     </section>

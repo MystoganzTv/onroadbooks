@@ -22,7 +22,7 @@ export async function createFuelEntryAction(values: unknown): Promise<ActionResu
   }
 
   try {
-    const entry = await getRepository((await requireWritableSession()).businessId).createFuelEntry(parsed.data);
+    const entry = await getRepository((await requireWritableSession("manage_fuel")).businessId).createFuelEntry(parsed.data);
     revalidateAll();
     return { ok: true, id: entry.id };
   } catch (error) {
@@ -37,7 +37,7 @@ export async function updateFuelEntryAction(id: string, values: unknown): Promis
   }
 
   try {
-    await getRepository((await requireWritableSession()).businessId).updateFuelEntry(id, parsed.data);
+    await getRepository((await requireWritableSession("manage_fuel")).businessId).updateFuelEntry(id, parsed.data);
     revalidateAll();
     return { ok: true, id };
   } catch (error) {
@@ -47,7 +47,7 @@ export async function updateFuelEntryAction(id: string, values: unknown): Promis
 
 export async function deleteFuelEntryAction(id: string): Promise<ActionResult> {
   try {
-    await getRepository((await requireWritableSession()).businessId).deleteFuelEntry(id);
+    await getRepository((await requireWritableSession("manage_fuel")).businessId).deleteFuelEntry(id);
     revalidateAll();
     return { ok: true };
   } catch (error) {

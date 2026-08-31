@@ -35,7 +35,7 @@ export async function createTruckAction(values: unknown): Promise<ActionResult> 
   }
 
   try {
-    const repository = getRepository((await requireWritableSession()).businessId);
+    const repository = getRepository((await requireWritableSession("manage_fleet")).businessId);
     const dataset = await repository.getDataset();
     const allowance = truckAllowance(dataset.subscription, activeTrucks(dataset.trucks).length);
 
@@ -62,7 +62,7 @@ export async function updateTruckByIdAction(id: string, values: unknown): Promis
   }
 
   try {
-    await getRepository((await requireWritableSession()).businessId).updateTruck(parsed.data, id);
+    await getRepository((await requireWritableSession("manage_fleet")).businessId).updateTruck(parsed.data, id);
     revalidate();
     return { ok: true, id };
   } catch (error) {
@@ -83,7 +83,7 @@ export async function archiveTruckAction(values: unknown): Promise<ActionResult>
   }
 
   try {
-    await getRepository((await requireWritableSession()).businessId).archiveTruck(
+    await getRepository((await requireWritableSession("manage_fleet")).businessId).archiveTruck(
       parsed.data.id,
       parsed.data.soldOn ?? null,
     );
@@ -96,7 +96,7 @@ export async function archiveTruckAction(values: unknown): Promise<ActionResult>
 
 export async function restoreTruckAction(id: string): Promise<ActionResult> {
   try {
-    const repository = getRepository((await requireWritableSession()).businessId);
+    const repository = getRepository((await requireWritableSession("manage_fleet")).businessId);
     const dataset = await repository.getDataset();
     const allowance = truckAllowance(dataset.subscription, activeTrucks(dataset.trucks).length);
 

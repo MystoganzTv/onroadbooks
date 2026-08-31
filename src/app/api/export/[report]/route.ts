@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { buildReport, reportFileName, REPORT_IDS, toCsv, type ReportId } from "@/lib/export";
-import { periodFromSearchParams } from "@/lib/period-params";
+import { periodFromSearchParams, truckFromSearchParams } from "@/lib/period-params";
+import { truckById } from "@/lib/fleet";
 
 export const runtime = "nodejs";
 
@@ -31,13 +32,15 @@ export async function GET(
   const period = periodFromSearchParams(searchParams);
 
   const dataset = await getRepository(session.businessId).getDataset();
-  const table = buildReport(report as ReportId, dataset, period);
+  const truckId = truckFromSearchParams(searchParams, dataset.trucks);
+  const truck = truckById(dataset.trucks, truckId);
+  const table = buildReport(report as ReportId, dataset, period, truckId);
   const csv = toCsv(table);
 
   return new NextResponse(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${reportFileName(report as ReportId, period)}"`,
+      "Content-Disposition": `attachment; filename="${reportFileName(report as ReportId, period, truck?.name)}"`,
       "Cache-Control": "no-store",
     },
   });

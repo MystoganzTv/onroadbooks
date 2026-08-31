@@ -1,17 +1,15 @@
 import "server-only";
 
+import { createClient } from "@supabase/supabase-js";
+
 import type { DocumentStorage } from "./contract";
 
 /**
  * Supabase Storage adapter.
  *
- * Talks to the Storage REST API with plain fetch rather than the JS client,
- * so switching to Supabase adds no dependency. Activated by setting
+ * Uses the Storage REST API for the server fallback and the official client for
+ * short-lived signed upload/download URLs. Activated with
  * DOCUMENT_STORAGE=supabase plus the three variables below.
- *
- * NOTE: written against the documented API but not exercised against a live
- * project in this repo -- run through one upload/download/delete cycle before
- * relying on it in production.
  */
 export class SupabaseDocumentStorage implements DocumentStorage {
   constructor(
@@ -19,6 +17,12 @@ export class SupabaseDocumentStorage implements DocumentStorage {
     private readonly serviceKey: string,
     private readonly bucket: string,
   ) {}
+
+  private storage() {
+    return createClient(this.url, this.serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    }).storage.from(this.bucket);
+  }
 
   private endpoint(key: string): string {
     return `${this.url.replace(/\/$/, "")}/storage/v1/object/${this.bucket}/${encodeURI(key)}`;
@@ -65,5 +69,37 @@ export class SupabaseDocumentStorage implements DocumentStorage {
     if (!response.ok && response.status !== 404) {
       throw new Error(`Supabase Storage delete failed (${response.status})`);
     }
+  }
+
+  async createSignedUpload(key: string): Promise<{ bucket: string; path: string; token: string }> {
+    const { data, error } = await this.storage().createSignedUploadUrl(key, { upsert: false });
+    if (error || !data?.token) {
+      throw new Error(`Could not authorize the document upload: ${error?.message ?? "missing token"}`);
+    }
+    return { bucket: this.bucket, path: data.path, token: data.token };
+  }
+
+  async info(key: string): Promise<{ sizeBytes: number; contentType: string | null } | null> {
+    const { data, error } = await this.storage().info(key);
+    if (error) {
+      if (error.status === 404 || error.statusCode === "404") return null;
+      throw new Error(`Could not verify the stored document: ${error.message}`);
+    }
+    return {
+      sizeBytes: Number(data.size ?? data.metadata?.size ?? 0),
+      contentType: data.contentType ?? data.metadata?.mimetype ?? null,
+    };
+  }
+
+  async createSignedDownloadUrl(key: string, downloadName?: string): Promise<string> {
+    const { data, error } = await this.storage().createSignedUrl(
+      key,
+      60,
+      downloadName ? { download: downloadName } : undefined,
+    );
+    if (error || !data?.signedUrl) {
+      throw new Error(`Could not authorize the document download: ${error?.message ?? "missing URL"}`);
+    }
+    return data.signedUrl;
   }
 }

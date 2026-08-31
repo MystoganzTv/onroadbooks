@@ -5,7 +5,9 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 
+import { dataDirectory } from "@/lib/data-directory";
 import { SESSION_MAX_AGE_SECONDS as MAX_AGE } from "./constants";
+import type { MemberRole } from "@/lib/types";
 
 const scrypt = promisify(scryptCb) as (
   password: string | Buffer,
@@ -27,15 +29,15 @@ export interface SessionPayload {
   userId: string;
   businessId: string;
   email: string;
-  /** Shared seeded account. Reads are allowed; writes are refused server-side. */
-  isDemo?: boolean;
+  /** Replaced with the authoritative database value on every request. */
+  role?: MemberRole;
   /** Unix seconds. */
   exp: number;
 }
 
 /* ---- Signing key ------------------------------------------------------ */
 
-const SECRET_FILE = path.join(process.cwd(), "data", ".auth-secret");
+const secretFile = () => path.join(dataDirectory(), ".auth-secret");
 let cachedSecret: string | null = null;
 
 /**
@@ -53,7 +55,7 @@ export async function getAuthSecret(): Promise<string> {
   }
 
   try {
-    const existing = (await fs.readFile(SECRET_FILE, "utf8")).trim();
+    const existing = (await fs.readFile(secretFile(), "utf8")).trim();
     if (existing.length >= 32) {
       cachedSecret = existing;
       return cachedSecret;
@@ -63,8 +65,8 @@ export async function getAuthSecret(): Promise<string> {
   }
 
   const generated = randomBytes(48).toString("base64url");
-  await fs.mkdir(path.dirname(SECRET_FILE), { recursive: true });
-  await fs.writeFile(SECRET_FILE, generated, { mode: 0o600 });
+  await fs.mkdir(path.dirname(secretFile()), { recursive: true });
+  await fs.writeFile(secretFile(), generated, { mode: 0o600 });
   cachedSecret = generated;
   return cachedSecret;
 }

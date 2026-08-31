@@ -27,10 +27,12 @@ const settings: FinancialSettings = {
 function load(over: Partial<Load> = {}): Load {
   return {
     id: "l", businessId: "b", truckId: "t", date: "2026-08-05",
+    deliveryDate: null, equipmentType: null, loadCapacity: null,
+    endingOdometer: null, equipmentLengthFt: null, weightLbs: null, commodity: null,
     originCity: "A", originState: "VA", destinationCity: "B", destinationState: "MD",
     broker: "Acme", loadNumber: null, loadedMiles: 100, deadheadMiles: 0, grossRate: 500,
     fuelCost: 0, tolls: 0, dispatchFee: 0, factoringFee: 0, otherExpenses: 0,
-    status: "PAID", notes: null, createdAt: "", ...over,
+    driverId: null, driverPay: 0, costsPosted: false, status: "PAID", notes: null, createdAt: "", ...over,
   };
 }
 

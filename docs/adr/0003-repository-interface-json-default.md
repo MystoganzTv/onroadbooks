@@ -10,9 +10,9 @@
 Two requirements pulled in opposite directions.
 
 The app had to **boot with zero setup**: clone, `npm install`, `npm run dev`,
-and there is a realistic ledger on screen. No Postgres, no connection string, no
-migration step -- for demos, for a new laptop, for CI, and for anyone evaluating
-the product.
+and there is a private, empty workspace ready for real records. No Postgres, no
+connection string, no migration step -- for local development, CI, and anyone
+evaluating the product.
 
 It also had to be **production-ready on a real database**, specifically Supabase
 Postgres, without a rewrite. Financial data belongs in a relational store with

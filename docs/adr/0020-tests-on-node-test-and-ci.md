@@ -45,7 +45,7 @@ Keeping it out of CI keeps the gate fast and non-flaky; the trade is that a UI
 regression is caught by a person, not by the pipeline.
 
 **Snapshot tests of the numbers.** They pass until someone updates the snapshot.
-The demo dataset's expected figures are asserted as explicit values instead.
+The reference fixture's expected figures are asserted as explicit values instead.
 
 ## Consequences
 
@@ -67,7 +67,7 @@ The demo dataset's expected figures are asserted as explicit values instead.
 - Do not add a private method to either repository class -- TypeScript `private`
   does not hide it at runtime and the parity test compares prototype method
   names. Put shared helpers at module level.
-- The demo figures are assertions, not decoration. If August 2026 stops showing
+- The fixture figures are assertions, not decoration. If August 2026 stops showing
   revenue $9,795 / expenses $6,143.90 / net $3,651.10 / CPM $1.84 / safe to pay
   $2,235.23, either the seed or the maths moved -- find out which.
 

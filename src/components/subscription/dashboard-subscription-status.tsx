@@ -11,9 +11,11 @@ import type { Subscription } from "@/lib/types";
 export function DashboardSubscriptionStatus({
   subscription,
   today,
+  canManage = true,
 }: {
   subscription: Subscription;
   today: string;
+  canManage?: boolean;
 }) {
   const plan = planOf(subscription);
   const trial = trialState(subscription, today);
@@ -42,12 +44,14 @@ export function DashboardSubscriptionStatus({
               </p>
             </div>
           </div>
-          <Button asChild size="sm" className="shrink-0">
-            <Link href="/plans">
-              Keep OnRoad Pro
-              <ArrowRight className="size-4" />
-            </Link>
-          </Button>
+          {canManage ? (
+            <Button asChild size="sm" className="shrink-0">
+              <Link href="/plans">
+                Keep OnRoad Pro
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+          ) : null}
         </div>
       </Card>
     );
@@ -102,12 +106,14 @@ export function DashboardSubscriptionStatus({
             </p>
           </div>
         </div>
-        <Button asChild size="sm" variant="outline" className="shrink-0">
-          <Link href="/plans">
-            {actionLabel}
-            <ArrowRight className="size-4" />
-          </Link>
-        </Button>
+        {canManage ? (
+          <Button asChild size="sm" variant="outline" className="shrink-0">
+            <Link href="/plans">
+              {actionLabel}
+              <ArrowRight className="size-4" />
+            </Link>
+          </Button>
+        ) : null}
       </div>
     </Card>
   );

@@ -51,12 +51,16 @@ export function calculateLoadScore(
 ): LoadScore {
   const greatFloor = thresholds.great > 0 ? thresholds.great : 2;
   const ppmTarget = greatFloor * PPM_FULL_MARKS_MULTIPLE;
-  const deadheadFloor = (deadheadWarnPct > 0 ? deadheadWarnPct : 20) * 2;
+  const deadheadFloor = Math.max(0, deadheadWarnPct) * 2;
 
   const ppmPoints = clamp01(metrics.profitPerMile / ppmTarget) * SCORE_WEIGHTS.profitPerMile;
   const marginPoints = clamp01(metrics.profitMargin / FULL_MARGIN_PCT) * SCORE_WEIGHTS.margin;
   const deadheadPoints =
-    clamp01(1 - metrics.deadheadPct / deadheadFloor) * SCORE_WEIGHTS.deadhead;
+    (deadheadFloor > 0
+      ? clamp01(1 - metrics.deadheadPct / deadheadFloor)
+      : metrics.deadheadPct <= 0
+        ? 1
+        : 0) * SCORE_WEIGHTS.deadhead;
 
   const components: ScoreComponent[] = [
     {
@@ -81,7 +85,10 @@ export function calculateLoadScore(
       points: Math.round(deadheadPoints),
       max: SCORE_WEIGHTS.deadhead,
       value: metrics.deadheadPct,
-      detail: `Nothing left at ${deadheadFloor.toFixed(0)}%`,
+      detail:
+        deadheadFloor > 0
+          ? `Nothing left at ${deadheadFloor.toFixed(0)}%`
+          : "Any deadhead loses these points",
     },
   ];
 

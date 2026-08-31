@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { getAuthStore, getRepository } from "@/lib/db";
 import { canWrite, trialState } from "@/lib/plans";
+import { permissionRefusal, roleCan, type Permission } from "@/lib/roles";
 import { todayISO } from "@/lib/periods";
 import { decodeSession, SESSION_COOKIE, type SessionPayload } from "./session";
 
@@ -22,7 +23,13 @@ export async function getSession(): Promise<SessionPayload | null> {
     if (!owner || owner.businessId !== session.businessId || owner.email !== session.email) {
       return null;
     }
-    return session;
+    return {
+      userId: session.userId,
+      businessId: session.businessId,
+      email: session.email,
+      exp: session.exp,
+      role: owner.role,
+    };
   } catch {
     return null;
   }
@@ -41,11 +48,10 @@ export async function requireSession(): Promise<SessionPayload> {
 }
 
 /** A signed-in owner whose ledger may be changed. */
-export async function requireWritableSession(): Promise<SessionPayload> {
+export async function requireWritableSession(
+  permission: Permission = "manage_business",
+): Promise<SessionPayload> {
   const session = await requireSession();
-  if (session.isDemo) {
-    throw new Error("The demo account is read-only. Create your own account to save changes.");
-  }
   const { subscription } = await getRepository(session.businessId).getDataset();
   const today = todayISO();
   if (!canWrite(subscription, today)) {
@@ -56,6 +62,16 @@ export async function requireWritableSession(): Promise<SessionPayload> {
         : "Your subscription needs attention before you can add or change records. Your existing books remain available to read and export.",
     );
   }
+  const role = session.role ?? "VIEWER";
+  if (!roleCan(role, permission)) throw new Error(permissionRefusal(role, permission));
+  return session;
+}
+
+/** Role gate for ownership actions that must remain available when billing lapses. */
+export async function requirePermission(permission: Permission): Promise<SessionPayload> {
+  const session = await requireSession();
+  const role = session.role ?? "VIEWER";
+  if (!roleCan(role, permission)) throw new Error(permissionRefusal(role, permission));
   return session;
 }
 

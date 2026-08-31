@@ -12,6 +12,8 @@ export type PaymentStatus = "PENDING" | "INVOICED" | "PAID";
 
 export type ExpenseBehavior = "FIXED" | "VARIABLE";
 
+export type MemberRole = "OWNER" | "ADMIN" | "BOOKKEEPER" | "DISPATCHER" | "VIEWER";
+
 export type ExpenseCategoryId =
   | "FUEL"
   | "TOLLS"
@@ -28,7 +30,16 @@ export type ExpenseCategoryId =
   | "OFFICE"
   | "PHONE"
   | "ACCOUNTING"
+  | "DRIVER_PAY"
   | "OTHER";
+
+export type DriverPayType =
+  | "PERCENT_GROSS"
+  | "PER_LOADED_MILE"
+  | "PER_TOTAL_MILE"
+  | "FLAT_PER_LOAD";
+
+export type DriverSettlementStatus = "DRAFT" | "PAID";
 
 export interface User {
   id: string;
@@ -37,6 +48,9 @@ export interface User {
   name: string | null;
   /** scrypt$<salt>$<hash>. Never leaves the server. */
   passwordHash: string;
+  role: MemberRole;
+  invitedAt: string | null;
+  joinedAt: string | null;
   createdAt: string;
 }
 
@@ -100,14 +114,24 @@ export interface Load {
   id: string;
   businessId: string;
   truckId: string;
-  /** ISO date, day precision: "2026-08-14". */
+  driverId: string | null;
+  /** Pickup date, ISO day precision: "2026-08-14". */
   date: string;
+  /** Delivery date when known. */
+  deliveryDate: string | null;
+  /** Actual dashboard reading at the end of the trip, when recorded. */
+  endingOdometer: number | null;
   originCity: string;
   originState: string;
   destinationCity: string;
   destinationState: string;
   broker: string | null;
   loadNumber: string | null;
+  equipmentType: EquipmentType | null;
+  loadCapacity: LoadCapacity | null;
+  equipmentLengthFt: number | null;
+  weightLbs: number | null;
+  commodity: string | null;
   loadedMiles: number;
   deadheadMiles: number;
   grossRate: number;
@@ -119,10 +143,25 @@ export interface Load {
   /** Factoring fee on this load's invoice. */
   factoringFee: number;
   otherExpenses: number;
+  /** Driver pay frozen and posted when the linked statement is paid. */
+  driverPay: number;
+  /** Whether trip costs are mirrored into the operating-expense ledger. */
+  costsPosted: boolean;
   status: PaymentStatus;
   notes: string | null;
   createdAt: string;
 }
+
+export type EquipmentType =
+  | "BOX_TRUCK"
+  | "DRY_VAN"
+  | "REEFER"
+  | "FLATBED"
+  | "POWER_ONLY"
+  | "SPRINTER_VAN"
+  | "OTHER";
+
+export type LoadCapacity = "FULL" | "PARTIAL";
 
 /**
  * What an expense belongs to.
@@ -154,6 +193,8 @@ export interface Expense {
   recurring: boolean;
   receiptNumber: string | null;
   notes: string | null;
+  /** Set only for a ledger row created by a paid driver statement. */
+  driverSettlementLineId?: string | null;
   createdAt: string;
 }
 
@@ -296,6 +337,8 @@ export interface Dataset {
   reserveAccounts: ReserveAccount[];
   reserveTransactions: ReserveTransaction[];
   settlements: Settlement[];
+  drivers: Driver[];
+  driverSettlements: DriverSettlement[];
   subscription: Subscription;
 }
 
@@ -305,7 +348,7 @@ export interface LoadMetrics {
   totalMiles: number;
   revenuePerLoadedMile: number;
   revenuePerTotalMile: number;
-  /** fuel + tolls + dispatch + factoring + other */
+  /** fuel + tolls + dispatch + factoring + other + paid driver settlement */
   tripExpenses: number;
   tripProfit: number;
   /** Trip profit divided by TOTAL miles -- deadhead included, always. */
@@ -509,6 +552,50 @@ export interface Settlement {
   /** Populated on close, null while open. */
   snapshot: SettlementSnapshot | null;
   notes: string | null;
+  createdAt: string;
+}
+
+/* ---- Drivers and driver pay ----------------------------------------- */
+
+export interface Driver {
+  id: string;
+  businessId: string;
+  name: string;
+  /** Internal employee/contractor code only; never SSN or bank data. */
+  reference: string | null;
+  /** Entry default only. Each load keeps the unit it actually ran. */
+  defaultTruckId: string | null;
+  payType: DriverPayType;
+  payRate: number;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface DriverSettlementLine {
+  id: string;
+  settlementId: string;
+  loadId: string;
+  truckId: string;
+  grossRevenue: number;
+  loadedMiles: number;
+  totalMiles: number;
+  payType: DriverPayType;
+  payRate: number;
+  payAmount: number;
+  expenseId: string | null;
+  createdAt: string;
+}
+
+export interface DriverSettlement {
+  id: string;
+  businessId: string;
+  driverId: string;
+  periodStart: string;
+  periodEnd: string;
+  status: DriverSettlementStatus;
+  paidOn: string | null;
+  notes: string | null;
+  lines: DriverSettlementLine[];
   createdAt: string;
 }
 

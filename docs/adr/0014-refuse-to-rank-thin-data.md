@@ -48,7 +48,7 @@ broker who gives steady, decent-margin volume beneath one lucky high-rate run.
 
 ## Consequences
 
-- In the demo data, lanes only qualify at Quarter or YTD (2 of 9 in August
+- In the reference fixture, lanes only qualify at Quarter or YTD (2 of 9 in August
   alone). That is the guard working, not a bug.
 - The lane and broker reports get better the longer the app is used, which is
   correct and needs saying in the UI.

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { PeriodControls } from "@/components/dashboard/period-controls";
@@ -26,7 +27,7 @@ import {
   formatPercent,
   formatRateValue,
 } from "@/lib/formatters";
-import { periodFromSearchParams, type SearchParams } from "@/lib/period-params";
+import { periodFromSearchParams, periodQuery, type SearchParams } from "@/lib/period-params";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Fleet" };
@@ -112,15 +113,15 @@ export default async function FleetPage({
       <Card>
         <CardHeader>
           <CardTitle>Contribution by unit</CardTitle>
+          {fleet.revenue === 0 && fleet.directCosts === 0 ? (
+            <span className="text-2xs text-muted-foreground">
+              No activity in {period.shortLabel} — open a unit to review or export it.
+            </span>
+          ) : null}
         </CardHeader>
         <CardContent className="p-0">
-          {fleet.revenue === 0 && fleet.directCosts === 0 ? (
-            <p className="p-6 text-center text-sm text-muted-foreground">
-              Nothing recorded against any truck in {period.label}.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
+          <div className="overflow-x-auto">
+            <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Truck</TableHead>
@@ -132,13 +133,19 @@ export default async function FleetPage({
                     <TableHead className="text-right">Contribution</TableHead>
                     <TableHead className="text-right">$/mi</TableHead>
                     <TableHead className="text-right">Share</TableHead>
+                    <TableHead className="text-right">Details</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {fleet.units.map((unit) => (
                     <TableRow key={unit.truck.id}>
                       <TableCell className="font-medium">
-                        <span className="block truncate">{unit.truck.name}</span>
+                        <Link
+                          href={`/fleet/${unit.truck.id}?${periodQuery(period)}`}
+                          className="block truncate text-primary hover:underline"
+                        >
+                          {unit.truck.name}
+                        </Link>
                         {unit.truck.active ? null : (
                           <span className="text-2xs text-muted-foreground">Retired</span>
                         )}
@@ -172,12 +179,19 @@ export default async function FleetPage({
                       <TableCell className="text-right tnum text-muted-foreground">
                         {unit.loadCount === 0 ? "--" : formatPercent(unit.shareOfContribution)}
                       </TableCell>
+                      <TableCell className="text-right">
+                        <Link
+                          href={`/fleet/${unit.truck.id}?${periodQuery(period)}`}
+                          className="whitespace-nowrap text-xs font-medium text-primary hover:underline"
+                        >
+                          Open unit
+                        </Link>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
-            </div>
-          )}
+            </Table>
+          </div>
         </CardContent>
       </Card>
 

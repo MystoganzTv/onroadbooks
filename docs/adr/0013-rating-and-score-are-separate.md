@@ -60,7 +60,7 @@ into "it was fine despite a 40% empty run".
   constants (`SCORE_WEIGHTS`, `FULL_MARGIN_PCT`, `PPM_FULL_MARKS_MULTIPLE`) so a
   change is a visible, reviewable diff rather than a magic number in a
   component.
-- The demo data is seeded to span all four bands with a score spread of 44-95,
+- The reference fixture spans all four bands with a score spread of 44-95,
   so both axes are visibly doing work.
 
 ## Guardrails

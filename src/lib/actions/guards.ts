@@ -4,6 +4,7 @@ import { requireWritableSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import type { Repository } from "@/lib/db/repository";
 import { capabilityRefusal, planAllows, type PlanCapability } from "@/lib/plans";
+import type { Permission } from "@/lib/roles";
 
 /**
  * The plan gate, for actions.
@@ -17,8 +18,11 @@ import { capabilityRefusal, planAllows, type PlanCapability } from "@/lib/plans"
  * Returns the repository, so the call replaces the one the action was making
  * anyway and the gate cannot be forgotten on the way to the write.
  */
-export async function repositoryWith(capability: PlanCapability): Promise<Repository> {
-  const repository = getRepository((await requireWritableSession()).businessId);
+export async function repositoryWith(
+  capability: PlanCapability,
+  permission: Permission = "manage_finances",
+): Promise<Repository> {
+  const repository = getRepository((await requireWritableSession(permission)).businessId);
   const { subscription } = await repository.getDataset();
   if (!planAllows(subscription, capability)) throw new Error(capabilityRefusal(capability));
   return repository;

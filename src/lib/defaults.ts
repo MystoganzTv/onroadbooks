@@ -1,5 +1,5 @@
 import { DEFAULT_PLAN, trialEndsOn } from "./plans";
-import type { Expense, FinancialGoal, ReserveAccount, Subscription, Truck } from "./types";
+import type { Expense, FinancialGoal, Load, ReserveAccount, Subscription, Truck } from "./types";
 
 /**
  * Defaults for records added after the first release.
@@ -93,6 +93,33 @@ export function migrateTruck(truck: Truck): Truck {
   truck.soldOn ??= null;
   truck.active ??= true;
   return truck;
+}
+
+/**
+ * Operational load details were added after the original bookkeeping model.
+ * Unknown history stays unknown rather than being mislabeled as a box truck
+ * or a full load.
+ *
+ * `costsPosted` defaults to FALSE for the same reason, and it is the most
+ * consequential default in this file. A load written by an older build kept
+ * its trip costs as per-load detail while the owner entered real spend in the
+ * expense ledger -- that was the documented model. Defaulting to true would
+ * mirror those costs into the ledger retroactively and count every one of
+ * them twice, rewriting months the owner already settled and paid themselves
+ * on. Nothing is ever posted to history that history did not post itself.
+ */
+export function migrateLoad(load: Load): Load {
+  load.deliveryDate ??= null;
+  load.endingOdometer ??= null;
+  load.equipmentType ??= null;
+  load.loadCapacity ??= null;
+  load.equipmentLengthFt ??= null;
+  load.weightLbs ??= null;
+  load.commodity ??= null;
+  load.costsPosted ??= false;
+  load.driverId ??= null;
+  load.driverPay ??= 0;
+  return load;
 }
 
 /**

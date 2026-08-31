@@ -15,7 +15,7 @@
  * mistake.
  */
 
-import { div, roundMoney } from "../calculations";
+import { div, isDeadheadElevated, roundMoney } from "../calculations";
 import type { FinancialSettings, PeriodSummary } from "../types";
 import type { CostPerMile } from "./cost-per-mile";
 
@@ -67,7 +67,7 @@ export function calculateDeadheadCost(
     totalMiles: summary.totalMiles,
     deadheadPct: summary.deadheadPct,
     warnPct,
-    elevated: summary.deadheadPct > warnPct,
+    elevated: isDeadheadElevated(summary.deadheadPct, warnPct),
     costPerMile,
     cost,
     opportunityRevenue: roundMoney(summary.deadheadMiles * summary.revenuePerLoadedMile),

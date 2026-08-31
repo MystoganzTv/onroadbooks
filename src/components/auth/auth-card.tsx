@@ -92,7 +92,7 @@ export function AuthCard({
           noValidate
           className="space-y-4 rounded-lg border border-border bg-card p-5"
         >
-          <AuthOptions showDemo={!isSetup} />
+          <AuthOptions />
 
           {isSetup ? (
             <>

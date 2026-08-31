@@ -1,8 +1,8 @@
 /**
  * Storage contract.
  *
- * Two implementations satisfy it: a local JSON store (zero-setup demo /
- * local development) and a Prisma + PostgreSQL store (production).
+ * Two implementations satisfy it: a local JSON store (zero-setup local
+ * development) and a Prisma + PostgreSQL store (production).
  * Application code only ever talks to this interface, so switching the
  * backing database is an environment change, not a refactor.
  */
@@ -11,6 +11,9 @@ import type {
   Business,
   User,
   Dataset,
+  Driver,
+  DriverPayType,
+  DriverSettlement,
   FinancialGoal,
   ReserveAccount,
   ReserveBasis,
@@ -30,23 +33,36 @@ import type {
   FinancialSettings,
   FuelEntry,
   Load,
+  LoadCapacity,
+  EquipmentType,
   MaintenanceBasis,
   MaintenanceRecord,
   MaintenanceType,
+  MemberRole,
   PaymentStatus,
   Truck,
 } from "../types";
 
 export interface LoadInput {
-  /** Which unit ran it. Defaults to the primary truck. */
+  /** Which unit ran it. Optional only while the workspace has one active truck. */
   truckId?: string | null;
+  /** Optional driver assigned to this trip. */
+  driverId?: string | null;
+  /** Pickup date. */
   date: string;
+  deliveryDate?: string | null;
+  endingOdometer?: number | null;
   originCity: string;
   originState: string;
   destinationCity: string;
   destinationState: string;
   broker?: string | null;
   loadNumber?: string | null;
+  equipmentType?: EquipmentType | null;
+  loadCapacity?: LoadCapacity | null;
+  equipmentLengthFt?: number | null;
+  weightLbs?: number | null;
+  commodity?: string | null;
   loadedMiles: number;
   deadheadMiles: number;
   grossRate: number;
@@ -55,6 +71,7 @@ export interface LoadInput {
   dispatchFee: number;
   factoringFee: number;
   otherExpenses: number;
+  costsPosted?: boolean;
   status: PaymentStatus;
   notes?: string | null;
 }
@@ -62,8 +79,8 @@ export interface LoadInput {
 export interface ExpenseInput {
   /**
    * TRUCK charges the cost to a unit; BUSINESS is fleet overhead and forces
-   * truckId to null. Defaults to TRUCK on the primary truck, which is what a
-   * single-truck business always means.
+   * truckId to null. A TRUCK expense may omit the id only while the workspace
+   * has one active truck; a fleet must name the unit explicitly.
    */
   scope?: ExpenseScope;
   truckId?: string | null;
@@ -149,6 +166,21 @@ export interface TruckInput {
   currentOdometer: number;
 }
 
+export interface DriverInput {
+  name: string;
+  reference?: string | null;
+  defaultTruckId?: string | null;
+  payType: DriverPayType;
+  payRate: number;
+}
+
+export interface DriverSettlementInput {
+  driverId: string;
+  periodStart: string;
+  periodEnd: string;
+  notes?: string | null;
+}
+
 export interface GoalInput {
   monthlyRevenueTarget: number;
   monthlyProfitTarget: number;
@@ -202,6 +234,17 @@ export interface Repository {
   createLoad(input: LoadInput): Promise<Load>;
   updateLoad(id: string, input: LoadInput): Promise<Load>;
   deleteLoad(id: string): Promise<void>;
+
+  createDriver(input: DriverInput): Promise<Driver>;
+  updateDriver(id: string, input: DriverInput): Promise<Driver>;
+  setDriverActive(id: string, active: boolean): Promise<Driver>;
+
+  /** Freezes every still-unsettled assigned load inside the selected period. */
+  createDriverSettlement(input: DriverSettlementInput): Promise<DriverSettlement>;
+  /** Posts one Driver Pay expense per frozen line on the selected cash date. */
+  payDriverSettlement(id: string, paidOn: string): Promise<DriverSettlement>;
+  /** Only drafts can be deleted; paid statements are immutable. */
+  deleteDriverSettlement(id: string): Promise<void>;
 
   createExpense(input: ExpenseInput): Promise<Expense>;
   updateExpense(id: string, input: ExpenseInput): Promise<Expense>;
@@ -258,11 +301,22 @@ export interface AuthStore {
   countUsers(): Promise<number>;
   findUserByEmail(email: string): Promise<User | null>;
   findUserById(id: string): Promise<User | null>;
-  /** Returns the shared seeded account, creating only its login row when needed. */
-  ensureDemoUser(): Promise<User>;
+  listMembers(businessId: string): Promise<User[]>;
+  createMember(input: {
+    businessId: string;
+    email: string;
+    name?: string | null;
+    role: Exclude<MemberRole, "OWNER">;
+  }): Promise<User>;
+  updateMemberRole(
+    userId: string,
+    businessId: string,
+    role: Exclude<MemberRole, "OWNER">,
+  ): Promise<User>;
+  markMemberJoined(userId: string, businessId: string): Promise<User>;
+  removeMember(userId: string, businessId: string): Promise<{ email: string }>;
   /**
-   * Creates an owner with a separate business. Seeded data belongs only to
-   * the demo account and must never be attached to a real signup.
+   * Creates an owner with a private business workspace.
    */
   createOwner(input: {
     email: string;
@@ -291,13 +345,21 @@ export interface AdminAccountSummary {
   subscriptionStatus: Subscription["status"];
   currentPeriodEnd: string | null;
   hasProviderSubscription: boolean;
+  /** Inferred server-side; no provider identifiers are exposed to the client. */
+  accessSource: "stripe" | "complimentary" | "trial" | "inactive";
+  /** Most recent record creation across product modules, never a financial value. */
+  lastActivityAt: string | null;
   counts: {
     trucks: number;
+    activeTrucks: number;
     loads: number;
     expenses: number;
+    fuelEntries: number;
     documents: number;
+    maintenance: number;
+    reserveTransactions: number;
+    settlements: number;
   };
-  isDemo: boolean;
 }
 
 export function newId(prefix: string): string {

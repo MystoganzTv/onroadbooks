@@ -271,7 +271,9 @@ export function ExpensesTable({
                 // read-only and point at where they are actually maintained.
                 const mirroredFuel = expense.id.startsWith("expfuel_");
                 const mirroredService = expense.id.startsWith("expmaint_");
-                const mirrored = mirroredFuel || mirroredService;
+                const mirroredLoad = expense.id.startsWith("expload_");
+                const mirroredDriver = expense.id.startsWith("expdriver_");
+                const mirrored = mirroredFuel || mirroredService || mirroredLoad || mirroredDriver;
                 return (
                   <TableRow key={expense.id}>
                     <TableCell className="text-muted-foreground">
@@ -311,7 +313,13 @@ export function ExpensesTable({
                       ) : null}
                       {mirrored ? (
                         <Badge variant="outline" className="ml-1.5">
-                          {mirroredFuel ? "From Fuel" : "From Service"}
+                          {mirroredFuel
+                            ? "From Fuel"
+                            : mirroredDriver
+                              ? "From Driver Pay"
+                            : mirroredLoad
+                              ? "From Load"
+                              : "From Service"}
                         </Badge>
                       ) : null}
                       {showCharge ? (
@@ -333,15 +341,31 @@ export function ExpensesTable({
                         {mirrored ? (
                           <Button asChild variant="ghost" size="icon-sm">
                             <Link
-                              href={mirroredFuel ? "/fuel" : "/truck"}
+                              href={
+                                mirroredFuel
+                                  ? "/fuel"
+                                  : mirroredDriver
+                                    ? "/driver-settlements"
+                                  : mirroredLoad && expense.loadId
+                                    ? `/loads/${expense.loadId}`
+                                    : "/truck"
+                              }
                               aria-label={
                                 mirroredFuel
                                   ? "Edit on the Fuel page"
+                                  : mirroredDriver
+                                    ? "Open the driver statement"
+                                  : mirroredLoad
+                                    ? "Edit on the Load page"
                                   : "Edit on the Truck maintenance tab"
                               }
                               title={
                                 mirroredFuel
                                   ? "Written by a fuel entry - edit it on the Fuel page"
+                                  : mirroredDriver
+                                    ? "Written by a paid driver statement"
+                                  : mirroredLoad
+                                    ? "Written by a load - edit it on the Load page"
                                   : "Written by a service record - edit it on the Truck page"
                               }
                             >

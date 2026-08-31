@@ -22,7 +22,7 @@ import { deleteCurrentAccount, resetAccountData } from "@/lib/actions/account";
 
 type Operation = "reset" | "delete" | null;
 
-export function AccountDangerZone({ email, isDemo }: { email: string; isDemo: boolean }) {
+export function AccountDangerZone({ email }: { email: string }) {
   const router = useRouter();
   const [operation, setOperation] = React.useState<Operation>(null);
   const [confirmation, setConfirmation] = React.useState("");
@@ -81,12 +81,6 @@ export function AccountDangerZone({ email, isDemo }: { email: string; isDemo: bo
         </span>
       </CardHeader>
       <CardContent className="space-y-3">
-        {isDemo ? (
-          <p className="rounded-md border border-dashed border-border bg-surface-sunken/50 p-3 text-xs leading-relaxed text-muted-foreground">
-            The shared demo is read-only. Its account and sample data cannot be reset or deleted.
-          </p>
-        ) : null}
-
         <div className="grid gap-3 lg:grid-cols-2">
           <div className="flex flex-col justify-between gap-4 rounded-md border border-border p-4">
             <div>
@@ -100,7 +94,6 @@ export function AccountDangerZone({ email, isDemo }: { email: string; isDemo: bo
               type="button"
               variant="outline"
               className="self-start"
-              disabled={isDemo}
               onClick={() => setOperation("reset")}
             >
               <RotateCcw />
@@ -120,7 +113,6 @@ export function AccountDangerZone({ email, isDemo }: { email: string; isDemo: bo
               type="button"
               variant="destructive"
               className="self-start"
-              disabled={isDemo}
               onClick={() => setOperation("delete")}
             >
               <Trash2 />

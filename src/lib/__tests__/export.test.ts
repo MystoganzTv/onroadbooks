@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { summarizePeriod } from "../calculations";
-import { buildReport, REPORT_IDS, toCsv } from "../export";
+import { buildReport, reportFileName, REPORT_IDS, toCsv } from "../export";
 import { calculateTrueCostPerMile } from "../finance/cost-per-mile";
 import { calculateDeadheadCost } from "../finance/deadhead";
 import { calculateSafeOwnerPay, resolveReserveRules } from "../finance/owner-pay";
+import { expensesForTruck, loadsForTruck } from "../fleet";
 import { resolvePeriod } from "../periods";
 import { buildSeedDataset } from "../seed/seed-data";
 
@@ -79,6 +80,69 @@ describe("buildReport", () => {
     const total = table.rows.reduce((sum, row) => sum + Number(row[rateColumn] ?? 0), 0);
     assert.ok(total > 0);
     assert.equal(Math.round(total * 100) / 100, 9795);
+  });
+
+  it("exports one truck without leaking another unit or company reserves", () => {
+    const first = dataset.trucks[0];
+    const second = { ...first, id: "truck_export_102", name: "Unit 102" };
+    const scoped = {
+      ...dataset,
+      trucks: [first, second],
+      loads: dataset.loads.map((load, index) => ({
+        ...load,
+        truckId: index % 2 === 0 ? first.id : second.id,
+      })),
+      expenses: dataset.expenses.map((expense, index) => ({
+        ...expense,
+        truckId: index % 2 === 0 ? first.id : second.id,
+        scope: "TRUCK" as const,
+      })),
+    };
+
+    const loads = buildReport("loads", scoped, period, second.id);
+    const truckColumn = loads.columns.indexOf("Truck");
+    assert.ok(loads.rows.length > 0);
+    assert.ok(loads.rows.every((row) => row[truckColumn] === second.name));
+
+    const profitLoss = buildReport("profit-loss", scoped, period, second.id);
+    const labels = profitLoss.rows.map((row) => String(row[0] ?? ""));
+    assert.ok(labels.includes("Truck contribution"));
+    assert.equal(labels.includes("Safe to pay yourself"), false);
+  });
+
+  it("reconciles a unit P&L to that unit's on-screen contribution", () => {
+    const first = dataset.trucks[0];
+    const second = { ...first, id: "truck_pnl_202", name: "Unit 202 / East" };
+    const scoped = {
+      ...dataset,
+      trucks: [first, second],
+      loads: dataset.loads.map((load, index) => ({
+        ...load,
+        truckId: index % 2 === 0 ? first.id : second.id,
+      })),
+      expenses: dataset.expenses.map((expense, index) => ({
+        ...expense,
+        truckId: index % 2 === 0 ? first.id : second.id,
+        scope: "TRUCK" as const,
+      })),
+    };
+    const summary = summarizePeriod(
+      loadsForTruck(scoped.loads, second.id),
+      expensesForTruck(scoped.expenses, second.id),
+      period,
+      scoped.settings,
+    );
+    const report = buildReport("profit-loss", scoped, period, second.id);
+    const row = (label: string) => report.rows.find((candidate) => candidate[0] === label);
+
+    assert.equal(Number(row("Gross revenue")?.[1]), summary.grossRevenue);
+    assert.equal(Number(row("Total operating expenses")?.[1]), summary.operatingExpenses);
+    assert.equal(Number(row("Truck contribution")?.[1]), summary.netProfit);
+    assert.match(report.title, /Unit 202 \/ East/);
+    assert.equal(
+      reportFileName("profit-loss", period, second.name),
+      `onroad-books-profit-loss-unit-202-east-${period.start}-to-${period.end}.csv`,
+    );
   });
 });
 

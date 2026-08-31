@@ -4,9 +4,10 @@ import { randomUUID } from "node:crypto";
 
 import { redirect } from "next/navigation";
 
-import { requireSession } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { trialState } from "@/lib/plans";
+import { subscriptionCheckoutParameters } from "@/lib/stripe-checkout";
 import {
   applicationUrl,
   getStripe,
@@ -26,10 +27,7 @@ function preservedTrialEnd(currentPeriodEnd: string | null): number | undefined 
 export async function createCheckoutAction(plan: PlanId): Promise<void> {
   if (!CHECKOUT_PLANS.has(plan)) throw new Error("That billing plan is not available.");
 
-  const session = await requireSession();
-  if (session.isDemo) {
-    throw new Error("Create your own account before starting a subscription.");
-  }
+  const session = await requirePermission("manage_billing");
 
   const repository = getRepository(session.businessId);
   const { business, subscription } = await repository.getDataset();
@@ -68,27 +66,14 @@ export async function createCheckoutAction(plan: PlanId): Promise<void> {
     : undefined;
   const baseUrl = applicationUrl();
   const checkout = await stripe.checkout.sessions.create(
-    {
-      mode: "subscription",
-      customer: providerCustomerId,
-      client_reference_id: session.businessId,
-      line_items: [{ price: stripePriceId(plan), quantity: 1 }],
-      allow_promotion_codes: true,
-      billing_address_collection: "auto",
-      success_url: `${baseUrl}/plans?checkout=success`,
-      cancel_url: `${baseUrl}/plans?checkout=canceled`,
-      metadata: {
-        onRoadBusinessId: session.businessId,
-        onRoadPlan: plan,
-      },
-      subscription_data: {
-        metadata: {
-          onRoadBusinessId: session.businessId,
-          onRoadPlan: plan,
-        },
-        ...(trialEnd ? { trial_end: trialEnd } : {}),
-      },
-    },
+    subscriptionCheckoutParameters({
+      baseUrl,
+      businessId: session.businessId,
+      customerId: providerCustomerId,
+      plan,
+      priceId: stripePriceId(plan),
+      trialEnd,
+    }),
     {
       // A Checkout Session is intentionally fresh on every visit. Reusing a
       // business-level key traps customers in an expired session and also
@@ -103,8 +88,7 @@ export async function createCheckoutAction(plan: PlanId): Promise<void> {
 }
 
 export async function openBillingPortalAction(): Promise<void> {
-  const session = await requireSession();
-  if (session.isDemo) throw new Error("The demo account has no billing profile.");
+  const session = await requirePermission("manage_billing");
 
   const { subscription } = await getRepository(session.businessId).getDataset();
   if (!subscription.providerCustomerId) redirect("/plans");

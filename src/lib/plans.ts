@@ -27,9 +27,9 @@
  * which plan is bigger. `rank` does, and it is what upgrade and downgrade are
  * decided against.
  *
- * Fleet access is stricter: its provider reference must be present and the
- * subscription active. That keeps Fleet a paid service instead of letting a
- * plan label or an old truck row turn the workspace on by accident.
+ * Fleet access is stricter: the subscription must be active and either be
+ * backed by Stripe or carry an explicit complimentary grant. A plan label or
+ * an old truck row can never turn the workspace on by accident.
  */
 
 import type { PlanId, Subscription, SubscriptionStatus } from "./types";
@@ -105,12 +105,13 @@ export const PLANS: Record<PlanId, Plan> = {
     features: [
       "Everything in OnRoad Pro",
       "Up to eight trucks on one account",
+      "Individual sign-ins with Owner, Admin, Bookkeeper, Dispatcher and Viewer roles",
+      "Drivers, load assignments and frozen driver-pay statements",
       "Cost per mile and contribution per unit",
       "Business overhead kept separate from truck costs",
       "Fleet-wide settlements",
     ],
-    note:
-      "Fleet is in early access. Everything listed here works today; a second sign-in for a partner or a bookkeeper does not exist yet, and early access pricing is locked for life.",
+    note: "Fleet is in early access, and early access pricing is locked for life.",
   },
 };
 
@@ -178,13 +179,27 @@ export function planOf(subscription: Subscription | undefined): Plan {
   return getPlan(subscription?.plan);
 }
 
-/** Fleet is a separate paid service, not a UI mode inferred from truck count. */
+/** Admin grants have no provider id and no billing period; Stripe access has both. */
+export function isComplimentaryAccess(
+  subscription:
+    | Pick<Subscription, "status" | "providerSubscriptionId" | "currentPeriodEnd">
+    | undefined,
+): boolean {
+  return Boolean(
+    subscription &&
+      subscription.status === "ACTIVE" &&
+      !subscription.providerSubscriptionId &&
+      subscription.currentPeriodEnd === null,
+  );
+}
+
+/** Fleet is a separate managed service, not a UI mode inferred from truck count. */
 export function hasFleetAccess(subscription: Subscription | undefined): boolean {
   return Boolean(
     subscription &&
       planOf(subscription).id === "FLEET" &&
       subscription.status === "ACTIVE" &&
-      subscription.providerSubscriptionId,
+      (subscription.providerSubscriptionId || isComplimentaryAccess(subscription)),
   );
 }
 

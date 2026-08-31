@@ -11,9 +11,11 @@ import type { Subscription } from "@/lib/types";
 export function CurrentPlanCard({
   subscription,
   today,
+  canManage = true,
 }: {
   subscription: Subscription;
   today: string;
+  canManage?: boolean;
 }) {
   const plan = planOf(subscription);
   const trial = trialState(subscription, today);
@@ -73,12 +75,16 @@ export function CurrentPlanCard({
             {statusMessage}
           </p>
         </div>
-        <Button asChild className="w-full" size="sm">
-          <Link href="/plans">
-            {actionLabel}
-            <ArrowRight className="size-4" />
-          </Link>
-        </Button>
+        {canManage ? (
+          <Button asChild className="w-full" size="sm">
+            <Link href="/plans">
+              {actionLabel}
+              <ArrowRight className="size-4" />
+            </Link>
+          </Button>
+        ) : (
+          <p className="text-xs text-muted-foreground">Only the workspace owner can manage billing.</p>
+        )}
       </CardContent>
     </Card>
   );

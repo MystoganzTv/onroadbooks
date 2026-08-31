@@ -11,6 +11,7 @@ import {
   overheadExpenses,
   orderedTrucks,
   primaryTruck,
+  resolveTruckId,
   truckById,
 } from "../fleet";
 import { calculateTrueCostPerMile } from "../finance/cost-per-mile";
@@ -25,7 +26,15 @@ function load(over: Partial<Load> = {}): Load {
     id: "l1",
     businessId: "b",
     truckId: "t1",
+    driverId: null,
     date: "2026-08-05",
+    deliveryDate: null,
+    endingOdometer: null,
+    equipmentType: null,
+    loadCapacity: null,
+    equipmentLengthFt: null,
+    weightLbs: null,
+    commodity: null,
     originCity: "A",
     originState: "VA",
     destinationCity: "B",
@@ -40,6 +49,8 @@ function load(over: Partial<Load> = {}): Load {
     dispatchFee: 0,
     factoringFee: 0,
     otherExpenses: 0,
+    driverPay: 0,
+    costsPosted: false,
     status: "PAID",
     notes: null,
     createdAt: "",
@@ -208,6 +219,17 @@ describe("reading a fleet", () => {
     assert.equal(isFleet({ trucks: fleet }), true);
     assert.equal(isFleet({ trucks: [fleet[0]] }), false);
   });
+
+  it("never guesses a unit when multiple active trucks are available", () => {
+    assert.throws(() => resolveTruckId(fleet, null), /Choose which truck/);
+    assert.equal(resolveTruckId(fleet, "t2"), "t2");
+    assert.throws(() => resolveTruckId(fleet, "foreign"), /does not belong/);
+  });
+
+  it("keeps the single-active-truck shortcut for individual accounts", () => {
+    assert.equal(resolveTruckId([fleet[0]], null), "t1");
+    assert.equal(resolveTruckId([fleet[2]], null), "t3");
+  });
 });
 
 describe("scoping expenses to a unit", () => {
@@ -265,16 +287,22 @@ describe("calculateFleetSummary", () => {
   const august = resolvePeriod("2026-08", "full");
   const settings = buildSeedDataset().settings;
 
-  const fleet = [truck({ id: "t1", name: "Unit 101" }), truck({ id: "t2", name: "Unit 102" })];
+  const fleet = [
+    truck({ id: "t1", name: "Unit 101" }),
+    truck({ id: "t2", name: "Unit 102" }),
+    truck({ id: "t3", name: "Unit 103" }),
+  ];
 
   const loads = [
     load({ id: "l1", truckId: "t1", grossRate: 9000, loadedMiles: 2700, deadheadMiles: 300 }),
     load({ id: "l2", truckId: "t2", grossRate: 6000, loadedMiles: 1800, deadheadMiles: 200 }),
+    load({ id: "l3", truckId: "t3", grossRate: 3000, loadedMiles: 900, deadheadMiles: 100 }),
   ];
 
   const expenses = [
     expense({ id: "e1", truckId: "t1", amount: 4000 }),
     expense({ id: "e2", truckId: "t2", amount: 3500 }),
+    expense({ id: "e3", truckId: "t3", amount: 2500 }),
     // Overhead: belongs to the business, to no unit.
     expense({ id: "o1", truckId: null, scope: "BUSINESS", amount: 1500, category: "PHONE" }),
   ];
@@ -287,17 +315,21 @@ describe("calculateFleetSummary", () => {
     assert.equal(unit101.directCosts, 4000);
     assert.equal(unit101.contribution, 5000);
     assert.equal(unit101.totalMiles, 3000);
+    const unit103 = fleetSummary.units.find((u) => u.truck.id === "t3")!;
+    assert.equal(unit103.revenue, 3000);
+    assert.equal(unit103.directCosts, 2500);
+    assert.equal(unit103.contribution, 500);
   });
 
   it("never charges overhead to a unit", () => {
     const total = fleetSummary.units.reduce((n, u) => n + u.directCosts, 0);
-    assert.equal(total, 7500);
+    assert.equal(total, 10000);
     assert.equal(fleetSummary.overhead, 1500);
   });
 
   it("subtracts overhead once, at the bottom", () => {
-    assert.equal(fleetSummary.contribution, 7500);
-    assert.equal(fleetSummary.operatingProfit, 6000);
+    assert.equal(fleetSummary.contribution, 8000);
+    assert.equal(fleetSummary.operatingProfit, 6500);
   });
 
   it("RECONCILES with the single number on the dashboard", () => {
@@ -312,8 +344,8 @@ describe("calculateFleetSummary", () => {
   });
 
   it("reports the overhead allocation separately from any unit's own cost", () => {
-    // 1500 over 5000 miles.
-    assert.equal(fleetSummary.overheadPerMile, 0.3);
+    // 1500 over 6000 miles.
+    assert.equal(fleetSummary.overheadPerMile, 0.25);
     const unit101 = fleetSummary.units.find((u) => u.truck.id === "t1")!;
     // The unit's own cost per mile knows nothing about it.
     assert.equal(unit101.directCostPerMile, 4000 / 3000);
@@ -323,7 +355,7 @@ describe("calculateFleetSummary", () => {
     assert.equal(fleetSummary.units[0].truck.id, "t1");
     const { best, weakest } = fleetExtremes(fleetSummary);
     assert.equal(best?.truck.id, "t1");
-    assert.equal(weakest?.truck.id, "t2");
+    assert.equal(weakest?.truck.id, "t3");
   });
 
   it("says it is not meaningful when only one unit actually ran", () => {
@@ -341,7 +373,7 @@ describe("calculateFleetSummary", () => {
   });
 
   it("still reconciles when a unit loses money", () => {
-    const bad = [...expenses, expense({ id: "e3", truckId: "t2", amount: 5000 })];
+    const bad = [...expenses, expense({ id: "e4", truckId: "t2", amount: 5000 })];
     const s = calculateFleetSummary(fleet, loads, bad, august, settings);
     const overall = summarizePeriod(loads, bad, august, settings);
     assert.ok(s.units.find((u) => u.truck.id === "t2")!.contribution < 0);

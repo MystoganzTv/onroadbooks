@@ -1,6 +1,6 @@
 /**
- * Seeds a PostgreSQL database with the same demo dataset the JSON store
- * boots with, so switching DATA_SOURCE=postgres gives an identical app.
+ * Seeds a PostgreSQL database with the deterministic reference fixture used
+ * by tests and local development.
  *
  *   npm run db:push && npm run db:seed
  */
@@ -25,6 +25,7 @@ async function main() {
   await prisma.document.deleteMany();
   await prisma.reserveTransaction.deleteMany();
   await prisma.settlement.deleteMany();
+  await prisma.driverSettlement.deleteMany();
   await prisma.reserveAccount.deleteMany();
   await prisma.financialGoal.deleteMany();
   await prisma.subscription.deleteMany();
@@ -32,6 +33,7 @@ async function main() {
   await prisma.fuelEntry.deleteMany();
   await prisma.expense.deleteMany();
   await prisma.load.deleteMany();
+  await prisma.driver.deleteMany();
   await prisma.financialSettings.deleteMany();
   await prisma.truck.deleteMany();
   await prisma.user.deleteMany();
@@ -83,12 +85,19 @@ async function main() {
         businessId: business.id,
         truckId,
         date: toDate(load.date),
+        deliveryDate: load.deliveryDate ? toDate(load.deliveryDate) : null,
+        endingOdometer: load.endingOdometer,
         originCity: load.originCity,
         originState: load.originState,
         destinationCity: load.destinationCity,
         destinationState: load.destinationState,
         broker: load.broker,
         loadNumber: load.loadNumber,
+        equipmentType: load.equipmentType,
+        loadCapacity: load.loadCapacity,
+        equipmentLengthFt: load.equipmentLengthFt,
+        weightLbs: load.weightLbs,
+        commodity: load.commodity,
         loadedMiles: load.loadedMiles,
         deadheadMiles: load.deadheadMiles,
         grossRate: load.grossRate,
@@ -97,6 +106,7 @@ async function main() {
         dispatchFee: load.dispatchFee,
         factoringFee: load.factoringFee,
         otherExpenses: load.otherExpenses,
+        costsPosted: load.costsPosted,
         status: load.status,
         notes: load.notes,
       },
@@ -165,7 +175,7 @@ async function main() {
 
   // --- the cockpit's own records -------------------------------------------
   // Goals, buckets, settlement history and the reserve movements those closes
-  // posted. Without these the Postgres demo is a different demo: no emergency
+  // posted. Without these the Postgres fixture differs from the reference: no emergency
   // bucket means a different Safe to Pay, and no history means the settlement
   // page opens empty.
 
@@ -263,7 +273,7 @@ async function main() {
   console.log("Done.");
   console.log(
     "Note: document *files* are not seeded -- only the local JSON store writes " +
-      "demo PDFs to disk. Upload documents through the UI when running on Postgres.",
+      "sample PDFs to disk. Upload documents through the UI when running on Postgres.",
   );
 }
 

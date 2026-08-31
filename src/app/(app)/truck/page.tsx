@@ -263,7 +263,11 @@ export default async function TruckPage({
           <div className="grid gap-4 xl:grid-cols-3">
             <div className="min-w-0 space-y-4 xl:col-span-1">
               <TruckHealthPanel health={health} />
-              <UpcomingMaintenance items={upcoming} currentOdometer={truck.currentOdometer} />
+              <UpcomingMaintenance
+                items={upcoming}
+                currentOdometer={truck.currentOdometer}
+                thresholds={thresholds}
+              />
             </div>
             <div className="min-w-0 xl:col-span-2">
               <MaintenanceTable
@@ -306,6 +310,7 @@ export default async function TruckPage({
           <TruckOverview
             truck={truck}
             odometerMiles={lifetime.odometerMiles}
+            loadMiles={lifetime.totalMiles}
             milesPerGallon={fuel.milesPerGallon}
             activeTruckCount={running}
             canRestore={allowance.canAdd}

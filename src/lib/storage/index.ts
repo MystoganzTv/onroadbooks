@@ -3,6 +3,7 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
+import { dataDirectory } from "@/lib/data-directory";
 import type { DocumentStorage } from "./contract";
 import { SupabaseDocumentStorage } from "./supabase";
 
@@ -19,7 +20,7 @@ import { SupabaseDocumentStorage } from "./supabase";
 export type { DocumentStorage } from "./contract";
 
 /** Resolved per call, for the same reason the ledger path is. */
-const uploadDir = () => path.join(process.cwd(), "data", "uploads");
+const uploadDir = () => path.join(dataDirectory(), "uploads");
 
 /** Keys are generated, but never trust one that arrived over the wire. */
 function safeKey(key: string): string {

@@ -20,7 +20,12 @@ import {
   formatBytes,
   isAcceptedType,
   MAX_DOCUMENT_BYTES,
+  MAX_DOCUMENT_SOURCE_BYTES,
 } from "@/lib/documents";
+import {
+  optimizeDocumentFile,
+  type DocumentOptimizationProgress,
+} from "@/lib/document-optimization";
 import type { DocumentOwner, DocumentType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -64,35 +69,53 @@ export function DocumentUploader({
   const [type, setType] = React.useState<DocumentType>(options[0]);
   const [dragging, setDragging] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
+  const [progress, setProgress] = React.useState<string | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   const staged = React.useMemo(() => pending ?? [], [pending]);
 
   const accept = React.useCallback(
-    (files: FileList | null) => {
+    async (files: FileList | null) => {
       if (!files?.length) return;
+      setBusy(true);
       const chosen: PendingUpload[] = [];
 
-      for (const file of Array.from(files)) {
-        if (file.size > MAX_DOCUMENT_BYTES) {
-          toast.error(`${file.name} is larger than ${Math.round(MAX_DOCUMENT_BYTES / 1024 / 1024)} MB.`);
+      for (const source of Array.from(files)) {
+        if (source.size > MAX_DOCUMENT_SOURCE_BYTES) {
+          toast.error(`${source.name} is larger than ${Math.round(MAX_DOCUMENT_SOURCE_BYTES / 1024 / 1024)} MB.`);
           continue;
         }
-        if (!isAcceptedType(file.type)) {
-          toast.error(`${file.name} is not an image or PDF.`);
+        if (!isAcceptedType(source.type)) {
+          toast.error(`${source.name} is not an image or PDF.`);
+          continue;
+        }
+
+        setProgress(source.type === "application/pdf" ? "Checking PDF..." : "Optimizing image...");
+        const file = await optimizeDocumentFile(source, (status) => {
+          setProgress(optimizationLabel(status));
+        });
+        if (file.size > MAX_DOCUMENT_BYTES) {
+          toast.error(
+            `${source.name} is still larger than ${Math.round(MAX_DOCUMENT_BYTES / 1024 / 1024)} MB after optimization.`,
+          );
           continue;
         }
         chosen.push({ file, type });
       }
-      if (chosen.length === 0) return;
-
-      if (!entityId) {
-        onPendingChange?.([...staged, ...chosen]);
+      setProgress(null);
+      if (chosen.length === 0) {
+        setBusy(false);
         return;
       }
 
-      setBusy(true);
-      void Promise.all(chosen.map((item) => uploadDocument(owner, entityId, item)))
+      if (!entityId) {
+        onPendingChange?.([...staged, ...chosen]);
+        setBusy(false);
+        return;
+      }
+
+      setProgress("Uploading securely...");
+      await Promise.all(chosen.map((item) => uploadDocument(owner, entityId, item)))
         .then((results) => {
           const failures = results.filter((r) => !r.ok);
           if (failures.length) toast.error(failures[0].error ?? "Upload failed.");
@@ -102,7 +125,10 @@ export function DocumentUploader({
             router.refresh();
           }
         })
-        .finally(() => setBusy(false));
+        .finally(() => {
+          setBusy(false);
+          setProgress(null);
+        });
     },
     [entityId, onPendingChange, owner, router, staged, type],
   );
@@ -130,7 +156,7 @@ export function DocumentUploader({
           onClick={() => inputRef.current?.click()}
         >
           {busy ? <Loader2 className="animate-spin" /> : <Paperclip />}
-          Attach file
+          {progress ?? "Attach file"}
         </Button>
       </div>
 
@@ -143,7 +169,7 @@ export function DocumentUploader({
         onDrop={(e) => {
           e.preventDefault();
           setDragging(false);
-          accept(e.dataTransfer.files);
+          void accept(e.dataTransfer.files);
         }}
         className={cn(
           "flex items-center justify-center gap-2 rounded-md border border-dashed px-3 text-2xs transition-colors",
@@ -154,8 +180,8 @@ export function DocumentUploader({
         )}
       >
         <Upload className="size-3.5" />
-        Drop an image or PDF here, or use Attach file. Max{" "}
-        {Math.round(MAX_DOCUMENT_BYTES / 1024 / 1024)} MB.
+        Drop an image or PDF here, or use Attach file. PDF scans are optimized automatically; max{" "}
+        {Math.round(MAX_DOCUMENT_BYTES / 1024 / 1024)} MB after optimization.
       </div>
 
       {/* Driven entirely by the Attach file button; sr-only keeps it in the
@@ -169,7 +195,7 @@ export function DocumentUploader({
         aria-hidden
         className="sr-only"
         onChange={(e) => {
-          accept(e.target.files);
+          void accept(e.target.files);
           e.target.value = "";
         }}
       />
@@ -212,6 +238,68 @@ async function uploadDocument(
   entityId: string,
   item: PendingUpload,
 ): Promise<{ ok: boolean; error?: string }> {
+  const metadata = {
+    type: item.type,
+    owner,
+    entityId,
+    label: item.file.name,
+    fileName: item.file.name,
+    contentType: item.file.type,
+    sizeBytes: item.file.size,
+  };
+
+  try {
+    const prepared = await fetch("/api/documents/upload/prepare", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(metadata),
+    });
+    const plan = (await prepared.json().catch(() => null)) as
+      | {
+          strategy: "direct";
+          upload: { bucket: string; path: string; token: string };
+          ticket: string;
+        }
+      | { strategy: "multipart" }
+      | { error?: string }
+      | null;
+    if (!prepared.ok) return { ok: false, error: plan && "error" in plan ? plan.error : undefined };
+
+    if (plan && "strategy" in plan && plan.strategy === "direct") {
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const key =
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+        ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (!url || !key) return { ok: false, error: "Secure document storage is not configured." };
+
+      const { createClient } = await import("@supabase/supabase-js");
+      const supabase = createClient(url, key, {
+        auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
+      });
+      const { error } = await supabase.storage
+        .from(plan.upload.bucket)
+        .uploadToSignedUrl(plan.upload.path, plan.upload.token, item.file, {
+          contentType: item.file.type,
+          cacheControl: "3600",
+          upsert: false,
+        });
+      if (error) return { ok: false, error: "The document could not reach secure storage." };
+
+      const completed = await fetch("/api/documents/upload/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticket: plan.ticket }),
+      });
+      if (completed.ok) return { ok: true };
+      const result = (await completed.json().catch(() => null)) as { error?: string } | null;
+      return { ok: false, error: result?.error ?? "The document could not be attached." };
+    }
+  } catch {
+    return { ok: false, error: "Upload failed." };
+  }
+
+  // Local development keeps its filesystem adapter and uses the small
+  // multipart route; production never sends document bytes through Vercel.
   const body = new FormData();
   body.set("file", item.file);
   body.set("type", item.type);
@@ -227,6 +315,15 @@ async function uploadDocument(
   } catch {
     return { ok: false, error: "Upload failed." };
   }
+}
+
+function optimizationLabel(progress: DocumentOptimizationProgress): string {
+  if (progress.stage === "page") {
+    return `Optimizing PDF ${progress.page ?? 0}/${progress.pages ?? 0}...`;
+  }
+  if (progress.stage === "saving") return "Finishing PDF...";
+  if (progress.stage === "native-pdf") return "Keeping searchable PDF...";
+  return "Checking PDF...";
 }
 
 export interface UploadOutcome {

@@ -125,7 +125,7 @@ export function SettingsForm({
       const result = await updateSettingsAction(payload);
       if (result.ok) {
         toast.success("Settings saved", {
-          description: "Every period recalculated with the new reserve percentages.",
+          description: "Financial metrics, load ratings, and warning states recalculated.",
         });
         router.refresh();
       } else {

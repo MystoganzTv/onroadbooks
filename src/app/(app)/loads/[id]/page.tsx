@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, FileText, Fuel, MapPin, Pencil, Receipt } from "lucide-react";
+import { ArrowLeft, FileText, Fuel, MapPin, Package, Pencil, Receipt } from "lucide-react";
 
 import { DocumentList } from "@/components/documents/document-list";
 import { DocumentUploader } from "@/components/documents/document-uploader";
@@ -15,7 +15,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
-import { loadMetrics, thresholdsFromSettings } from "@/lib/calculations";
+import { hasFleetAccess } from "@/lib/plans";
+import { isDeadheadElevated, loadMetrics, thresholdsFromSettings } from "@/lib/calculations";
 import { calculateLoadScore } from "@/lib/finance/load-score";
 import { LoadScoreBreakdown } from "@/components/cockpit/load-score-badge";
 import {
@@ -23,10 +24,12 @@ import {
   formatGallons,
   formatMiles,
   formatMoney,
+  formatNumber,
   formatPercent,
   formatRateValue,
 } from "@/lib/formatters";
 import { categoryLabel } from "@/lib/categories";
+import { equipmentTypeLabel, loadCapacityLabel } from "@/lib/load-details";
 
 export const metadata: Metadata = { title: "Load detail" };
 
@@ -68,11 +71,15 @@ export default async function LoadDetailPage({
             <span className="truncate">{route}</span>
           </h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            {formatDateLong(load.date)}
+            Pickup {formatDateLong(load.date)}
+            {load.deliveryDate ? ` - Delivery ${formatDateLong(load.deliveryDate)}` : ""}
             {load.broker ? ` - ${load.broker}` : ""}
             {load.loadNumber ? ` - Load #${load.loadNumber}` : ""}
             {dataset.trucks.length > 1
               ? ` - ${dataset.trucks.find((t) => t.id === load.truckId)?.name ?? "Unknown truck"}`
+              : ""}
+            {load.driverId
+              ? ` - ${dataset.drivers.find((driver) => driver.id === load.driverId)?.name ?? "Unknown driver"}`
               : ""}
           </p>
         </div>
@@ -83,6 +90,7 @@ export default async function LoadDetailPage({
             load={load}
             brokers={brokers}
             trucks={dataset.trucks}
+            drivers={hasFleetAccess(dataset.subscription) ? dataset.drivers : []}
             ratingThresholds={thresholdsFromSettings(dataset.settings)}
             trigger={
               <Button variant="outline" size="sm">
@@ -130,7 +138,11 @@ export default async function LoadDetailPage({
               <Metric
                 label="Deadhead"
                 value={formatPercent(metrics.deadheadPct)}
-                valueClassName={metrics.deadheadPct > 20 ? "text-warn" : undefined}
+                valueClassName={
+                  isDeadheadElevated(metrics.deadheadPct, dataset.settings.deadheadWarnPct)
+                    ? "text-warn"
+                    : undefined
+                }
                 sub={`${formatMiles(load.deadheadMiles)} empty`}
               />
               <Metric
@@ -154,6 +166,39 @@ export default async function LoadDetailPage({
         </div>
 
         <div className="min-w-0 space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Package className="size-3.5 text-muted-foreground" />
+                <CardTitle>Load Details</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-x-4 gap-y-3 p-4">
+              <Metric label="Pickup" value={formatDateLong(load.date)} />
+              <Metric
+                label="Delivery"
+                value={load.deliveryDate ? formatDateLong(load.deliveryDate) : "Not specified"}
+              />
+              <Metric
+                label="Equipment"
+                value={equipmentTypeLabel(load.equipmentType)}
+                sub={load.equipmentLengthFt ? `${load.equipmentLengthFt} ft` : undefined}
+              />
+              <Metric label="Load Type" value={loadCapacityLabel(load.loadCapacity)} />
+              <Metric
+                label="Weight"
+                value={load.weightLbs ? `${formatNumber(load.weightLbs)} lb` : "Not specified"}
+              />
+              <Metric label="Commodity" value={load.commodity ?? "Not specified"} />
+              <Metric
+                label="Ending Odometer"
+                value={load.endingOdometer ? formatNumber(load.endingOdometer) : "Not recorded"}
+                sub={load.endingOdometer ? "mi" : undefined}
+              />
+              <Metric label="Trip Costs" value="Included in Expenses" />
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">

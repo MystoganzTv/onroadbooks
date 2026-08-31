@@ -13,6 +13,7 @@ import {
   TableWrapper,
 } from "@/components/ui/table";
 import type { BrokerPerformance } from "@/lib/calculations";
+import { isDeadheadElevated } from "@/lib/calculations";
 import {
   formatMoney,
   formatNumber,
@@ -29,7 +30,13 @@ import { cn } from "@/lib/utils";
  * Miles and rate per loaded mile are dropped in print: ten columns do not fit
  * a portrait page, and those two are the ones the reader can live without.
  */
-export function BrokerTable({ brokers }: { brokers: BrokerPerformance[] }) {
+export function BrokerTable({
+  brokers,
+  deadheadWarnPct = 20,
+}: {
+  brokers: BrokerPerformance[];
+  deadheadWarnPct?: number;
+}) {
   const best = brokers[0];
   const worst = brokers.length > 1 ? brokers[brokers.length - 1] : undefined;
 
@@ -86,7 +93,9 @@ export function BrokerTable({ brokers }: { brokers: BrokerPerformance[] }) {
                     <TableCell
                       className={cn(
                         "text-right tnum",
-                        broker.deadheadPct > 20 ? "text-warn" : "text-muted-foreground",
+                        isDeadheadElevated(broker.deadheadPct, deadheadWarnPct)
+                          ? "text-warn"
+                          : "text-muted-foreground",
                       )}
                     >
                       {formatPercent(broker.deadheadPct)}

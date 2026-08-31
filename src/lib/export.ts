@@ -23,9 +23,10 @@ import { calculateDeadheadCost } from "./finance/deadhead";
 import { calculateSafeOwnerPay, resolveReserveRules } from "./finance/owner-pay";
 import { behaviorOf, categoryLabel } from "./categories";
 import { maintenanceLabel } from "./maintenance";
+import { equipmentTypeLabel, loadCapacityLabel } from "./load-details";
 import type { Period } from "./periods";
 import type { Dataset } from "./types";
-import { primaryTruck } from "./fleet";
+import { expensesForTruck, loadsForTruck, primaryTruck, truckById } from "./fleet";
 
 export type ReportId =
   | "loads"
@@ -63,8 +64,27 @@ const money = (value: number | null | undefined) =>
 const rate = (value: number | null | undefined) =>
   Number((Number.isFinite(value) ? (value as number) : 0).toFixed(3));
 
-export function buildReport(id: ReportId, dataset: Dataset, period: Period): ReportTable {
-  const { loads, expenses, fuelEntries, settings } = dataset;
+export function buildReport(
+  id: ReportId,
+  dataset: Dataset,
+  period: Period,
+  truckId: string | null = null,
+): ReportTable {
+  const selectedTruck = truckById(dataset.trucks, truckId);
+  if (truckId && !selectedTruck) throw new Error("That truck does not belong to this workspace.");
+
+  const loads = loadsForTruck(dataset.loads, truckId);
+  const expenses = expensesForTruck(dataset.expenses, truckId);
+  const fuelEntries = truckId
+    ? dataset.fuelEntries.filter((entry) => entry.truckId === truckId)
+    : dataset.fuelEntries;
+  const maintenanceRecords = truckId
+    ? dataset.maintenanceRecords.filter((record) => record.truckId === truckId)
+    : dataset.maintenanceRecords;
+  const { settings } = dataset;
+  const scopeLabel = selectedTruck?.name ?? (dataset.trucks.length > 1 ? "Whole fleet" : primaryTruck(dataset.trucks).name);
+  const truckName = (id: string | null) =>
+    id ? (truckById(dataset.trucks, id)?.name ?? "Unknown truck") : "Business overhead";
   const thresholds = thresholdsFromSettings(settings);
   const periodLoads = withMetricsAll(loadsInPeriod(loads, period), thresholds);
   const periodExpenses = expensesInPeriod(expenses, period);
@@ -74,9 +94,10 @@ export function buildReport(id: ReportId, dataset: Dataset, period: Period): Rep
   switch (id) {
     case "loads":
       return {
-        title: `Loads - ${period.label}`,
+        title: `Loads - ${scopeLabel} - ${period.label}`,
         columns: [
-          "Date", "Load Number", "Broker", "Origin", "Destination",
+          "Truck", "Pickup Date", "Delivery Date", "Ending Odometer", "Load Number", "Broker", "Origin", "Destination",
+          "Equipment", "Load Type", "Length (ft)", "Weight (lb)", "Commodity",
           "Loaded Miles", "Deadhead Miles", "Total Miles", "Deadhead %",
           "Gross Rate", "Rate/Loaded Mile", "Rate/Total Mile",
           "Fuel", "Tolls", "Dispatch", "Factoring", "Other",
@@ -84,11 +105,19 @@ export function buildReport(id: ReportId, dataset: Dataset, period: Period): Rep
           "Profit Margin %", "Rating", "Payment Status", "Notes",
         ],
         rows: periodLoads.map((load) => [
+          truckName(load.truckId),
           load.date,
+          load.deliveryDate ?? "",
+          load.endingOdometer ?? "",
           load.loadNumber ?? "",
           load.broker ?? "",
           `${load.originCity}, ${load.originState}`,
           `${load.destinationCity}, ${load.destinationState}`,
+          equipmentTypeLabel(load.equipmentType),
+          loadCapacityLabel(load.loadCapacity),
+          load.equipmentLengthFt ?? "",
+          load.weightLbs ?? "",
+          load.commodity ?? "",
           load.loadedMiles,
           load.deadheadMiles,
           load.metrics.totalMiles,
@@ -113,14 +142,15 @@ export function buildReport(id: ReportId, dataset: Dataset, period: Period): Rep
 
     case "expenses":
       return {
-        title: `Expenses - ${period.label}`,
+        title: `Expenses - ${scopeLabel} - ${period.label}`,
         columns: [
-          "Date", "Category", "Fixed/Variable", "Description", "Vendor",
+          "Charged To", "Date", "Category", "Fixed/Variable", "Description", "Vendor",
           "Amount", "Receipt Number", "Recurring", "Linked Load", "Notes",
         ],
         rows: periodExpenses.map((expense) => {
           const load = expense.loadId ? loads.find((l) => l.id === expense.loadId) : undefined;
           return [
+            truckName(expense.truckId),
             expense.date,
             categoryLabel(expense.category),
             behaviorOf(expense.category, settings.categoryBehavior) === "FIXED" ? "Fixed" : "Variable",
@@ -138,12 +168,13 @@ export function buildReport(id: ReportId, dataset: Dataset, period: Period): Rep
     case "fuel": {
       const fuel = summarizeFuel(periodFuel, summary.totalMiles);
       return {
-        title: `Fuel - ${period.label}`,
-        columns: ["Date", "Location", "Gallons", "Price/Gallon", "Total Cost", "Odometer", "Linked Load"],
+        title: `Fuel - ${scopeLabel} - ${period.label}`,
+        columns: ["Truck", "Date", "Location", "Gallons", "Price/Gallon", "Total Cost", "Odometer", "Linked Load"],
         rows: [
           ...periodFuel.map((entry) => {
             const load = entry.loadId ? loads.find((l) => l.id === entry.loadId) : undefined;
             return [
+              truckName(entry.truckId),
               entry.date,
               entry.location ?? "",
               Number(entry.gallons.toFixed(2)),
@@ -154,13 +185,13 @@ export function buildReport(id: ReportId, dataset: Dataset, period: Period): Rep
             ];
           }),
           [],
-          ["TOTALS", "", Number(fuel.totalGallons.toFixed(2)), rate(fuel.averagePricePerGallon), money(fuel.totalCost), "", ""],
+          ["TOTALS", "", "", Number(fuel.totalGallons.toFixed(2)), rate(fuel.averagePricePerGallon), money(fuel.totalCost), "", ""],
           // Derived figures are labelled in place so no dollar value ever
           // lands under a gallons or odometer column.
-          [`Fuel cost per mile: ${rate(fuel.fuelCostPerMile)}`, "", "", "", "", "", ""],
+          [`Fuel cost per mile: ${rate(fuel.fuelCostPerMile)}`, "", "", "", "", "", "", ""],
           [
             `Miles per gallon: ${fuel.milesPerGallon ? Number(fuel.milesPerGallon.toFixed(2)) : "n/a"}`,
-            "", "", "", "", "", "",
+            "", "", "", "", "", "", "",
           ],
         ],
       };
@@ -179,7 +210,7 @@ export function buildReport(id: ReportId, dataset: Dataset, period: Period): Rep
       const categories = categoryTotals(periodExpenses, settings);
 
       return {
-        title: `Profit & Loss - ${period.label}`,
+        title: `Profit & Loss - ${scopeLabel} - ${period.label}`,
         columns: ["Line", "Amount", "Per Total Mile", "Notes"],
         rows: [
           ["Period", period.label, "", `${period.start} to ${period.end}`],
@@ -200,18 +231,35 @@ export function buildReport(id: ReportId, dataset: Dataset, period: Period): Rep
           ["Fixed expenses", money(behavior.FIXED), "", ""],
           ["Variable expenses", money(behavior.VARIABLE), "", ""],
           [],
-          ["RESULT", "", "", ""],
-          ["Net profit", money(summary.netProfit), rate(summary.profitPerMile), `${summary.netMargin.toFixed(1)}% margin`],
-          [],
-          ["RESERVES", "", "", ""],
-          ...pay.reserves.map((reserve) => [
-            reserve.name,
-            money(reserve.amount),
-            "",
-            `${reserve.pct}% of ${reserve.basis === "OPERATING_PROFIT" ? "operating profit" : "gross revenue"}`,
-          ]),
-          ["Total reserves", money(pay.reserveTotal), "", "Every active bucket"],
-          ["Safe to pay yourself", money(pay.safeToPay), "", "After expenses and reserves"],
+          [selectedTruck ? "TRUCK RESULT" : "RESULT", "", "", ""],
+          [
+            selectedTruck ? "Truck contribution" : "Net profit",
+            money(summary.netProfit),
+            rate(summary.profitPerMile),
+            `${summary.netMargin.toFixed(1)}% margin`,
+          ],
+          ...(selectedTruck
+            ? [
+                [],
+                [
+                  "Company overhead and reserves",
+                  "",
+                  "",
+                  "Excluded here; see Whole fleet for what the business keeps.",
+                ],
+              ]
+            : [
+                [],
+                ["RESERVES", "", "", ""],
+                ...pay.reserves.map((reserve) => [
+                  reserve.name,
+                  money(reserve.amount),
+                  "",
+                  `${reserve.pct}% of ${reserve.basis === "OPERATING_PROFIT" ? "operating profit" : "gross revenue"}`,
+                ]),
+                ["Total reserves", money(pay.reserveTotal), "", "Every active bucket"],
+                ["Safe to pay yourself", money(pay.safeToPay), "", "After expenses and reserves"],
+              ]),
           [],
           ["BROKERS", "", "", ""],
           ...brokerPerformance(periodLoads, thresholds).map((broker) => [
@@ -231,10 +279,11 @@ export function buildReport(id: ReportId, dataset: Dataset, period: Period): Rep
       const basis = calculateTrueCostPerMile(loads, expenses, period, settings, period.label);
       const deadhead = calculateDeadheadCost(summary, basis, settings, null);
       return {
-        title: `Mileage - ${period.label}`,
-        columns: ["Date", "Load Number", "Origin", "Destination", "Loaded Miles", "Deadhead Miles", "Total Miles", "Deadhead %"],
+        title: `Mileage - ${scopeLabel} - ${period.label}`,
+        columns: ["Truck", "Pickup Date", "Load Number", "Origin", "Destination", "Loaded Miles", "Deadhead Miles", "Total Miles", "Deadhead %"],
         rows: [
           ...periodLoads.map((load) => [
+            truckName(load.truckId),
             load.date,
             load.loadNumber ?? "",
             `${load.originCity}, ${load.originState}`,
@@ -245,11 +294,11 @@ export function buildReport(id: ReportId, dataset: Dataset, period: Period): Rep
             Number(load.metrics.deadheadPct.toFixed(1)),
           ]),
           [],
-          ["TOTALS", "", "", "", summary.loadedMiles, summary.deadheadMiles, summary.totalMiles, Number(summary.deadheadPct.toFixed(1))],
-          [`Deadhead cost (${rate(deadhead.costPerMile)}/mi true cost): ${money(deadhead.cost)}`, "", "", "", "", "", "", ""],
+          ["TOTALS", "", "", "", "", summary.loadedMiles, summary.deadheadMiles, summary.totalMiles, Number(summary.deadheadPct.toFixed(1))],
+          [`Deadhead cost (${rate(deadhead.costPerMile)}/mi true cost): ${money(deadhead.cost)}`, "", "", "", "", "", "", "", ""],
           [
             `Deadhead cost per total mile: ${rate(deadhead.dragPerTotalMile)}`,
-            "", "", "", "", "", "", "",
+            "", "", "", "", "", "", "", "",
           ],
         ],
       };
@@ -258,12 +307,15 @@ export function buildReport(id: ReportId, dataset: Dataset, period: Period): Rep
     case "maintenance":
     default:
       return {
-        title: `Maintenance - ${primaryTruck(dataset.trucks).name}`,
+        title: `Maintenance - ${scopeLabel} - ${period.label}`,
         columns: [
-          "Service Date", "Type", "Tracked By", "Odometer", "Cost", "Vendor",
+          "Truck", "Service Date", "Type", "Tracked By", "Odometer", "Cost", "Vendor",
           "Next Service Date", "Next Service Odometer", "In Expense Ledger", "Notes",
         ],
-        rows: dataset.maintenanceRecords.map((record) => [
+        rows: maintenanceRecords
+          .filter((record) => record.serviceDate >= period.start && record.serviceDate <= period.end)
+          .map((record) => [
+          truckName(record.truckId),
           record.serviceDate,
           maintenanceLabel(record.type),
           record.basis,
@@ -306,6 +358,9 @@ export function toCsv(table: ReportTable): string {
   return `﻿${lines.join("\r\n")}\r\n`;
 }
 
-export function reportFileName(id: ReportId, period: Period): string {
-  return `onroad-books-${id}-${period.start}-to-${period.end}.csv`;
+export function reportFileName(id: ReportId, period: Period, truckName?: string | null): string {
+  const scope = truckName
+    ? `-${truckName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`
+    : "";
+  return `onroad-books-${id}${scope}-${period.start}-to-${period.end}.csv`;
 }

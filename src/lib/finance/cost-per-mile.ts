@@ -14,10 +14,9 @@
  *     If the truck note posts on the 1st, the first half of the month really
  *     did carry it, and the second half really did not. Splitting a monthly
  *     total in half would invent a number that never happened.
- *  2. Expenses come from the expense ledger only. Trip-level fuel, tolls,
- *     dispatch and factoring recorded on a Load feed per-load profitability
- *     and never enter a period total -- see the double-counting rule in
- *     README / lib/calculations.ts.
+ *  2. Expenses come from the expense ledger only. Trip-level costs that the
+ *     owner posts are mirrored into linked ledger rows. Detailed Fuel entries
+ *     replace the load's generated fuel row, so one purchase is counted once.
  *  3. Deadhead miles are in the denominator. A mile is a mile; the empty ones
  *     still burn fuel and still wear the truck.
  *  4. Fixed vs variable is the business's own classification, taken from
@@ -31,6 +30,7 @@
 
 import { div, roundMoney, sum } from "../calculations";
 import { behaviorOf, getCategory } from "../categories";
+import { isLoadExpenseId } from "../load-expenses";
 import { addDays, inRange, type DateRange } from "../periods";
 import type {
   Expense,
@@ -57,6 +57,14 @@ export interface CostPerMile {
   fixedTotal: number;
   variableTotal: number;
   totalCost: number;
+  /**
+   * Dollars the trip itself caused: everything in the four direct categories
+   * PLUS every ledger row posted automatically from a load (which includes
+   * the load's "Other trip cost" row, filed under OTHER). This is what the
+   * load calculator asks the driver for explicitly, so it is what
+   * `overheadCostPerMile` must exclude.
+   */
+  directTripTotal: number;
   fixedCostPerMile: number;
   variableCostPerMile: number;
   trueCostPerMile: number;
@@ -90,6 +98,7 @@ function emptyCostPerMile(basisLabel: string, days: number): CostPerMile {
     fixedTotal: 0,
     variableTotal: 0,
     totalCost: 0,
+    directTripTotal: 0,
     fixedCostPerMile: 0,
     variableCostPerMile: 0,
     trueCostPerMile: 0,
@@ -130,6 +139,16 @@ export function calculateTrueCostPerMile(
   }
 
   const totalCost = roundMoney(sum(periodExpenses, (e) => e.amount));
+  // One filter, so a load-posted FUEL row (both a direct category AND a
+  // derived id) is never subtracted twice.
+  const directTripTotal = roundMoney(
+    sum(
+      periodExpenses.filter(
+        (e) => DIRECT_TRIP_CATEGORIES.includes(e.category) || isLoadExpenseId(e.id),
+      ),
+      (e) => e.amount,
+    ),
+  );
 
   const lines: CostLine[] = [...buckets.entries()]
     .map(([category, amount]) => {
@@ -157,6 +176,7 @@ export function calculateTrueCostPerMile(
     fixedTotal,
     variableTotal,
     totalCost,
+    directTripTotal,
     fixedCostPerMile: div(fixedTotal, totalMiles),
     variableCostPerMile: div(variableTotal, totalMiles),
     trueCostPerMile: div(totalCost, totalMiles),
@@ -223,10 +243,13 @@ export function overheadCostPerMile(basis: CostPerMile): number {
   // Subtract the dollars, then divide once. Subtracting four already-divided
   // per-mile rates accumulates float noise into a number that is then
   // multiplied back up by hundreds of miles.
-  const direct = basis.lines
-    .filter((l) => DIRECT_TRIP_CATEGORIES.includes(l.category))
-    .reduce((total, l) => total + l.amount, 0);
-  const overhead = Math.max(basis.totalCost - direct, 0);
+  //
+  // `directTripTotal` (not a category filter) is the amount excluded: since
+  // loads post their costs into the ledger, a load's "Other trip cost" row
+  // lives under OTHER, and leaving it in the overhead would charge it twice
+  // -- once as the calculator's explicit "Other costs" input and once inside
+  // this rate.
+  const overhead = Math.max(basis.totalCost - basis.directTripTotal, 0);
   return Math.round(div(overhead, basis.totalMiles) * 10_000) / 10_000;
 }
 

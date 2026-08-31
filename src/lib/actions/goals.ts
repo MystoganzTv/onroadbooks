@@ -17,7 +17,7 @@ export async function updateGoalsAction(values: unknown): Promise<ActionResult> 
   }
 
   try {
-    await (await repositoryWith("cockpit")).updateGoals({
+    await (await repositoryWith("cockpit", "manage_business")).updateGoals({
       monthlyRevenueTarget: parsed.data.monthlyRevenueTarget,
       monthlyProfitTarget: parsed.data.monthlyProfitTarget,
       targetProfitPerMile: parsed.data.targetProfitPerMile,

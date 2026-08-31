@@ -4,6 +4,8 @@ import { getSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { isInlineSafe } from "@/lib/documents";
 import { getDocumentStorage } from "@/lib/storage";
+import { roleCan, type Permission } from "@/lib/roles";
+import { canWrite } from "@/lib/plans";
 
 export const runtime = "nodejs";
 
@@ -22,11 +24,6 @@ export async function GET(
     return NextResponse.json({ error: "Document not found." }, { status: 404 });
   }
 
-  const bytes = await getDocumentStorage().get(document.storageKey);
-  if (!bytes) {
-    return NextResponse.json({ error: "The stored file is missing." }, { status: 404 });
-  }
-
   const download = new URL(request.url).searchParams.get("download") === "1";
   const safeName = document.fileName.replace(/["\\]/g, "_");
 
@@ -34,6 +31,30 @@ export async function GET(
   // including a file whose stored type we no longer trust -- is a download,
   // and the sandbox CSP plus nosniff stop the browser second-guessing us.
   const inline = !download && isInlineSafe(document.contentType);
+  const storage = getDocumentStorage();
+
+  // Supabase serves the bytes itself through a one-minute signed URL. This
+  // keeps both large uploads and large downloads outside Vercel Functions'
+  // 4.5 MB request/response envelope.
+  if (storage.createSignedDownloadUrl) {
+    try {
+      const signedUrl = await storage.createSignedDownloadUrl(
+        document.storageKey,
+        inline ? undefined : safeName,
+      );
+      return NextResponse.redirect(signedUrl, {
+        status: 307,
+        headers: { "Cache-Control": "private, no-store" },
+      });
+    } catch {
+      return NextResponse.json({ error: "Could not open the stored document." }, { status: 502 });
+    }
+  }
+
+  const bytes = await storage.get(document.storageKey);
+  if (!bytes) {
+    return NextResponse.json({ error: "The stored file is missing." }, { status: 404 });
+  }
 
   return new NextResponse(new Uint8Array(bytes), {
     headers: {
@@ -53,12 +74,32 @@ export async function DELETE(
 ) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
-  if (session.isDemo) {
-    return NextResponse.json({ error: "The demo account is read-only." }, { status: 403 });
-  }
 
   const { id } = await params;
-  const storageKey = await getRepository(session.businessId).deleteDocument(id);
+  const repository = getRepository(session.businessId);
+  const dataset = await repository.getDataset();
+  if (!canWrite(dataset.subscription)) {
+    return NextResponse.json(
+      { error: "This workspace is read-only until billing is active." },
+      { status: 403 },
+    );
+  }
+  const document = dataset.documents.find((row) => row.id === id);
+  if (!document) {
+    return NextResponse.json({ error: "Document not found." }, { status: 404 });
+  }
+  const permission: Permission = document.loadId
+    ? "manage_loads"
+    : document.expenseId
+      ? "manage_expenses"
+      : document.maintenanceId
+        ? "manage_maintenance"
+        : "manage_fleet";
+  if (!roleCan(session.role ?? "VIEWER", permission)) {
+    return NextResponse.json({ error: "Your role does not allow removing that document." }, { status: 403 });
+  }
+
+  const storageKey = await repository.deleteDocument(id);
   if (!storageKey) {
     return NextResponse.json({ error: "Document not found." }, { status: 404 });
   }

@@ -23,7 +23,7 @@ export async function createExpenseAction(values: unknown): Promise<ActionResult
   }
 
   try {
-    const expense = await getRepository((await requireWritableSession()).businessId).createExpense({
+    const expense = await getRepository((await requireWritableSession("manage_expenses")).businessId).createExpense({
       ...parsed.data,
       category: parsed.data.category as ExpenseCategoryId,
     });
@@ -41,7 +41,7 @@ export async function updateExpenseAction(id: string, values: unknown): Promise<
   }
 
   try {
-    await getRepository((await requireWritableSession()).businessId).updateExpense(id, {
+    await getRepository((await requireWritableSession("manage_expenses")).businessId).updateExpense(id, {
       ...parsed.data,
       category: parsed.data.category as ExpenseCategoryId,
     });
@@ -54,7 +54,7 @@ export async function updateExpenseAction(id: string, values: unknown): Promise<
 
 export async function deleteExpenseAction(id: string): Promise<ActionResult> {
   try {
-    await getRepository((await requireWritableSession()).businessId).deleteExpense(id);
+    await getRepository((await requireWritableSession("manage_expenses")).businessId).deleteExpense(id);
     revalidateAll();
     return { ok: true };
   } catch (error) {

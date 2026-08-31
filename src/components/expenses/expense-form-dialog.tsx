@@ -178,15 +178,30 @@ export function ExpenseFormDialog({
 
   const behavior = behaviorOf(values.category, categoryBehavior);
 
-  // Keep whatever load is already linked in the option list even when it
-  // falls outside the period being viewed, so the control never shows blank.
+  // A linked load is not just a label: it determines which unit caused the
+  // cost. Only offer loads from the selected truck, and keep an existing
+  // historical link visible only while that same truck remains selected.
   const linkOptions = React.useMemo(() => {
-    const visible = loads.slice(0, 40);
+    if (!values.charge || values.charge === BUSINESS) return [];
+    const matching = loads.filter((load) => load.truckId === values.charge);
+    const visible = matching.slice(0, 40);
     const linkedId = expense?.loadId;
     if (!linkedId || visible.some((l) => l.id === linkedId)) return visible;
-    const linked = loads.find((l) => l.id === linkedId);
+    const linked = matching.find((l) => l.id === linkedId);
     return linked ? [linked, ...visible] : visible;
-  }, [loads, expense?.loadId]);
+  }, [loads, expense?.loadId, values.charge]);
+
+  function changeCharge(charge: string) {
+    setValues((prev) => {
+      const linked = loads.find((load) => load.id === prev.loadId);
+      return {
+        ...prev,
+        charge,
+        loadId:
+          charge !== BUSINESS && linked?.truckId === charge ? prev.loadId : "none",
+      };
+    });
+  }
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -307,7 +322,7 @@ export function ExpenseFormDialog({
                     : "Counts against this truck's own profit"
                 }
               >
-                <Select value={values.charge} onValueChange={(value) => set("charge", value)}>
+                <Select value={values.charge} onValueChange={changeCharge}>
                   <SelectTrigger id="expense-charge">
                     <SelectValue />
                   </SelectTrigger>
@@ -375,9 +390,17 @@ export function ExpenseFormDialog({
                   placeholder="Optional"
                 />
               </Field>
-              <Field label="Link to load" htmlFor="expense-load">
+              <Field
+                label="Link to load"
+                htmlFor="expense-load"
+                hint={
+                  values.charge === BUSINESS
+                    ? "Business overhead cannot be linked to a load"
+                    : "Only loads assigned to this truck are shown"
+                }
+              >
                 <Select value={values.loadId} onValueChange={(value) => set("loadId", value)}>
-                  <SelectTrigger id="expense-load">
+                  <SelectTrigger id="expense-load" disabled={values.charge === BUSINESS}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -416,7 +439,8 @@ export function ExpenseFormDialog({
                   Recurring expense
                 </Label>
                 <p className="mt-0.5 text-2xs text-muted-foreground">
-                  Repeats every month, like insurance or the truck note.
+                  Saves this as a monthly template. The dashboard will prompt you when the next
+                  month is missing.
                 </p>
               </div>
               <Switch

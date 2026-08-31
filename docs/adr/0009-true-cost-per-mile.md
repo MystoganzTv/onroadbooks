@@ -84,7 +84,7 @@ several hundred miles.
 - Changing the 90-day window changes quoted rates across the app. It was chosen
   deliberately on 2026-08-29 as long enough to absorb a maintenance event and
   short enough to track a fuel-price change.
-- The demo dataset pins the expected numbers: at `?month=2026-08&period=full`,
+- The reference fixture pins the expected numbers: at `?month=2026-08&period=full`,
   revenue $9,795, expenses $6,143.90, net $3,651.10, true cost per mile $1.84,
   safe to pay $2,235.23. A different number after a change means the seed or the
   maths moved.

@@ -8,6 +8,12 @@ build
 next-env.d.ts
 tsconfig.tsbuildinfo
 
+# Browser test artifacts and isolated ledger
+.e2e-data
+playwright-report
+test-results
+blob-report
+
 # Secrets and environment
 .env
 .env*.local

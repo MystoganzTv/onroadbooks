@@ -29,13 +29,20 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, before, describe, it } from "node:test";
 
-import { DEMO_BUSINESS } from "../seed/seed-data";
-import type { ExpenseInput, FuelEntryInput, MaintenanceInput } from "../db/repository";
+import { buildSeedDataset, FIXTURE_BUSINESS } from "../seed/seed-data";
+import { hasFleetAccess } from "../plans";
+import type {
+  ExpenseInput,
+  FuelEntryInput,
+  LoadInput,
+  MaintenanceInput,
+} from "../db/repository";
+import { loadExpenseId } from "../load-expenses";
 
 const SANDBOX = mkdtempSync(path.join(tmpdir(), "onroad-books-store-"));
 const ORIGINAL_CWD = process.cwd();
 const DATA_FILE = path.join(SANDBOX, "data", "onroad-books.json");
-const BUSINESS = DEMO_BUSINESS.id;
+const BUSINESS = FIXTURE_BUSINESS.id;
 
 type StoreModule = typeof import("../db/json-store");
 
@@ -49,6 +56,8 @@ before(async () => {
   // time it is loaded, so the move happens before the import -- otherwise
   // these tests would write to the real ledger.
   process.chdir(SANDBOX);
+  mkdirSync(path.dirname(DATA_FILE), { recursive: true });
+  writeFileSync(DATA_FILE, JSON.stringify(buildSeedDataset(), null, 2), "utf8");
   store = await import("../db/json-store");
   fuelExpenseId = store.fuelExpenseId;
   repo = new store.JsonRepository(BUSINESS);
@@ -98,8 +107,35 @@ const expense = (over: Partial<ExpenseInput> = {}): ExpenseInput => ({
   ...over,
 });
 
-describe("seeding", () => {
-  it("writes a usable ledger on first read", async () => {
+const loadInput = (over: Partial<LoadInput> = {}): LoadInput => ({
+  date: "2026-08-20",
+  deliveryDate: "2026-08-21",
+  originCity: "Dallas",
+  originState: "TX",
+  destinationCity: "Atlanta",
+  destinationState: "GA",
+  broker: "Acme",
+  loadNumber: "THREE-TRUCK-1",
+  equipmentType: "DRY_VAN",
+  loadCapacity: "FULL",
+  equipmentLengthFt: 53,
+  weightLbs: 35_000,
+  commodity: "General freight",
+  loadedMiles: 784,
+  deadheadMiles: 20,
+  grossRate: 2400,
+  fuelCost: 0,
+  tolls: 0,
+  dispatchFee: 0,
+  factoringFee: 0,
+  otherExpenses: 0,
+  status: "PENDING",
+  notes: null,
+  ...over,
+});
+
+describe("reference fixture", () => {
+  it("loads a usable ledger", async () => {
     const dataset = await repo.getDataset();
     assert.equal(dataset.business.id, BUSINESS);
     assert.ok(dataset.loads.length >= 15, "seed should ship a working month of loads");
@@ -267,6 +303,123 @@ describe("maintenance <-> expense mirror", () => {
   });
 });
 
+describe("load costs <-> expense mirror", () => {
+  it("posts each trip cost once, updates it, and advances only from a real odometer", async () => {
+    const start = (await repo.getDataset()).trucks[0].currentOdometer;
+    const load = await repo.createLoad({
+      date: "2026-08-29",
+      endingOdometer: start + 700,
+      originCity: "Dallas",
+      originState: "TX",
+      destinationCity: "Atlanta",
+      destinationState: "GA",
+      broker: "Test Broker",
+      loadNumber: "SYNC-1",
+      loadedMiles: 620,
+      deadheadMiles: 80,
+      grossRate: 2400,
+      fuelCost: 300,
+      tolls: 45,
+      dispatchFee: 120,
+      factoringFee: 60,
+      otherExpenses: 25,
+      // Omitted on purpose: a load the app creates posts its costs by default.
+      status: "PENDING",
+      notes: null,
+    });
+
+    let dataset = await repo.getDataset();
+    assert.equal(dataset.trucks[0].currentOdometer, start + 700);
+    assert.equal(dataset.expenses.find((e) => e.id === loadExpenseId(load.id, "fuel"))?.amount, 300);
+    assert.equal(dataset.expenses.find((e) => e.id === loadExpenseId(load.id, "tolls"))?.amount, 45);
+    assert.equal(
+      dataset.expenses
+        .filter((expense) => expense.loadId === load.id)
+        .reduce((total, expense) => total + expense.amount, 0),
+      550,
+      "all trip costs must reach the same-day operating ledger even from an old false flag",
+    );
+    assert.equal(
+      dataset.expenses.filter((expense) => expense.loadId === load.id).every((expense) => expense.date === load.date),
+      true,
+      "Today must see load costs on the pickup date",
+    );
+
+    const updated = await repo.updateLoad(load.id, { ...load, fuelCost: 325, tolls: 0 });
+    dataset = await repo.getDataset();
+    assert.equal(
+      dataset.expenses.filter((e) => e.id === loadExpenseId(load.id, "fuel")).length,
+      1,
+    );
+    assert.equal(dataset.expenses.find((e) => e.id === loadExpenseId(load.id, "fuel"))?.amount, 325);
+    assert.equal(dataset.expenses.some((e) => e.id === loadExpenseId(load.id, "tolls")), false);
+
+    await repo.deleteLoad(updated.id);
+    dataset = await repo.getDataset();
+    assert.equal(dataset.expenses.some((e) => e.id.startsWith(`expload_${load.id}_`)), false);
+  });
+
+  it("honours an explicit costsPosted:false so history is never posted retroactively", async () => {
+    const load = await repo.createLoad({
+      date: "2026-08-28",
+      originCity: "A",
+      originState: "VA",
+      destinationCity: "B",
+      destinationState: "MD",
+      loadedMiles: 200,
+      deadheadMiles: 0,
+      grossRate: 900,
+      fuelCost: 150,
+      tolls: 20,
+      dispatchFee: 45,
+      factoringFee: 22,
+      otherExpenses: 0,
+      costsPosted: false,
+      status: "PAID",
+    });
+
+    const dataset = await repo.getDataset();
+    assert.deepEqual(
+      dataset.expenses.filter((e) => e.id.startsWith(`expload_${load.id}_`)),
+      [],
+      "a load imported as not-posted keeps its costs as per-load detail",
+    );
+    assert.equal(dataset.loads.find((l) => l.id === load.id)?.costsPosted, false);
+    await repo.deleteLoad(load.id);
+  });
+
+  it("lets linked detailed Fuel replace the load fuel row without double counting", async () => {
+    const load = await repo.createLoad({
+      date: "2026-08-30",
+      originCity: "A",
+      originState: "VA",
+      destinationCity: "B",
+      destinationState: "MD",
+      loadedMiles: 100,
+      deadheadMiles: 0,
+      grossRate: 500,
+      fuelCost: 180,
+      tolls: 0,
+      dispatchFee: 0,
+      factoringFee: 0,
+      otherExpenses: 0,
+      costsPosted: true,
+      status: "PENDING",
+    });
+    assert.ok((await repo.getDataset()).expenses.some((e) => e.id === loadExpenseId(load.id, "fuel")));
+
+    const entry = await repo.createFuelEntry(fuel({ loadId: load.id, totalCost: 190 }));
+    let dataset = await repo.getDataset();
+    assert.equal(dataset.expenses.some((e) => e.id === loadExpenseId(load.id, "fuel")), false);
+    assert.equal(dataset.expenses.filter((e) => e.category === "FUEL" && e.loadId === load.id).length, 1);
+
+    await repo.deleteFuelEntry(entry.id);
+    dataset = await repo.getDataset();
+    assert.equal(dataset.expenses.find((e) => e.id === loadExpenseId(load.id, "fuel"))?.amount, 180);
+    await repo.deleteLoad(load.id);
+  });
+});
+
 describe("deleting a load", () => {
   it("unlinks its costs instead of deleting them", async () => {
     const load = await repo.createLoad({
@@ -378,15 +531,85 @@ describe("accounts", () => {
     assert.equal(await auth.findUserByEmail("nobody@example.com"), null);
   });
 
+  it("keeps members in one workspace and protects the owner role", async () => {
+    const member = await auth.createMember({
+      businessId: BUSINESS,
+      email: " Books@Example.com ",
+      name: "Pat Books",
+      role: "BOOKKEEPER",
+    });
+    assert.equal(member.email, "books@example.com");
+    assert.equal(member.role, "BOOKKEEPER");
+    assert.equal(member.joinedAt, null);
+    assert.ok(member.invitedAt);
+    assert.equal((await auth.listMembers(BUSINESS)).length, 2);
+
+    const active = await auth.markMemberJoined(member.id, BUSINESS);
+    assert.ok(active.joinedAt);
+    const admin = await auth.updateMemberRole(member.id, BUSINESS, "ADMIN");
+    assert.equal(admin.role, "ADMIN");
+
+    const owner = await auth.findUserByEmail("owner@example.com");
+    assert.ok(owner);
+    await assert.rejects(
+      () => auth.updateMemberRole(owner.id, BUSINESS, "VIEWER"),
+      /owner role cannot be changed/i,
+    );
+    await assert.rejects(
+      () => auth.removeMember(owner.id, BUSINESS),
+      /owner cannot be removed/i,
+    );
+
+    assert.deepEqual(await auth.removeMember(member.id, BUSINESS), { email: member.email });
+    assert.equal(await auth.findUserById(member.id), null);
+  });
+
   it("builds the protected admin account index without exposing credentials", async () => {
     const accounts = await auth.listAccounts();
     assert.equal(accounts.length, 1);
     assert.equal(accounts[0].email, "owner@example.com");
     assert.equal(accounts[0].businessName, "Padron Freight LLC");
     assert.equal(accounts[0].counts.trucks, 1);
+    assert.equal(accounts[0].counts.activeTrucks, 1);
     assert.ok(accounts[0].counts.loads > 0);
+    assert.ok(accounts[0].counts.fuelEntries > 0);
+    assert.ok(accounts[0].counts.maintenance > 0);
+    assert.ok(accounts[0].counts.reserveTransactions > 0);
+    assert.ok(accounts[0].counts.settlements > 0);
+    assert.ok(accounts[0].lastActivityAt, "product activity is summarized without returning records");
     assert.equal(accounts[0].subscriptionStatus, "TRIALING");
+    assert.equal(accounts[0].accessSource, "trial");
+    assert.equal("providerSubscriptionId" in accounts[0], false, "provider ids never reach the index");
     assert.equal("passwordHash" in accounts[0], false, "password material never reaches the index");
+  });
+
+  it("surfaces an Admin Fleet grant as complimentary Fleet access", async () => {
+    const original = (await repo.getDataset()).subscription;
+    try {
+      const granted = await repo.updateSubscription({
+        plan: "FLEET",
+        status: "ACTIVE",
+        currentPeriodEnd: null,
+        providerCustomerId: original.providerCustomerId,
+        providerSubscriptionId: null,
+      });
+      assert.equal(hasFleetAccess(granted), true);
+
+      const account = (await auth.listAccounts()).find((candidate) => candidate.businessId === BUSINESS);
+      assert.ok(account);
+      assert.equal(account.plan, "FLEET");
+      assert.equal(account.subscriptionStatus, "ACTIVE");
+      assert.equal(account.accessSource, "complimentary");
+      assert.equal(account.hasProviderSubscription, false);
+    } finally {
+      await repo.updateSubscription({
+        plan: original.plan,
+        status: original.status,
+        currentPeriodEnd: original.currentPeriodEnd,
+        providerCustomerId: original.providerCustomerId,
+        providerSubscriptionId: original.providerSubscriptionId,
+      });
+    }
   });
 
   it("resets only ledger data, then invalidates the owner when the account is deleted", async () => {
@@ -417,22 +640,6 @@ describe("accounts", () => {
     }
   });
 
-  it("never permits destructive operations on the shared demo", async () => {
-    const original = readFileSync(DATA_FILE, "utf8");
-    try {
-      const demo = await auth.ensureDemoUser();
-      await assert.rejects(
-        () => auth.resetBusinessData(demo.id, demo.businessId),
-        /demo account cannot be reset/,
-      );
-      await assert.rejects(
-        () => auth.deleteAccount(demo.id, demo.businessId),
-        /demo account cannot be deleted/,
-      );
-    } finally {
-      writeFileSync(DATA_FILE, original, "utf8");
-    }
-  });
 });
 
 /**
@@ -479,6 +686,22 @@ describe("upgrading an older ledger", () => {
     assert.equal(dataset.loads[0].dispatchFee, 0);
     assert.equal(dataset.loads[0].factoringFee, 0);
     assert.equal(dataset.loads[0].otherExpenses, 0);
+    assert.equal(dataset.loads[0].deliveryDate, null);
+    assert.equal(dataset.loads[0].endingOdometer, null);
+    assert.equal(dataset.loads[0].equipmentType, null);
+    assert.equal(dataset.loads[0].loadCapacity, null);
+    assert.equal(dataset.loads[0].equipmentLengthFt, null);
+    assert.equal(dataset.loads[0].weightLbs, null);
+    assert.equal(dataset.loads[0].commodity, null);
+    // The load kept its trip costs as per-load detail, exactly as the build
+    // that wrote the file did. Posting them now would add spend to a month
+    // the owner already closed.
+    assert.equal(dataset.loads[0].costsPosted, false);
+    assert.deepEqual(
+      dataset.expenses.filter((e) => e.id.startsWith("expload_")),
+      [],
+      "an older ledger never gains mirrored trip costs on upgrade",
+    );
     assert.equal(dataset.settings.ratingGreatPerMile, 2);
     assert.equal(dataset.settings.deadheadWarnPct, 20);
     assert.equal(dataset.settings.maintenanceWarnMiles, 2000);
@@ -502,7 +725,7 @@ describe("an unreadable ledger", () => {
     writeFileSync(path.join(brokenDir, "data", "onroad-books.json"), "{ not json at all", "utf8");
   });
 
-  it("is set aside rather than overwritten with demo data", async () => {
+  it("is set aside rather than overwritten with fixture data", async () => {
     process.chdir(brokenDir);
     const broken = new store.JsonRepository(BUSINESS);
     await assert.rejects(() => broken.getDataset(), /could not be read/);
@@ -552,10 +775,23 @@ describe("which truck a row belongs to", () => {
     assert.equal(charged.scope, "TRUCK");
   });
 
-  it("falls back to the primary truck when none is named", async () => {
-    const { trucks } = await repo.getDataset();
-    const created = await repo.createExpense(expense({ description: "No truck named" }));
-    assert.equal(created.truckId, trucks.find((t) => t.active)!.id);
+  it("requires an explicit unit once more than one truck is active", async () => {
+    await assert.rejects(
+      () => repo.createLoad(loadInput()),
+      /Choose which truck/,
+    );
+    await assert.rejects(
+      () => repo.createExpense(expense({ description: "No truck named" })),
+      /Choose which truck/,
+    );
+    await assert.rejects(
+      () => repo.createFuelEntry(fuel()),
+      /Choose which truck/,
+    );
+    await assert.rejects(
+      () => repo.createMaintenance(service()),
+      /Choose which truck/,
+    );
   });
 
   it("keeps business overhead off every truck", async () => {
@@ -583,12 +819,18 @@ describe("which truck a row belongs to", () => {
     const load = await repo.createLoad({
       truckId: second.id,
       date: "2026-08-18",
+      deliveryDate: "2026-08-19",
       originCity: "Reno",
       originState: "NV",
       destinationCity: "Boise",
       destinationState: "ID",
       broker: null,
       loadNumber: null,
+      equipmentType: "BOX_TRUCK",
+      loadCapacity: "FULL",
+      equipmentLengthFt: 26,
+      weightLbs: 8000,
+      commodity: "General freight",
       loadedMiles: 420,
       deadheadMiles: 30,
       grossRate: 1200,
@@ -601,6 +843,12 @@ describe("which truck a row belongs to", () => {
       notes: null,
     });
     assert.equal(load.truckId, second.id);
+    assert.equal(load.deliveryDate, "2026-08-19");
+    assert.equal(load.equipmentType, "BOX_TRUCK");
+    assert.equal(load.loadCapacity, "FULL");
+    assert.equal(load.equipmentLengthFt, 26);
+    assert.equal(load.weightLbs, 8000);
+    assert.equal(load.commodity, "General freight");
   });
 
   it("moves a fill-up's odometer and its ledger row to the same truck", async () => {
@@ -633,5 +881,170 @@ describe("which truck a row belongs to", () => {
     assert.equal(record.truckId, second.id);
     const { expenses } = await repo.getDataset();
     assert.equal(expenses.find((e) => e.id === record.expenseId)?.truckId, second.id);
+  });
+
+  it("refuses cross-truck links in a three-truck ledger", async () => {
+    const before = await repo.getDataset();
+    const second = before.trucks[1];
+    const third = await repo.createTruck({
+      name: "Unit 103",
+      acquiredOn: null,
+      year: null,
+      make: null,
+      model: null,
+      vin: null,
+      purchasePrice: null,
+      monthlyPayment: null,
+      monthlyInsurance: null,
+      startingOdometer: 20_000,
+      currentOdometer: 20_000,
+    });
+    const load = await repo.createLoad(loadInput({ truckId: second.id }));
+
+    await assert.rejects(
+      () => repo.createExpense(expense({ truckId: third.id, loadId: load.id })),
+      /another truck/,
+    );
+    await assert.rejects(
+      () => repo.createFuelEntry(fuel({ truckId: third.id, loadId: load.id })),
+      /another truck/,
+    );
+    await assert.rejects(
+      () => repo.createExpense(expense({ scope: "BUSINESS", loadId: load.id })),
+      /overhead cannot be linked/,
+    );
+
+    await repo.createExpense(expense({ truckId: second.id, loadId: load.id }));
+    await assert.rejects(
+      () => repo.updateLoad(load.id, loadInput({ truckId: third.id })),
+      /linked costs on another truck/,
+    );
+  });
+
+  it("files truck documents against any of the three owned units, and no other target", async () => {
+    const { trucks } = await repo.getDataset();
+    assert.equal(trucks.length, 3);
+
+    for (const [index, truck] of trucks.entries()) {
+      const document = await repo.createDocument({
+        type: "INSURANCE",
+        label: `${truck.name} insurance`,
+        fileName: `insurance-${index + 1}.pdf`,
+        contentType: "application/pdf",
+        sizeBytes: 100 + index,
+        storageKey: `tests/fleet/${truck.id}/insurance-${index + 1}.pdf`,
+        truckId: truck.id,
+      });
+      assert.equal(document.truckId, truck.id);
+    }
+
+    await assert.rejects(
+      () => repo.createDocument({
+        type: "OTHER",
+        label: "Orphan",
+        fileName: "orphan.pdf",
+        contentType: "application/pdf",
+        sizeBytes: 10,
+        storageKey: "tests/fleet/orphan.pdf",
+      }),
+      /exactly one record/,
+    );
+    await assert.rejects(
+      () => repo.createDocument({
+        type: "OTHER",
+        label: "Foreign truck",
+        fileName: "foreign.pdf",
+        contentType: "application/pdf",
+        sizeBytes: 10,
+        storageKey: "tests/fleet/foreign.pdf",
+        truckId: "truck_from_another_business",
+      }),
+      /does not belong to this workspace/,
+    );
+  });
+});
+
+describe("drivers and driver statements", () => {
+  it("freezes assigned loads, prevents double settlement, and posts pay to the right load and truck", async () => {
+    const dataset = await repo.getDataset();
+    const truck = dataset.trucks[0];
+    const driver = await repo.createDriver({
+      name: "Jordan Miles",
+      reference: "DRV-101",
+      defaultTruckId: truck.id,
+      payType: "PERCENT_GROSS",
+      payRate: 30,
+    });
+    const load = await repo.createLoad(loadInput({
+      truckId: truck.id,
+      driverId: driver.id,
+      date: "2026-09-02",
+      grossRate: 1000,
+      loadedMiles: 400,
+      deadheadMiles: 20,
+      loadNumber: "PAY-001",
+    }));
+
+    const statement = await repo.createDriverSettlement({
+      driverId: driver.id,
+      periodStart: "2026-09-01",
+      periodEnd: "2026-09-07",
+      notes: "Week 1",
+    });
+    assert.equal(statement.lines.length, 1);
+    assert.equal(statement.lines[0].payAmount, 300);
+    assert.equal(statement.lines[0].truckId, truck.id);
+
+    await assert.rejects(
+      () => repo.createDriverSettlement({
+        driverId: driver.id,
+        periodStart: "2026-09-01",
+        periodEnd: "2026-09-07",
+      }),
+      /No unsettled loads/,
+    );
+    await assert.rejects(
+      () => repo.updateLoad(load.id, loadInput({ truckId: truck.id, driverId: null })),
+      /already on a driver settlement/,
+    );
+
+    const paid = await repo.payDriverSettlement(statement.id, "2026-09-08");
+    assert.equal(paid.status, "PAID");
+    assert.equal(paid.paidOn, "2026-09-08");
+    const after = await repo.getDataset();
+    const line = after.driverSettlements.find((row) => row.id === statement.id)!.lines[0];
+    const booked = after.expenses.find((row) => row.id === line.expenseId);
+    assert.equal(booked?.category, "DRIVER_PAY");
+    assert.equal(booked?.amount, 300);
+    assert.equal(booked?.truckId, truck.id);
+    assert.equal(booked?.loadId, load.id);
+    assert.equal(after.loads.find((row) => row.id === load.id)?.driverPay, 300);
+
+    await assert.rejects(() => repo.deleteExpense(booked!.id), /cannot be deleted/);
+    await assert.rejects(() => repo.deleteLoad(load.id), /paid statements cannot be changed/);
+    await assert.rejects(() => repo.deleteDriverSettlement(statement.id), /permanent accounting/);
+  });
+
+  it("lets an unpaid draft be deleted so its loads can be prepared again", async () => {
+    const dataset = await repo.getDataset();
+    const driver = dataset.drivers[0];
+    const load = await repo.createLoad(loadInput({
+      truckId: dataset.trucks[0].id,
+      driverId: driver.id,
+      date: "2026-09-09",
+      loadNumber: "PAY-002",
+    }));
+    const draft = await repo.createDriverSettlement({
+      driverId: driver.id,
+      periodStart: "2026-09-09",
+      periodEnd: "2026-09-09",
+    });
+    await repo.deleteDriverSettlement(draft.id);
+    const replacement = await repo.createDriverSettlement({
+      driverId: driver.id,
+      periodStart: "2026-09-09",
+      periodEnd: "2026-09-09",
+    });
+    assert.equal(replacement.lines[0].loadId, load.id);
   });
 });

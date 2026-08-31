@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { summarizePeriod, thresholdsFromSettings, withMetricsAll } from "../calculations";
+import {
+  isDeadheadElevated,
+  summarizePeriod,
+  thresholdsFromSettings,
+  withMetricsAll,
+} from "../calculations";
 import { defaultCategoryBehavior } from "../categories";
 import {
   calculateTrueCostPerMile,
@@ -116,7 +121,15 @@ function load(over: Partial<Load> = {}): Load {
     id: "l",
     businessId: "b",
     truckId: "t",
+    driverId: null,
     date: "2026-08-05",
+    deliveryDate: null,
+    endingOdometer: null,
+    equipmentType: null,
+    loadCapacity: null,
+    equipmentLengthFt: null,
+    weightLbs: null,
+    commodity: null,
     originCity: "Richmond",
     originState: "VA",
     destinationCity: "Baltimore",
@@ -131,6 +144,8 @@ function load(over: Partial<Load> = {}): Load {
     dispatchFee: 0,
     factoringFee: 0,
     otherExpenses: 0,
+    driverPay: 0,
+    costsPosted: false,
     status: "PAID",
     notes: null,
     createdAt: "",
@@ -259,6 +274,26 @@ describe("overheadCostPerMile", () => {
     assert.equal(overheadCostPerMile(cost), 1.2);
   });
 
+  it("also removes a load's auto-posted Other row, even though it books under OTHER", () => {
+    const cost = calculateTrueCostPerMile(
+      [load({ loadedMiles: 900, deadheadMiles: 100 })],
+      [
+        // The row reconcileLoadExpenseLedger posts for a load's otherExpenses.
+        expense({ id: "expload_l1_other", category: "OTHER", amount: 120, loadId: "l1" }),
+        // A manual OTHER expense with no load behind it stays in the overhead.
+        expense({ id: "manual", category: "OTHER", amount: 80 }),
+        expense({ id: "note", category: "TRUCK_PAYMENT", amount: 800 }),
+      ],
+      august,
+      settings,
+      "x",
+    );
+    // The calculator asks for trip Other costs explicitly, so the posted row
+    // must not also ride inside the overhead rate: (800 + 80) / 1000 miles.
+    assert.equal(cost.directTripTotal, 120);
+    assert.equal(overheadCostPerMile(cost), 0.88);
+  });
+
   it("is zero, not negative, when there is no basis", () => {
     const cost = calculateTrueCostPerMile([], [], august, settings, "x");
     assert.equal(overheadCostPerMile(cost), 0);
@@ -337,6 +372,21 @@ describe("calculateSafeOwnerPay", () => {
     const sum = pay.reserves.reduce((total, r) => total + r.amount, 0) + pay.safeToPay;
     assert.ok(Math.abs(sum - pay.operatingProfit) < 0.02);
   });
+
+  it("reconciles the reviewed two-load example after trip costs reach the ledger", () => {
+    const pay = calculateSafeOwnerPay(
+      { grossRevenue: 4800, operatingExpenses: 2734 },
+      resolveReserveRules(
+        { ...settings, taxReservePct: 20, maintenanceReservePct: 10 },
+        accounts.slice(0, 2),
+      ),
+    );
+
+    assert.equal(pay.operatingProfit, 2066);
+    assert.equal(pay.reserves.find((reserve) => reserve.kind === "TAX")?.amount, 413.2);
+    assert.equal(pay.reserves.find((reserve) => reserve.kind === "MAINTENANCE")?.amount, 480);
+    assert.equal(pay.safeToPay, 1172.8);
+  });
 });
 
 /* ---- Load score --------------------------------------------------------- */
@@ -400,6 +450,21 @@ describe("calculateLoadScore", () => {
       20,
     );
     assert.ok(clean.score > empty.score);
+  });
+
+  it("honours a zero deadhead warning instead of falling back to 20%", () => {
+    const clean = calculateLoadScore(
+      { profitPerMile: 2, profitMargin: 50, deadheadPct: 0 },
+      thresholds,
+      0,
+    );
+    const anyDeadhead = calculateLoadScore(
+      { profitPerMile: 2, profitMargin: 50, deadheadPct: 0.1 },
+      thresholds,
+      0,
+    );
+    assert.equal(clean.components.find((part) => part.key === "deadhead")?.points, 20);
+    assert.equal(anyDeadhead.components.find((part) => part.key === "deadhead")?.points, 0);
   });
 });
 
@@ -558,6 +623,20 @@ describe("calculateDeadheadCost", () => {
     );
     assert.equal(report.deadheadMiles, 782);
     assert.equal(report.cost, 883.66);
+  });
+
+  it("uses the configured warning percentage everywhere", () => {
+    assert.equal(isDeadheadElevated(15.6, 20), false);
+    assert.equal(isDeadheadElevated(15.6, 10), true);
+
+    const report = calculateDeadheadCost(
+      summary,
+      { trueCostPerMile: 1, sufficient: true },
+      { deadheadWarnPct: 10 },
+      null,
+    );
+    assert.equal(report.warnPct, 10);
+    assert.equal(report.elevated, true);
   });
 
   it("reports zero cost rather than a guess when there is no cost basis", () => {

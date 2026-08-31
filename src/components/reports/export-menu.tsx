@@ -18,7 +18,7 @@ import { REPORTS } from "@/lib/export";
  * exactly what is on screen. PDF goes through the browser's print dialog
  * against the print stylesheet, which needs no extra dependency.
  */
-export function ExportMenu({ periodQuery }: { periodQuery: string }) {
+export function ExportMenu({ query }: { query: string }) {
   return (
     <div className="flex items-center gap-2 print:hidden">
       <Button variant="outline" size="sm" onClick={() => window.print()}>
@@ -39,7 +39,7 @@ export function ExportMenu({ periodQuery }: { periodQuery: string }) {
           {REPORTS.map((report) => (
             <DropdownMenuItem key={report.id} asChild>
               <a
-                href={`/api/export/${report.id}?${periodQuery}`}
+                href={`/api/export/${report.id}?${query}`}
                 download
                 className="cursor-pointer"
               >

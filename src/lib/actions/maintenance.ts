@@ -26,7 +26,7 @@ export async function createMaintenanceAction(values: unknown): Promise<ActionRe
   }
 
   try {
-    const record = await getRepository((await requireWritableSession()).businessId).createMaintenance({
+    const record = await getRepository((await requireWritableSession("manage_maintenance")).businessId).createMaintenance({
       ...parsed.data,
       type: parsed.data.type as MaintenanceType,
       basis: parsed.data.basis as MaintenanceBasis,
@@ -55,7 +55,7 @@ export async function updateMaintenanceAction(
   }
 
   try {
-    await getRepository((await requireWritableSession()).businessId).updateMaintenance(id, {
+    await getRepository((await requireWritableSession("manage_maintenance")).businessId).updateMaintenance(id, {
       ...parsed.data,
       type: parsed.data.type as MaintenanceType,
       basis: parsed.data.basis as MaintenanceBasis,
@@ -72,7 +72,7 @@ export async function updateMaintenanceAction(
 
 export async function deleteMaintenanceAction(id: string): Promise<ActionResult> {
   try {
-    await getRepository((await requireWritableSession()).businessId).deleteMaintenance(id);
+    await getRepository((await requireWritableSession("manage_maintenance")).businessId).deleteMaintenance(id);
     revalidateAll();
     return { ok: true };
   } catch (error) {

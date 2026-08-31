@@ -20,10 +20,10 @@ npm run dev
 Open http://localhost:3000. The first visit lands on `/setup`, where you create
 the owner account -- email, password, business name. After that, `/login`.
 
-No database setup required: the app boots on a local JSON store seeded with a
-realistic August 2026 dataset (plus three months of history so trends and period
-comparisons are populated). The account you create attaches to that seeded
-business, so there is data on screen from the first sign-in.
+No database setup required: the app boots on a local JSON store. The account you
+create receives a private, empty workspace and a guided first-run setup; the
+deterministic August 2026 reference dataset is reserved for tests and database
+smoke checks.
 
 ---
 
@@ -71,7 +71,10 @@ excludes those four precisely because the form already asks for them.
 date-range filters, a totals row, and a detail page per load carrying the trip
 cost waterfall and its documents. Adding a load takes six fields; total miles,
 both rate-per-mile figures, trip expenses, trip profit, profit per mile and the
-profitability rating calculate live as you type.
+profitability rating calculate live as you type. Every trip cost also appears
+in the operating-expense ledger on the load date, including loads saved by an
+older build; a linked detailed Fuel entry replaces the load fuel estimate so it
+is never counted twice.
 
 **Load profitability score** -- every load is rated GREAT / GOOD / MARGINAL / BAD
 on **profit per total mile**, never on gross rate per mile. Gross rate minus fuel,
@@ -101,9 +104,11 @@ service optionally writes a matching row to the expense ledger, so the cost is
 counted exactly once.
 
 **Documents** -- receipts and paperwork attach to loads (Rate Confirmation, BOL,
-POD, Invoice, Other), expenses (Receipt, Invoice, Other), the truck (Registration,
-Insurance, Title, Inspection) and maintenance records. Drag-and-drop or file
-picker, images and PDFs up to 10 MB, viewable and downloadable in place.
+POD, Invoice, Other), expenses (Receipt, Invoice, Other), every fleet truck
+(Registration, Insurance, Title, Inspection) and maintenance records. The browser
+optimizes large images and scanned PDFs, then uploads the result directly to
+private Supabase Storage with a short-lived signed URL. The stored-file limit is
+10 MB; searchable/native PDFs are preserved instead of being rasterized.
 
 **Accountant exports** -- CSV for Loads, Expenses, Fuel, Profit & Loss Summary,
 Mileage and Maintenance, plus a print stylesheet for save-as-PDF. Exports use the
@@ -128,7 +133,8 @@ rewriting the number the owner already paid themselves on.
 any others the owner adds. A balance is always the running sum of its signed
 transactions, so it can be explained line by line. Contributions post on
 settlement close; manual contributions, withdrawals and corrections are always
-available.
+available. Dashboard and Reserves show the amount suggested by the saved
+percentages immediately and label the separately recorded balance explicitly.
 
 **Goals and pace** -- monthly targets for revenue, profit, profit per mile,
 maximum deadhead and load count, with progress, pace and an end-of-month
@@ -239,14 +245,14 @@ src/
     storage/               document storage adapter (local / Supabase)
     plans.ts               the plan catalogue, in code (ADR-0017)
     marketing/             landing page copy and figures
-    seed/                  deterministic demo dataset
+    seed/                  deterministic reference fixture for tests and local QA
   generated/prisma/        generated Prisma client (git-ignored)
 prisma/
   schema.prisma            User, Business, Subscription, Truck, Load, Expense,
                            FuelEntry, MaintenanceRecord, Document,
                            FinancialSettings, FinancialGoal, ReserveAccount,
                            ReserveTransaction, Settlement
-  seed.ts                  seeds Postgres with the same demo dataset
+  seed.ts                  seeds Postgres with the same reference fixture
 docs/adr/                  architecture decision records
 ```
 
@@ -288,21 +294,26 @@ returns `0` rather than `Infinity` or `NaN`. See
 ### Revenue and expense accounting
 
 Trip-level costs recorded **on a load** (fuel, tolls, dispatch, factoring, other)
-drive per-load profitability and the rating. Period operating expenses come from
-the **expense ledger** only. This avoids double counting: real money is entered
-once, in the ledger, and the two places that could drift write to it
-automatically --
+drive per-load profitability and the rating. By default they are also posted to
+the **expense ledger**, so period Net Profit and True Cost / Mile use the same
+dollars. Existing historical loads are not reinterpreted silently; the dashboard
+offers a one-click bookkeeping check to post them. The places that could drift
+write to the ledger automatically --
+
+- saving a **load** creates one deterministic row per non-zero trip cost, keyed
+  `expload_<load id>_<cost>`; a detailed Fuel entry linked to the load replaces
+  the generated fuel row to avoid double counting;
 
 - adding a **fuel entry** creates its matching `FUEL` ledger row, keyed
   `expfuel_<entry id>` so edits and deletes stay in step in both stores;
 - logging a **maintenance service** optionally creates its ledger row and keeps
   the two linked, so editing or deleting one updates the other.
 
-Rows the app writes for you are badged **From Fuel** / **From Service** in the
+Rows the app writes for you are badged **From Load** / **From Fuel** / **From Service** in the
 expense table and are read-only there — they link back to the record that owns
 them, because editing them in place would just be overwritten.
 
-In the demo data the ledger's dispatch and factoring rows reconcile exactly with
+In the reference fixture the ledger's dispatch and factoring rows reconcile exactly with
 the per-load fees, which is what you want to see when auditing the two views
 against each other.
 
@@ -342,7 +353,7 @@ DIRECT_URL="postgresql://postgres.<ref>:<pw>@aws-0-<region>.pooler.supabase.com:
 ```bash
 npm run db:generate   # regenerate the client
 npm run db:push       # create tables
-npm run db:seed       # load the same demo dataset
+npm run db:seed       # load the local QA reference fixture
 ```
 
 No application code changes. If `DATA_SOURCE` is anything other than `postgres`,
@@ -369,9 +380,10 @@ single-truck ledger written before any of this upgrades in place -- covered by
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm test` | the test suite (see below) |
+| `npm run test:e2e` | Playwright browser flows against an isolated local ledger |
 | `npm run db:generate` | regenerate the Prisma client |
 | `npm run db:push` | push the schema to Postgres |
-| `npm run db:seed` | seed Postgres with the demo dataset |
+| `npm run db:seed` | seed Postgres with the local QA reference fixture |
 | `npm run smoke:postgres` | check the Prisma store against a live database |
 
 ---
@@ -401,8 +413,9 @@ sidebar becomes a drawer.
 
 ## Security posture
 
-- **Authentication** is single-owner email + password, built on `node:crypto`
-  alone: scrypt password hashing with a per-user salt, constant-time
+- **Authentication** supports email/password plus verified Google identities,
+  workspace invitations and five server-enforced roles. Passwords and app
+  sessions use `node:crypto`: scrypt hashing with a per-user salt, constant-time
   comparison, and an HMAC-SHA256 signed session cookie (`httpOnly`,
   `sameSite=lax`, `secure` in production). `middleware.ts` gates every route
   except the landing page `/` (matched exactly, never by prefix), `/login`,
@@ -440,15 +453,16 @@ Everything found in the audit is fixed:
   that go.
 - **A corrupt `data/onroad-books.json` is never overwritten.** It is renamed
   aside and the failure surfaces, rather than a real ledger being silently
-  replaced with demo data.
+  replaced with generated data.
 
 ## Tests and CI
 
 ```bash
 npm test
+npm run test:e2e
 ```
 
-196 tests on `node:test`, no framework. They cover the parts where a quiet
+The `node:test` suite covers the parts where a quiet
 mistake costs money rather than throwing an error:
 
 | File | What it pins down |
@@ -463,7 +477,11 @@ mistake costs money rather than throwing an error:
 | `store-contract.test.ts` | the JSON and Prisma stores expose the same shape, so the Postgres implementation cannot drift without the suite noticing |
 | `store-behaviour.test.ts` | the rules both stores must keep: a fuel purchase appears in the ledger exactly once across create/edit/delete, a service record's ledger row lives and dies with it, deleting a load unlinks its costs instead of deleting them, an odometer never moves backwards, a session cannot touch another business's rows, an older ledger file upgrades instead of crashing, and a corrupt one is set aside rather than replaced |
 
-The store tests run against a temporary directory, never `data/`.
+The store tests run against a temporary directory, never `data/`. Five serial
+Playwright flows exercise owner signup and onboarding, protected routes, loads,
+expenses, local document upload, Fleet drivers, frozen driver-pay statements,
+role boundaries and the authenticated mobile shell. Their ledger, uploads and
+session key live under `.e2e-data`, never the developer's local books.
 
 Two notes on running them. The suite passes `--conditions=react-server` so
 that the `server-only` marker resolves to its empty build instead of throwing;
@@ -471,7 +489,7 @@ that is what the `test` script does for you. And the JSON store resolves its
 paths per call rather than at import, which is what lets a test point it at a
 scratch directory.
 
-`.github/workflows/ci.yml` runs types, lint, tests and a production build on
+`.github/workflows/ci.yml` runs types, lint, unit tests, Playwright and a production build on
 every push and pull request, and then a second job against a real Postgres
 service: `prisma db push`, `npm run db:seed`, `npm run smoke:postgres`. That
 last one is `scripts/postgres-smoke.ts`, which asserts what only a server can
@@ -485,17 +503,22 @@ that a repository bound to another business cannot read these rows. See
 
 ## Not built yet (deliberately)
 
-Invoice generation, IFTA reporting, and multi-user accounts -- the auth model is
-single-owner, and `/setup` closes once one account exists. The data model
-accommodates all of them; the MVP focuses on the financial product.
+Invoice generation and IFTA reporting remain deliberately outside this release.
+CSV and print-to-PDF are implemented; a native XLSX/PDF renderer and city/market
+lane grouping remain later refinements.
 
-Billing is a seam rather than an integration: the plan catalogue is in code and
-the truck limit and the plan capabilities are enforced server-side, but no
-payment provider is wired up.
-`Subscription` carries empty provider references so adding one is a field being
-filled in rather than a model being reshaped.
+Stripe Checkout, the customer billing portal and signed webhook synchronization
+are implemented. A deployment still needs the Stripe secret, webhook secret and
+three recurring Price ids configured in its environment before checkout is shown.
 
-Two more honest gaps: the Supabase storage adapter is written and selected by
-`DOCUMENT_STORAGE=supabase`, but it has never been run against a live project,
-and there are no browser-level end-to-end tests in CI -- the suite below covers
-the logic, and the Postgres job covers the store, but neither drives a browser.
+Fleet workspaces include individual sign-ins, Owner/Admin/Bookkeeper/Dispatcher/
+Viewer roles, email invitations through Supabase Auth, drivers, load assignment
+and frozen driver-pay statements. `/setup` creates the first workspace owner;
+additional people join through `/invite/accept`.
+
+The Supabase storage adapter is selected by `DOCUMENT_STORAGE=supabase`. Its
+signed upload, metadata lookup, signed download, byte-for-byte verification and
+cleanup flow has been exercised against the live project. CI drives the safe,
+deterministic browser flows against local adapters; Google, email delivery and
+Stripe-hosted pages remain deployment smoke checks because CI must not create
+real identities, send email or enter payment details.
