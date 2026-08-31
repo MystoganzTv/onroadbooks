@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ import { formatMiles, formatMoney, formatRateValue } from "@/lib/formatters";
 import { loadSchema } from "@/lib/schemas";
 import { todayISO } from "@/lib/periods";
 import { orderedTrucks } from "@/lib/fleet";
+import { IFTA_JURISDICTIONS } from "@/lib/ifta";
 import { EQUIPMENT_TYPES, LOAD_CAPACITIES } from "@/lib/load-details";
 import type { Driver, EquipmentType, Load, LoadCapacity, PaymentStatus, Truck } from "@/lib/types";
 import { toNumber } from "@/lib/utils";
@@ -93,7 +94,15 @@ interface FormState {
   factoringFee: string;
   otherExpenses: string;
   status: PaymentStatus;
+  jurisdictionMiles: JurisdictionRow[];
   notes: string;
+}
+
+interface JurisdictionRow {
+  id: string;
+  jurisdiction: string;
+  totalMiles: string;
+  nonTaxableMiles: string;
 }
 
 function emptyState(defaultDate: string, truckId: string): FormState {
@@ -123,6 +132,7 @@ function emptyState(defaultDate: string, truckId: string): FormState {
     factoringFee: "",
     otherExpenses: "",
     status: "PENDING",
+    jurisdictionMiles: [],
     notes: "",
   };
 }
@@ -154,6 +164,12 @@ function stateFromLoad(load: Load): FormState {
     factoringFee: load.factoringFee ? String(load.factoringFee) : "",
     otherExpenses: load.otherExpenses ? String(load.otherExpenses) : "",
     status: load.status,
+    jurisdictionMiles: load.jurisdictionMiles.map((row, index) => ({
+      id: `${row.jurisdiction}-${index}`,
+      jurisdiction: row.jurisdiction,
+      totalMiles: String(row.totalMiles),
+      nonTaxableMiles: row.nonTaxableMiles ? String(row.nonTaxableMiles) : "",
+    })),
     notes: load.notes ?? "",
   };
 }
@@ -293,6 +309,10 @@ export function LoadFormDialog({
   const tripProfit = roundMoney(grossRate - tripExpenses);
   const profitPerMile = div(tripProfit, totalMiles);
   const rating = rateLoad(profitPerMile, ratingThresholds);
+  const assignedJurisdictionMiles = values.jurisdictionMiles.reduce(
+    (total, row) => total + toNumber(row.totalMiles),
+    0,
+  );
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -330,6 +350,11 @@ export function LoadFormDialog({
       otherExpenses: toNumber(values.otherExpenses),
       costsPosted: true,
       status: values.status,
+      jurisdictionMiles: values.jurisdictionMiles.map((row) => ({
+        jurisdiction: row.jurisdiction,
+        totalMiles: Math.round(toNumber(row.totalMiles)),
+        nonTaxableMiles: Math.round(toNumber(row.nonTaxableMiles)),
+      })),
       notes: values.notes || null,
     };
 
@@ -782,6 +807,115 @@ export function LoadFormDialog({
               Trip costs are included automatically in Operating Expenses. A detailed Fuel entry
               linked to this load replaces its fuel amount to prevent double counting.
             </p>
+
+            <div className="space-y-2 rounded-md border border-border p-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="label-xs">IFTA jurisdiction miles</p>
+                  <p className="mt-1 text-2xs text-muted-foreground">
+                    Enter actual route miles by jurisdiction. Unassigned miles remain visible in the quarterly report.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    set("jurisdictionMiles", [
+                      ...values.jurisdictionMiles,
+                      {
+                        id: `ifta-${Date.now()}`,
+                        jurisdiction: values.originState.toUpperCase() || "VA",
+                        totalMiles: "",
+                        nonTaxableMiles: "",
+                      },
+                    ])
+                  }
+                >
+                  <Plus /> Add jurisdiction
+                </Button>
+              </div>
+              {values.jurisdictionMiles.map((row) => (
+                <div key={row.id} className="grid grid-cols-[7rem_1fr_1fr_auto] gap-2">
+                  <Select
+                    value={row.jurisdiction}
+                    onValueChange={(jurisdiction) =>
+                      set(
+                        "jurisdictionMiles",
+                        values.jurisdictionMiles.map((item) =>
+                          item.id === row.id ? { ...item, jurisdiction } : item,
+                        ),
+                      )
+                    }
+                  >
+                    <SelectTrigger aria-label="IFTA jurisdiction">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {IFTA_JURISDICTIONS.map((jurisdiction) => (
+                        <SelectItem key={jurisdiction} value={jurisdiction}>
+                          {jurisdiction}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    aria-label={`${row.jurisdiction} total miles`}
+                    type="number"
+                    min={0}
+                    step={1}
+                    placeholder="Total miles"
+                    value={row.totalMiles}
+                    onChange={(event) =>
+                      set(
+                        "jurisdictionMiles",
+                        values.jurisdictionMiles.map((item) =>
+                          item.id === row.id ? { ...item, totalMiles: event.target.value } : item,
+                        ),
+                      )
+                    }
+                  />
+                  <Input
+                    aria-label={`${row.jurisdiction} non-taxable miles`}
+                    type="number"
+                    min={0}
+                    step={1}
+                    placeholder="Non-taxable"
+                    value={row.nonTaxableMiles}
+                    onChange={(event) =>
+                      set(
+                        "jurisdictionMiles",
+                        values.jurisdictionMiles.map((item) =>
+                          item.id === row.id
+                            ? { ...item, nonTaxableMiles: event.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                  />
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    aria-label={`Remove ${row.jurisdiction} mileage`}
+                    onClick={() =>
+                      set(
+                        "jurisdictionMiles",
+                        values.jurisdictionMiles.filter((item) => item.id !== row.id),
+                      )
+                    }
+                  >
+                    <Trash2 />
+                  </Button>
+                </div>
+              ))}
+              <p className="text-2xs text-muted-foreground tnum">
+                Assigned {formatMiles(assignedJurisdictionMiles)} of {formatMiles(totalMiles)} trip miles.
+              </p>
+              {errors.jurisdictionMiles ? (
+                <p className="text-2xs text-neg">{errors.jurisdictionMiles}</p>
+              ) : null}
+            </div>
 
             <Field label="Notes" htmlFor="load-notes" error={errors.notes}>
               <Textarea

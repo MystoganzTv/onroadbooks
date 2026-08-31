@@ -15,6 +15,7 @@ import {
   migrateTruck,
 } from "../defaults";
 import { assertLoadTruckLink, primaryTruck, resolveTruckId } from "../fleet";
+import { normalizeJurisdictionMiles } from "../ifta";
 import {
   LOAD_EXPENSE_KEYS,
   loadExpenseId,
@@ -154,6 +155,7 @@ async function seedFresh(): Promise<Dataset> {
       deadheadWarnPct: 20,
       maintenanceWarnMiles: 2000,
       maintenanceWarnDays: 30,
+      iftaTaxRates: {},
       updatedAt: now,
     },
     goals: defaultGoals(businessId, now),
@@ -266,6 +268,7 @@ function migrate(dataset: Dataset): Dataset {
     deadheadWarnPct: dataset.settings?.deadheadWarnPct ?? 20,
     maintenanceWarnMiles: dataset.settings?.maintenanceWarnMiles ?? 2000,
     maintenanceWarnDays: dataset.settings?.maintenanceWarnDays ?? 30,
+    iftaTaxRates: dataset.settings?.iftaTaxRates ?? {},
   };
 
   for (const load of dataset.loads) {
@@ -277,6 +280,15 @@ function migrate(dataset: Dataset): Dataset {
     load.otherExpenses ??= 0;
     load.driverId ??= null;
     load.driverPay ??= 0;
+    load.jurisdictionMiles = normalizeJurisdictionMiles(load.jurisdictionMiles);
+    load.invoiceNumber ??= null;
+    load.invoiceDate ??= null;
+    load.invoiceDueDate ??= null;
+    load.invoicePaidDate ??= null;
+    load.billToName ??= null;
+    load.billToEmail ??= null;
+    load.billToAddress ??= null;
+    load.invoiceNotes ??= null;
   }
   const fallbackTruckId = dataset.trucks[0]?.id ?? "";
   for (const expense of dataset.expenses) {
@@ -288,6 +300,7 @@ function migrate(dataset: Dataset): Dataset {
   }
   for (const entry of dataset.fuelEntries) {
     entry.expenseId ??= fuelExpenseId(entry.id);
+    entry.jurisdiction ??= null;
   }
   reconcileLoadExpenseLedger(dataset);
 
@@ -343,7 +356,13 @@ async function mutate<T>(
   });
 }
 
-function loadFromInput(input: LoadInput, dataset: Dataset, id: string, createdAt: string): Load {
+function loadFromInput(
+  input: LoadInput,
+  dataset: Dataset,
+  id: string,
+  createdAt: string,
+  existing?: Load,
+): Load {
   const driverId = input.driverId?.trim() || null;
   if (driverId && !dataset.drivers.some((driver) => driver.id === driverId)) {
     throw new Error("That driver does not belong to this workspace.");
@@ -378,6 +397,24 @@ function loadFromInput(input: LoadInput, dataset: Dataset, id: string, createdAt
     driverPay: 0,
     costsPosted: input.costsPosted ?? true,
     status: input.status,
+    jurisdictionMiles: normalizeJurisdictionMiles(
+      input.jurisdictionMiles === undefined ? existing?.jurisdictionMiles : input.jurisdictionMiles,
+    ),
+    invoiceNumber:
+      input.invoiceNumber === undefined ? (existing?.invoiceNumber ?? null) : input.invoiceNumber?.trim() || null,
+    invoiceDate: input.invoiceDate === undefined ? (existing?.invoiceDate ?? null) : input.invoiceDate || null,
+    invoiceDueDate:
+      input.invoiceDueDate === undefined ? (existing?.invoiceDueDate ?? null) : input.invoiceDueDate || null,
+    invoicePaidDate:
+      input.invoicePaidDate === undefined ? (existing?.invoicePaidDate ?? null) : input.invoicePaidDate || null,
+    billToName:
+      input.billToName === undefined ? (existing?.billToName ?? null) : input.billToName?.trim() || null,
+    billToEmail:
+      input.billToEmail === undefined ? (existing?.billToEmail ?? null) : input.billToEmail?.trim() || null,
+    billToAddress:
+      input.billToAddress === undefined ? (existing?.billToAddress ?? null) : input.billToAddress?.trim() || null,
+    invoiceNotes:
+      input.invoiceNotes === undefined ? (existing?.invoiceNotes ?? null) : input.invoiceNotes?.trim() || null,
     notes: input.notes?.trim() || null,
     createdAt,
   };
@@ -430,6 +467,7 @@ function fuelFromInput(
     totalCost: roundMoney(input.totalCost),
     odometer: input.odometer ?? null,
     location: input.location?.trim() || null,
+    jurisdiction: input.jurisdiction?.trim().toUpperCase() || null,
     // The mirror is addressed by an explicit column, not by reconstructing a
     // string, so the two records can never drift apart.
     expenseId: fuelExpenseId(id),
@@ -859,6 +897,7 @@ export class JsonAuthStore implements AuthStore {
         deadheadWarnPct: 20,
         maintenanceWarnMiles: 2000,
         maintenanceWarnDays: 30,
+        iftaTaxRates: {},
         updatedAt: now,
       };
       dataset.goals = defaultGoals(businessId, now);
@@ -921,7 +960,13 @@ export class JsonRepository implements Repository {
     return mutate((dataset) => {
       const index = dataset.loads.findIndex((l) => l.id === id);
       if (index === -1) throw new Error(`Load ${id} not found`);
-      const updated = loadFromInput(input, dataset, id, dataset.loads[index].createdAt);
+      const updated = loadFromInput(
+        input,
+        dataset,
+        id,
+        dataset.loads[index].createdAt,
+        dataset.loads[index],
+      );
       updated.driverPay = dataset.loads[index].driverPay;
       const frozenLine = dataset.driverSettlements
         .flatMap((settlement) => settlement.lines)
@@ -1338,6 +1383,7 @@ export class JsonRepository implements Repository {
         deadheadWarnPct: input.deadheadWarnPct,
         maintenanceWarnMiles: input.maintenanceWarnMiles,
         maintenanceWarnDays: input.maintenanceWarnDays,
+        iftaTaxRates: input.iftaTaxRates ?? dataset.settings.iftaTaxRates,
         updatedAt: new Date().toISOString(),
       };
       return dataset.settings;

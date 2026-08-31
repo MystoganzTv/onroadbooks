@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 
 import { getSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
-import { buildReport, reportFileName, REPORT_IDS, toCsv, type ReportId } from "@/lib/export";
+import { buildReport, reportFileName, REPORT_IDS, toCsv, type ExportFormat, type ReportId } from "@/lib/export";
+import { toPdf } from "@/lib/export-pdf";
+import { toXlsx } from "@/lib/export-xlsx";
 import { periodFromSearchParams, truckFromSearchParams } from "@/lib/period-params";
 import { truckById } from "@/lib/fleet";
 
@@ -35,12 +37,17 @@ export async function GET(
   const truckId = truckFromSearchParams(searchParams, dataset.trucks);
   const truck = truckById(dataset.trucks, truckId);
   const table = buildReport(report as ReportId, dataset, period, truckId);
-  const csv = toCsv(table);
+  const requested = url.searchParams.get("format") ?? "csv";
+  const format: ExportFormat = requested === "xlsx" || requested === "pdf" ? requested : "csv";
+  const body = format === "xlsx" ? await toXlsx(table) : format === "pdf" ? await toPdf(table) : toCsv(table);
+  const contentType = format === "xlsx"
+    ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    : format === "pdf" ? "application/pdf" : "text/csv; charset=utf-8";
 
-  return new NextResponse(csv, {
+  return new NextResponse(typeof body === "string" ? body : Buffer.from(body), {
     headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${reportFileName(report as ReportId, period, truck?.name)}"`,
+      "Content-Type": contentType,
+      "Content-Disposition": `attachment; filename="${reportFileName(report as ReportId, period, truck?.name, format)}"`,
       "Cache-Control": "no-store",
     },
   });

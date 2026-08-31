@@ -6,9 +6,8 @@
  * may be a strong outbound lane and the other the empty-ish backhaul that
  * pays for the privilege of getting home. They are never averaged together.
  *
- * Lanes are grouped state to state to start with. City and market level
- * grouping is a later refinement; state pairs are what a one-truck operation
- * actually has enough loads to say anything about.
+ * The caller can group by curated freight market or by state. Market is more
+ * commercially useful; state remains available for smaller samples.
  *
  * A lane is not ranked until it has run at least LANE_MIN_LOADS times. Two
  * loads is an anecdote, and a ranking built on anecdotes is worse than no
@@ -18,6 +17,7 @@
 import { div, roundMoney, sum, type RatingThresholds } from "../calculations";
 import { rateLoad } from "../calculations";
 import type { LoadWithMetrics, ProfitabilityRating } from "../types";
+import { freightMarket } from "../markets";
 
 export const LANE_MIN_LOADS = 3;
 
@@ -25,6 +25,10 @@ export interface LanePerformance {
   key: string;
   originState: string;
   destinationState: string;
+  originKey: string;
+  destinationKey: string;
+  originLabel: string;
+  destinationLabel: string;
   label: string;
   loadCount: number;
   revenue: number;
@@ -42,17 +46,26 @@ export interface LanePerformance {
   qualified: boolean;
 }
 
+export type LaneGrouping = "state" | "market";
+
 export function calculateLanePerformance(
   loads: LoadWithMetrics[],
   thresholds: RatingThresholds,
   minLoads = LANE_MIN_LOADS,
+  grouping: LaneGrouping = "state",
 ): LanePerformance[] {
   const buckets = new Map<string, LoadWithMetrics[]>();
 
   for (const load of loads) {
-    const origin = (load.originState || "??").toUpperCase();
-    const destination = (load.destinationState || "??").toUpperCase();
-    const key = `${origin}>${destination}`;
+    const originState = (load.originState || "??").toUpperCase();
+    const destinationState = (load.destinationState || "??").toUpperCase();
+    const origin = grouping === "market"
+      ? freightMarket(load.originCity, originState)
+      : { key: originState, label: originState };
+    const destination = grouping === "market"
+      ? freightMarket(load.destinationCity, destinationState)
+      : { key: destinationState, label: destinationState };
+    const key = `${origin.key}>${destination.key}`;
     const bucket = buckets.get(key);
     if (bucket) bucket.push(load);
     else buckets.set(key, [load]);
@@ -60,7 +73,15 @@ export function calculateLanePerformance(
 
   return [...buckets.entries()]
     .map(([key, group]) => {
-      const [originState, destinationState] = key.split(">");
+      const first = group[0];
+      const originState = first.originState.toUpperCase();
+      const destinationState = first.destinationState.toUpperCase();
+      const origin = grouping === "market"
+        ? freightMarket(first.originCity, originState)
+        : { key: originState, label: originState };
+      const destination = grouping === "market"
+        ? freightMarket(first.destinationCity, destinationState)
+        : { key: destinationState, label: destinationState };
       const revenue = roundMoney(sum(group, (l) => l.grossRate));
       const totalMiles = sum(group, (l) => l.metrics.totalMiles);
       const loadedMiles = sum(group, (l) => l.loadedMiles);
@@ -72,7 +93,11 @@ export function calculateLanePerformance(
         key,
         originState,
         destinationState,
-        label: `${originState} → ${destinationState}`,
+        originKey: origin.key,
+        destinationKey: destination.key,
+        originLabel: origin.label,
+        destinationLabel: destination.label,
+        label: `${origin.label} → ${destination.label}`,
         loadCount: group.length,
         revenue,
         totalMiles,

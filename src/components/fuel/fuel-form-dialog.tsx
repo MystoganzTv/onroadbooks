@@ -33,6 +33,7 @@ import { formatDateShort, formatMoney } from "@/lib/formatters";
 import { todayISO } from "@/lib/periods";
 import { fuelSchema } from "@/lib/schemas";
 import { orderedTrucks } from "@/lib/fleet";
+import { IFTA_JURISDICTIONS, inferFuelJurisdiction } from "@/lib/ifta";
 import type { FuelEntry, LoadWithMetrics, Truck } from "@/lib/types";
 import { toNumber } from "@/lib/utils";
 
@@ -53,6 +54,7 @@ interface FormState {
   totalCost: string;
   odometer: string;
   location: string;
+  jurisdiction: string;
   loadId: string;
   notes: string;
 }
@@ -102,6 +104,7 @@ export function FuelFormDialog({
             totalCost: String(entry.totalCost),
             odometer: entry.odometer ? String(entry.odometer) : "",
             location: entry.location ?? "",
+            jurisdiction: entry.jurisdiction ?? inferFuelJurisdiction(entry.location) ?? "UNASSIGNED",
             loadId: entry.loadId ?? "none",
             notes: entry.notes ?? "",
           }
@@ -112,6 +115,7 @@ export function FuelFormDialog({
             totalCost: "",
             odometer: "",
             location: "",
+            jurisdiction: "UNASSIGNED",
             loadId: "none",
             notes: "",
           },
@@ -176,6 +180,7 @@ export function FuelFormDialog({
       totalCost,
       odometer: values.odometer ? toNumber(values.odometer) : null,
       location: values.location || null,
+      jurisdiction: values.jurisdiction === "UNASSIGNED" ? null : values.jurisdiction,
       loadId: values.loadId === "none" ? null : values.loadId,
       notes: values.notes || null,
     };
@@ -254,7 +259,7 @@ export function FuelFormDialog({
               </Field>
             ) : null}
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <Field label="Date" htmlFor="fuel-date" required error={errors.date}>
                 <Input
                   id="fuel-date"
@@ -274,6 +279,29 @@ export function FuelFormDialog({
                   onChange={(e) => set("location", e.target.value)}
                   placeholder="Baltimore, MD"
                 />
+              </Field>
+              <Field
+                label="IFTA jurisdiction"
+                htmlFor="fuel-jurisdiction"
+                error={errors.jurisdiction}
+                hint="Tax-paid gallons"
+              >
+                <Select
+                  value={values.jurisdiction}
+                  onValueChange={(value) => set("jurisdiction", value)}
+                >
+                  <SelectTrigger id="fuel-jurisdiction" aria-invalid={Boolean(errors.jurisdiction)}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="UNASSIGNED">Unassigned</SelectItem>
+                    {IFTA_JURISDICTIONS.map((jurisdiction) => (
+                      <SelectItem key={jurisdiction} value={jurisdiction}>
+                        {jurisdiction}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </Field>
             </div>
 

@@ -3,7 +3,7 @@
  *
  * Each report is defined once as columns + rows, so a new output format
  * (PDF, XLSX) is a new renderer rather than five new report implementations.
- * CSV is implemented; the Reports page also offers a print-to-PDF view.
+ * CSV, XLSX and PDF renderers consume the same table definition.
  */
 
 import {
@@ -358,9 +358,16 @@ export function toCsv(table: ReportTable): string {
   return `﻿${lines.join("\r\n")}\r\n`;
 }
 
-export function reportFileName(id: ReportId, period: Period, truckName?: string | null): string {
+export type ExportFormat = "csv" | "xlsx" | "pdf";
+
+export function reportFileName(
+  id: ReportId,
+  period: Period,
+  truckName?: string | null,
+  format: ExportFormat = "csv",
+): string {
   const scope = truckName
     ? `-${truckName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`
     : "";
-  return `onroad-books-${id}${scope}-${period.start}-to-${period.end}.csv`;
+  return `onroad-books-${id}${scope}-${period.start}-to-${period.end}.${format}`;
 }

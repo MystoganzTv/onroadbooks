@@ -376,6 +376,8 @@ model FinancialSettings {
   /// Remaining service life that flags maintenance as due soon.
   maintenanceWarnMiles Int     @default(2000)
   maintenanceWarnDays  Int     @default(30)
+  /// Quarterly IFTA rates keyed as `YYYY-QN:ST`.
+  iftaTaxRates         Json    @default("{}")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -464,8 +466,22 @@ model Load {
   /// explicitly for every load it creates.
   costsPosted   Boolean @default(false)
 
-  status PaymentStatus @default(PENDING)
-  notes  String?
+  status            PaymentStatus @default(PENDING)
+  /// Actual miles split by IFTA jurisdiction. JSON keeps a trip's allocation
+  /// together and avoids pretending origin/destination states describe the route.
+  jurisdictionMiles Json          @default("[]")
+
+  /// Freight invoicing is one invoice per load. Existing payment status remains
+  /// the accounting state; these fields carry the customer-facing document.
+  invoiceNumber   String?
+  invoiceDate     DateTime? @db.Date
+  invoiceDueDate  DateTime? @db.Date
+  invoicePaidDate DateTime? @db.Date
+  billToName      String?
+  billToEmail     String?
+  billToAddress   String?
+  invoiceNotes    String?
+  notes           String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -475,6 +491,7 @@ model Load {
   documents            Document[]
   driverSettlementLine DriverSettlementLine?
 
+  @@unique([businessId, invoiceNumber])
   @@index([businessId, date])
   @@index([truckId, date])
   @@index([driverId, date])
@@ -608,6 +625,7 @@ model FuelEntry {
   /// Odometer at fill-up -- drives MPG once two readings exist.
   odometer       Int?
   location       String?
+  jurisdiction   String?  @db.VarChar(2)
 
   /// The ledger row this fill-up mirrors into. An explicit relation, so the
   /// database enforces the link the application relies on.

@@ -168,6 +168,31 @@ test.describe.serial("critical browser flows", () => {
     await expect(page.getByText(/Online billing is being configured/).first()).toBeVisible();
   });
 
+  test("owner issues a freight invoice and reviews an incomplete IFTA quarter", async ({ page }) => {
+    await login(page);
+    await page.goto("/invoices");
+    const row = page.getByRole("row").filter({ hasText: "E2E-LOAD-1" });
+    await row.getByRole("button", { name: "Invoice", exact: true }).click();
+    await page.getByLabel("Customer").fill("E2E Broker LLC");
+    await page.getByRole("button", { name: "Save invoice", exact: true }).click();
+    await expect(page.getByRole("dialog")).toBeHidden();
+    await expect(row).toContainText("INV-2026-");
+
+    const downloadPromise = page.waitForEvent("download");
+    await row.getByTitle("Download PDF").click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(/^inv-2026-.*\.pdf$/);
+
+    await page.goto("/ifta?quarter=2026-Q3");
+    await expect(page.getByText("Filing is incomplete")).toBeVisible();
+    await expect(page.getByText(/not assigned to a jurisdiction/)).toBeVisible();
+
+    const xlsx = await page.request.get("/api/export/loads?month=2026-08&period=full&format=xlsx");
+    expect(xlsx.status()).toBe(200);
+    expect(xlsx.headers()["content-type"]).toContain("spreadsheetml");
+    expect((await xlsx.body()).subarray(0, 2).toString()).toBe("PK");
+  });
+
   test("Fleet owner adds a driver, assigns a load and posts a frozen statement", async ({ page }) => {
     await mutateDataset((dataset) => {
       dataset.subscription.plan = "FLEET";

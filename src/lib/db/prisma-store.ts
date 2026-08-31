@@ -45,6 +45,7 @@ import {
   reconcileLoadExpenseLedger,
 } from "../load-expenses";
 import { resolveTruckId } from "../fleet";
+import { normalizeJurisdictionMiles } from "../ifta";
 import type {
   AdminAccountSummary,
   AuthStore,
@@ -857,6 +858,8 @@ export class PrismaRepository implements Repository {
       deadheadWarnPct: settingNumber(business.settings?.deadheadWarnPct, 20),
       maintenanceWarnMiles: business.settings?.maintenanceWarnMiles ?? 2000,
       maintenanceWarnDays: business.settings?.maintenanceWarnDays ?? 30,
+      iftaTaxRates:
+        (business.settings?.iftaTaxRates as Record<string, number> | null) ?? {},
       categoryBehavior: {
         ...defaultCategoryBehavior(),
         ...((business.settings?.categoryBehavior as Record<
@@ -998,6 +1001,15 @@ export class PrismaRepository implements Repository {
           driverPay: num(row.driverPay),
           costsPosted: row.costsPosted,
           status: row.status as PaymentStatus,
+          jurisdictionMiles: normalizeJurisdictionMiles(row.jurisdictionMiles),
+          invoiceNumber: row.invoiceNumber,
+          invoiceDate: row.invoiceDate ? isoDate(row.invoiceDate) : null,
+          invoiceDueDate: row.invoiceDueDate ? isoDate(row.invoiceDueDate) : null,
+          invoicePaidDate: row.invoicePaidDate ? isoDate(row.invoicePaidDate) : null,
+          billToName: row.billToName,
+          billToEmail: row.billToEmail,
+          billToAddress: row.billToAddress,
+          invoiceNotes: row.invoiceNotes,
           notes: row.notes,
           createdAt: row.createdAt.toISOString(),
         }),
@@ -1032,6 +1044,7 @@ export class PrismaRepository implements Repository {
           totalCost: num(row.totalCost),
           odometer: row.odometer,
           location: row.location,
+          jurisdiction: row.jurisdiction,
           expenseId: row.expenseId,
           notes: row.notes,
           createdAt: row.createdAt.toISOString(),
@@ -1103,6 +1116,37 @@ export class PrismaRepository implements Repository {
       otherExpenses: roundMoney(input.otherExpenses),
       costsPosted: input.costsPosted ?? true,
       status: input.status,
+      ...(input.jurisdictionMiles === undefined
+        ? {}
+        : {
+            jurisdictionMiles: normalizeJurisdictionMiles(
+              input.jurisdictionMiles,
+            ) as unknown as Prisma.InputJsonValue,
+          }),
+      ...(input.invoiceNumber === undefined
+        ? {}
+        : { invoiceNumber: input.invoiceNumber?.trim() || null }),
+      ...(input.invoiceDate === undefined
+        ? {}
+        : { invoiceDate: input.invoiceDate ? toDate(input.invoiceDate) : null }),
+      ...(input.invoiceDueDate === undefined
+        ? {}
+        : { invoiceDueDate: input.invoiceDueDate ? toDate(input.invoiceDueDate) : null }),
+      ...(input.invoicePaidDate === undefined
+        ? {}
+        : { invoicePaidDate: input.invoicePaidDate ? toDate(input.invoicePaidDate) : null }),
+      ...(input.billToName === undefined
+        ? {}
+        : { billToName: input.billToName?.trim() || null }),
+      ...(input.billToEmail === undefined
+        ? {}
+        : { billToEmail: input.billToEmail?.trim() || null }),
+      ...(input.billToAddress === undefined
+        ? {}
+        : { billToAddress: input.billToAddress?.trim() || null }),
+      ...(input.invoiceNotes === undefined
+        ? {}
+        : { invoiceNotes: input.invoiceNotes?.trim() || null }),
       notes: input.notes?.trim() || null,
     };
   }
@@ -1454,6 +1498,7 @@ export class PrismaRepository implements Repository {
       totalCost: roundMoney(input.totalCost),
       odometer: input.odometer ?? null,
       location: input.location?.trim() || null,
+      jurisdiction: input.jurisdiction?.trim().toUpperCase() || null,
       loadId: input.loadId || null,
       notes: input.notes?.trim() || null,
     };
@@ -1774,6 +1819,7 @@ export class PrismaRepository implements Repository {
         deadheadWarnPct: input.deadheadWarnPct,
         maintenanceWarnMiles: Math.round(input.maintenanceWarnMiles),
         maintenanceWarnDays: Math.round(input.maintenanceWarnDays),
+        iftaTaxRates: (input.iftaTaxRates ?? {}) as Prisma.InputJsonValue,
       },
       update: {
         taxReservePct: input.taxReservePct,
@@ -1785,6 +1831,9 @@ export class PrismaRepository implements Repository {
         deadheadWarnPct: input.deadheadWarnPct,
         maintenanceWarnMiles: Math.round(input.maintenanceWarnMiles),
         maintenanceWarnDays: Math.round(input.maintenanceWarnDays),
+        ...(input.iftaTaxRates
+          ? { iftaTaxRates: input.iftaTaxRates as Prisma.InputJsonValue }
+          : {}),
       },
     });
     return (await this.getDataset()).settings;

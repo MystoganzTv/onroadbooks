@@ -22,6 +22,7 @@ const settings: FinancialSettings = {
   categoryBehavior: {}, ratingGreatPerMile: 2, ratingGoodPerMile: 1.5,
   ratingMarginalPerMile: 1, deadheadWarnPct: 20, maintenanceWarnMiles: 2000,
   maintenanceWarnDays: 30, updatedAt: "",
+  iftaTaxRates: {},
 };
 
 function load(over: Partial<Load> = {}): Load {
@@ -32,7 +33,10 @@ function load(over: Partial<Load> = {}): Load {
     originCity: "A", originState: "VA", destinationCity: "B", destinationState: "MD",
     broker: "Acme", loadNumber: null, loadedMiles: 100, deadheadMiles: 0, grossRate: 500,
     fuelCost: 0, tolls: 0, dispatchFee: 0, factoringFee: 0, otherExpenses: 0,
-    driverId: null, driverPay: 0, costsPosted: false, status: "PAID", notes: null, createdAt: "", ...over,
+    driverId: null, driverPay: 0, costsPosted: false, status: "PAID",
+    jurisdictionMiles: [], invoiceNumber: null, invoiceDate: null, invoiceDueDate: null,
+    invoicePaidDate: null, billToName: null, billToEmail: null, billToAddress: null,
+    invoiceNotes: null, notes: null, createdAt: "", ...over,
   };
 }
 
@@ -275,6 +279,7 @@ describe("summarizeFuel", () => {
     totalCost: 400,
     odometer: null,
     location: null,
+    jurisdiction: null,
     expenseId: null,
     notes: null,
     createdAt: "2026-08-01T00:00:00.000Z",

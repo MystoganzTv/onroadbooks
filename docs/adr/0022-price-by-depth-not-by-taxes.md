@@ -65,9 +65,10 @@ decided against it.
    entity, and it is advice. The line the product holds is: your accountant
    files; we hand them the file.
 
-**IFTA is not on the roadmap** until the product decides to serve CDL
-owner-operators rather than box trucks. It is a positioning decision, not a
-feature request.
+**2026-08-31 amendment:** the product now supports carriers that need IFTA while
+keeping it outside plan differentiation. The implementation records actual
+jurisdiction mileage and fuel, refuses to call an incomplete quarter ready, and
+exports a filing draft; it does not determine tax liability or infer routes.
 
 Anyone on the old **Individual** plan maps to **Owner-Operator**, not to Solo
 Starter: they were sold the cockpit and they keep it. The mapping lives in

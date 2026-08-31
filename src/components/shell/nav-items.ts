@@ -14,6 +14,8 @@ import {
   Wallet,
   UserRound,
   ClipboardList,
+  FileText,
+  MapPinned,
   type LucideIcon,
 } from "lucide-react";
 
@@ -53,6 +55,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Money",
     items: [
+      { href: "/invoices", label: "Invoices", icon: FileText },
       { href: "/settlements", label: "Owner Settlements", icon: Wallet },
       { href: "/driver-settlements", label: "Driver Pay", icon: ClipboardList, fleetOnly: true },
       { href: "/reserves", label: "Reserves", icon: Landmark },
@@ -61,6 +64,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Intelligence",
     items: [
+      { href: "/ifta", label: "IFTA", icon: MapPinned },
       { href: "/analytics/cost-per-mile", label: "Analytics", icon: BarChart3, matches: ["/analytics"] },
       { href: "/reports", label: "Reports", icon: BarChart3 },
       { href: "/fleet", label: "Fleet", icon: Truck, fleetOnly: true },

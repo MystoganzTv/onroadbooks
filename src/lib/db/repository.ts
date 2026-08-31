@@ -73,6 +73,15 @@ export interface LoadInput {
   otherExpenses: number;
   costsPosted?: boolean;
   status: PaymentStatus;
+  jurisdictionMiles?: Load["jurisdictionMiles"];
+  invoiceNumber?: string | null;
+  invoiceDate?: string | null;
+  invoiceDueDate?: string | null;
+  invoicePaidDate?: string | null;
+  billToName?: string | null;
+  billToEmail?: string | null;
+  billToAddress?: string | null;
+  invoiceNotes?: string | null;
   notes?: string | null;
 }
 
@@ -103,6 +112,7 @@ export interface FuelEntryInput {
   totalCost: number;
   odometer?: number | null;
   location?: string | null;
+  jurisdiction?: string | null;
   loadId?: string | null;
   notes?: string | null;
 }
@@ -117,6 +127,7 @@ export interface SettingsInput {
   deadheadWarnPct: number;
   maintenanceWarnMiles: number;
   maintenanceWarnDays: number;
+  iftaTaxRates?: Record<string, number>;
 }
 
 export interface MaintenanceInput {

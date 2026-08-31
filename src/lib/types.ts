@@ -82,6 +82,8 @@ export interface FinancialSettings {
   maintenanceWarnMiles: number;
   /** Days of remaining service life that flag maintenance as due soon. */
   maintenanceWarnDays: number;
+  /** Quarterly IFTA rates keyed as `YYYY-QN:ST`, in dollars per gallon. */
+  iftaTaxRates: Record<string, number>;
   updatedAt: string;
 }
 
@@ -148,8 +150,26 @@ export interface Load {
   /** Whether trip costs are mirrored into the operating-expense ledger. */
   costsPosted: boolean;
   status: PaymentStatus;
+  /** Actual IFTA miles entered for each jurisdiction on this trip. */
+  jurisdictionMiles: JurisdictionMileage[];
+  /** One freight invoice per load; null until the load is invoiced. */
+  invoiceNumber: string | null;
+  invoiceDate: string | null;
+  invoiceDueDate: string | null;
+  invoicePaidDate: string | null;
+  billToName: string | null;
+  billToEmail: string | null;
+  billToAddress: string | null;
+  invoiceNotes: string | null;
   notes: string | null;
   createdAt: string;
+}
+
+export interface JurisdictionMileage {
+  /** Two-letter US or Canadian IFTA jurisdiction code. */
+  jurisdiction: string;
+  totalMiles: number;
+  nonTaxableMiles: number;
 }
 
 export type EquipmentType =
@@ -209,6 +229,8 @@ export interface FuelEntry {
   totalCost: number;
   odometer: number | null;
   location: string | null;
+  /** Jurisdiction where the tax-paid fuel was purchased. */
+  jurisdiction: string | null;
   /**
    * The ledger expense this fill-up writes. An explicit link, not a naming
    * convention, so the two can never drift apart.

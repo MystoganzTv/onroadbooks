@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isIftaJurisdiction } from "./ifta";
 
 import { CATEGORY_IDS } from "./categories";
 import { DOCUMENT_TYPE_IDS } from "./documents";
@@ -18,6 +19,18 @@ const miles = z
   .number({ invalid_type_error: "Enter a number" })
   .min(0, "Cannot be negative")
   .max(100_000, "That looks too large");
+
+const iftaJurisdiction = z
+  .string()
+  .trim()
+  .transform((value) => value.toUpperCase())
+  .refine(isIftaJurisdiction, "Choose an IFTA jurisdiction");
+
+const jurisdictionMileageSchema = z.object({
+  jurisdiction: iftaJurisdiction,
+  totalMiles: miles,
+  nonTaxableMiles: miles,
+});
 
 export const memberInviteSchema = z.object({
   email: z.string().trim().email("Enter a valid email address").max(254),
@@ -90,6 +103,7 @@ export const loadSchema = z
     otherExpenses: money,
     costsPosted: z.boolean().optional(),
     status: z.enum(["PENDING", "INVOICED", "PAID"]),
+    jurisdictionMiles: z.array(jurisdictionMileageSchema).max(60).optional(),
     notes: z.string().trim().max(2000).optional().nullable(),
   })
   .refine((value) => !value.deliveryDate || value.deliveryDate >= value.date, {
@@ -108,7 +122,52 @@ export const loadSchema = z
       message: "Trip expenses look far higher than the rate -- check the numbers",
       path: ["fuelCost"],
     },
+  )
+  .refine(
+    (value) =>
+      (value.jurisdictionMiles ?? []).every(
+        (row) => row.nonTaxableMiles <= row.totalMiles,
+      ),
+    {
+      message: "Non-taxable miles cannot exceed total jurisdiction miles",
+      path: ["jurisdictionMiles"],
+    },
+  )
+  .refine(
+    (value) =>
+      (value.jurisdictionMiles ?? []).reduce((total, row) => total + row.totalMiles, 0) <=
+      value.loadedMiles + value.deadheadMiles,
+    {
+      message: "Jurisdiction miles cannot exceed total trip miles",
+      path: ["jurisdictionMiles"],
+    },
   );
+
+export const invoiceSchema = z
+  .object({
+    invoiceNumber: z.string().trim().min(1, "Invoice number is required").max(40),
+    invoiceDate: isoDate,
+    invoiceDueDate: isoDate,
+    billToName: z.string().trim().min(1, "Customer name is required").max(160),
+    billToEmail: z.string().trim().email("Enter a valid email").max(254).optional().nullable().or(z.literal("")),
+    billToAddress: z.string().trim().max(500).optional().nullable(),
+    invoiceNotes: z.string().trim().max(2000).optional().nullable(),
+  })
+  .refine((value) => value.invoiceDueDate >= value.invoiceDate, {
+    message: "Due date cannot be before the invoice date",
+    path: ["invoiceDueDate"],
+  });
+
+export const iftaRatesSchema = z.object({
+  quarter: z.string().regex(/^\d{4}-Q[1-4]$/, "Use a quarter such as 2026-Q3"),
+  rates: z.record(
+    z.string().regex(/^[A-Za-z]{2}$/),
+    z.number().min(0, "Rate cannot be negative").max(5, "Rate looks too high"),
+  ).refine(
+    (rates) => Object.keys(rates).every(isIftaJurisdiction),
+    "Choose valid IFTA jurisdictions",
+  ),
+});
 
 export const expenseSchema = z.object({
   scope: z.enum(expenseScopeValues).optional(),
@@ -143,6 +202,7 @@ export const fuelSchema = z.object({
     .optional()
     .nullable(),
   location: z.string().trim().max(120).optional().nullable(),
+  jurisdiction: iftaJurisdiction.optional().nullable(),
   loadId: z.string().trim().optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
 });
@@ -351,6 +411,7 @@ export const settlementNotesSchema = z.object({
 });
 
 export type LoadFormValues = z.infer<typeof loadSchema>;
+export type InvoiceFormValues = z.infer<typeof invoiceSchema>;
 export type GoalFormValues = z.infer<typeof goalSchema>;
 export type ReserveAccountFormValues = z.infer<typeof reserveAccountSchema>;
 export type ReserveTransactionFormValues = z.infer<typeof reserveTransactionSchema>;

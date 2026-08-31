@@ -62,6 +62,7 @@ const settings: FinancialSettings = {
   deadheadWarnPct: 20,
   maintenanceWarnMiles: 2000,
   maintenanceWarnDays: 30,
+  iftaTaxRates: {},
   updatedAt: "",
 };
 
@@ -147,6 +148,15 @@ function load(over: Partial<Load> = {}): Load {
     driverPay: 0,
     costsPosted: false,
     status: "PAID",
+    jurisdictionMiles: [],
+    invoiceNumber: null,
+    invoiceDate: null,
+    invoiceDueDate: null,
+    invoicePaidDate: null,
+    billToName: null,
+    billToEmail: null,
+    billToAddress: null,
+    invoiceNotes: null,
     notes: null,
     createdAt: "",
     ...over,

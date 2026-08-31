@@ -14,6 +14,7 @@ import { defaultCategoryBehavior } from "../categories";
 import { roundMoney } from "../calculations";
 import { defaultGoals, defaultReserveAccounts, defaultSubscription } from "../defaults";
 import { buildSettlementSnapshot, settlementBounds, settlementId } from "../finance/settlement";
+import { inferFuelJurisdiction } from "../ifta";
 import { pad } from "../periods";
 import type {
   Business,
@@ -56,6 +57,7 @@ export const FIXTURE_SETTINGS: FinancialSettings = {
   deadheadWarnPct: 20,
   maintenanceWarnMiles: 2000,
   maintenanceWarnDays: 30,
+  iftaTaxRates: {},
   updatedAt: CREATED,
 };
 
@@ -282,6 +284,8 @@ function generateMonth(
     const ratePerLoadedMile = 3.55 + rand() * 1.15;
     const grossRate = roundMoney(Math.round(loadedMiles * ratePerLoadedMile * 0.2) * 5);
     const date = `${month}-${pad(day)}`;
+    const destinationMiles = Math.floor(loadedMiles / 2);
+    const broker = BROKERS[Math.floor(rand() * BROKERS.length)];
 
     loads.push({
       id: `load_${month}_${pad(i + 1)}`,
@@ -295,7 +299,7 @@ function generateMonth(
       originState: lane[1],
       destinationCity: lane[2],
       destinationState: lane[3],
-      broker: BROKERS[Math.floor(rand() * BROKERS.length)],
+      broker,
       loadNumber: `GEN-${month.replace("-", "")}${pad(i + 1)}`,
       equipmentType: "BOX_TRUCK",
       loadCapacity: "FULL",
@@ -313,6 +317,22 @@ function generateMonth(
       driverPay: 0,
       costsPosted: false,
       status: "PAID",
+      jurisdictionMiles: [
+        {
+          jurisdiction: lane[1],
+          totalMiles: loadedMiles + deadheadMiles - destinationMiles,
+          nonTaxableMiles: 0,
+        },
+        { jurisdiction: lane[3], totalMiles: destinationMiles, nonTaxableMiles: 0 },
+      ],
+      invoiceNumber: `INV-${date.replaceAll("-", "")}-${pad(i + 1)}`,
+      invoiceDate: date,
+      invoiceDueDate: date,
+      invoicePaidDate: date,
+      billToName: broker,
+      billToEmail: null,
+      billToAddress: null,
+      invoiceNotes: null,
       notes: null,
       createdAt: `${date}T18:00:00.000Z`,
     });
@@ -413,6 +433,7 @@ function generateMonth(
     odometer += Math.round(totalMiles / fills);
     const totalCost = roundMoney(gallons * pricePerGallon);
 
+    const location = FUEL_STOPS[Math.floor(rand() * FUEL_STOPS.length)];
     fuelEntries.push({
       id: `fuel_${month}_${pad(i + 1)}`,
       expenseId: `expfuel_fuel_${month}_${pad(i + 1)}`,
@@ -424,7 +445,8 @@ function generateMonth(
       pricePerGallon,
       totalCost,
       odometer,
-      location: FUEL_STOPS[Math.floor(rand() * FUEL_STOPS.length)],
+      location,
+      jurisdiction: inferFuelJurisdiction(location),
       notes: null,
       createdAt: `${date}T12:00:00.000Z`,
     });
@@ -493,6 +515,8 @@ export function buildSeedDataset(): Dataset {
       notes,
     ] = row;
 
+    const destinationMiles = Math.floor(loadedMiles / 2);
+    const invoiceNumber = status === "PENDING" ? null : `INV-${date.replaceAll("-", "")}-${pad(i + 1)}`;
     loads.push({
       id: `load_aug_${pad(i + 1)}`,
       businessId: BUSINESS_ID,
@@ -523,6 +547,22 @@ export function buildSeedDataset(): Dataset {
       driverPay: 0,
       costsPosted: false,
       status,
+      jurisdictionMiles: [
+        {
+          jurisdiction: originState,
+          totalMiles: loadedMiles + deadheadMiles - destinationMiles,
+          nonTaxableMiles: 0,
+        },
+        { jurisdiction: destinationState, totalMiles: destinationMiles, nonTaxableMiles: 0 },
+      ],
+      invoiceNumber,
+      invoiceDate: invoiceNumber ? date : null,
+      invoiceDueDate: invoiceNumber ? date : null,
+      invoicePaidDate: status === "PAID" ? date : null,
+      billToName: invoiceNumber ? broker : null,
+      billToEmail: null,
+      billToAddress: null,
+      invoiceNotes: null,
       notes: notes || null,
       createdAt: `${date}T18:00:00.000Z`,
     });
@@ -564,6 +604,7 @@ export function buildSeedDataset(): Dataset {
       totalCost,
       odometer: odo,
       location,
+      jurisdiction: inferFuelJurisdiction(location),
       notes: null,
       createdAt: `${date}T12:00:00.000Z`,
     });

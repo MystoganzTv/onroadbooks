@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
 import { AnalyticsTabs } from "@/components/cockpit/analytics-tabs";
@@ -40,7 +41,7 @@ export const metadata: Metadata = { title: "Lane Intelligence" };
 /**
  * LANE INTELLIGENCE.
  *
- * State to state and directional: VA → NJ is a different business from
+ * Market to market and directional: Richmond → North Jersey is a different business from
  * NJ → VA, and averaging them together hides exactly the thing worth knowing.
  * Nothing is ranked until a lane has run enough times to mean something.
  */
@@ -55,13 +56,16 @@ export default async function LanesPage({
     session.businessId,
   ).getDataset();
   const period = periodFromSearchParams(params);
+  const grouping = (Array.isArray(params.group) ? params.group[0] : params.group) === "state"
+    ? "state"
+    : "market";
 
   if (!planAllows(subscription, "cockpit")) {
     return (
       <div className="space-y-4 p-4 lg:p-6">
         <PageHeader
           title="Lanes"
-          description="Which state-to-state runs actually pay, in the direction you ran them."
+          description="Which market-to-market runs actually pay, in the direction you ran them."
         />
         <PlanGate
           capability="cockpit"
@@ -76,7 +80,7 @@ export default async function LanesPage({
 
   const thresholds = thresholdsFromSettings(settings);
   const periodLoads = withMetricsAll(loadsInPeriod(loads, period), thresholds);
-  const lanes = calculateLanePerformance(periodLoads, thresholds);
+  const lanes = calculateLanePerformance(periodLoads, thresholds, LANE_MIN_LOADS, grouping);
 
   const qualified = lanes.filter((l) => l.qualified);
   const emerging = lanes.filter((l) => !l.qualified);
@@ -87,8 +91,8 @@ export default async function LanesPage({
     .map((lane) => {
       const reverse = qualified.find(
         (other) =>
-          other.originState === lane.destinationState &&
-          other.destinationState === lane.originState,
+          other.originKey === lane.destinationKey &&
+          other.destinationKey === lane.originKey,
       );
       return reverse && lane.key < reverse.key ? { out: lane, back: reverse } : null;
     })
@@ -106,6 +110,28 @@ export default async function LanesPage({
       <div className="flex flex-wrap items-center gap-2">
         <PeriodControls period={period} />
         <TruckSwitcher trucks={orderedTrucks(trucks)} selectedId={truckId} />
+        <div className="flex rounded-md border border-border bg-surface-sunken p-0.5 text-xs">
+          {(["market", "state"] as const).map((option) => {
+            const query = new URLSearchParams();
+            for (const [key, value] of Object.entries(params)) {
+              const first = Array.isArray(value) ? value[0] : value;
+              if (first && key !== "group") query.set(key, first);
+            }
+            query.set("group", option);
+            return (
+              <Link
+                key={option}
+                href={`/analytics/lanes?${query.toString()}`}
+                className={cn(
+                  "rounded px-2.5 py-1.5 capitalize",
+                  grouping === option && "bg-background font-medium text-foreground shadow-sm",
+                )}
+              >
+                {option}
+              </Link>
+            );
+          })}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -133,7 +159,7 @@ export default async function LanesPage({
           <CardHeader>
             <CardTitle>Round trips</CardTitle>
             <span className="text-2xs text-muted-foreground">
-              The same two states, each direction priced separately
+              The same two {grouping === "market" ? "markets" : "states"}, each direction priced separately
             </span>
           </CardHeader>
           <CardContent className="grid gap-3 p-4 lg:grid-cols-2">
@@ -143,7 +169,7 @@ export default async function LanesPage({
                 className="rounded-md border border-border bg-surface-sunken/50 p-3"
               >
                 <p className="text-xs font-medium text-foreground">
-                  {pair.out.originState} ↔ {pair.out.destinationState}
+                  {pair.out.originLabel} ↔ {pair.out.destinationLabel}
                 </p>
                 <div className="mt-2 space-y-1.5">
                   <Direction lane={pair.out} />
@@ -263,8 +289,8 @@ export default async function LanesPage({
             } shown greyed out rather than ranked. `
           : ""}
         A lane needs {LANE_MIN_LOADS} loads before it is ranked — two runs is an anecdote, and a
-        ranking built on anecdotes is worse than none. Lanes are grouped state to state for now;
-        city and market level grouping comes later.
+        ranking built on anecdotes is worse than none. Market grouping normalizes nearby freight
+        cities into the same commercial area; switch to states when the sample is still small.
       </p>
     </div>
   );

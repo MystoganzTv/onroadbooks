@@ -114,9 +114,16 @@ optimizes large images and scanned PDFs, then uploads the result directly to
 private Supabase Storage with a short-lived signed URL. The stored-file limit is
 10 MB; searchable/native PDFs are preserved instead of being rasterized.
 
-**Accountant exports** -- CSV for Loads, Expenses, Fuel, Profit & Loss Summary,
-Mileage and Maintenance, plus a print stylesheet for save-as-PDF. Exports use the
-page's own period query string, so what downloads is exactly what is on screen.
+**Accountant exports** -- native CSV, XLSX and PDF for Loads, Expenses, Fuel,
+Profit & Loss Summary, Mileage and Maintenance, plus a print stylesheet. Exports
+use the page's own period query string, so what downloads is exactly what is on screen.
+
+**Invoices** -- one freight invoice per load, with customer details, issue and due
+dates, overdue tracking, payment status and a ready-to-send PDF.
+
+**IFTA** -- actual jurisdiction mileage per load, fuel jurisdiction, quarterly tax
+rates and draft XLSX/PDF filing support. Missing miles, gallons or rates keep the
+quarter visibly incomplete; the app never guesses a route from its endpoints.
 
 **Expenses** -- 16 categories, each classified fixed or variable (editable in
 Settings). Donut + ranked bar breakdown, inline edit and delete.
@@ -146,9 +153,9 @@ projection. A shorter window compares against a share of the monthly target
 scaled by working days, and always says that it was pro-rated. Rates and
 ceilings never scale with the length of the window.
 
-**Lane and broker intelligence** -- directional state-to-state lanes (`VA>NJ` is
-not `NJ>VA`, and the two are never averaged), ranked only once a lane has run at
-least three times. Two loads is an anecdote.
+**Lane and broker intelligence** -- directional freight-market lanes (with a state
+fallback), where the outbound and return are never averaged. A lane is ranked only
+after at least three runs. Two loads is an anecdote.
 
 **Fleet** -- up to eight trucks on the paid OnRoad Fleet service, each with its own
 contribution and cost per mile. A truck is never charged a share of the phone bill; business
@@ -328,10 +335,10 @@ Documents follow the same pattern as rows. `lib/storage/` defines a
 `DocumentStorage` adapter; local development ships `LocalDocumentStorage`, which writes to
 `data/uploads/` and serves through `/api/documents/[id]`. `SupabaseDocumentStorage`
 is selected by `DOCUMENT_STORAGE=supabase`; it talks to the Storage REST API
-with plain `fetch`. Signed upload, metadata lookup, signed download, tenant
-isolation, byte verification and deletion have all been exercised against the
-production project. Only metadata lives in the database, so moving buckets
-never touches application code.
+with plain `fetch`. Certification scripts cover signed upload, metadata lookup,
+signed download, tenant isolation, byte verification and deletion; run them
+against the selected production project after each deployment. Only metadata
+lives in the database, so moving buckets never touches application code.
 
 `Document` rows carry four optional owner columns (`loadId`, `expenseId`,
 `truckId`, `maintenanceId`) with exactly one set, which is why one upload path
@@ -339,8 +346,8 @@ serves rate confirmations, receipts, registrations and service invoices alike.
 
 ### Exports
 
-`lib/export.ts` defines each report once as columns + rows. CSV is implemented;
-adding PDF or XLSX later means writing one renderer, not six reports.
+`lib/export.ts` defines each report once as columns + rows. CSV, native XLSX and
+paginated PDF renderers all consume that definition.
 
 ---
 
@@ -514,11 +521,11 @@ backup-restoration drill are documented in the [operations runbook](docs/operati
 
 ---
 
-## Not built yet (deliberately)
+## Filing boundaries
 
-Invoice generation and IFTA reporting remain deliberately outside this release.
-CSV and print-to-PDF are implemented; a native XLSX/PDF renderer and city/market
-lane grouping remain later refinements.
+IFTA output is a draft based on the actual jurisdiction mileage, fuel purchases
+and quarterly rates entered by the operator. It does not infer routes or replace
+the official filing rules of the carrier's base jurisdiction.
 
 Stripe Checkout, the customer billing portal and signed webhook synchronization
 are implemented. Each deployment requires its Stripe secret, webhook signing
