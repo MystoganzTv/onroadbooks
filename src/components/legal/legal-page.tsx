@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, LockKeyhole } from "lucide-react";
 
 import { BrandLogo } from "@/components/shell/brand-logo";
+import { LegalToc } from "@/components/legal/legal-toc";
 import { display } from "@/lib/marketing/fonts";
 import { cn } from "@/lib/utils";
 
@@ -76,17 +77,7 @@ export function LegalPage({
         <div className="mx-auto grid max-w-[1180px] gap-10 px-5 py-12 sm:px-8 sm:py-16 lg:grid-cols-[220px_minmax(0,720px)] lg:gap-16">
           <aside className="lg:sticky lg:top-24 lg:h-fit">
             <p className="font-display text-xs font-bold uppercase tracking-[0.18em] text-mkt-faint">On this page</p>
-            <nav className="mt-3 grid gap-0.5" aria-label="Table of contents">
-              {toc.map((entry) => (
-                <a
-                  key={entry.id}
-                  href={`#${entry.id}`}
-                  className="rounded-md px-2.5 py-1.5 text-[13px] leading-5 text-mkt-dim transition-colors hover:bg-white/[0.06] hover:text-white"
-                >
-                  {entry.label}
-                </a>
-              ))}
-            </nav>
+            <LegalToc toc={toc} />
             <div className="mt-7 border-t border-white/[0.08] pt-5">
               <p className="font-display text-xs font-bold uppercase tracking-[0.18em] text-mkt-faint">Legal center</p>
               <nav className="mt-3 grid gap-0.5" aria-label="Legal center">
@@ -115,7 +106,8 @@ export function LegalPage({
               className={cn(
                 "max-w-2xl text-[15px] leading-7 text-mkt-dim",
                 "[&_a]:font-medium [&_a]:text-mkt-blue [&_a]:underline [&_a]:underline-offset-4",
-                "[&_h2]:scroll-mt-24 [&_h2]:font-display [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-white",
+                "[&_section]:scroll-mt-24",
+                "[&_h2]:font-display [&_h2]:text-lg [&_h2]:font-bold [&_h2]:text-white",
                 "[&_section+section]:mt-9 [&_section+section]:border-t [&_section+section]:border-white/[0.08] [&_section+section]:pt-9",
                 "[&_h3]:scroll-mt-24 [&_h3]:mt-6 [&_h3]:font-display [&_h3]:text-[15px] [&_h3]:font-semibold [&_h3]:text-white/90",
                 "[&_h2+p]:mt-3 [&_h3+p]:mt-2 [&_p+p]:mt-3 [&_p+ul]:mt-3 [&_ul+p]:mt-3",
