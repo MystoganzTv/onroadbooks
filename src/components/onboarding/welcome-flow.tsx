@@ -128,7 +128,6 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
 
   function finish() {
     router.replace("/dashboard");
-    router.refresh();
   }
 
   const workingDays = toNumber(runValues.workingDaysPerWeek, 6);
