@@ -10,6 +10,16 @@ const nextConfig = {
   experimental: {
     serverActions: { bodySizeLimit: "2mb" },
   },
+  // The Acceptable Use, Billing & Refund, and Cookie policies were folded
+  // into Terms of Service and Privacy Policy as sections (2026-08-31) --
+  // these keep any old bookmarks or indexed links from 404ing.
+  async redirects() {
+    return [
+      { source: "/acceptable-use", destination: "/terms#acceptable-use", permanent: true },
+      { source: "/billing-policy", destination: "/terms#billing", permanent: true },
+      { source: "/cookies", destination: "/privacy#cookies", permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

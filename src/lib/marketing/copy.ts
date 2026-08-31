@@ -325,9 +325,6 @@ const en = {
       { href: "#faq", label: "FAQ" },
       { href: "/terms", label: "Terms" },
       { href: "/privacy", label: "Privacy" },
-      { href: "/billing-policy", label: "Billing" },
-      { href: "/cookies", label: "Cookies" },
-      { href: "/acceptable-use", label: "Acceptable use" },
     ],
     disclaimer:
       "OnRoad Books is a financial management tool for independent trucking businesses. It is not tax, accounting or legal advice, and the figures it produces are planning figures based on the data and the rates you enter.",
@@ -602,9 +599,6 @@ const es: LandingCopy = {
       { href: "#faq", label: "Preguntas" },
       { href: "/terms", label: "Términos" },
       { href: "/privacy", label: "Privacidad" },
-      { href: "/billing-policy", label: "Facturación" },
-      { href: "/cookies", label: "Cookies" },
-      { href: "/acceptable-use", label: "Uso aceptable" },
     ],
     disclaimer:
       "OnRoad Books es una herramienta de gestión financiera para transportistas independientes. No es asesoría fiscal, contable ni legal, y las cifras que produce son cifras de planeación basadas en los datos y las tarifas que tú capturas.",
