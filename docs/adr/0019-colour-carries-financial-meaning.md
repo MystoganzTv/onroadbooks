@@ -36,7 +36,7 @@ dashboard broker panel and the lanes table for exactly this reason; they remain
 on the full broker scorecard, where the judgement is the point.
 
 **The public landing page runs its own fixed dark palette** -- the `mkt.*`
-tokens in `tailwind.config.ts`. It is a sales page with one look, and it must
+tokens in `tailwind.config.cjs`. It is a sales page with one look, and it must
 not change when a visitor's system flips to light. **Nothing inside the product
 may use the `mkt` tokens, and the landing page does not use the app's theme
 tokens.**
@@ -73,5 +73,5 @@ light for half of its visitors, and the design falls apart.
 
 ## Where this lives
 
-`tailwind.config.ts`, `src/app/globals.css`, `src/components/ui/`,
+`tailwind.config.cjs`, `src/app/globals.css`, `src/components/ui/`,
 `src/components/cockpit/`, `src/components/marketing/`.

@@ -3,6 +3,8 @@
  * without a cycle through the adapter selector in ./index.ts.
  */
 export interface DocumentStorage {
+  /** Read-only dependency probe for operational readiness checks. */
+  healthcheck?(): Promise<void>;
   /** Persists bytes and returns the key needed to read them back. */
   put(key: string, data: Buffer, contentType: string): Promise<string>;
   get(key: string): Promise<Buffer | null>;

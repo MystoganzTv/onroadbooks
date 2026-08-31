@@ -3,14 +3,21 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth/constants";
 
 /**
- * Gate every route at the edge.
+ * Gate every route at the network boundary.
  *
  * This only checks that a session cookie is present -- the signature and
  * expiry are verified server side by `getSession()` on each page and route,
- * which is where the secret lives. The middleware exists so an unauthenticated
+ * which is where the secret lives. The proxy exists so an unauthenticated
  * request never reaches a page render at all.
  */
-const PUBLIC_PATHS = ["/login", "/setup", "/invite/accept", "/api/auth", "/api/stripe/webhook"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/setup",
+  "/invite/accept",
+  "/api/auth",
+  "/api/health",
+  "/api/stripe/webhook",
+];
 
 /**
  * The marketing landing page. It is matched exactly and never by prefix --
@@ -32,7 +39,7 @@ function isPublicAsset(pathname: string): boolean {
   return !pathname.startsWith("/api/") && /\.[a-z0-9]+$/i.test(pathname);
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (PUBLIC_EXACT_PATHS.includes(pathname)) {

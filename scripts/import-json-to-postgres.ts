@@ -18,7 +18,7 @@
 import { Prisma, PrismaClient } from "../src/generated/prisma";
 import { JsonRepository } from "../src/lib/db/json-store";
 
-const BUSINESS_ID = "biz_boxtruck";
+const BUSINESS_ID = process.env.IMPORT_BUSINESS_ID?.trim() || "biz_boxtruck";
 
 const prisma = new PrismaClient();
 
@@ -49,6 +49,8 @@ async function main() {
     reserveAccounts,
     reserveTransactions,
     settlements,
+    drivers,
+    driverSettlements,
     users,
   } = dataset;
 
@@ -66,23 +68,36 @@ async function main() {
     );
   }
 
-  // Children before parents. A fresh database makes this a no-op; it exists so
-  // the import can be re-run after a failure without leaving half a ledger.
-  console.log("Limpiando destino…");
-  await prisma.document.deleteMany();
-  await prisma.reserveTransaction.deleteMany();
-  await prisma.settlement.deleteMany();
-  await prisma.reserveAccount.deleteMany();
-  await prisma.financialGoal.deleteMany();
-  await prisma.subscription.deleteMany();
-  await prisma.maintenanceRecord.deleteMany();
-  await prisma.fuelEntry.deleteMany();
-  await prisma.expense.deleteMany();
-  await prisma.load.deleteMany();
-  await prisma.financialSettings.deleteMany();
-  await prisma.truck.deleteMany();
-  await prisma.user.deleteMany();
-  await prisma.business.deleteMany();
+  const existingBusinesses = await prisma.business.count();
+  if (existingBusinesses > 0 && process.env.ALLOW_DESTRUCTIVE_IMPORT !== "REPLACE_ALL") {
+    throw new Error(
+      `El destino contiene ${existingBusinesses} negocio(s). `
+      + "La importación se negó a borrar datos; use ALLOW_DESTRUCTIVE_IMPORT=REPLACE_ALL solo para una restauración deliberada.",
+    );
+  }
+
+  if (existingBusinesses > 0) {
+    // Children before parents. This path is intentionally hard to enable: a
+    // normal migration targets an empty schema and must never erase production.
+    console.log("Limpiando destino autorizado…");
+    await prisma.document.deleteMany();
+    await prisma.reserveTransaction.deleteMany();
+    await prisma.settlement.deleteMany();
+    await prisma.driverSettlementLine.deleteMany();
+    await prisma.driverSettlement.deleteMany();
+    await prisma.maintenanceRecord.deleteMany();
+    await prisma.fuelEntry.deleteMany();
+    await prisma.expense.deleteMany();
+    await prisma.load.deleteMany();
+    await prisma.driver.deleteMany();
+    await prisma.reserveAccount.deleteMany();
+    await prisma.financialGoal.deleteMany();
+    await prisma.subscription.deleteMany();
+    await prisma.financialSettings.deleteMany();
+    await prisma.truck.deleteMany();
+    await prisma.user.deleteMany();
+    await prisma.business.deleteMany();
+  }
 
   console.log("Negocio, ajustes, metas y suscripción…");
   await prisma.business.create({
@@ -148,6 +163,9 @@ async function main() {
         email: user.email,
         name: user.name,
         passwordHash: user.passwordHash,
+        role: user.role,
+        invitedAt: stamp(user.invitedAt),
+        joinedAt: user.joinedAt ? stamp(user.joinedAt) : null,
         businessId: user.businessId,
         createdAt: stamp(user.createdAt),
       },
@@ -161,6 +179,8 @@ async function main() {
         id: truck.id,
         businessId: business.id,
         name: truck.name,
+        acquiredOn: truck.acquiredOn ? day(truck.acquiredOn) : null,
+        soldOn: truck.soldOn ? day(truck.soldOn) : null,
         year: truck.year,
         make: truck.make,
         model: truck.model,
@@ -176,6 +196,23 @@ async function main() {
     });
   }
 
+  console.log(`${drivers.length} chofer(es)…`);
+  for (const driver of drivers) {
+    await prisma.driver.create({
+      data: {
+        id: driver.id,
+        businessId: business.id,
+        name: driver.name,
+        reference: driver.reference,
+        defaultTruckId: driver.defaultTruckId,
+        payType: driver.payType,
+        payRate: driver.payRate,
+        active: driver.active,
+        createdAt: stamp(driver.createdAt),
+      },
+    });
+  }
+
   console.log(`${loads.length} loads…`);
   for (const load of loads) {
     await prisma.load.create({
@@ -183,6 +220,7 @@ async function main() {
         id: load.id,
         businessId: business.id,
         truckId: load.truckId,
+        driverId: load.driverId,
         date: day(load.date),
         deliveryDate: load.deliveryDate ? day(load.deliveryDate) : null,
         endingOdometer: load.endingOdometer,
@@ -205,6 +243,7 @@ async function main() {
         dispatchFee: load.dispatchFee,
         factoringFee: load.factoringFee,
         otherExpenses: load.otherExpenses,
+        driverPay: load.driverPay,
         // Carried across as-is. False on this ledger's historical loads, which
         // is the whole reason the numbers do not move.
         costsPosted: load.costsPosted,
@@ -277,6 +316,38 @@ async function main() {
         expenseId: record.expenseId,
         notes: record.notes,
         createdAt: stamp(record.createdAt),
+      },
+    });
+  }
+
+  console.log(`${driverSettlements.length} liquidación(es) de chofer…`);
+  for (const settlement of driverSettlements) {
+    await prisma.driverSettlement.create({
+      data: {
+        id: settlement.id,
+        businessId: business.id,
+        driverId: settlement.driverId,
+        periodStart: day(settlement.periodStart),
+        periodEnd: day(settlement.periodEnd),
+        status: settlement.status,
+        paidOn: settlement.paidOn ? day(settlement.paidOn) : null,
+        notes: settlement.notes,
+        createdAt: stamp(settlement.createdAt),
+        lines: {
+          create: settlement.lines.map((line) => ({
+            id: line.id,
+            loadId: line.loadId,
+            truckId: line.truckId,
+            grossRevenue: line.grossRevenue,
+            loadedMiles: line.loadedMiles,
+            totalMiles: line.totalMiles,
+            payType: line.payType,
+            payRate: line.payRate,
+            payAmount: line.payAmount,
+            expenseId: line.expenseId,
+            createdAt: stamp(line.createdAt),
+          })),
+        },
       },
     });
   }
@@ -370,6 +441,9 @@ async function main() {
     gastos: await prisma.expense.count(),
     fuel: await prisma.fuelEntry.count(),
     servicios: await prisma.maintenanceRecord.count(),
+    choferes: await prisma.driver.count(),
+    liquidacionesChofer: await prisma.driverSettlement.count(),
+    lineasLiquidacion: await prisma.driverSettlementLine.count(),
     documentos: await prisma.document.count(),
     buckets: await prisma.reserveAccount.count(),
     settlements: await prisma.settlement.count(),

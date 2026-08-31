@@ -32,6 +32,10 @@ function safeKey(key: string): string {
 }
 
 export class LocalDocumentStorage implements DocumentStorage {
+  async healthcheck(): Promise<void> {
+    await fs.access(dataDirectory());
+  }
+
   async put(key: string, data: Buffer, _contentType: string): Promise<string> {
     const target = path.join(uploadDir(), safeKey(key));
     await fs.mkdir(path.dirname(target), { recursive: true });

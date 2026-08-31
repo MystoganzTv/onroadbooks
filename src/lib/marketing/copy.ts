@@ -16,6 +16,8 @@
  * The preview figures live in `PREVIEW_FIGURES` because numbers do not translate.
  */
 
+import { TRIAL_DAYS } from "../plans";
+
 export type Lang = "en" | "es";
 
 /**
@@ -66,7 +68,7 @@ const en = {
       "Bookkeeping and profit tracking for owner-operators. True cost per mile, load screening before you book, owner pay after reserves, and broker and lane scoring - all from your own ledger.",
   },
   banner: {
-    text: "Half-month settlements and reserve buckets are live. Free for 7 days, no card.",
+    text: `Half-month settlements and reserve buckets are live. Free for ${TRIAL_DAYS} days, no card.`,
   },
   nav: {
     links: [
@@ -216,7 +218,7 @@ const en = {
   cta: {
     title: "Ready to take control of your numbers?",
     checks: [
-      "Start your 7-day free trial",
+      `Start your ${TRIAL_DAYS}-day free trial`,
       "No credit card required",
       "No bank connection, ever",
       "Cancel anytime and export everything",
@@ -235,7 +237,7 @@ const en = {
   pricing: {
     eyebrow: "Pricing",
     title: "Less than one bad load a year.",
-    sub: "Every plan includes the full profit engine. Seven days free, no card up front.",
+    sub: `Every plan includes the full profit engine. ${TRIAL_DAYS} days free, no card up front.`,
     per: "/month",
     plans: [
       {
@@ -341,7 +343,7 @@ const es: LandingCopy = {
       "Contabilidad y control de ganancia para owner-operators. Costo real por milla, la carga evaluada antes de aceptarla, cuánto puedes pagarte después de reservas, y qué brokers y rutas rinden - todo desde tu propio libro.",
   },
   banner: {
-    text: "Ya están los cortes de quincena y las reservas. Gratis 7 días, sin tarjeta.",
+    text: `Ya están los cortes de quincena y las reservas. Gratis ${TRIAL_DAYS} días, sin tarjeta.`,
   },
   nav: {
     links: [
@@ -490,7 +492,7 @@ const es: LandingCopy = {
   cta: {
     title: "¿Listo para tomar control de tus números?",
     checks: [
-      "Empieza tu prueba de 7 días",
+      `Empieza tu prueba de ${TRIAL_DAYS} días`,
       "Sin tarjeta de crédito",
       "Nunca se conecta a tu banco",
       "Cancela cuando quieras y exporta todo",
@@ -509,7 +511,7 @@ const es: LandingCopy = {
   pricing: {
     eyebrow: "Precios",
     title: "Menos que una carga mala al año.",
-    sub: "Todos los planes traen el motor completo. Siete días gratis, sin tarjeta por delante.",
+    sub: `Todos los planes traen el motor completo. ${TRIAL_DAYS} días gratis, sin tarjeta por delante.`,
     per: "/mes",
     plans: [
       {

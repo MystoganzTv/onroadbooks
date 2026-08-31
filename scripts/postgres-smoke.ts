@@ -284,8 +284,12 @@ async function main() {
   ok(`every reserve bucket handed out exists in the database (${storedAccounts.length})`);
 
   // --- close and reopen ----------------------------------------------------
-  const month = "2026-07";
-  const half = "SECOND" as const;
+  const settlementLoad = dataset.loads.find((load) => load.grossRate > 0);
+  assert.ok(settlementLoad, "the dataset has a revenue-producing load for settlement checks");
+  const month = settlementLoad.date.slice(0, 7);
+  const half = Number(settlementLoad.date.slice(8, 10)) <= 15
+    ? "FIRST" as const
+    : "SECOND" as const;
   const existing = await repository.ensureSettlement(month, half);
   if (existing.status === "CLOSED") await repository.reopenSettlement(existing.id);
 

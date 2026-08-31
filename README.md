@@ -2,8 +2,9 @@
 
 Production: [onroadbooks.com](https://onroadbooks.com/)
 
-A financial operating console for a **single box truck business**. It answers one
-question on every screen: *is the truck actually making money?*
+A financial operating console for **owner-operators and small fleets of up to
+eight trucks**. It answers one question on every screen: *is each truck, and the
+business as a whole, actually making money?*
 
 > The displayed name comes from `NEXT_PUBLIC_APP_NAME` in `.env`; change it there and it
 > updates across the UI and page titles.
@@ -18,7 +19,10 @@ npm run dev
 ```
 
 Open http://localhost:3000. The first visit lands on `/setup`, where you create
-the owner account -- email, password, business name. After that, `/login`.
+the workspace owner -- email, password, business name. After that, `/login`.
+Owners can invite teammates from Team as Admin, Bookkeeper, Dispatcher or
+Viewer; each person receives an individual sign-in and every permission is
+enforced on the server.
 
 No database setup required: the app boots on a local JSON store. The account you
 create receives a private, empty workspace and a guided first-run setup; the
@@ -165,8 +169,10 @@ the load profitability thresholds with a visual scale, the deadhead and
 maintenance warning thresholds, the fixed/variable classification matrix, and a
 compact subscription summary that links out instead of embedding a plan selector.
 
-**Plans & Billing** -- a dedicated comparison for Solo Starter and OnRoad Pro,
-with Fleet presented and activated as a separate paid service.
+**Plans & Billing** -- a dedicated comparison for Solo Starter, OnRoad Pro and
+OnRoad Fleet. Stripe Checkout creates the subscription, signed webhook events
+keep its status and plan synchronized, and the Stripe-hosted customer portal
+handles payment methods, invoices, plan changes and cancellation.
 
 ---
 
@@ -213,14 +219,14 @@ accept the identical query string.
 
 ```
 src/
-  middleware.ts            the auth gate; edge runtime, cookie presence only
+  proxy.ts                 the auth gate; cookie presence only
   app/
     page.tsx               public landing page
     login/ setup/ welcome/ owner account, first run, onboarding
     (app)/                 route group carrying the sidebar shell
       dashboard/ loads/ expenses/ fuel/ truck/ (maintenance lives here)
       calculator/ analytics/ reports/ settlements/ reserves/ fleet/ settings/
-    api/                   auth and private document serving only
+    api/                   auth, health, Stripe webhook, exports and documents
   components/
     ui/                    shadcn-style primitives (compact, tabular-friendly)
     shell/                 sidebar, mobile drawer, theme
@@ -248,10 +254,9 @@ src/
     seed/                  deterministic reference fixture for tests and local QA
   generated/prisma/        generated Prisma client (git-ignored)
 prisma/
-  schema.prisma            User, Business, Subscription, Truck, Load, Expense,
-                           FuelEntry, MaintenanceRecord, Document,
-                           FinancialSettings, FinancialGoal, ReserveAccount,
-                           ReserveTransaction, Settlement
+  schema.prisma            users/roles, businesses/subscriptions, trucks/drivers,
+                           loads/expenses/fuel/maintenance/documents, reserves,
+                           owner and driver settlements, settings and goals
   seed.ts                  seeds Postgres with the same reference fixture
 docs/adr/                  architecture decision records
 ```
@@ -320,12 +325,13 @@ against each other.
 ### Documents and storage
 
 Documents follow the same pattern as rows. `lib/storage/` defines a
-`DocumentStorage` adapter; the MVP ships `LocalDocumentStorage`, which writes to
+`DocumentStorage` adapter; local development ships `LocalDocumentStorage`, which writes to
 `data/uploads/` and serves through `/api/documents/[id]`. `SupabaseDocumentStorage`
-is written and selected by `DOCUMENT_STORAGE=supabase`; it talks to the Storage
-REST API with plain `fetch`, so switching adds no dependency -- but it has never
-been exercised against a live project. Only metadata lives in the database, so
-moving buckets never touches application code.
+is selected by `DOCUMENT_STORAGE=supabase`; it talks to the Storage REST API
+with plain `fetch`. Signed upload, metadata lookup, signed download, tenant
+isolation, byte verification and deletion have all been exercised against the
+production project. Only metadata lives in the database, so moving buckets
+never touches application code.
 
 `Document` rows carry four optional owner columns (`loadId`, `expenseId`,
 `truckId`, `maintenanceId`) with exactly one set, which is why one upload path
@@ -385,6 +391,10 @@ single-truck ledger written before any of this upgrades in place -- covered by
 | `npm run db:push` | push the schema to Postgres |
 | `npm run db:seed` | seed Postgres with the local QA reference fixture |
 | `npm run smoke:postgres` | check the Prisma store against a live database |
+| `npm run certify:database` | audit production RLS/Data API and run an isolated import + Postgres smoke test |
+| `npm run certify:storage` | exercise production upload/download/delete and cross-workspace isolation |
+| `npm run certify:invitations` | exercise verified Supabase invitation acceptance and replay protection |
+| `npm run certify:backup-restore` | restore a production logical backup into disposable local PostgreSQL and compare it |
 
 ---
 
@@ -417,21 +427,21 @@ sidebar becomes a drawer.
   workspace invitations and five server-enforced roles. Passwords and app
   sessions use `node:crypto`: scrypt hashing with a per-user salt, constant-time
   comparison, and an HMAC-SHA256 signed session cookie (`httpOnly`,
-  `sameSite=lax`, `secure` in production). `middleware.ts` gates every route
+  `sameSite=lax`, `secure` in production). `proxy.ts` gates every route
   except the landing page `/` (matched exactly, never by prefix), `/login`,
-  `/setup`, `/api/auth/*` and static assets outside `/api/` -- pages redirect,
-  API routes get a 401. The middleware only checks that the cookie is present;
-  the signature and expiry are verified server-side by `getSession()`, because
-  the edge runtime has no `node:crypto`. `AUTH_SECRET` signs the cookie and is
+  `/setup`, `/api/auth/*`, `/api/health`, the Stripe webhook, and static assets outside `/api/` -- pages redirect,
+  API routes get a 401. The proxy only checks that the cookie is present;
+  the signature and expiry are verified server-side by `getSession()`, keeping
+  authorization in the same trusted path as each request. `AUTH_SECRET` signs the cookie and is
   **ignored unless it is at least 32 characters**; with no usable value a key
   is generated once into `data/.auth-secret` (mode 0600), which is fine locally
   and wrong for a deployment, because a restart on new hardware signs
   everyone out.
 - **Every repository instance is bound to a `businessId`** taken from the
   session, and the binding is checked on read *and* on write. A repository
-  cannot be constructed without one. Today the file holds a single business,
-  so this buys nothing visible -- it is there so that adding the second one
-  is a schema change rather than a security incident.
+  cannot be constructed without one. Both storage implementations support
+  multiple private workspaces, and the production certification verifies that
+  one workspace cannot read or mutate another's rows or files.
 
 Everything found in the audit is fixed:
 
@@ -462,7 +472,7 @@ npm test
 npm run test:e2e
 ```
 
-The `node:test` suite covers the parts where a quiet
+The current `node:test` suite contains **272 passing tests**. It covers the parts where a quiet
 mistake costs money rather than throwing an error:
 
 | File | What it pins down |
@@ -499,6 +509,9 @@ removes exactly those, that a fuel purchase keeps one linked ledger row, and
 that a repository bound to another business cannot read these rows. See
 [ADR-0021](docs/adr/0021-exercise-the-postgres-store-in-ci.md).
 
+Production readiness, Stripe webhook alerts, incident response and the
+backup-restoration drill are documented in the [operations runbook](docs/operations.md).
+
 ---
 
 ## Not built yet (deliberately)
@@ -508,8 +521,10 @@ CSV and print-to-PDF are implemented; a native XLSX/PDF renderer and city/market
 lane grouping remain later refinements.
 
 Stripe Checkout, the customer billing portal and signed webhook synchronization
-are implemented. A deployment still needs the Stripe secret, webhook secret and
-three recurring Price ids configured in its environment before checkout is shown.
+are implemented. Each deployment requires its Stripe secret, webhook signing
+secret and three recurring Price IDs; production health checks fail when that
+configuration is incomplete, and synchronization failures are logged and can
+be forwarded immediately to the operations alert webhook.
 
 Fleet workspaces include individual sign-ins, Owner/Admin/Bookkeeper/Dispatcher/
 Viewer roles, email invitations through Supabase Auth, drivers, load assignment

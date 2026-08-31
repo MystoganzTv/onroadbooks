@@ -53,9 +53,9 @@ tokens got there with less fighting.
 - Because pages render on the server, anything reading "today" or a cookie must
   opt out of static rendering. `/`, `/login` and `/setup` carry
   `export const dynamic = "force-dynamic"`.
-- The middleware runs on the edge runtime, which cannot import `node:crypto` or
-  `node:fs`. That constraint is why auth constants live in their own module
-  (see [ADR-0005](0005-dependency-free-auth.md)).
+- The route proxy remains a small cookie-presence gate. Auth constants live in
+  their own runtime-independent module so session verification stays inside
+  the server request path (see [ADR-0005](0005-dependency-free-auth.md)).
 - One `.next` build directory per running server. Two processes sharing one
   build directory produce bare "Internal Server Error" responses from `/api/*`
   while pages still render, because the BUILD_ID moved underneath the running
@@ -72,4 +72,4 @@ tokens got there with less fighting.
 
 ## Where this lives
 
-`src/app`, `src/components`, `src/middleware.ts`, `tailwind.config.ts`.
+`src/app`, `src/components`, `src/proxy.ts`, `tailwind.config.cjs`.

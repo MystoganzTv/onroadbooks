@@ -2,13 +2,20 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 
 import { syncStripeSubscription } from "@/lib/billing";
+import { operationalLog, reportOperationalError } from "@/lib/operations";
 import { getStripe, stripeWebhookSecret } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
+  const requestId = request.headers.get("x-vercel-id");
   const signature = request.headers.get("stripe-signature");
   if (!signature) {
+    operationalLog("warning", "Stripe webhook rejected without signature", {
+      route: "/api/stripe/webhook",
+      requestId,
+    });
     return NextResponse.json({ error: "Missing Stripe signature." }, { status: 400 });
   }
 
@@ -19,7 +26,12 @@ export async function POST(request: Request) {
       signature,
       stripeWebhookSecret(),
     );
-  } catch {
+  } catch (error) {
+    operationalLog("warning", "Stripe webhook signature rejected", {
+      route: "/api/stripe/webhook",
+      requestId,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     return NextResponse.json({ error: "Invalid Stripe signature." }, { status: 400 });
   }
 
@@ -45,13 +57,22 @@ export async function POST(request: Request) {
         break;
     }
   } catch (error) {
-    console.error("Stripe webhook synchronization failed", {
+    await reportOperationalError("Stripe webhook synchronization failed", error, {
+      route: "/api/stripe/webhook",
+      requestId,
       eventId: event.id,
       eventType: event.type,
-      error: error instanceof Error ? error.message : "Unknown error",
+      durationMs: Date.now() - startedAt,
     });
     return NextResponse.json({ error: "Could not synchronize billing." }, { status: 500 });
   }
 
+  operationalLog("info", "Stripe webhook processed", {
+    route: "/api/stripe/webhook",
+    requestId,
+    eventId: event.id,
+    eventType: event.type,
+    durationMs: Date.now() - startedAt,
+  });
   return NextResponse.json({ received: true });
 }

@@ -33,12 +33,12 @@ dependency:
   unless it is at least 32 characters**. With no usable value, a random key is
   generated once into `data/.auth-secret` (mode 0600). There is no hardcoded
   default anywhere in the codebase.
-- **Gate:** `middleware.ts` allows `/` (matched exactly), `/login`, `/setup`,
-  `/api/auth/*` and static assets outside `/api/`; everything else requires a
+- **Gate:** `proxy.ts` allows `/` (matched exactly), `/login`, `/setup`,
+  `/api/auth/*`, `/api/health`, the Stripe webhook and static assets outside `/api/`; everything else requires a
   session cookie. Pages redirect, API routes return 401.
-- **The middleware only checks that a cookie is present.** The signature and
+- **The proxy only checks that a cookie is present.** The signature and
   expiry are verified server-side by `getSession()` on each page and route,
-  where the secret lives. The middleware exists so an unauthenticated request
+  where the secret lives. The proxy exists so an unauthenticated request
   never reaches a page render.
 
 ## Alternatives considered
@@ -52,9 +52,9 @@ abstraction.
 to boot without, and pulls a second user identity into a schema that already has
 one.
 
-**Verifying the session inside the middleware.** Not possible: the edge runtime
-has no `node:crypto`, and moving the secret to the edge to make it possible
-would put the signing key in more places, not fewer.
+**Verifying the session inside the proxy.** Rejected: authorization stays in
+the same server-side `getSession()` path used by pages and route handlers,
+rather than duplicating cryptographic policy in a preliminary routing gate.
 
 ## Consequences
 
@@ -63,13 +63,13 @@ would put the signing key in more places, not fewer.
   the correct trade.
 - Adding multi-user, invitations or password reset is real work, not
   configuration. Accepted: the product does not have those users.
-- `src/lib/auth/constants.ts` exists **solely** because the middleware runs on
-  the edge and must not pull in `node:crypto` or `node:fs`.
+- `src/lib/auth/constants.ts` keeps the proxy runtime-independent and prevents
+  the preliminary gate from pulling in session verification or filesystem code.
 
 ## Guardrails
 
 - Cookie name and max age live in `auth/constants.ts`. Never in `session.ts`,
-  and never inlined in the middleware.
+  and never inlined in the proxy.
 - `session.ts` is marked `server-only` and must stay that way.
 - `/`, `/login` and `/setup` need `export const dynamic = "force-dynamic"`.
 - Never ship a fallback secret. The "generate into `data/.auth-secret`" path is
@@ -78,4 +78,4 @@ would put the signing key in more places, not fewer.
 ## Where this lives
 
 `src/lib/auth/constants.ts`, `src/lib/auth/session.ts`, `src/lib/auth/index.ts`,
-`src/middleware.ts`, `src/app/login`, `src/app/setup`, `src/app/api/auth`.
+`src/proxy.ts`, `src/app/login`, `src/app/setup`, `src/app/api/auth`.

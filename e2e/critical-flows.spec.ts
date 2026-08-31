@@ -118,6 +118,12 @@ test.describe.serial("critical browser flows", () => {
     await page.goto("/");
     await expect(page.locator("body")).toContainText("OnRoad Books");
 
+    const health = await page.request.get("/api/health");
+    expect([200, 503]).toContain(health.status());
+    await expect(health.json()).resolves.toMatchObject({
+      checks: { application: { status: "ok" } },
+    });
+
     await page.goto("/dashboard");
     await expect(page).toHaveURL(/\/login$/);
 

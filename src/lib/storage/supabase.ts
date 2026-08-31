@@ -35,6 +35,15 @@ export class SupabaseDocumentStorage implements DocumentStorage {
     };
   }
 
+  async healthcheck(): Promise<void> {
+    const { data, error } = await createClient(this.url, this.serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    }).storage.getBucket(this.bucket);
+    if (error || !data) {
+      throw new Error(`Supabase Storage bucket is unavailable: ${error?.message ?? "missing bucket"}`);
+    }
+  }
+
   async put(key: string, data: Buffer, contentType: string): Promise<string> {
     const response = await fetch(this.endpoint(key), {
       method: "POST",

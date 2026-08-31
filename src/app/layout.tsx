@@ -10,7 +10,7 @@ import "./globals.css";
 /**
  * Typography.
  *
- * tailwind.config.ts has always asked for `var(--font-sans)`, and nothing ever
+ * tailwind.config.cjs has always asked for `var(--font-sans)`, and nothing ever
  * defined it. An undefined custom property makes the whole `font-family`
  * declaration invalid at computed-value time, so the browser fell back to its
  * default serif -- the entire app, and every printed report, was rendering in

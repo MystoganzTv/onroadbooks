@@ -106,13 +106,21 @@ function domainUser(row: {
 }
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClientType };
+let prismaClient = globalForPrisma.prisma;
 
 async function getClient(): Promise<PrismaClientType> {
-  if (globalForPrisma.prisma) return globalForPrisma.prisma;
+  if (prismaClient) return prismaClient;
   const { PrismaClient } = await import("@/generated/prisma");
   const client = new PrismaClient();
+  prismaClient = client;
   if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = client;
   return client;
+}
+
+/** Lightweight readiness probe used by the public health endpoint. */
+export async function checkPostgresConnection(): Promise<void> {
+  const client = await getClient();
+  await client.$queryRawUnsafe("select 1");
 }
 
 type DecimalLike = { toNumber(): number } | number | null | undefined;

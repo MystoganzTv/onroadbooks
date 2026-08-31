@@ -51,11 +51,11 @@ buys nothing the adapter does not already give.
 ## Guardrails
 
 - Nothing writes user-uploaded bytes to `public/`.
-- The `isPublicAsset` exemption in the middleware must keep its
+- The `isPublicAsset` exemption in the proxy must keep its
   `!pathname.startsWith("/api/")` condition. Removing it makes every uploaded
   receipt public, because receipt URLs contain a file extension.
 
 ## Where this lives
 
 `src/lib/storage/contract.ts`, `src/lib/storage/index.ts`,
-`src/lib/storage/supabase.ts`, `src/lib/documents.ts`, `src/middleware.ts`.
+`src/lib/storage/supabase.ts`, `src/lib/documents.ts`, `src/proxy.ts`.
