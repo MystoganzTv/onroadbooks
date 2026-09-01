@@ -9,6 +9,12 @@ import { cn } from "@/lib/utils";
 import { BrandLogo } from "./brand-logo";
 import { DisplayMenu } from "./display-menu";
 import { isNavActive, NAV_GROUPS } from "./nav-items";
+import {
+  getCollapsedGroups,
+  getCollapsedGroupsOnServer,
+  subscribeToCollapsedGroups,
+  toggleGroup,
+} from "./sidebar-groups";
 import { ROLE_DEFINITIONS } from "@/lib/roles";
 import type { MemberRole } from "@/lib/types";
 
@@ -40,17 +46,15 @@ export function SidebarNav({
       (item) => (hasFleet || !item.fleetOnly) && (isAdmin || !item.adminOnly),
     ),
   })).filter((group) => group.items.length > 0);
-  const activeGroup = visibleGroups.find((group) =>
-    group.items.some((item) => isNavActive(item, pathname)),
+  // Every group is open until it is deliberately closed, and navigating never
+  // reopens one. The nav used to force the active group open on every route
+  // change, which meant a group you had just collapsed sprang back the moment
+  // you clicked a link inside it.
+  const collapsed = React.useSyncExternalStore(
+    subscribeToCollapsedGroups,
+    getCollapsedGroups,
+    getCollapsedGroupsOnServer,
   );
-  const activeGroupLabel = activeGroup?.label;
-  const [expandedGroup, setExpandedGroup] = React.useState<string | null>(
-    activeGroupLabel ?? visibleGroups[0]?.label ?? null,
-  );
-
-  React.useEffect(() => {
-    if (activeGroupLabel) setExpandedGroup(activeGroupLabel);
-  }, [activeGroupLabel]);
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -66,7 +70,10 @@ export function SidebarNav({
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-2" aria-label="Main">
         {visibleGroups.map((group) => {
-          const expanded = expandedGroup === group.label;
+          const expanded = !collapsed.includes(group.label);
+          const holdsCurrentPage = group.items.some((item) =>
+            isNavActive(item, pathname),
+          );
           const groupId = `${navId}-${group.label.toLowerCase().replaceAll(" ", "-")}`;
 
           return (
@@ -75,7 +82,7 @@ export function SidebarNav({
                 type="button"
                 aria-expanded={expanded}
                 aria-controls={groupId}
-                onClick={() => setExpandedGroup(expanded ? null : group.label)}
+                onClick={() => toggleGroup(group.label)}
                 className={cn(
                   "flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-2xs font-semibold uppercase tracking-[0.14em] transition-colors",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
@@ -84,7 +91,15 @@ export function SidebarNav({
                     : "text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-strong",
                 )}
               >
-                <span>{group.label}</span>
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate">{group.label}</span>
+                  {holdsCurrentPage && !expanded ? (
+                    <span
+                      aria-hidden="true"
+                      className="size-1.5 shrink-0 rounded-full bg-primary"
+                    />
+                  ) : null}
+                </span>
                 <ChevronDown
                   aria-hidden="true"
                   className={cn(
