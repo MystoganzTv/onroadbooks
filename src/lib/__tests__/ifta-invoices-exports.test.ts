@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { calculateIftaReport, iftaRateKey, IFTA_JURISDICTIONS } from "../ifta";
-import { invoiceIssueOutcome, nextInvoiceNumber } from "../invoices";
+import {
+  duplicateInvoiceNumber,
+  invoiceIssueOutcome,
+  invoiceIssuePatch,
+  nextInvoiceNumber,
+} from "../invoices";
 import { freightMarket } from "../markets";
 import { buildSeedDataset } from "../seed/seed-data";
 import { toPdf } from "../export-pdf";
@@ -42,6 +47,38 @@ describe("issuing an invoice", () => {
       "2026-08-31",
     );
     assert.deepEqual(outcome, { status: "PAID", invoicePaidDate: "2026-08-20" });
+  });
+
+  it("writes one patch for the web form and the phone alike", () => {
+    // Both callers go through invoiceIssuePatch. Empty optional fields become
+    // null rather than "", because "" is a value a customer field can hold and
+    // null is the absence the rest of the app checks for.
+    const patch = invoiceIssuePatch(
+      { status: "PENDING", invoicePaidDate: null },
+      {
+        invoiceNumber: "INV-2026-0043",
+        invoiceDate: "2026-09-01",
+        invoiceDueDate: "2026-10-01",
+        billToName: "Werner Logistics",
+        billToEmail: "",
+      },
+    );
+    assert.equal(patch.status, "INVOICED");
+    assert.equal(patch.invoicePaidDate, null);
+    assert.equal(patch.billToEmail, null);
+    assert.equal(patch.billToAddress, null);
+    assert.equal(patch.invoiceNumber, "INV-2026-0043");
+  });
+
+  it("refuses to reuse an invoice number on a different load", () => {
+    const loads = [
+      { id: "a", invoiceNumber: "INV-2026-0001" },
+      { id: "b", invoiceNumber: null },
+    ] as unknown as Parameters<typeof duplicateInvoiceNumber>[0];
+    assert.equal(duplicateInvoiceNumber(loads, "b", "INV-2026-0001"), true);
+    // Re-issuing the SAME load with its own number is not a duplicate.
+    assert.equal(duplicateInvoiceNumber(loads, "a", "INV-2026-0001"), false);
+    assert.equal(duplicateInvoiceNumber(loads, "b", "INV-2026-0002"), false);
   });
 
   it("backfills a payment date when the load was paid before it had an invoice", () => {

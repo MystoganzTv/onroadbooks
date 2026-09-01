@@ -62,7 +62,76 @@ final class MockRepository: LedgerRepository {
                  totalCost: 388.10, odometer: 267_165, location: "Love's, Amarillo, TX", jurisdiction: "TX"),
     ]
 
+    /// Demo receivables, tied to the demo loads above: one collected, one
+    /// overdue, one just issued, one delivered and not yet billed.
+    private var invoices: [Invoice] = [
+        Invoice(loadId: "1", invoiceNumber: "INV-2026-0042", loadNumber: "DAT-784",
+                customer: "Werner Logistics", lane: "Chicago, IL → Columbus, OH",
+                amount: 2850, status: .invoiced, date: mockDate(2026, 8, 28),
+                invoiceDate: mockDate(2026, 8, 29), dueDate: mockDate(2026, 9, 28), overdueDays: nil),
+        Invoice(loadId: "2", invoiceNumber: "INV-2026-0041", loadNumber: nil,
+                customer: "TQL", lane: "Dallas, TX → Memphis, TN",
+                amount: 1640, status: .invoiced, date: mockDate(2026, 8, 25),
+                invoiceDate: mockDate(2026, 7, 26), dueDate: mockDate(2026, 8, 25), overdueDays: 7),
+        Invoice(loadId: "3", invoiceNumber: "INV-2026-0040", loadNumber: nil,
+                customer: "Coyote", lane: "Atlanta, GA → Charlotte, NC",
+                amount: 980, status: .paid, date: mockDate(2026, 8, 22),
+                invoiceDate: mockDate(2026, 8, 22), dueDate: mockDate(2026, 9, 21), overdueDays: nil),
+        Invoice(loadId: "4", invoiceNumber: nil, loadNumber: nil,
+                customer: "Landstar", lane: "Louisville, KY → Indianapolis, IN",
+                amount: 640, status: .pending, date: mockDate(2026, 8, 19),
+                invoiceDate: nil, dueDate: nil, overdueDays: nil),
+    ]
+
     func fetchLoads() async throws -> [Load] { loads }
+
+    func fetchInvoices() async throws -> InvoiceLedger {
+        let outstanding = invoices.filter { $0.isIssued && $0.status == .invoiced }
+        let overdue = outstanding.filter(\.isOverdue)
+        let paid = invoices.filter { $0.isIssued && $0.status == .paid }
+        let total = { (list: [Invoice]) in list.reduce(0) { $0 + $1.amount } }
+
+        return InvoiceLedger(
+            today: mockDate(2026, 9, 1),
+            suggestedNumber: "INV-2026-0043",
+            summary: InvoiceSummary(
+                outstandingAmount: total(outstanding), outstandingCount: outstanding.count,
+                overdueAmount: total(overdue), overdueCount: overdue.count,
+                collectedAmount: total(paid), collectedCount: paid.count,
+                uninvoicedCount: invoices.filter { !$0.isIssued }.count
+            ),
+            invoices: invoices
+        )
+    }
+
+    @discardableResult
+    func issueInvoice(loadId: String, _ invoice: NewInvoice) async throws -> String {
+        guard let index = invoices.firstIndex(where: { $0.loadId == loadId }) else { return loadId }
+        let existing = invoices[index]
+        invoices[index] = Invoice(
+            loadId: existing.loadId, invoiceNumber: invoice.invoiceNumber,
+            loadNumber: existing.loadNumber, customer: invoice.customer, lane: existing.lane,
+            amount: existing.amount,
+            // Same rule as the server: money already collected stays collected.
+            status: existing.status == .paid ? .paid : .invoiced,
+            date: existing.date, invoiceDate: invoice.invoiceDate, dueDate: invoice.dueDate,
+            overdueDays: nil
+        )
+        return loadId
+    }
+
+    @discardableResult
+    func markInvoicePaid(loadId: String, on date: Date) async throws -> String {
+        guard let index = invoices.firstIndex(where: { $0.loadId == loadId }) else { return loadId }
+        let existing = invoices[index]
+        invoices[index] = Invoice(
+            loadId: existing.loadId, invoiceNumber: existing.invoiceNumber,
+            loadNumber: existing.loadNumber, customer: existing.customer, lane: existing.lane,
+            amount: existing.amount, status: .paid, date: existing.date,
+            invoiceDate: existing.invoiceDate, dueDate: existing.dueDate, overdueDays: nil
+        )
+        return loadId
+    }
 
     func fetchFuel() async throws -> FuelLedger {
         let gallons = fuel.reduce(0) { $0 + $1.gallons }

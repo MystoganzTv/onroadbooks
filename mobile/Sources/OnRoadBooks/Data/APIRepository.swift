@@ -66,7 +66,7 @@ final class APIRepository: LedgerRepository {
         guard let http = response as? HTTPURLResponse else { throw APIError.requestFailed }
         if http.statusCode == 401 { throw APIError.unauthorized }
 
-        if http.statusCode == 201 {
+        if http.statusCode == 200 || http.statusCode == 201 {
             guard let created = try? JSONDecoder().decode(CreatedDTO.self, from: data) else {
                 throw APIError.decodingFailed
             }
@@ -113,6 +113,20 @@ final class APIRepository: LedgerRepository {
     @discardableResult
     func createFuelStop(_ stop: NewFuelStop) async throws -> String {
         try await post("api/mobile/fuel", body: NewFuelDTO(stop))
+    }
+
+    func fetchInvoices() async throws -> InvoiceLedger {
+        try await get("api/mobile/invoices", as: InvoicesResponseDTO.self).toDomain()
+    }
+
+    @discardableResult
+    func issueInvoice(loadId: String, _ invoice: NewInvoice) async throws -> String {
+        try await post("api/mobile/invoices/\(loadId)", body: IssueInvoiceDTO(invoice))
+    }
+
+    @discardableResult
+    func markInvoicePaid(loadId: String, on date: Date) async throws -> String {
+        try await post("api/mobile/invoices/\(loadId)", body: MarkPaidDTO(paidOn: ISODate.day(date)))
     }
 
     func fetchSettlements() async throws -> [SettlementPeriod] {
@@ -255,6 +269,88 @@ private struct NewFuelDTO: Encodable {
         location = stop.location.isEmpty ? nil : stop.location
         jurisdiction = stop.jurisdiction.isEmpty ? nil : stop.jurisdiction.uppercased()
     }
+}
+
+private struct InvoicesResponseDTO: Decodable {
+    struct Summary: Decodable {
+        let outstandingAmount: Double
+        let outstandingCount: Int
+        let overdueAmount: Double
+        let overdueCount: Int
+        let collectedAmount: Double
+        let collectedCount: Int
+        let uninvoicedCount: Int
+    }
+
+    struct Row: Decodable {
+        let loadId: String
+        let invoiceNumber: String?
+        let loadNumber: String?
+        let customer: String?
+        let lane: String
+        let amount: Double
+        let status: String
+        let date: String
+        let invoiceDate: String?
+        let invoiceDueDate: String?
+        let overdueDays: Int?
+    }
+
+    let today: String
+    let suggestedNumber: String
+    let summary: Summary
+    let invoices: [Row]
+
+    func toDomain() -> InvoiceLedger {
+        InvoiceLedger(
+            today: ISODate.parse(today),
+            suggestedNumber: suggestedNumber,
+            summary: InvoiceSummary(
+                outstandingAmount: summary.outstandingAmount,
+                outstandingCount: summary.outstandingCount,
+                overdueAmount: summary.overdueAmount,
+                overdueCount: summary.overdueCount,
+                collectedAmount: summary.collectedAmount,
+                collectedCount: summary.collectedCount,
+                uninvoicedCount: summary.uninvoicedCount
+            ),
+            invoices: invoices.map { row in
+                Invoice(
+                    loadId: row.loadId,
+                    invoiceNumber: row.invoiceNumber,
+                    loadNumber: row.loadNumber,
+                    customer: row.customer,
+                    lane: row.lane,
+                    amount: row.amount,
+                    status: InvoiceStatus(rawValue: row.status) ?? .pending,
+                    date: ISODate.parse(row.date),
+                    invoiceDate: row.invoiceDate.map(ISODate.parse),
+                    dueDate: row.invoiceDueDate.map(ISODate.parse),
+                    overdueDays: row.overdueDays
+                )
+            }
+        )
+    }
+}
+
+private struct IssueInvoiceDTO: Encodable {
+    let intent = "issue"
+    let invoiceNumber: String
+    let invoiceDate: String
+    let invoiceDueDate: String
+    let billToName: String
+
+    init(_ invoice: NewInvoice) {
+        invoiceNumber = invoice.invoiceNumber
+        invoiceDate = ISODate.day(invoice.invoiceDate)
+        invoiceDueDate = ISODate.day(invoice.dueDate)
+        billToName = invoice.customer
+    }
+}
+
+private struct MarkPaidDTO: Encodable {
+    let intent = "paid"
+    let paidOn: String
 }
 
 private struct CreatedDTO: Decodable { let id: String }

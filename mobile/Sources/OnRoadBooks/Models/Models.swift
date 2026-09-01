@@ -106,6 +106,62 @@ struct NewLoad {
     var otherExpenses: Double
 }
 
+// MARK: - Invoices
+
+enum InvoiceStatus: String {
+    case pending = "PENDING"
+    case invoiced = "INVOICED"
+    case paid = "PAID"
+}
+
+/// One load, seen as money owed. Freight invoicing is one invoice per load, so
+/// the load's id is the invoice's identity — there is no separate record.
+struct Invoice: Identifiable, Hashable {
+    let loadId: String
+    let invoiceNumber: String?
+    let loadNumber: String?
+    let customer: String?
+    let lane: String
+    let amount: Double
+    let status: InvoiceStatus
+    let date: Date
+    let invoiceDate: Date?
+    let dueDate: Date?
+    /// Days past due. Positive means late; nil when there is nothing to be late
+    /// for — the server computes it, this app never guesses it from a date.
+    let overdueDays: Int?
+
+    var id: String { loadId }
+    var isIssued: Bool { invoiceNumber != nil }
+    var isOverdue: Bool { (overdueDays ?? 0) > 0 }
+    var title: String { invoiceNumber ?? loadNumber ?? "Load sin número" }
+}
+
+struct InvoiceSummary {
+    let outstandingAmount: Double
+    let outstandingCount: Int
+    let overdueAmount: Double
+    let overdueCount: Int
+    let collectedAmount: Double
+    let collectedCount: Int
+    let uninvoicedCount: Int
+}
+
+struct InvoiceLedger {
+    let today: Date
+    /// The next number in the business's own sequence, computed server-side.
+    let suggestedNumber: String
+    let summary: InvoiceSummary
+    let invoices: [Invoice]
+}
+
+struct NewInvoice {
+    var invoiceNumber: String
+    var invoiceDate: Date
+    var dueDate: Date
+    var customer: String
+}
+
 // MARK: - Fuel
 
 struct FuelStop: Identifiable, Hashable {

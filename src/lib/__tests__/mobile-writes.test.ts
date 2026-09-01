@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { roleCan } from "../roles";
-import { expenseSchema, fuelSchema, loadSchema } from "../schemas";
+import { expenseSchema, fuelSchema, invoiceSchema, loadSchema } from "../schemas";
 
 /**
  * The iOS app posts JSON straight at `/api/mobile/loads` and
@@ -53,11 +53,30 @@ const fuelFromPhone = {
   jurisdiction: "MO",
 };
 
+/** From `IssueInvoiceDTO`. `intent` is routing, not a schema field. */
+const invoiceFromPhone = {
+  invoiceNumber: "INV-2026-0043",
+  invoiceDate: "2026-09-01",
+  invoiceDueDate: "2026-10-01",
+  billToName: "Werner Logistics",
+};
+
 describe("what the iOS app posts", () => {
   it("is accepted by the same schema the web form uses", () => {
     assert.equal(loadSchema.safeParse(loadFromPhone).success, true);
     assert.equal(expenseSchema.safeParse(expenseFromPhone).success, true);
     assert.equal(fuelSchema.safeParse(fuelFromPhone).success, true);
+    assert.equal(invoiceSchema.safeParse(invoiceFromPhone).success, true);
+    // The route reads `intent` off the body; the schema must not choke on it.
+    assert.equal(invoiceSchema.safeParse({ ...invoiceFromPhone, intent: "issue" }).success, true);
+  });
+
+  it("refuses an invoice that would be due before it was issued", () => {
+    assert.equal(
+      invoiceSchema.safeParse({ ...invoiceFromPhone, invoiceDueDate: "2026-08-01" }).success,
+      false,
+    );
+    assert.equal(invoiceSchema.safeParse({ ...invoiceFromPhone, billToName: "" }).success, false);
   });
 
   it("accepts a fill-up with nothing but the pump numbers", () => {

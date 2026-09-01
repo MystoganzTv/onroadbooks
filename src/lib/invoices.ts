@@ -22,6 +22,50 @@ export function invoiceIssueOutcome(
   return { status: "PAID", invoicePaidDate: load.invoicePaidDate ?? invoiceDate };
 }
 
+/** What issuing an invoice needs, whatever posted it: a web form or a phone. */
+export interface InvoiceDetails {
+  invoiceNumber: string;
+  invoiceDate: string;
+  invoiceDueDate: string;
+  billToName: string;
+  billToEmail?: string | null;
+  billToAddress?: string | null;
+  invoiceNotes?: string | null;
+}
+
+/**
+ * An invoice number identifies a document to a customer and to an accountant,
+ * so two loads must never carry the same one. The database enforces it with a
+ * unique constraint; this catches it first so the owner gets a sentence rather
+ * than a constraint violation.
+ */
+export function duplicateInvoiceNumber(
+  loads: Load[],
+  loadId: string,
+  invoiceNumber: string,
+): boolean {
+  return loads.some((row) => row.id !== loadId && row.invoiceNumber === invoiceNumber);
+}
+
+/**
+ * The exact patch issuing an invoice writes onto a load. Empty optional fields
+ * become null rather than "", and `invoiceIssueOutcome` decides the status --
+ * both callers go through here so a phone can never write a shape the web form
+ * would not have written.
+ */
+export function invoiceIssuePatch(
+  load: Pick<Load, "status" | "invoicePaidDate">,
+  details: InvoiceDetails,
+) {
+  return {
+    ...details,
+    billToEmail: details.billToEmail || null,
+    billToAddress: details.billToAddress || null,
+    invoiceNotes: details.invoiceNotes || null,
+    ...invoiceIssueOutcome(load, details.invoiceDate),
+  };
+}
+
 export function nextInvoiceNumber(loads: Load[], date: string): string {
   const year = date.slice(0, 4);
   const prefix = `INV-${year}-`;

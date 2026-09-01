@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireWritableSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
-import { invoiceIssueOutcome } from "@/lib/invoices";
+import { duplicateInvoiceNumber, invoiceIssuePatch } from "@/lib/invoices";
 import { invoiceSchema } from "@/lib/schemas";
 import { fieldErrorsFrom, type ActionResult } from "./types";
 
@@ -31,25 +31,15 @@ export async function issueInvoiceAction(loadId: string, values: unknown): Promi
     const dataset = await repository.getDataset();
     const load = dataset.loads.find((row) => row.id === loadId);
     if (!load) return { ok: false, error: "Load not found." };
-    const duplicate = dataset.loads.find(
-      (row) => row.id !== loadId && row.invoiceNumber === parsed.data.invoiceNumber,
-    );
-    if (duplicate) {
+    if (duplicateInvoiceNumber(dataset.loads, loadId, parsed.data.invoiceNumber)) {
       return {
         ok: false,
         error: "That invoice number is already in use.",
         fieldErrors: { invoiceNumber: "Use a unique invoice number" },
       };
     }
-    await repository.updateLoad(loadId, {
-      ...load,
-      ...parsed.data,
-      billToEmail: parsed.data.billToEmail || null,
-      billToAddress: parsed.data.billToAddress || null,
-      invoiceNotes: parsed.data.invoiceNotes || null,
-      // Issuing the document never un-collects money already in the bank.
-      ...invoiceIssueOutcome(load, parsed.data.invoiceDate),
-    });
+    // Issuing the document never un-collects money already in the bank.
+    await repository.updateLoad(loadId, { ...load, ...invoiceIssuePatch(load, parsed.data) });
     revalidateInvoicePaths(loadId);
     return { ok: true, id: loadId };
   } catch (error) {
