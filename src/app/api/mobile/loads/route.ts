@@ -8,12 +8,14 @@ import { getRepository } from "@/lib/db";
 import {
   linkedFuelByLoad,
   loadsInPeriod,
+  roundMoney,
   thresholdsFromSettings,
   withMetricsAll,
 } from "@/lib/calculations";
-import { scoreLoads } from "@/lib/finance";
+import { overheadCostPerMile, scoreLoads, trailingCostBasis } from "@/lib/finance";
 import { periodFromSearchParams } from "@/lib/period-params";
 import { FINANCIAL_MODEL_VERSION } from "@/lib/finance/terminology";
+import { todayISO } from "@/lib/periods";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +27,7 @@ export async function GET(request: NextRequest) {
 
   const period = periodFromSearchParams(Object.fromEntries(request.nextUrl.searchParams));
   const dataset = await getRepository(session.businessId).getDataset();
-  const { loads, settings, fuelEntries } = dataset;
+  const { loads, expenses, settings, fuelEntries } = dataset;
 
   const thresholds = thresholdsFromSettings(settings);
   const scored = scoreLoads(
@@ -33,30 +35,43 @@ export async function GET(request: NextRequest) {
     thresholds,
     settings.deadheadWarnPct,
   );
+  const costBasis = trailingCostBasis(loads, expenses, settings, todayISO());
+  const allocatedOperatingCostPerMile = overheadCostPerMile(costBasis);
 
   const results = [...scored]
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
-    .map((load) => ({
-      id: load.id,
-      date: load.date,
-      broker: load.broker,
-      originCity: load.originCity,
-      originState: load.originState,
-      destinationCity: load.destinationCity,
-      destinationState: load.destinationState,
-      grossRate: load.grossRate,
-      loadedMiles: load.loadedMiles,
-      deadheadMiles: load.deadheadMiles,
-      directTripCosts: load.metrics.tripExpenses,
-      contributionProfit: load.metrics.tripProfit,
-      contributionProfitPerMile: load.metrics.profitPerMile,
-      contributionMargin: load.metrics.profitMargin,
-      // Read-compatible aliases for older mobile builds.
-      profitPerMile: load.metrics.profitPerMile,
-      profitMargin: load.metrics.profitMargin,
-      deadheadPct: load.metrics.deadheadPct,
-      rating: load.metrics.rating,
-    }));
+    .map((load) => {
+      const allocatedOperatingCosts = roundMoney(
+        load.metrics.totalMiles * allocatedOperatingCostPerMile,
+      );
+      return {
+        id: load.id,
+        date: load.date,
+        broker: load.broker,
+        originCity: load.originCity,
+        originState: load.originState,
+        destinationCity: load.destinationCity,
+        destinationState: load.destinationState,
+        grossRate: load.grossRate,
+        loadedMiles: load.loadedMiles,
+        deadheadMiles: load.deadheadMiles,
+        directTripCosts: load.metrics.tripExpenses,
+        contributionProfit: load.metrics.tripProfit,
+        contributionProfitPerMile: load.metrics.profitPerMile,
+        contributionMargin: load.metrics.profitMargin,
+        allocatedOperatingCosts,
+        estimatedFullyLoadedOperatingProfit: roundMoney(
+          load.metrics.tripProfit - allocatedOperatingCosts,
+        ),
+        debtCashBurden: roundMoney(load.metrics.totalMiles * costBasis.debtServicePerMile),
+        allocationBasisLabel: costBasis.basisLabel,
+        // Read-compatible aliases for older mobile builds.
+        profitPerMile: load.metrics.profitPerMile,
+        profitMargin: load.metrics.profitMargin,
+        deadheadPct: load.metrics.deadheadPct,
+        rating: load.metrics.rating,
+      };
+    });
 
   return NextResponse.json(
     { calculationVersion: FINANCIAL_MODEL_VERSION, periodLabel: period.label, loads: results },

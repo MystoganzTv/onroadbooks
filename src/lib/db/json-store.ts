@@ -25,6 +25,7 @@ import {
 } from "../load-expenses";
 import { DEFAULT_PLAN, getPlan, isComplimentaryAccess, trialEndsOn } from "../plans";
 import { calculateDriverPay } from "../driver-pay";
+import { financialTreatmentForCategory } from "../finance/terminology";
 import type {
   Business,
   Dataset,
@@ -36,9 +37,11 @@ import type {
   Expense,
   ExpenseCategoryId,
   FinancialGoal,
+  FinancialObligation,
   FinancialSettings,
   FuelEntry,
   Load,
+  PaymentEvent,
   MaintenanceRecord,
   MemberRole,
   PlanId,
@@ -57,10 +60,13 @@ import {
   type DocumentInput,
   type DriverInput,
   type DriverSettlementInput,
+  type DebtPaymentClassificationInput,
   type ExpenseInput,
+  type FinancialObligationInput,
   type FuelEntryInput,
   type GoalInput,
   type LoadInput,
+  type PaymentEventInput,
   type MaintenanceInput,
   type Repository,
   type ReserveAccountInput,
@@ -182,6 +188,8 @@ async function seedFresh(): Promise<Dataset> {
     }],
     loads: [],
     expenses: [],
+    financialObligations: [],
+    paymentEvents: [],
     fuelEntries: [],
     documents: [],
     maintenanceRecords: [],
@@ -222,6 +230,8 @@ function migrate(dataset: Dataset): Dataset {
 
   dataset.loads ??= [];
   dataset.expenses ??= [];
+  dataset.financialObligations ??= [];
+  dataset.paymentEvents ??= [];
   dataset.fuelEntries ??= [];
   dataset.documents ??= [];
   dataset.maintenanceRecords ??= [];
@@ -232,6 +242,7 @@ function migrate(dataset: Dataset): Dataset {
 
   const businessId = dataset.business?.id ?? "";
   dataset.goals ??= defaultGoals(businessId);
+  dataset.goals.expectedMonthlyMiles ??= 0;
   dataset.subscription ??= defaultSubscription(businessId);
   dataset.subscription.providerCustomerId ??= null;
   dataset.subscription.providerSubscriptionId ??= null;
@@ -427,6 +438,7 @@ function expenseFromInput(
   dataset: Dataset,
   id: string,
   createdAt: string,
+  existing?: Expense,
 ): Expense {
   // Overhead belongs to the business, so it deliberately carries no truck.
   const scope: ExpenseScope = input.scope ?? "TRUCK";
@@ -443,10 +455,42 @@ function expenseFromInput(
     description: input.description.trim(),
     vendor: input.vendor?.trim() || null,
     amount: roundMoney(input.amount),
+    financialTreatment:
+      input.financialTreatment ??
+      existing?.financialTreatment ??
+      financialTreatmentForCategory(input.category),
+    obligationId:
+      input.obligationId === undefined ? (existing?.obligationId ?? null) : input.obligationId,
+    splitGroupId:
+      input.splitGroupId === undefined ? (existing?.splitGroupId ?? null) : input.splitGroupId,
     recurring: input.recurring,
     receiptNumber: input.receiptNumber?.trim() || null,
     notes: input.notes?.trim() || null,
     createdAt,
+  };
+}
+
+function financialObligationFromInput(
+  input: FinancialObligationInput,
+  dataset: Dataset,
+): FinancialObligation {
+  const truckId = input.truckId?.trim() || null;
+  if (truckId && !dataset.trucks.some((truck) => truck.id === truckId)) {
+    throw new Error("That truck does not belong to this workspace.");
+  }
+  return {
+    id: newId("obligation"),
+    businessId: dataset.business.id,
+    truckId,
+    name: input.name.trim(),
+    kind: input.kind,
+    counterparty: input.counterparty?.trim() || null,
+    startedOn: input.startedOn || null,
+    endedOn: input.endedOn || null,
+    expectedMonthlyPayment:
+      input.expectedMonthlyPayment == null ? null : roundMoney(input.expectedMonthlyPayment),
+    active: input.active ?? true,
+    createdAt: new Date().toISOString(),
   };
 }
 
@@ -860,6 +904,8 @@ export class JsonAuthStore implements AuthStore {
       const storageKeys = dataset.documents.map((document) => document.storageKey);
       dataset.loads = [];
       dataset.expenses = [];
+      dataset.financialObligations = [];
+      dataset.paymentEvents = [];
       dataset.fuelEntries = [];
       dataset.documents = [];
       dataset.maintenanceRecords = [];
@@ -1029,6 +1075,9 @@ export class JsonRepository implements Repository {
 
   async deleteLoad(id: string): Promise<void> {
     await mutate((dataset) => {
+      if (dataset.paymentEvents.some((event) => event.loadId === id)) {
+        throw new Error("A load with recorded customer payments cannot be deleted.");
+      }
       if (
         dataset.driverSettlements.some((settlement) =>
           settlement.lines.some((line) => line.loadId === id),
@@ -1223,7 +1272,13 @@ export class JsonRepository implements Repository {
       }
       const index = dataset.expenses.findIndex((e) => e.id === id);
       if (index === -1) throw new Error(`Expense ${id} not found`);
-      const updated = expenseFromInput(input, dataset, id, dataset.expenses[index].createdAt);
+      const updated = expenseFromInput(
+        input,
+        dataset,
+        id,
+        dataset.expenses[index].createdAt,
+        dataset.expenses[index],
+      );
       dataset.expenses[index] = updated;
       return updated;
     }, this.businessId);
@@ -1239,6 +1294,128 @@ export class JsonRepository implements Repository {
       for (const record of dataset.maintenanceRecords) {
         if (record.expenseId === id) record.expenseId = null;
       }
+    }, this.businessId);
+  }
+
+  async createFinancialObligation(
+    input: FinancialObligationInput,
+  ): Promise<FinancialObligation> {
+    return mutate((dataset) => {
+      const obligation = financialObligationFromInput(input, dataset);
+      dataset.financialObligations.push(obligation);
+      return obligation;
+    }, this.businessId);
+  }
+
+  async classifyDebtPayment(
+    id: string,
+    input: DebtPaymentClassificationInput,
+  ): Promise<Expense[]> {
+    return mutate((dataset) => {
+      const expense = dataset.expenses.find((row) => row.id === id);
+      if (!expense) throw new Error("That payment does not belong to this workspace.");
+      if (expense.category !== "TRUCK_PAYMENT") {
+        throw new Error("Only unallocated truck payments can be classified here.");
+      }
+
+      let obligationId = input.obligationId?.trim() || null;
+      if (input.newObligation) {
+        const obligation = financialObligationFromInput(input.newObligation, dataset);
+        dataset.financialObligations.push(obligation);
+        obligationId = obligation.id;
+      }
+      const obligation = obligationId
+        ? dataset.financialObligations.find((row) => row.id === obligationId)
+        : null;
+      if (obligationId && !obligation) {
+        throw new Error("That obligation does not belong to this workspace.");
+      }
+
+      if (input.treatment === "DEBT_UNALLOCATED") {
+        expense.financialTreatment = "DEBT_UNALLOCATED";
+        expense.obligationId = obligationId;
+        return [expense];
+      }
+
+      if (input.treatment === "OPERATING_LEASE") {
+        if (obligation && obligation.kind !== "OPERATING_LEASE") {
+          throw new Error("Choose an operating-lease obligation for this treatment.");
+        }
+        expense.category = "OPERATING_LEASE";
+        expense.financialTreatment = "OPERATING";
+        expense.obligationId = obligationId;
+        return [expense];
+      }
+
+      if (obligation && obligation.kind !== "LOAN") {
+        throw new Error("Choose a loan obligation before recording principal and interest.");
+      }
+      const principal = roundMoney(input.principalAmount ?? 0);
+      const interest = roundMoney(input.interestAmount ?? 0);
+      if (principal < 0 || interest < 0 || roundMoney(principal + interest) !== expense.amount) {
+        throw new Error("Principal plus interest must equal the original payment exactly.");
+      }
+      const splitGroupId = newId("split");
+      if (principal <= 0) {
+        expense.category = "INTEREST_EXPENSE";
+        expense.financialTreatment = "INTEREST";
+        expense.amount = interest;
+        expense.obligationId = obligationId;
+        expense.splitGroupId = splitGroupId;
+        return [expense];
+      }
+      expense.category = "PRINCIPAL_PAYMENT";
+      expense.financialTreatment = "PRINCIPAL";
+      expense.amount = principal;
+      expense.obligationId = obligationId;
+      expense.splitGroupId = splitGroupId;
+
+      const rows = [expense];
+      if (interest > 0) {
+        const interestRow: Expense = {
+          ...expense,
+          id: newId("exp"),
+          category: "INTEREST_EXPENSE",
+          financialTreatment: "INTEREST",
+          amount: interest,
+          description: `${expense.description} · interest`,
+          receiptNumber: null,
+          createdAt: new Date().toISOString(),
+        };
+        dataset.expenses.push(interestRow);
+        rows.push(interestRow);
+      }
+      return rows;
+    }, this.businessId);
+  }
+
+  async createPaymentEvent(input: PaymentEventInput): Promise<PaymentEvent> {
+    return mutate((dataset) => {
+      const load = dataset.loads.find((row) => row.id === input.loadId);
+      if (!load?.invoiceNumber) throw new Error("Issue the invoice before recording a payment.");
+      const existingEvents = dataset.paymentEvents.filter((event) => event.loadId === load.id);
+      const recorded =
+        existingEvents.length === 0 && load.status === "PAID"
+          ? load.grossRate
+          : existingEvents.reduce((total, event) => total + event.amount, 0);
+      const remaining = roundMoney(load.grossRate - recorded);
+      if (input.amount > remaining) throw new Error("Payment cannot exceed the invoice balance.");
+      const event: PaymentEvent = {
+        id: newId("payment"),
+        businessId: dataset.business.id,
+        loadId: load.id,
+        date: input.date,
+        amount: roundMoney(input.amount),
+        method: input.method?.trim() || null,
+        reference: input.reference?.trim() || null,
+        notes: input.notes?.trim() || null,
+        createdAt: new Date().toISOString(),
+      };
+      dataset.paymentEvents.push(event);
+      const fullyPaid = roundMoney(recorded + event.amount) >= load.grossRate;
+      load.status = fullyPaid ? "PAID" : "INVOICED";
+      load.invoicePaidDate = fullyPaid ? event.date : null;
+      return event;
     }, this.businessId);
   }
 
@@ -1558,6 +1735,8 @@ export class JsonRepository implements Repository {
         maxDeadheadPct: input.maxDeadheadPct,
         targetLoads: input.targetLoads ?? null,
         workingDaysPerWeek: input.workingDaysPerWeek,
+        expectedMonthlyMiles:
+          input.expectedMonthlyMiles ?? dataset.goals.expectedMonthlyMiles ?? 0,
         updatedAt: new Date().toISOString(),
       };
       return dataset.goals;

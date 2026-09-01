@@ -43,7 +43,7 @@ export default async function ReservesPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { loads, expenses, settings, reserveAccounts, reserveTransactions, subscription } =
+  const { loads, expenses, settings, reserveAccounts, reserveTransactions, subscription, paymentEvents } =
     await getRepository(session.businessId).getDataset();
 
   if (!planAllows(subscription, "cockpit")) {
@@ -65,7 +65,7 @@ export default async function ReservesPage({
   const balances = calculateReserveBalances(reserveAccounts, reserveTransactions, period);
   const rules = resolveReserveRules(settings, reserveAccounts);
   const ownerPay = calculateSafeOwnerPay(
-    summarizePeriod(loads, expenses, period, settings),
+    summarizePeriod(loads, expenses, period, settings, paymentEvents),
     rules,
   );
   const total = totalReserved(balances);

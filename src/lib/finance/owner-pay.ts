@@ -64,7 +64,7 @@ export interface OwnerPay {
   reserves: ReserveLine[];
   reserveTotal: number;
   safeToPay: number;
-  /** Safe-to-pay as a share of booked revenue, 0-100. */
+  /** Safe-to-pay as a share of collected revenue, 0-100. */
   takeHomeRate: number;
 }
 

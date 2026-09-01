@@ -29,6 +29,11 @@ Accounts Receivable affects performance but never increases cash available.
 A paid load without a historical payment date remains paid, but is not silently
 assigned to a collection period.
 
+Version 3 records customer cash as `PaymentEvent` rows. This permits partial
+payments: each receipt increases Collected Revenue on its own date, while only
+the unpaid balance remains in Accounts Receivable. A legacy paid invoice with
+no events keeps its historical meaning; no migration invents receipt rows.
+
 Load quality is classified from Contribution Profit per total mile. Allocated
 operating costs may produce an Estimated Fully Loaded Operating Profit, and
 Debt Service may be shown as a separate cash burden, but neither financing nor
@@ -44,6 +49,16 @@ as stored and are never backfilled or recomputed automatically.
 Historical `TRUCK_PAYMENT` rows remain unallocated debt payments. New explicit
 Interest Expense and Principal Payment categories may be used going forward;
 no migration guesses a historical split.
+
+Financial treatment is stored separately from the display category. Human
+review may associate a payment with a `FinancialObligation`, explicitly choose
+loan, operating lease, or unknown, and split a loan payment into principal and
+interest. The split is atomic and must equal the original payment exactly.
+
+Planning uses user-entered Expected Monthly Miles and the normalized trailing
+operating cost per mile. Active expected monthly obligations are added only to
+Cash Break-Even and fixed-obligation coverage; they never affect Operating
+Break-Even or load quality.
 
 ## Guardrails
 

@@ -1158,3 +1158,81 @@ describe("drivers and driver statements", () => {
     assert.equal(replacement.lines[0].loadId, load.id);
   });
 });
+
+describe("financial review and customer cash events", () => {
+  it("splits a reviewed loan payment without changing its total", async () => {
+    const dataset = await repo.getDataset();
+    const original = await repo.createExpense(expense({
+      truckId: dataset.trucks[0].id,
+      category: "TRUCK_PAYMENT",
+      description: "Truck note",
+      amount: 1200,
+    }));
+    assert.equal(original.financialTreatment, "DEBT_UNALLOCATED");
+
+    const rows = await repo.classifyDebtPayment(original.id, {
+      treatment: "LOAN_SPLIT",
+      principalAmount: 950,
+      interestAmount: 250,
+      newObligation: {
+        truckId: dataset.trucks[0].id,
+        name: "Unit loan",
+        kind: "LOAN",
+        expectedMonthlyPayment: 1200,
+      },
+    });
+    assert.equal(rows.reduce((total, row) => total + row.amount, 0), 1200);
+    assert.deepEqual(
+      rows.map((row) => row.financialTreatment).sort(),
+      ["INTEREST", "PRINCIPAL"],
+    );
+    assert.ok(rows.every((row) => row.obligationId && row.splitGroupId));
+  });
+
+  it("treats an explicitly reviewed operating lease as operating cost", async () => {
+    const dataset = await repo.getDataset();
+    const original = await repo.createExpense(expense({
+      truckId: dataset.trucks[0].id,
+      category: "TRUCK_PAYMENT",
+      description: "Lease payment",
+      amount: 900,
+    }));
+    const [classified] = await repo.classifyDebtPayment(original.id, {
+      treatment: "OPERATING_LEASE",
+      newObligation: {
+        truckId: dataset.trucks[0].id,
+        name: "Operating lease",
+        kind: "OPERATING_LEASE",
+        expectedMonthlyPayment: 900,
+      },
+    });
+    assert.equal(classified.category, "OPERATING_LEASE");
+    assert.equal(classified.financialTreatment, "OPERATING");
+    assert.equal(classified.amount, 900);
+  });
+
+  it("records partial customer payments and closes the invoice only at zero balance", async () => {
+    const dataset = await repo.getDataset();
+    const load = await repo.createLoad(loadInput({
+      truckId: dataset.trucks[0].id,
+      grossRate: 2500,
+      status: "INVOICED",
+      invoiceNumber: "INV-PARTIAL-1",
+      invoiceDate: "2026-09-01",
+      invoiceDueDate: "2026-10-01",
+    }));
+    await repo.createPaymentEvent({ loadId: load.id, date: "2026-09-10", amount: 900 });
+    let after = await repo.getDataset();
+    assert.equal(after.loads.find((row) => row.id === load.id)?.status, "INVOICED");
+    assert.equal(after.loads.find((row) => row.id === load.id)?.invoicePaidDate, null);
+
+    await repo.createPaymentEvent({ loadId: load.id, date: "2026-09-18", amount: 1600 });
+    after = await repo.getDataset();
+    assert.equal(after.loads.find((row) => row.id === load.id)?.status, "PAID");
+    assert.equal(after.loads.find((row) => row.id === load.id)?.invoicePaidDate, "2026-09-18");
+    assert.equal(
+      after.paymentEvents.filter((event) => event.loadId === load.id).reduce((total, event) => total + event.amount, 0),
+      2500,
+    );
+  });
+});

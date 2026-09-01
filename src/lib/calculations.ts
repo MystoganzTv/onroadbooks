@@ -11,11 +11,8 @@
 import { behaviorOf, EXPENSE_CATEGORIES, getCategory } from "./categories";
 import {
   FINANCIAL_MODEL_VERSION,
+  financialTreatmentOf,
   isDebtServiceCategory,
-  isInterestExpenseCategory,
-  isOperatingExpenseCategory,
-  isPrincipalPaymentCategory,
-  isUnallocatedDebtServiceCategory,
 } from "./finance/terminology";
 import { inRange, type DateRange, type Period } from "./periods";
 import type {
@@ -32,6 +29,7 @@ import type {
   LoadWithMetrics,
   MoneyBreakdown,
   PeriodSummary,
+  PaymentEvent,
   Truck,
 } from "./types";
 
@@ -252,6 +250,7 @@ export function summarizePeriod(
   expenses: Expense[],
   range: DateRange,
   settings?: FinancialSettings,
+  paymentEvents: PaymentEvent[] = [],
 ): PeriodSummary {
   const periodLoads = loadsInPeriod(loads, range);
   const periodExpenses = expensesInPeriod(expenses, range);
@@ -260,49 +259,71 @@ export function summarizePeriod(
   // Collections belong to the day cash arrived, not to the operational date
   // of the load. A legacy PAID row with no date stays paid but is not guessed
   // into this or any other cash period.
-  const collectedRevenue = roundMoney(
-    sum(
-      loads.filter(
-        (load) =>
-          load.status === "PAID" &&
-          Boolean(load.invoicePaidDate) &&
-          inRange(load.invoicePaidDate!, range),
-      ),
-      (load) => load.grossRate,
-    ),
+  const includedLoadIds = new Set(loads.map((load) => load.id));
+  const relevantPaymentEvents = paymentEvents.filter((event) => includedLoadIds.has(event.loadId));
+  const eventsByLoad = new Map<string, PaymentEvent[]>();
+  for (const event of relevantPaymentEvents) {
+    const events = eventsByLoad.get(event.loadId) ?? [];
+    events.push(event);
+    eventsByLoad.set(event.loadId, events);
+  }
+  const eventCollections = sum(
+    relevantPaymentEvents.filter((event) => inRange(event.date, range)),
+    (event) => event.amount,
   );
+  const legacyCollections = sum(
+    loads.filter(
+      (load) =>
+        !eventsByLoad.has(load.id) &&
+        load.status === "PAID" &&
+        Boolean(load.invoicePaidDate) &&
+        inRange(load.invoicePaidDate!, range),
+    ),
+    (load) => load.grossRate,
+  );
+  const collectedRevenue = roundMoney(eventCollections + legacyCollections);
   const accountsReceivable = roundMoney(
     sum(
-      periodLoads.filter((load) => load.status !== "PAID"),
-      (load) => load.grossRate,
+      periodLoads,
+      (load) => {
+        const events = eventsByLoad.get(load.id);
+        if (!events) return load.status === "PAID" ? 0 : load.grossRate;
+        const paid = sum(events, (event) => event.amount);
+        return Math.max(0, roundMoney(load.grossRate - paid));
+      },
     ),
   );
   const unallocatedCollectedRevenue = roundMoney(
     sum(
-      periodLoads.filter((load) => load.status === "PAID" && !load.invoicePaidDate),
+      periodLoads.filter(
+        (load) =>
+          !eventsByLoad.has(load.id) && load.status === "PAID" && !load.invoicePaidDate,
+      ),
       (load) => load.grossRate,
     ),
   );
 
   const operatingExpenseRows = periodExpenses.filter((expense) =>
-    isOperatingExpenseCategory(expense.category),
+    financialTreatmentOf(expense) === "OPERATING",
   );
   const operatingExpenses = roundMoney(sum(operatingExpenseRows, (expense) => expense.amount));
   const interestExpense = roundMoney(
     sum(
-      periodExpenses.filter((expense) => isInterestExpenseCategory(expense.category)),
+      periodExpenses.filter((expense) => financialTreatmentOf(expense) === "INTEREST"),
       (expense) => expense.amount,
     ),
   );
   const principalPayment = roundMoney(
     sum(
-      periodExpenses.filter((expense) => isPrincipalPaymentCategory(expense.category)),
+      periodExpenses.filter((expense) => financialTreatmentOf(expense) === "PRINCIPAL"),
       (expense) => expense.amount,
     ),
   );
   const unallocatedDebtService = roundMoney(
     sum(
-      periodExpenses.filter((expense) => isUnallocatedDebtServiceCategory(expense.category)),
+      periodExpenses.filter(
+        (expense) => financialTreatmentOf(expense) === "DEBT_UNALLOCATED",
+      ),
       (expense) => expense.amount,
     ),
   );
@@ -705,7 +726,7 @@ export function truckLifetime(dataset: Dataset, truck: Truck): TruckLifetime {
     sum(loads.filter((load) => load.status === "PAID" && !load.invoicePaidDate), (load) => load.grossRate),
   );
   const totalExpenses = roundMoney(
-    sum(expenses.filter((expense) => isOperatingExpenseCategory(expense.category)), (e) => e.amount),
+    sum(expenses.filter((expense) => financialTreatmentOf(expense) === "OPERATING"), (e) => e.amount),
   );
   const debtService = roundMoney(
     sum(expenses.filter((expense) => isDebtServiceCategory(expense.category)), (e) => e.amount),

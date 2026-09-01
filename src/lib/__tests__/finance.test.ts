@@ -37,10 +37,13 @@ import {
 } from "../finance/settlement";
 import { buildCockpitInsights } from "../finance/insights";
 import { calculateMaintenanceHealth } from "../finance/maintenance-health";
+import { calculateCashActivity } from "../finance/cash-activity";
+import { calculateFinancialPlanning } from "../finance/planning";
 import { resolvePeriod } from "../periods";
 import type {
   Expense,
   FinancialGoal,
+  FinancialObligation,
   FinancialSettings,
   Load,
   MaintenanceRecord,
@@ -992,6 +995,65 @@ describe("calculateDaySnapshot", () => {
   });
 });
 
+describe("cash activity and monthly planning", () => {
+  it("keeps day-one operations and day-one cash on their own dates", () => {
+    const cash = calculateCashActivity(
+      [load({ id: "old", date: "2026-07-20", grossRate: 2500, status: "INVOICED" })],
+      [
+        expense({ date: "2026-08-01", category: "OPERATING_LEASE", amount: 800 }),
+        expense({ id: "principal", date: "2026-08-01", category: "PRINCIPAL_PAYMENT", amount: 600 }),
+      ],
+      [{
+        id: "payment",
+        businessId: "b",
+        loadId: "old",
+        date: "2026-08-01",
+        amount: 1000,
+        method: null,
+        reference: null,
+        notes: null,
+        createdAt: "",
+      }],
+      { start: "2026-08-01", end: "2026-08-01" },
+    );
+    assert.equal(cash.collectedRevenue, 1000);
+    assert.equal(cash.operatingCashOutflows, 800);
+    assert.equal(cash.principalPayment, 600);
+    assert.equal(cash.netCashActivity, -400);
+  });
+
+  it("adds financing only to cash break-even and coverage", () => {
+    const cost = calculateTrueCostPerMile(
+      [load({ loadedMiles: 1000 })],
+      [expense({ amount: 1000 })],
+      august,
+      settings,
+      "August",
+    );
+    const obligations: FinancialObligation[] = [{
+      id: "loan",
+      businessId: "b",
+      truckId: "t",
+      name: "Truck loan",
+      kind: "LOAN",
+      counterparty: null,
+      startedOn: null,
+      endedOn: null,
+      expectedMonthlyPayment: 1200,
+      active: true,
+      createdAt: "",
+    }];
+    const planning = calculateFinancialPlanning(
+      { ...goals, expectedMonthlyMiles: 8000 },
+      cost,
+      obligations,
+    );
+    assert.equal(planning.operatingBreakEvenRevenue, 8000);
+    assert.equal(planning.cashBreakEvenRevenue, 9200);
+    assert.equal(planning.fixedObligationCoverage, 7000 / 1200);
+  });
+});
+
 /* ---- Reserves ------------------------------------------------------------ */
 
 describe("calculateReserveBalances", () => {
@@ -1111,7 +1173,7 @@ describe("settlements", () => {
       settings,
       accounts,
     );
-    assert.equal(snapshot.calculationVersion, 2);
+    assert.equal(snapshot.calculationVersion, 3);
     assert.equal(snapshot.bookedRevenue, snapshot.grossRevenue);
     assert.equal(snapshot.collectedRevenue, 0);
     assert.equal(snapshot.debtService, 1200);

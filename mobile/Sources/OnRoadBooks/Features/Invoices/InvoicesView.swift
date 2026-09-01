@@ -13,6 +13,8 @@ struct InvoicesView: View {
     @State private var isLoading = true
     @State private var issuing: Invoice?
     @State private var collecting: Invoice?
+    @State private var partialInvoice: Invoice?
+    @State private var partialAmount = ""
     @State private var failure: String?
 
     private var overdue: [Invoice] { (ledger?.invoices ?? []).filter { $0.isIssued && $0.status == .invoiced && $0.isOverdue } }
@@ -54,10 +56,31 @@ struct InvoicesView: View {
                 if let invoice = collecting { markPaid(invoice) }
                 collecting = nil
             }
+            Button("Registrar pago parcial") {
+                partialInvoice = collecting
+                partialAmount = ""
+                collecting = nil
+            }
             Button("Cancelar", role: .cancel) { collecting = nil }
         } message: {
             if let invoice = collecting {
-                Text("\(invoice.amount, format: .currency(code: "USD")) de \(invoice.customer ?? "el cliente"). Se registra con la fecha de hoy.")
+                Text("\(invoice.outstandingAmount, format: .currency(code: "USD")) pendientes de \(invoice.customer ?? "el cliente"). Se registra con la fecha de hoy.")
+            }
+        }
+        .alert(
+            partialInvoice.map { "Pago parcial · \($0.title)" } ?? "Pago parcial",
+            isPresented: Binding(get: { partialInvoice != nil }, set: { if !$0 { partialInvoice = nil } })
+        ) {
+            TextField("Monto", text: $partialAmount)
+                .keyboardType(.decimalPad)
+            Button("Guardar") {
+                if let invoice = partialInvoice { recordPartial(invoice) }
+                partialInvoice = nil
+            }
+            Button("Cancelar", role: .cancel) { partialInvoice = nil }
+        } message: {
+            if let invoice = partialInvoice {
+                Text("Saldo actual: \(invoice.outstandingAmount, format: .currency(code: "USD"))")
             }
         }
     }
@@ -105,7 +128,7 @@ struct InvoicesView: View {
             VStack(alignment: .leading, spacing: 0) {
                 PanelHeader(
                     title: title,
-                    trailing: rows.reduce(0) { $0 + $1.amount }
+                    trailing: rows.reduce(0) { $0 + (action == .collect ? $1.outstandingAmount : $1.amount) }
                         .formatted(.currency(code: "USD").precision(.fractionLength(0)))
                 )
                 VStack(spacing: 0) {
@@ -160,6 +183,22 @@ struct InvoicesView: View {
         }
     }
 
+    private func recordPartial(_ invoice: Invoice) {
+        failure = nil
+        guard let amount = Double(partialAmount.replacingOccurrences(of: ",", with: ".")), amount > 0 else {
+            failure = "Escribe un monto válido."
+            return
+        }
+        Task {
+            do {
+                try await repository.recordInvoicePayment(loadId: invoice.loadId, amount: amount, on: ledger?.today ?? Date())
+                await reload()
+            } catch {
+                failure = (error as? LocalizedError)?.errorDescription ?? "No se pudo registrar el pago."
+            }
+        }
+    }
+
     private func reload() async {
         ledger = try? await repository.fetchInvoices()
         isLoading = false
@@ -195,10 +234,15 @@ private struct InvoiceRow: View {
             Spacer(minLength: 0)
 
             VStack(alignment: .trailing, spacing: 6) {
-                Text(invoice.amount, format: .currency(code: "USD").precision(.fractionLength(0)))
+                Text((invoice.outstandingAmount > 0 ? invoice.outstandingAmount : invoice.amount), format: .currency(code: "USD").precision(.fractionLength(0)))
                     .font(.subheadline.weight(.semibold))
                     .monospacedDigit()
                     .foregroundStyle(OBColor.foreground)
+                if invoice.collectedAmount > 0 && invoice.outstandingAmount > 0 {
+                    Text("\(invoice.collectedAmount, format: .currency(code: "USD").precision(.fractionLength(0))) cobrado")
+                        .font(.caption2)
+                        .foregroundStyle(OBColor.mutedForeground)
+                }
                 if let actionTitle {
                     Button(actionTitle, action: onAction)
                         .font(.caption.weight(.semibold))

@@ -26,10 +26,13 @@ export async function GET(request: NextRequest) {
 
   const period = periodFromSearchParams(Object.fromEntries(request.nextUrl.searchParams));
   const dataset = await getRepository(session.businessId).getDataset();
-  const { loads, expenses, settings, fuelEntries } = dataset;
+  const { loads, expenses, settings, fuelEntries, paymentEvents } = dataset;
 
   const entries = fuelInPeriod(fuelEntries, period);
-  const summary = summarizeFuel(entries, summarizePeriod(loads, expenses, period, settings).totalMiles);
+  const summary = summarizeFuel(
+    entries,
+    summarizePeriod(loads, expenses, period, settings, paymentEvents).totalMiles,
+  );
 
   return NextResponse.json(
     {

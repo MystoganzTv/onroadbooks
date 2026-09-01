@@ -39,7 +39,43 @@ struct Load: Identifiable, Hashable {
     let miles: Double
     let deadheadMiles: Double
     let rating: LoadRating
-    let profitPerMile: Double
+    let directTripCosts: Double
+    let contributionProfit: Double
+    let contributionProfitPerMile: Double
+    let allocatedOperatingCosts: Double
+    let estimatedFullyLoadedOperatingProfit: Double
+    let debtCashBurden: Double
+    let allocationBasisLabel: String
+
+    init(
+        id: String, date: Date, broker: String, origin: String, destination: String,
+        rate: Double, miles: Double, deadheadMiles: Double, rating: LoadRating,
+        profitPerMile: Double, directTripCosts: Double? = nil,
+        contributionProfit: Double? = nil, allocatedOperatingCosts: Double? = nil,
+        estimatedFullyLoadedOperatingProfit: Double? = nil, debtCashBurden: Double? = nil,
+        allocationBasisLabel: String = "trailing operating basis"
+    ) {
+        self.id = id
+        self.date = date
+        self.broker = broker
+        self.origin = origin
+        self.destination = destination
+        self.rate = rate
+        self.miles = miles
+        self.deadheadMiles = deadheadMiles
+        self.rating = rating
+        let totalMiles = miles + deadheadMiles
+        let contribution = contributionProfit ?? profitPerMile * totalMiles
+        let allocated = allocatedOperatingCosts ?? totalMiles * 0.94
+        self.directTripCosts = directTripCosts ?? max(0, rate - contribution)
+        self.contributionProfit = contribution
+        self.contributionProfitPerMile = profitPerMile
+        self.allocatedOperatingCosts = allocated
+        self.estimatedFullyLoadedOperatingProfit =
+            estimatedFullyLoadedOperatingProfit ?? contribution - allocated
+        self.debtCashBurden = debtCashBurden ?? totalMiles * 0.39
+        self.allocationBasisLabel = allocationBasisLabel
+    }
 
     var lane: String { "\(origin) → \(destination)" }
 }
@@ -333,11 +369,15 @@ struct Invoice: Identifiable, Hashable {
     /// Days past due. Positive means late; nil when there is nothing to be late
     /// for — the server computes it, this app never guesses it from a date.
     let overdueDays: Int?
+    var collectedAmount: Double = 0
+    var balanceAmount: Double? = nil
+    var paymentEventCount: Int = 0
 
     var id: String { loadId }
     var isIssued: Bool { invoiceNumber != nil }
     var isOverdue: Bool { (overdueDays ?? 0) > 0 }
     var title: String { invoiceNumber ?? loadNumber ?? "Load sin número" }
+    var outstandingAmount: Double { balanceAmount ?? (status == .paid ? 0 : amount) }
 }
 
 struct InvoiceSummary {
@@ -421,26 +461,29 @@ struct SettlementPeriod: Identifiable {
     let id: String
     let label: String                 // "Aug 1 – 15"
     let status: SettlementStatus
-    let netProfit: Double
+    let operatingProfit: Double
     let reserveContributions: Double
     let ownerDraw: Double
 }
 
 struct DashboardSnapshot {
     let periodLabel: String            // "August 2026 · Full Month"
-    let revenue: Double
-    let expenses: Double
-    let netProfit: Double
-    let revenueDelta: (text: String, direction: PerformanceDirection)
-    let netProfitDelta: (text: String, direction: PerformanceDirection)
+    let bookedRevenue: Double
+    let operatingExpenses: Double
+    let operatingProfit: Double
+    let bookedRevenueDelta: (text: String, direction: PerformanceDirection)
+    let operatingProfitDelta: (text: String, direction: PerformanceDirection)
 
-    let trueCostPerMile: Double
+    let actualCostPerMile: Double
     let safeToPay: Double
     let totalMiles: Double
     let deadheadPct: Double            // 0...1
 
-    let todayRevenue: Double
+    let todayBookedRevenue: Double
+    let todayOperatingProfit: Double
     let todayLoads: Int
+    let todayCashCollected: Double
+    let todayNetCashActivity: Double
 
     let expenseBreakdown: [CategoryTotal]
     let recentLoads: [Load]

@@ -189,6 +189,7 @@ async function main() {
       maxDeadheadPct: dataset.goals.maxDeadheadPct,
       targetLoads: dataset.goals.targetLoads,
       workingDaysPerWeek: dataset.goals.workingDaysPerWeek,
+      expectedMonthlyMiles: dataset.goals.expectedMonthlyMiles ?? 0,
     },
   });
 

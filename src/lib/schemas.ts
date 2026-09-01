@@ -163,6 +163,44 @@ export const invoiceSchema = z
     path: ["invoiceDueDate"],
   });
 
+export const paymentEventSchema = z.object({
+  loadId: z.string().trim().min(1),
+  date: isoDate,
+  amount: money.min(0.01, "Payment amount is required"),
+  method: z.string().trim().max(60).optional().nullable(),
+  reference: z.string().trim().max(120).optional().nullable(),
+  notes: z.string().trim().max(1000).optional().nullable(),
+});
+
+const financialObligationSchema = z
+  .object({
+    truckId: z.string().trim().optional().nullable(),
+    name: z.string().trim().min(1, "Name the obligation").max(120),
+    kind: z.enum(["LOAN", "OPERATING_LEASE", "UNKNOWN"]),
+    counterparty: z.string().trim().max(120).optional().nullable(),
+    startedOn: isoDate.optional().nullable(),
+    endedOn: isoDate.optional().nullable(),
+    expectedMonthlyPayment: money.optional().nullable(),
+    active: z.boolean().optional(),
+  })
+  .refine((value) => !value.endedOn || !value.startedOn || value.endedOn >= value.startedOn, {
+    message: "End date cannot be before start date",
+    path: ["endedOn"],
+  });
+
+export const debtPaymentClassificationSchema = z
+  .object({
+    obligationId: z.string().trim().optional().nullable(),
+    newObligation: financialObligationSchema.optional(),
+    treatment: z.enum(["OPERATING_LEASE", "LOAN_SPLIT", "DEBT_UNALLOCATED"]),
+    principalAmount: money.optional(),
+    interestAmount: money.optional(),
+  })
+  .refine((value) => !(value.obligationId && value.newObligation), {
+    message: "Choose an existing obligation or create a new one, not both",
+    path: ["obligationId"],
+  });
+
 export const iftaRatesSchema = z.object({
   quarter: z.string().regex(/^\d{4}-Q[1-4]$/, "Use a quarter such as 2026-Q3"),
   rates: z.record(
@@ -381,6 +419,7 @@ export const goalSchema = z.object({
   maxDeadheadPct: z.number().min(0).max(100),
   targetLoads: z.number().int().min(0).max(1000).optional().nullable(),
   workingDaysPerWeek: z.number().int().min(1, "At least one day").max(7),
+  expectedMonthlyMiles: z.number().int().min(0).max(100_000),
 });
 
 /* ---- Reserve buckets -------------------------------------------------- */

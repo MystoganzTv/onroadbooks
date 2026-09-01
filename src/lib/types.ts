@@ -21,6 +21,7 @@ export type ExpenseCategoryId =
   | "TRUCK_PAYMENT"
   | "INTEREST_EXPENSE"
   | "PRINCIPAL_PAYMENT"
+  | "OPERATING_LEASE"
   | "MAINTENANCE"
   | "REPAIRS"
   | "PARKING"
@@ -42,6 +43,15 @@ export type DriverPayType =
   | "FLAT_PER_LOAD";
 
 export type DriverSettlementStatus = "DRAFT" | "PAID";
+
+/** Explicit financial meaning of an expense row, independent of its UI label. */
+export type FinancialTreatment =
+  | "OPERATING"
+  | "INTEREST"
+  | "PRINCIPAL"
+  | "DEBT_UNALLOCATED";
+
+export type FinancialObligationKind = "LOAN" | "OPERATING_LEASE" | "UNKNOWN";
 
 export interface User {
   id: string;
@@ -212,11 +222,44 @@ export interface Expense {
   description: string;
   vendor: string | null;
   amount: number;
+  financialTreatment?: FinancialTreatment;
+  /** Financing agreement this row belongs to, when explicitly classified. */
+  obligationId?: string | null;
+  /** Links the principal and interest rows created from one reviewed payment. */
+  splitGroupId?: string | null;
   recurring: boolean;
   receiptNumber: string | null;
   notes: string | null;
   /** Set only for a ledger row created by a paid driver statement. */
   driverSettlementLineId?: string | null;
+  createdAt: string;
+}
+
+/** A loan, operating lease, or deliberately unknown financing agreement. */
+export interface FinancialObligation {
+  id: string;
+  businessId: string;
+  truckId: string | null;
+  name: string;
+  kind: FinancialObligationKind;
+  counterparty: string | null;
+  startedOn: string | null;
+  endedOn: string | null;
+  expectedMonthlyPayment: number | null;
+  active: boolean;
+  createdAt: string;
+}
+
+/** One actual customer cash receipt. Multiple events allow partial payments. */
+export interface PaymentEvent {
+  id: string;
+  businessId: string;
+  loadId: string;
+  date: string;
+  amount: number;
+  method: string | null;
+  reference: string | null;
+  notes: string | null;
   createdAt: string;
 }
 
@@ -355,6 +398,8 @@ export interface Dataset {
   trucks: Truck[];
   loads: Load[];
   expenses: Expense[];
+  financialObligations: FinancialObligation[];
+  paymentEvents: PaymentEvent[];
   fuelEntries: FuelEntry[];
   documents: Document[];
   maintenanceRecords: MaintenanceRecord[];
@@ -428,6 +473,22 @@ export interface PeriodSummary {
   variableCostPerMile: number;
 }
 
+/** Canonical all-in period answer used by financial surfaces. */
+export interface FinancialSummary extends PeriodSummary {
+  reserves: Array<{
+    accountId: string;
+    name: string;
+    kind: ReserveKind;
+    basis: ReserveBasis;
+    pct: number;
+    amount: number;
+  }>;
+  reserveTotal: number;
+  safeToPayYourself: number;
+  safeToPay: number;
+  takeHomeRate: number;
+}
+
 export interface MoneyBreakdown {
   grossRevenue: number;
   operatingExpenses: number;
@@ -466,7 +527,7 @@ export interface FinancialGoal {
   businessId: string;
   /** Gross revenue the owner wants to book in a calendar month. */
   monthlyRevenueTarget: number;
-  /** Net profit (revenue - operating expenses) wanted in a calendar month. */
+  /** Operating profit (booked revenue - operating expenses) wanted in a calendar month. */
   monthlyProfitTarget: number;
   /** Profit per total mile the owner is trying to hold. */
   targetProfitPerMile: number;
@@ -480,6 +541,8 @@ export interface FinancialGoal {
    * days would overstate every month.
    */
   workingDaysPerWeek: number;
+  /** Expected loaded + deadhead miles in a normal month. */
+  expectedMonthlyMiles?: number;
   updatedAt: string;
 }
 

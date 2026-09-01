@@ -1,4 +1,29 @@
-import type { Load, PaymentStatus } from "./types";
+import { roundMoney } from "./calculations";
+import type { Load, PaymentEvent, PaymentStatus } from "./types";
+
+export interface InvoicePaymentSummary {
+  collected: number;
+  balance: number;
+  eventCount: number;
+  legacyPaid: boolean;
+}
+
+export function invoicePaymentSummary(
+  load: Pick<Load, "id" | "grossRate" | "status">,
+  paymentEvents: PaymentEvent[],
+): InvoicePaymentSummary {
+  const events = paymentEvents.filter((event) => event.loadId === load.id);
+  const legacyPaid = events.length === 0 && load.status === "PAID";
+  const collected = legacyPaid
+    ? load.grossRate
+    : roundMoney(events.reduce((total, event) => total + event.amount, 0));
+  return {
+    collected,
+    balance: Math.max(0, roundMoney(load.grossRate - collected)),
+    eventCount: events.length,
+    legacyPaid,
+  };
+}
 
 /**
  * What issuing an invoice does to a load's status and payment date.

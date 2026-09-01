@@ -24,6 +24,7 @@ import type {
   FinancialSettings,
   Load,
   ReserveAccount,
+  PaymentEvent,
   Settlement,
   SettlementHalf,
   SettlementSnapshot,
@@ -90,8 +91,9 @@ export function buildSettlementSnapshot(
   range: DateRange,
   settings: FinancialSettings,
   accounts: ReserveAccount[],
+  paymentEvents: PaymentEvent[] = [],
 ): SettlementSnapshot {
-  const summary = summarizePeriod(loads, expenses, range, settings);
+  const summary = summarizePeriod(loads, expenses, range, settings, paymentEvents);
   const rules = resolveReserveRules(settings, accounts);
   const pay = calculateSafeOwnerPay(summary, rules);
   const cost = calculateTrueCostPerMile(loads, expenses, range, settings, "Settlement window");
@@ -201,9 +203,10 @@ export function calculateSettlement(
   accounts: ReserveAccount[],
   stored: Settlement | undefined,
   today: string,
+  paymentEvents: PaymentEvent[] = [],
 ): SettlementView {
   const range = settlementBounds(month, half);
-  const live = buildSettlementSnapshot(loads, expenses, range, settings, accounts);
+  const live = buildSettlementSnapshot(loads, expenses, range, settings, accounts, paymentEvents);
   const closed = stored?.status === "CLOSED" && stored.snapshot;
   const figures = closed ? stored.snapshot! : live;
   const driftAmount = closed ? Math.round((live.safeToPay - figures.safeToPay) * 100) / 100 : 0;

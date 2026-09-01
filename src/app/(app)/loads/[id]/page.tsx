@@ -20,8 +20,13 @@ import {
   isDeadheadElevated,
   linkedFuelByLoad,
   loadMetrics,
+  roundMoney,
   thresholdsFromSettings,
 } from "@/lib/calculations";
+import {
+  overheadCostPerMile,
+  trailingCostBasis,
+} from "@/lib/finance/cost-per-mile";
 import { calculateLoadScore } from "@/lib/finance/load-score";
 import { LoadScoreBreakdown } from "@/components/cockpit/load-score-badge";
 import {
@@ -35,6 +40,7 @@ import {
 } from "@/lib/formatters";
 import { categoryLabel } from "@/lib/categories";
 import { equipmentTypeLabel, loadCapacityLabel } from "@/lib/load-details";
+import { todayISO } from "@/lib/periods";
 
 export const metadata: Metadata = { title: "Load detail" };
 
@@ -60,6 +66,21 @@ export default async function LoadDetailPage({
     metrics,
     thresholdsFromSettings(dataset.settings),
     dataset.settings.deadheadWarnPct,
+  );
+  const allocationBasis = trailingCostBasis(
+    dataset.loads,
+    dataset.expenses,
+    dataset.settings,
+    todayISO(),
+  );
+  const allocatedOperatingCosts = roundMoney(
+    metrics.totalMiles * overheadCostPerMile(allocationBasis),
+  );
+  const fullyLoadedOperatingProfit = roundMoney(
+    metrics.tripProfit - allocatedOperatingCosts,
+  );
+  const debtCashBurden = roundMoney(
+    metrics.totalMiles * allocationBasis.debtServicePerMile,
   );
   const brokers = [...new Set(dataset.loads.map((l) => l.broker).filter(Boolean))].sort() as string[];
   const linkedExpenses = dataset.expenses.filter((expense) => expense.loadId === load.id);
@@ -118,6 +139,33 @@ export default async function LoadDetailPage({
         <LoadScoreBreakdown score={score} showBasis="trip" />
 
         <TripWaterfall load={load} metrics={metrics} linkedFuelCost={linkedFuelCost} />
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Profitability Layers</CardTitle>
+            <span className="text-2xs text-muted-foreground">
+              Rating uses Contribution Profit only · {allocationBasis.basisLabel} allocation
+            </span>
+          </CardHeader>
+          <CardContent className="space-y-3 p-4">
+            <Layer label="Gross Rate" value={load.grossRate} />
+            <Layer label="Direct Trip Costs" value={-metrics.tripExpenses} />
+            <Layer label="Contribution Profit" value={metrics.tripProfit} strong />
+            <Separator />
+            <Layer label="Allocated Operating Costs (estimate)" value={-allocatedOperatingCosts} />
+            <Layer
+              label="Estimated Fully Loaded Operating Profit"
+              value={fullyLoadedOperatingProfit}
+              strong
+            />
+            <Separator />
+            <Layer label="Debt Cash Burden (separate)" value={-debtCashBurden} />
+            <p className="text-2xs text-muted-foreground">
+              Debt Service is a business cash burden. It never changes this load&apos;s GREAT,
+              GOOD, MARGINAL or BAD classification.
+            </p>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
@@ -297,6 +345,29 @@ export default async function LoadDetailPage({
           </Card>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Layer({
+  label,
+  value,
+  strong = false,
+}: {
+  label: string;
+  value: number;
+  strong?: boolean;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-4">
+      <span className={strong ? "text-sm font-semibold" : "text-sm text-muted-foreground"}>
+        {label}
+      </span>
+      <span
+        className={`tnum text-sm ${strong ? "font-semibold" : ""} ${value < 0 ? "text-neg" : ""}`}
+      >
+        {formatMoney(value)}
+      </span>
     </div>
   );
 }

@@ -17,6 +17,8 @@ import { ReservesPanel } from "@/components/cockpit/reserves-panel";
 import { SafeToPayCard } from "@/components/cockpit/safe-to-pay-card";
 import { Section } from "@/components/cockpit/section";
 import { TodayCard } from "@/components/cockpit/today-card";
+import { TodayCashCard } from "@/components/cockpit/today-cash-card";
+import { PlanningCard } from "@/components/cockpit/planning-card";
 import { TruckHealthPanel } from "@/components/cockpit/truck-health-panel";
 import { MiniStat } from "@/components/dashboard/mini-stat";
 import { BookkeepingAlerts } from "@/components/dashboard/bookkeeping-alerts";
@@ -37,7 +39,6 @@ import {
   expensesInPeriod,
   loadsInPeriod,
   pctChange,
-  summarizePeriod,
   thresholdsFromSettings,
   withMetricsAll,
 } from "@/lib/calculations";
@@ -55,6 +56,7 @@ import {
   bestAndWorst,
   buildCockpitInsights,
   calculateBrokerPerformance,
+  buildFinancialSummary,
   calculateDaySnapshot,
   calculateDeadheadCost,
   calculateGoalProgress,
@@ -62,11 +64,12 @@ import {
   calculateMaintenanceHealth,
   calculateProjection,
   calculateReserveBalances,
-  calculateSafeOwnerPay,
   calculateTrueCostPerMile,
+  calculateCashActivity,
+  calculateFinancialPlanning,
+  trailingCostBasis,
   LANE_MIN_LOADS,
   reserveBalanceFor,
-  resolveReserveRules,
   scoreLoads,
 } from "@/lib/finance";
 import {
@@ -77,6 +80,7 @@ import {
   formatRateValue,
 } from "@/lib/formatters";
 import { thresholdsFrom } from "@/lib/maintenance";
+import { isOperatingExpense } from "@/lib/finance/terminology";
 import {
   periodFromSearchParams,
   scopeQuery,
@@ -129,6 +133,8 @@ export default async function DashboardPage({
     reserveAccounts,
     reserveTransactions,
     drivers,
+    paymentEvents,
+    financialObligations,
   } = dataset;
 
   // PeriodControls sends the browser's calendar date for "Today", so that
@@ -142,11 +148,24 @@ export default async function DashboardPage({
   const expenses = truckId ? expensesForTruck(allExpenses, truckId) : allExpenses;
 
   const ratingThresholds = thresholdsFromSettings(settings);
-  const summary = summarizePeriod(loads, expenses, period, settings);
-  const priorSummary = summarizePeriod(loads, expenses, prior, settings);
+  const summary = buildFinancialSummary(
+    loads,
+    expenses,
+    paymentEvents,
+    period,
+    settings,
+    reserveAccounts,
+  );
+  const priorSummary = buildFinancialSummary(
+    loads,
+    expenses,
+    paymentEvents,
+    prior,
+    settings,
+    reserveAccounts,
+  );
 
-  const reserveRules = resolveReserveRules(settings, reserveAccounts);
-  const ownerPay = calculateSafeOwnerPay(summary, reserveRules);
+  const ownerPay = summary;
 
   // The cockpit is the decision layer. Without it the dashboard is still the
   // whole ledger -- revenue, profit, miles, what a mile cost, the chart and
@@ -160,7 +179,7 @@ export default async function DashboardPage({
     settings.deadheadWarnPct,
   );
   const periodExpenses = expensesInPeriod(expenses, period);
-  const categories = categoryTotals(periodExpenses, settings);
+  const categories = categoryTotals(periodExpenses.filter(isOperatingExpense), settings);
   // Split by whether the cost's date has arrived. What is due but still
   // missing is a real gap in the books; what is merely dated later this month
   // is not late, it is scheduled -- the nightly job posts it on its day.
@@ -173,6 +192,17 @@ export default async function DashboardPage({
   const goalProgress = calculateGoalProgress(summary, goals, period);
   const projection = calculateProjection(summary, period, goals, today);
   const day = calculateDaySnapshot(loads, expenses, today, goals);
+  const cashToday = calculateCashActivity(loads, expenses, paymentEvents, {
+    start: today,
+    end: today,
+  });
+  const planning = calculateFinancialPlanning(
+    goals,
+    trailingCostBasis(loads, expenses, settings, today),
+    truckId
+      ? financialObligations.filter((obligation) => obligation.truckId === truckId)
+      : financialObligations,
+  );
 
   const brokers = calculateBrokerPerformance(periodLoads, ratingThresholds);
   const lanes = calculateLanePerformance(periodLoads, ratingThresholds);
@@ -339,7 +369,10 @@ export default async function DashboardPage({
       </Section>
 
       {/* ---- Today ------------------------------------------------------ */}
-      <TodayCard day={day} />
+      <div className="grid gap-3 xl:grid-cols-2">
+        <TodayCard day={day} />
+        <TodayCashCard cash={cashToday} />
+      </div>
 
       {/* ---- Business health -------------------------------------------- */}
       <Section title="Business health" description="What a mile costs, and whether the pace holds">
@@ -388,6 +421,7 @@ export default async function DashboardPage({
             />
           ) : null}
           <DeadheadMonitor report={deadhead} className="min-w-0" />
+          {cockpit ? <PlanningCard planning={planning} /> : null}
         </div>
       </Section>
 

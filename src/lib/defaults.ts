@@ -1,4 +1,5 @@
 import { DEFAULT_PLAN, trialEndsOn } from "./plans";
+import { financialTreatmentForCategory } from "./finance/terminology";
 import type { Expense, FinancialGoal, Load, ReserveAccount, Subscription, Truck } from "./types";
 
 /**
@@ -21,6 +22,7 @@ export function defaultGoals(businessId: string, updatedAt = CREATED_FALLBACK): 
     maxDeadheadPct: 15,
     targetLoads: 32,
     workingDaysPerWeek: 6,
+    expectedMonthlyMiles: 0,
     updatedAt,
   };
 }
@@ -134,5 +136,8 @@ export function migrateExpense(expense: Expense, fallbackTruckId: string): Expen
     expense.truckId ??= fallbackTruckId;
   }
   if (expense.scope === "BUSINESS") expense.truckId = null;
+  expense.financialTreatment ??= financialTreatmentForCategory(expense.category);
+  expense.obligationId ??= null;
+  expense.splitGroupId ??= null;
   return expense;
 }

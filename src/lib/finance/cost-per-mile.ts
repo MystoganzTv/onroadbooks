@@ -39,8 +39,7 @@ import type {
   Load,
 } from "../types";
 import {
-  isDebtServiceCategory,
-  isOperatingExpenseCategory,
+  financialTreatmentOf,
 } from "./terminology";
 
 export interface CostLine {
@@ -75,7 +74,7 @@ export interface CostPerMile {
   fixedCostPerMile: number;
   variableCostPerMile: number;
   trueCostPerMile: number;
-  /** Canonical name for trueCostPerMile under model version 2. */
+  /** Canonical name for the legacy trueCostPerMile alias. */
   actualCostPerMile: number;
   debtServicePerMile: number;
   cashCostPerMile: number;
@@ -141,10 +140,10 @@ export function calculateTrueCostPerMile(
   const periodLoads = loads.filter((l) => inRange(l.date, range));
   const periodExpenses = expenses.filter((e) => inRange(e.date, range));
   const operatingExpenses = periodExpenses.filter((expense) =>
-    isOperatingExpenseCategory(expense.category),
+    financialTreatmentOf(expense) === "OPERATING",
   );
   const debtExpenses = periodExpenses.filter((expense) =>
-    isDebtServiceCategory(expense.category),
+    financialTreatmentOf(expense) !== "OPERATING",
   );
 
   const loadedMiles = sum(periodLoads, (l) => l.loadedMiles);

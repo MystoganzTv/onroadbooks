@@ -238,7 +238,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
       id: "take-home",
       tone: ownerPay.takeHomeRate >= 30 ? "positive" : "neutral",
       priority: 65,
-      text: `After Debt Service and ${usd(ownerPay.reserveTotal)} of Reserve Contributions, Safe to Pay Yourself is ${usd(ownerPay.safeToPay)}, or ${ownerPay.takeHomeRate.toFixed(1)}c of every Booked Revenue dollar.`.replace(
+      text: `After Debt Service and ${usd(ownerPay.reserveTotal)} of Reserve Contributions, Safe to Pay Yourself is ${usd(ownerPay.safeToPay)}, or ${ownerPay.takeHomeRate.toFixed(1)}c of every Collected Revenue dollar.`.replace(
         "c of",
         " cents of",
       ),

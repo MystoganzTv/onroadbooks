@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
   const balances = calculateReserveBalances(reserveAccounts, reserveTransactions, period);
   const rules = resolveReserveRules(settings, reserveAccounts);
   const ownerPay = calculateSafeOwnerPay(
-    summarizePeriod(loads, expenses, period, settings),
+    summarizePeriod(loads, expenses, period, settings, dataset.paymentEvents),
     rules,
   );
 

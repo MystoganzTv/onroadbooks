@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 
 import { requireWritableSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
-import { expenseSchema, loadExpenseAmountSchema } from "@/lib/schemas";
+import {
+  debtPaymentClassificationSchema,
+  expenseSchema,
+  loadExpenseAmountSchema,
+} from "@/lib/schemas";
 import type { ExpenseCategoryId } from "@/lib/types";
 import { fieldErrorsFrom, type ActionResult } from "./types";
 
@@ -82,5 +86,32 @@ export async function deleteExpenseAction(id: string): Promise<ActionResult> {
     return { ok: true };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Could not delete the expense." };
+  }
+}
+
+export async function classifyDebtPaymentAction(
+  id: string,
+  values: unknown,
+): Promise<ActionResult> {
+  const parsed = debtPaymentClassificationSchema.safeParse(values);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Check the classification.",
+      fieldErrors: fieldErrorsFrom(parsed.error.issues),
+    };
+  }
+  try {
+    const repository = getRepository(
+      (await requireWritableSession("manage_expenses")).businessId,
+    );
+    await repository.classifyDebtPayment(id, parsed.data);
+    revalidateAll();
+    return { ok: true, id };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Could not classify the payment.",
+    };
   }
 }

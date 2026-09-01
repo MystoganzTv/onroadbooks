@@ -5,8 +5,8 @@ import Foundation
 /// (see project memory `truckledger.md` / `onroadbooks_landing.md`) so the
 /// app reads with credible numbers instead of Lorem Ipsum:
 ///
-///   revenue $9,795.00 − expenses $6,143.90 = net $3,651.10
-///   true cost/mile $1.84 · reserves (tax 20% of profit, maintenance 5% of
+///   booked revenue $9,795.00 − operating expenses $6,143.90 = operating profit $3,651.10
+///   actual cost/mile $1.84 · reserves (tax 20% of profit, maintenance 5% of
 ///   revenue, emergency 2% of revenue) = $1,415.87 · safe to pay $2,235.23
 ///
 /// Every figure below ties back to that same arithmetic — if you change
@@ -249,15 +249,20 @@ final class MockRepository: LedgerRepository {
         let outstanding = invoices.filter { $0.isIssued && $0.status == .invoiced }
         let overdue = outstanding.filter(\.isOverdue)
         let paid = invoices.filter { $0.isIssued && $0.status == .paid }
-        let total = { (list: [Invoice]) in list.reduce(0) { $0 + $1.amount } }
+        let outstandingTotal = { (list: [Invoice]) in list.reduce(0) { $0 + $1.outstandingAmount } }
+        let collectedTotal = { (list: [Invoice]) in
+            list.reduce(0) { total, invoice in
+                total + (invoice.collectedAmount > 0 ? invoice.collectedAmount : invoice.amount)
+            }
+        }
 
         return InvoiceLedger(
             today: mockDate(2026, 9, 1),
             suggestedNumber: "INV-2026-0043",
             summary: InvoiceSummary(
-                outstandingAmount: total(outstanding), outstandingCount: outstanding.count,
-                overdueAmount: total(overdue), overdueCount: overdue.count,
-                collectedAmount: total(paid), collectedCount: paid.count,
+                outstandingAmount: outstandingTotal(outstanding), outstandingCount: outstanding.count,
+                overdueAmount: outstandingTotal(overdue), overdueCount: overdue.count,
+                collectedAmount: collectedTotal(paid), collectedCount: paid.count,
                 uninvoicedCount: invoices.filter { !$0.isIssued }.count
             ),
             invoices: invoices
@@ -275,7 +280,10 @@ final class MockRepository: LedgerRepository {
             // Same rule as the server: money already collected stays collected.
             status: existing.status == .paid ? .paid : .invoiced,
             date: existing.date, invoiceDate: invoice.invoiceDate, dueDate: invoice.dueDate,
-            overdueDays: nil
+            overdueDays: nil,
+            collectedAmount: existing.collectedAmount,
+            balanceAmount: existing.balanceAmount,
+            paymentEventCount: existing.paymentEventCount
         )
         return loadId
     }
@@ -295,7 +303,31 @@ final class MockRepository: LedgerRepository {
             loadId: existing.loadId, invoiceNumber: existing.invoiceNumber,
             loadNumber: existing.loadNumber, customer: existing.customer, lane: existing.lane,
             amount: existing.amount, status: .paid, date: existing.date,
-            invoiceDate: existing.invoiceDate, dueDate: existing.dueDate, overdueDays: nil
+            invoiceDate: existing.invoiceDate, dueDate: existing.dueDate, overdueDays: nil,
+            collectedAmount: existing.amount, balanceAmount: 0,
+            paymentEventCount: existing.paymentEventCount + 1
+        )
+        return loadId
+    }
+
+    @discardableResult
+    func recordInvoicePayment(loadId: String, amount: Double, on date: Date) async throws -> String {
+        guard let index = invoices.firstIndex(where: { $0.loadId == loadId }) else { return loadId }
+        let existing = invoices[index]
+        let currentBalance = existing.outstandingAmount
+        guard amount > 0, amount <= currentBalance else {
+            throw APIError.refused("El pago debe ser mayor que cero y no puede exceder el saldo.")
+        }
+        let collected = existing.collectedAmount + amount
+        let balance = max(0, currentBalance - amount)
+        invoices[index] = Invoice(
+            loadId: existing.loadId, invoiceNumber: existing.invoiceNumber,
+            loadNumber: existing.loadNumber, customer: existing.customer, lane: existing.lane,
+            amount: existing.amount, status: balance == 0 ? .paid : .invoiced, date: existing.date,
+            invoiceDate: existing.invoiceDate, dueDate: existing.dueDate,
+            overdueDays: balance == 0 ? nil : existing.overdueDays,
+            collectedAmount: collected, balanceAmount: balance,
+            paymentEventCount: existing.paymentEventCount + 1
         )
         return loadId
     }
@@ -400,21 +432,20 @@ final class MockRepository: LedgerRepository {
 
     func fetchSettlements() async throws -> [SettlementPeriod] {
         [
-            SettlementPeriod(id: "s-aug-16", label: "Aug 16 – 31", status: .open, netProfit: 1802.40, reserveContributions: 0, ownerDraw: 0),
-            SettlementPeriod(id: "s-aug-01", label: "Aug 1 – 15", status: .closed, netProfit: 1848.70, reserveContributions: 703.10, ownerDraw: 1145.60),
-            SettlementPeriod(id: "s-jul-16", label: "Jul 16 – 31", status: .closed, netProfit: 1710.05, reserveContributions: 649.90, ownerDraw: 1060.15),
-            SettlementPeriod(id: "s-jul-01", label: "Jul 1 – 15", status: .closed, netProfit: 1594.30, reserveContributions: 606.20, ownerDraw: 988.10),
+            SettlementPeriod(id: "s-aug-16", label: "Aug 16 – 31", status: .open, operatingProfit: 1802.40, reserveContributions: 0, ownerDraw: 0),
+            SettlementPeriod(id: "s-aug-01", label: "Aug 1 – 15", status: .closed, operatingProfit: 1848.70, reserveContributions: 703.10, ownerDraw: 1145.60),
+            SettlementPeriod(id: "s-jul-16", label: "Jul 16 – 31", status: .closed, operatingProfit: 1710.05, reserveContributions: 649.90, ownerDraw: 1060.15),
+            SettlementPeriod(id: "s-jul-01", label: "Jul 1 – 15", status: .closed, operatingProfit: 1594.30, reserveContributions: 606.20, ownerDraw: 988.10),
         ]
     }
 
     func fetchDashboard() async throws -> DashboardSnapshot {
-        let revenue = 9795.00
-        let expenses = 6143.90
-        let netProfit = revenue - expenses // 3651.10
+        let bookedRevenue = 9795.00
+        let operatingExpenses = 4859.82
+        let operatingProfit = bookedRevenue - operatingExpenses
 
         let breakdown: [CategoryTotal] = [
             .init(id: "FUEL", label: "Fuel", amount: 1320.94),
-            .init(id: "TRUCK_PAYMENT", label: "Truck Payment", amount: 1284.08),
             .init(id: "TOLLS_DISPATCH_FACTORING", label: "Tolls, Dispatch & Factoring", amount: 952.30),
             .init(id: "MAINTENANCE", label: "Maintenance & Repairs", amount: 897.01),
             .init(id: "INSURANCE", label: "Insurance", amount: 681.97),
@@ -429,17 +460,20 @@ final class MockRepository: LedgerRepository {
 
         return DashboardSnapshot(
             periodLabel: "August 2026 · Full Month",
-            revenue: revenue,
-            expenses: expenses,
-            netProfit: netProfit,
-            revenueDelta: ("+8.4% vs Jul", .up),
-            netProfitDelta: ("+12.1% vs Jul", .up),
-            trueCostPerMile: 1.84,
+            bookedRevenue: bookedRevenue,
+            operatingExpenses: operatingExpenses,
+            operatingProfit: operatingProfit,
+            bookedRevenueDelta: ("+8.4% vs Jul", .up),
+            operatingProfitDelta: ("+12.1% vs Jul", .up),
+            actualCostPerMile: 1.84,
             safeToPay: 2235.23,
             totalMiles: 3339,
             deadheadPct: 0.265,
-            todayRevenue: 420,
+            todayBookedRevenue: 420,
+            todayOperatingProfit: 285,
             todayLoads: 1,
+            todayCashCollected: 900,
+            todayNetCashActivity: 615,
             expenseBreakdown: breakdown,
             recentLoads: loads,
             reserves: reserves

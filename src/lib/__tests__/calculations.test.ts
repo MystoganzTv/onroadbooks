@@ -16,7 +16,7 @@ import {
   withMetricsAll,
 } from "../calculations";
 import { resolvePeriod } from "../periods";
-import type { Expense, FinancialSettings, FuelEntry, Load } from "../types";
+import type { Expense, FinancialSettings, FuelEntry, Load, PaymentEvent } from "../types";
 
 const settings: FinancialSettings = {
   id: "s", businessId: "b", taxReservePct: 20, maintenanceReservePct: 5,
@@ -205,6 +205,39 @@ describe("summarizePeriod", () => {
     assert.equal(s.unallocatedDebtService, 200);
     assert.equal(s.debtService, 900);
     assert.equal(s.cashAfterDebtService, 500);
+  });
+
+  it("keeps a partial payment as cash while leaving only the balance in receivables", () => {
+    const invoice = load({
+      id: "partial",
+      grossRate: 2500,
+      status: "INVOICED",
+      invoiceNumber: "INV-1",
+    });
+    const payments: PaymentEvent[] = [
+      {
+        id: "pay-1",
+        businessId: "b",
+        loadId: invoice.id,
+        date: "2026-08-10",
+        amount: 900,
+        method: null,
+        reference: null,
+        notes: null,
+        createdAt: "",
+      },
+    ];
+    const summary = summarizePeriod(
+      [invoice],
+      [],
+      resolvePeriod("2026-08", "full"),
+      settings,
+      payments,
+    );
+    assert.equal(summary.bookedRevenue, 2500);
+    assert.equal(summary.collectedRevenue, 900);
+    assert.equal(summary.accountsReceivable, 1600);
+    assert.equal(summary.cashAfterDebtService, 900);
   });
 
   it("halves sum exactly to the full month", () => {

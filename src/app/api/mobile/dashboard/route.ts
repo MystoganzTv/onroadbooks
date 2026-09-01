@@ -8,22 +8,21 @@ import {
   linkedFuelByLoad,
   loadsInPeriod,
   pctChange,
-  summarizePeriod,
   thresholdsFromSettings,
   withMetricsAll,
 } from "@/lib/calculations";
 import {
   calculateDaySnapshot,
+  calculateCashActivity,
+  calculateFinancialPlanning,
   calculateReserveBalances,
-  calculateSafeOwnerPay,
   calculateTrueCostPerMile,
+  trailingCostBasis,
+  buildFinancialSummary,
   resolveReserveRules,
   scoreLoads,
 } from "@/lib/finance";
-import {
-  FINANCIAL_MODEL_VERSION,
-  isOperatingExpenseCategory,
-} from "@/lib/finance/terminology";
+import { FINANCIAL_MODEL_VERSION, isOperatingExpense } from "@/lib/finance/terminology";
 import { periodFromSearchParams } from "@/lib/period-params";
 import { previousPeriod, todayISO } from "@/lib/periods";
 
@@ -49,14 +48,14 @@ export async function GET(request: NextRequest) {
   const today = todayISO();
 
   const dataset = await getRepository(session.businessId).getDataset();
-  const { loads, expenses, settings, goals, reserveAccounts, reserveTransactions, fuelEntries } = dataset;
+  const { loads, expenses, settings, goals, reserveAccounts, reserveTransactions, fuelEntries, paymentEvents, financialObligations } = dataset;
 
   const thresholds = thresholdsFromSettings(settings);
-  const summary = summarizePeriod(loads, expenses, period, settings);
-  const priorSummary = summarizePeriod(loads, expenses, prior, settings);
+  const summary = buildFinancialSummary(loads, expenses, paymentEvents, period, settings, reserveAccounts);
+  const priorSummary = buildFinancialSummary(loads, expenses, paymentEvents, prior, settings, reserveAccounts);
 
   const reserveRules = resolveReserveRules(settings, reserveAccounts);
-  const ownerPay = calculateSafeOwnerPay(summary, reserveRules);
+  const ownerPay = summary;
   const costBasis = calculateTrueCostPerMile(loads, expenses, period, settings, period.label);
   const balances = calculateReserveBalances(reserveAccounts, reserveTransactions, period);
 
@@ -67,11 +66,17 @@ export async function GET(request: NextRequest) {
   );
   const categories = categoryTotals(
     expensesInPeriod(expenses, period).filter((expense) =>
-      isOperatingExpenseCategory(expense.category),
+      isOperatingExpense(expense),
     ),
     settings,
   );
   const day = calculateDaySnapshot(loads, expenses, today, goals);
+  const cashToday = calculateCashActivity(loads, expenses, paymentEvents, { start: today, end: today });
+  const planning = calculateFinancialPlanning(
+    goals,
+    trailingCostBasis(loads, expenses, settings, today),
+    financialObligations,
+  );
 
   const recentLoads = [...periodLoads]
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
@@ -130,7 +135,9 @@ export async function GET(request: NextRequest) {
         // Compatibility alias.
         revenue: day.revenue,
         loadCount: day.loadCount,
+        cashActivity: cashToday,
       },
+      planning,
       expenseBreakdown: categories.map((c) => ({
         category: c.category,
         label: c.label,

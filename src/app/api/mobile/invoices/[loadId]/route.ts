@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { fieldErrorsFrom } from "@/lib/actions/types";
 import { requireMobileWrite } from "@/lib/auth/mobile";
 import { duplicateInvoiceNumber, invoiceIssuePatch } from "@/lib/invoices";
-import { invoiceSchema } from "@/lib/schemas";
+import { invoiceSchema, paymentEventSchema } from "@/lib/schemas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,11 +57,37 @@ export async function POST(
       return NextResponse.json({ error: "Use a valid payment date." }, { status: 422 });
     }
     try {
-      await gate.repository.updateLoad(loadId, { ...load, status: "PAID", invoicePaidDate: paidOn });
+      const recorded = dataset.paymentEvents
+        .filter((event) => event.loadId === loadId)
+        .reduce((total, event) => total + event.amount, 0);
+      const remaining = Math.round((load.grossRate - recorded) * 100) / 100;
+      if (remaining <= 0) {
+        return NextResponse.json({ error: "That invoice is already fully paid." }, { status: 422 });
+      }
+      await gate.repository.createPaymentEvent({ loadId, date: paidOn, amount: remaining });
       return done();
     } catch (error) {
       return NextResponse.json(
         { error: error instanceof Error ? error.message : "Could not mark it paid." },
+        { status: 400 },
+      );
+    }
+  }
+
+  if (body.intent === "payment") {
+    const parsed = paymentEventSchema.safeParse({ ...body, loadId });
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Check the payment.", fieldErrors: fieldErrorsFrom(parsed.error.issues) },
+        { status: 422 },
+      );
+    }
+    try {
+      await gate.repository.createPaymentEvent(parsed.data);
+      return done();
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Could not record payment." },
         { status: 400 },
       );
     }

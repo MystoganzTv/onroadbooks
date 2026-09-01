@@ -1,3 +1,5 @@
+import type { ExpenseCategoryId, FinancialTreatment } from "../types";
+
 /**
  * CANONICAL FINANCIAL TERMINOLOGY
  * ===============================
@@ -9,13 +11,28 @@
  * preserve any closed snapshot written by an earlier version.
  */
 
-export const FINANCIAL_MODEL_VERSION = 2 as const;
+export const FINANCIAL_MODEL_VERSION = 3 as const;
 export const LEGACY_FINANCIAL_MODEL_VERSION = 1 as const;
 
 /** Financing rows excluded from Operating Expenses and reported below it. */
 export const INTEREST_EXPENSE_CATEGORY = "INTEREST_EXPENSE" as const;
 export const PRINCIPAL_PAYMENT_CATEGORY = "PRINCIPAL_PAYMENT" as const;
 export const UNALLOCATED_DEBT_SERVICE_CATEGORY = "TRUCK_PAYMENT" as const;
+
+export function financialTreatmentForCategory(category: string): FinancialTreatment {
+  if (category === INTEREST_EXPENSE_CATEGORY) return "INTEREST";
+  if (category === PRINCIPAL_PAYMENT_CATEGORY) return "PRINCIPAL";
+  if (category === UNALLOCATED_DEBT_SERVICE_CATEGORY) return "DEBT_UNALLOCATED";
+  return "OPERATING";
+}
+
+/** Treatment metadata is authoritative once present; category is the legacy fallback. */
+export function financialTreatmentOf(expense: {
+  category: ExpenseCategoryId | string;
+  financialTreatment?: FinancialTreatment | null;
+}): FinancialTreatment {
+  return expense.financialTreatment ?? financialTreatmentForCategory(expense.category);
+}
 
 export function isInterestExpenseCategory(category: string): boolean {
   return category === INTEREST_EXPENSE_CATEGORY;
@@ -41,6 +58,20 @@ export function isOperatingExpenseCategory(category: string): boolean {
   return !isDebtServiceCategory(category);
 }
 
+export function isOperatingExpense(expense: {
+  category: ExpenseCategoryId | string;
+  financialTreatment?: FinancialTreatment | null;
+}): boolean {
+  return financialTreatmentOf(expense) === "OPERATING";
+}
+
+export function isDebtServiceExpense(expense: {
+  category: ExpenseCategoryId | string;
+  financialTreatment?: FinancialTreatment | null;
+}): boolean {
+  return financialTreatmentOf(expense) !== "OPERATING";
+}
+
 export const FINANCIAL_TERMS = {
   bookedRevenue: {
     label: "Booked Revenue",
@@ -52,13 +83,13 @@ export const FINANCIAL_TERMS = {
     label: "Collected Revenue",
     definition:
       "Cash received from customers. A paid status without a recorded payment date remains paid operationally but is not guessed into a cash period.",
-    basis: "Gross rates for paid loads whose recorded invoice-paid date is inside the cash period.",
+    basis: "Payment-event amounts dated inside the cash period; legacy fully-paid invoices use their recorded invoice-paid date only when no payment events exist.",
   },
   accountsReceivable: {
     label: "Accounts Receivable",
     definition:
       "Booked revenue that has not been collected. It affects performance but is not cash available to spend.",
-    basis: "Gross rates for loads in the performance period whose payment status is not PAID.",
+    basis: "For loads in the performance period: Gross Rate minus all recorded payment events, floored at zero; legacy PAID invoices without events remain fully paid.",
   },
   directTripCosts: {
     label: "Direct Trip Costs",
@@ -143,6 +174,18 @@ export const FINANCIAL_TERMS = {
     definition:
       "The rate at which a proposed load covers Operating Break-Even plus its separately allocated debt-service burden.",
     basis: "Operating Break-Even plus Allocated Debt Service.",
+  },
+  expectedMonthlyMiles: {
+    label: "Expected Monthly Miles",
+    definition:
+      "The owner's planning estimate of loaded plus deadhead miles in a normal month. It does not rewrite actual history.",
+    basis: "User-entered monthly planning assumption.",
+  },
+  fixedObligationCoverage: {
+    label: "Fixed-Obligation Coverage",
+    definition:
+      "How many times planned operating cash before financing covers active monthly financing obligations.",
+    basis: "Expected monthly Booked Revenue minus normalized monthly Operating Costs, divided by active expected monthly obligation payments.",
   },
 } as const;
 

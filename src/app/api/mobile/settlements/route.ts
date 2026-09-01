@@ -30,7 +30,17 @@ export async function GET(request: NextRequest) {
   const windows = settlementWindows(fromMonth, toMonth);
   const views = windows.map(({ month, half }) => {
     const stored = settlements.find((s) => s.id === settlementId(month, half));
-    return calculateSettlement(month, half, loads, expenses, settings, reserveAccounts, stored, today);
+    return calculateSettlement(
+      month,
+      half,
+      loads,
+      expenses,
+      settings,
+      reserveAccounts,
+      stored,
+      today,
+      dataset.paymentEvents,
+    );
   });
 
   const results = views

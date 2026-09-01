@@ -57,6 +57,19 @@ enum ExpenseScope {
   BUSINESS
 }
 
+enum FinancialTreatment {
+  OPERATING
+  INTEREST
+  PRINCIPAL
+  DEBT_UNALLOCATED
+}
+
+enum FinancialObligationKind {
+  LOAN
+  OPERATING_LEASE
+  UNKNOWN
+}
+
 enum DocumentType {
   RATE_CONFIRMATION
   BOL
@@ -162,6 +175,7 @@ enum ExpenseCategory {
   TRUCK_PAYMENT
   INTEREST_EXPENSE
   PRINCIPAL_PAYMENT
+  OPERATING_LEASE
   MAINTENANCE
   REPAIRS
   PARKING
@@ -211,21 +225,23 @@ model Business {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users               User[]
-  trucks              Truck[]
-  loads               Load[]
-  expenses            Expense[]
-  fuelEntries         FuelEntry[]
-  documents           Document[]
-  maintenance         MaintenanceRecord[]
-  settings            FinancialSettings?
-  goals               FinancialGoal?
-  subscription        Subscription?
-  reserveAccounts     ReserveAccount[]
-  reserveTransactions ReserveTransaction[]
-  settlements         Settlement[]
-  drivers             Driver[]
-  driverSettlements   DriverSettlement[]
+  users                User[]
+  trucks               Truck[]
+  loads                Load[]
+  expenses             Expense[]
+  financialObligations FinancialObligation[]
+  paymentEvents        PaymentEvent[]
+  fuelEntries          FuelEntry[]
+  documents            Document[]
+  maintenance          MaintenanceRecord[]
+  settings             FinancialSettings?
+  goals                FinancialGoal?
+  subscription         Subscription?
+  reserveAccounts      ReserveAccount[]
+  reserveTransactions  ReserveTransaction[]
+  settlements          Settlement[]
+  drivers              Driver[]
+  driverSettlements    DriverSettlement[]
 }
 
 /// What the owner is aiming at. One row per business; targets are monthly and
@@ -243,6 +259,7 @@ model FinancialGoal {
   /// Days a week the truck is expected to run. Drives the daily target and
   /// the month-end projection.
   workingDaysPerWeek   Int     @default(6)
+  expectedMonthlyMiles Int     @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -414,6 +431,7 @@ model Truck {
 
   loads                 Load[]
   expenses              Expense[]
+  financialObligations  FinancialObligation[]
   fuelEntries           FuelEntry[]
   documents             Document[]
   maintenance           MaintenanceRecord[]
@@ -493,6 +511,7 @@ model Load {
   fuelEntries          FuelEntry[]
   documents            Document[]
   driverSettlementLine DriverSettlementLine?
+  paymentEvents        PaymentEvent[]
 
   @@unique([businessId, invoiceNumber])
   @@index([businessId, date])
@@ -510,15 +529,19 @@ model Expense {
   loadId     String?
   load       Load?    @relation(fields: [loadId], references: [id], onDelete: SetNull)
 
-  date          DateTime        @db.Date
-  scope         ExpenseScope    @default(TRUCK)
-  category      ExpenseCategory
-  description   String
-  vendor        String?
-  amount        Decimal         @db.Decimal(12, 2)
-  recurring     Boolean         @default(false)
-  receiptNumber String?
-  notes         String?
+  date               DateTime             @db.Date
+  scope              ExpenseScope         @default(TRUCK)
+  category           ExpenseCategory
+  description        String
+  vendor             String?
+  amount             Decimal              @db.Decimal(12, 2)
+  financialTreatment FinancialTreatment?
+  obligationId       String?
+  obligation         FinancialObligation? @relation(fields: [obligationId], references: [id], onDelete: SetNull)
+  splitGroupId       String?
+  recurring          Boolean              @default(false)
+  receiptNumber      String?
+  notes              String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -532,6 +555,50 @@ model Expense {
   @@index([category])
   @@index([loadId])
   @@index([truckId, date])
+  @@index([obligationId])
+}
+
+model FinancialObligation {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  truckId    String?
+  truck      Truck?   @relation(fields: [truckId], references: [id], onDelete: SetNull)
+
+  name                   String
+  kind                   FinancialObligationKind
+  counterparty           String?
+  startedOn              DateTime?               @db.Date
+  endedOn                DateTime?               @db.Date
+  expectedMonthlyPayment Decimal?                @db.Decimal(12, 2)
+  active                 Boolean                 @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  expenses Expense[]
+
+  @@index([businessId, active])
+  @@index([truckId])
+}
+
+model PaymentEvent {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  loadId     String
+  load       Load     @relation(fields: [loadId], references: [id], onDelete: Restrict)
+
+  date      DateTime @db.Date
+  amount    Decimal  @db.Decimal(12, 2)
+  method    String?
+  reference String?
+  notes     String?
+
+  createdAt DateTime @default(now())
+
+  @@index([businessId, date])
+  @@index([loadId, date])
 }
 
 /// Operational driver profile. We deliberately do not store SSNs, bank

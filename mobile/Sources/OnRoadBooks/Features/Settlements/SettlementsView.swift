@@ -48,7 +48,7 @@ private struct SettlementRow: View {
                 StatusPill(text: settlement.status.rawValue, isActive: settlement.status == .open)
             }
             HStack(spacing: OBSpacing.lg) {
-                metric("Net Profit", settlement.netProfit, color: OBColor.pos)
+                metric("Operating Profit", settlement.operatingProfit, color: OBColor.pos)
                 if settlement.status == .closed {
                     metric("To Reserves", settlement.reserveContributions)
                     metric("Owner Draw", settlement.ownerDraw, color: OBColor.primary)

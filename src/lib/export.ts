@@ -15,13 +15,12 @@ import {
   linkedFuelByLoad,
   loadsInPeriod,
   summarizeFuel,
-  summarizePeriod,
   thresholdsFromSettings,
   withMetricsAll,
 } from "./calculations";
 import { calculateTrueCostPerMile } from "./finance/cost-per-mile";
 import { calculateDeadheadCost } from "./finance/deadhead";
-import { calculateSafeOwnerPay, resolveReserveRules } from "./finance/owner-pay";
+import { buildFinancialSummary } from "./finance/financial-summary";
 import { behaviorOf, categoryLabel } from "./categories";
 import { maintenanceLabel } from "./maintenance";
 import { equipmentTypeLabel, loadCapacityLabel } from "./load-details";
@@ -30,10 +29,7 @@ import type { Dataset } from "./types";
 import { expensesForTruck, loadsForTruck, primaryTruck, truckById } from "./fleet";
 import {
   FINANCIAL_MODEL_VERSION,
-  isInterestExpenseCategory,
-  isOperatingExpenseCategory,
-  isPrincipalPaymentCategory,
-  isUnallocatedDebtServiceCategory,
+  financialTreatmentOf,
 } from "./finance/terminology";
 
 export type ReportId =
@@ -102,7 +98,14 @@ export function buildReport(
   );
   const periodExpenses = expensesInPeriod(expenses, period);
   const periodFuel = fuelInPeriod(fuelEntries, period);
-  const summary = summarizePeriod(loads, expenses, period, settings);
+  const summary = buildFinancialSummary(
+    loads,
+    expenses,
+    dataset.paymentEvents,
+    period,
+    settings,
+    dataset.reserveAccounts,
+  );
 
   switch (id) {
     case "loads":
@@ -169,11 +172,11 @@ export function buildReport(
             truckName(expense.truckId),
             expense.date,
             categoryLabel(expense.category),
-            isInterestExpenseCategory(expense.category)
+            financialTreatmentOf(expense) === "INTEREST"
               ? "Interest Expense"
-              : isPrincipalPaymentCategory(expense.category)
+              : financialTreatmentOf(expense) === "PRINCIPAL"
                 ? "Principal Payment"
-                : isUnallocatedDebtServiceCategory(expense.category)
+                : financialTreatmentOf(expense) === "DEBT_UNALLOCATED"
                   ? "Unallocated Debt Service"
                   : "Operating Expense",
             behaviorOf(expense.category, settings.categoryBehavior) === "FIXED" ? "Fixed" : "Variable",
@@ -226,12 +229,9 @@ export function buildReport(
       // bucket at its configured rate and basis. The legacy two-bucket
       // breakdown ignored custom buckets, so this export disagreed with the
       // app's Safe to Pay whenever one existed.
-      const pay = calculateSafeOwnerPay(
-        summary,
-        resolveReserveRules(settings, dataset.reserveAccounts),
-      );
+      const pay = summary;
       const operatingPeriodExpenses = periodExpenses.filter((expense) =>
-        isOperatingExpenseCategory(expense.category),
+        financialTreatmentOf(expense) === "OPERATING",
       );
       const behavior = behaviorTotals(operatingPeriodExpenses, settings);
       const categories = categoryTotals(operatingPeriodExpenses, settings);

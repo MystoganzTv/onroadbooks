@@ -73,6 +73,7 @@ export default async function SettlementsPage({
       reserveAccounts,
       settlements.find((s) => s.month === window.month && s.half === window.half),
       today,
+      dataset.paymentEvents,
     ),
   );
 

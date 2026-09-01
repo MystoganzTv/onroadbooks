@@ -290,6 +290,15 @@ final class APIRepository: LedgerRepository {
                        summary: "Marcar factura cobrada")
     }
 
+    @discardableResult
+    func recordInvoicePayment(loadId: String, amount: Double, on date: Date) async throws -> String {
+        try await post(
+            "api/mobile/invoices/\(loadId)",
+            body: RecordPaymentDTO(date: ISODate.day(date), amount: amount),
+            summary: "Registrar pago parcial"
+        )
+    }
+
     func fetchSettlements() async throws -> [SettlementPeriod] {
         try await get("api/mobile/settlements", as: SettlementsResponseDTO.self).settlements.map { $0.toDomain() }
     }
@@ -308,7 +317,13 @@ private struct LoadDTO: Decodable {
     let grossRate: Double
     let loadedMiles: Double
     let deadheadMiles: Double
-    let profitPerMile: Double
+    let directTripCosts: Double
+    let contributionProfit: Double
+    let contributionProfitPerMile: Double
+    let allocatedOperatingCosts: Double
+    let estimatedFullyLoadedOperatingProfit: Double
+    let debtCashBurden: Double
+    let allocationBasisLabel: String
     let rating: String
 
     func toDomain() -> Load {
@@ -322,7 +337,13 @@ private struct LoadDTO: Decodable {
             miles: loadedMiles,
             deadheadMiles: deadheadMiles,
             rating: LoadRating(rawValue: rating) ?? .marginal,
-            profitPerMile: profitPerMile
+            profitPerMile: contributionProfitPerMile,
+            directTripCosts: directTripCosts,
+            contributionProfit: contributionProfit,
+            allocatedOperatingCosts: allocatedOperatingCosts,
+            estimatedFullyLoadedOperatingProfit: estimatedFullyLoadedOperatingProfit,
+            debtCashBurden: debtCashBurden,
+            allocationBasisLabel: allocationBasisLabel
         )
     }
 }
@@ -763,6 +784,9 @@ private struct InvoicesResponseDTO: Decodable {
         let invoiceDate: String?
         let invoiceDueDate: String?
         let overdueDays: Int?
+        let collectedAmount: Double?
+        let balanceAmount: Double?
+        let paymentEventCount: Int?
     }
 
     let today: String
@@ -795,7 +819,10 @@ private struct InvoicesResponseDTO: Decodable {
                     date: ISODate.parse(row.date),
                     invoiceDate: row.invoiceDate.map(ISODate.parse),
                     dueDate: row.invoiceDueDate.map(ISODate.parse),
-                    overdueDays: row.overdueDays
+                    overdueDays: row.overdueDays,
+                    collectedAmount: row.collectedAmount ?? 0,
+                    balanceAmount: row.balanceAmount,
+                    paymentEventCount: row.paymentEventCount ?? 0
                 )
             }
         )
@@ -820,6 +847,12 @@ private struct IssueInvoiceDTO: Encodable {
 private struct MarkPaidDTO: Encodable {
     let intent = "paid"
     let paidOn: String
+}
+
+private struct RecordPaymentDTO: Encodable {
+    let intent = "payment"
+    let date: String
+    let amount: Double
 }
 
 /// Exactly the fields `loadSchema` requires. The trip-cost fields the phone
@@ -885,7 +918,7 @@ private struct SettlementDTO: Decodable {
     let id: String
     let label: String
     let status: String
-    let netProfit: Double
+    let operatingProfit: Double
     let reserveTotal: Double
     let safeToPay: Double
     let drifted: Bool
@@ -895,7 +928,7 @@ private struct SettlementDTO: Decodable {
             id: id,
             label: label,
             status: status == "OPEN" ? .open : .closed,
-            netProfit: netProfit,
+            operatingProfit: operatingProfit,
             reserveContributions: reserveTotal,
             ownerDraw: safeToPay
         )
@@ -907,17 +940,23 @@ private struct SettlementsResponseDTO: Decodable {
 }
 
 private struct DashboardDTO: Decodable {
-    struct Today: Decodable { let revenue: Double; let loadCount: Int }
+    struct Today: Decodable {
+        struct CashActivity: Decodable { let collectedRevenue: Double; let netCashActivity: Double }
+        let bookedRevenue: Double
+        let operatingProfit: Double
+        let loadCount: Int
+        let cashActivity: CashActivity
+    }
     struct Category: Decodable { let category: String; let label: String; let amount: Double }
     struct Reserve: Decodable { let id: String; let name: String; let contributionPct: Double?; let balance: Double }
 
     let periodLabel: String
-    let revenue: Double
-    let expenses: Double
-    let netProfit: Double
-    let revenueDeltaPct: Double
-    let netProfitDeltaPct: Double
-    let trueCostPerMile: Double
+    let bookedRevenue: Double
+    let operatingExpenses: Double
+    let operatingProfit: Double
+    let bookedRevenueDeltaPct: Double
+    let operatingProfitDeltaPct: Double
+    let actualCostPerMile: Double
     let safeToPay: Double
     let totalMiles: Double
     let deadheadPct: Double
@@ -935,17 +974,20 @@ private struct DashboardDTO: Decodable {
     func toDomain() -> DashboardSnapshot {
         DashboardSnapshot(
             periodLabel: periodLabel,
-            revenue: revenue,
-            expenses: expenses,
-            netProfit: netProfit,
-            revenueDelta: delta(revenueDeltaPct),
-            netProfitDelta: delta(netProfitDeltaPct),
-            trueCostPerMile: trueCostPerMile,
+            bookedRevenue: bookedRevenue,
+            operatingExpenses: operatingExpenses,
+            operatingProfit: operatingProfit,
+            bookedRevenueDelta: delta(bookedRevenueDeltaPct),
+            operatingProfitDelta: delta(operatingProfitDeltaPct),
+            actualCostPerMile: actualCostPerMile,
             safeToPay: safeToPay,
             totalMiles: totalMiles,
             deadheadPct: deadheadPct / 100, // server sends 0...100
-            todayRevenue: today.revenue,
+            todayBookedRevenue: today.bookedRevenue,
+            todayOperatingProfit: today.operatingProfit,
             todayLoads: today.loadCount,
+            todayCashCollected: today.cashActivity.collectedRevenue,
+            todayNetCashActivity: today.cashActivity.netCashActivity,
             expenseBreakdown: expenseBreakdown.map { CategoryTotal(id: $0.category, label: $0.label, amount: $0.amount) },
             recentLoads: recentLoads.map { $0.toDomain() },
             reserves: reserves.map { reserve in

@@ -29,11 +29,11 @@ import {
   categoryTotals,
   expensesInPeriod,
   loadsInPeriod,
-  summarizePeriod,
   thresholdsFromSettings,
   withMetricsAll,
 } from "@/lib/calculations";
 import { halfMonthComparison } from "@/lib/chart-data";
+import { buildFinancialSummary } from "@/lib/finance/financial-summary";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import {
@@ -44,7 +44,7 @@ import {
   truckById,
 } from "@/lib/fleet";
 import { formatDateMedium } from "@/lib/formatters";
-import { isOperatingExpenseCategory } from "@/lib/finance/terminology";
+import { isOperatingExpense } from "@/lib/finance/terminology";
 import {
   periodFromSearchParams,
   scopeQuery,
@@ -75,7 +75,7 @@ export default async function ReportsPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { business, trucks, loads, expenses, fuelEntries, settings } = await getRepository(
+  const { business, trucks, loads, expenses, fuelEntries, settings, paymentEvents, reserveAccounts } = await getRepository(
     session.businessId,
   ).getDataset();
   const period = periodFromSearchParams(params);
@@ -84,11 +84,11 @@ export default async function ReportsPage({
   const scopedLoads = loadsForTruck(loads, truckId);
   const scopedExpenses = expensesForTruck(expenses, truckId);
 
-  const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings);
-  const priorSummary = summarizePeriod(scopedLoads, scopedExpenses, prior, settings);
+  const summary = buildFinancialSummary(scopedLoads, scopedExpenses, paymentEvents, period, settings, reserveAccounts);
+  const priorSummary = buildFinancialSummary(scopedLoads, scopedExpenses, paymentEvents, prior, settings, reserveAccounts);
   const categories = categoryTotals(
     expensesInPeriod(scopedExpenses, period).filter((expense) =>
-      isOperatingExpenseCategory(expense.category),
+      isOperatingExpense(expense),
     ),
     settings,
   );

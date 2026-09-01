@@ -59,7 +59,7 @@ export default async function FleetPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { trucks, loads, expenses, settings, subscription } = await getRepository(
+  const { trucks, loads, expenses, settings, subscription, paymentEvents } = await getRepository(
     session.businessId,
   ).getDataset();
 
@@ -69,8 +69,8 @@ export default async function FleetPage({
   if (!hasFleetAccess(subscription)) redirect("/truck");
 
   const period = periodFromSearchParams(params);
-  const fleet = calculateFleetSummary(orderedTrucks(trucks), loads, expenses, period, settings);
-  const summary = summarizePeriod(loads, expenses, period, settings);
+  const fleet = calculateFleetSummary(orderedTrucks(trucks), loads, expenses, period, settings, paymentEvents);
+  const summary = summarizePeriod(loads, expenses, period, settings, paymentEvents);
   const { best, weakest } = fleetExtremes(fleet);
 
   const loadCount = fleet.units.reduce((total, unit) => total + unit.loadCount, 0);

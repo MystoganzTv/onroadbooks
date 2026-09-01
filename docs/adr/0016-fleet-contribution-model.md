@@ -39,7 +39,8 @@ sum of contributions - overhead  = OPERATING PROFIT  (fleet)
 The reconciliation this guarantees, and which the tests assert:
 
 ```
-sum(contributions) - overhead === revenue - every expense === summarizePeriod().netProfit
+sum(contributions) - overhead === booked revenue - operating expenses
+                                              === summarizePeriod().operatingProfit
 ```
 
 A fleet view that did not tie back to the single number on the dashboard would
@@ -60,7 +61,7 @@ be a second place for the numbers to diverge.
 ## Consequences
 
 - The single-truck case is unchanged: one contribution, minus overhead, equals
-  net profit.
+  operating profit. Debt service remains a separate cash burden.
 - Existing single-truck data migrates by attaching rows to a primary truck --
   covered by `fleet-migration.test.ts`.
 - The number of trucks is what the plan gates (see

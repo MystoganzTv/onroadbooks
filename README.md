@@ -33,35 +33,44 @@ smoke checks.
 
 ## What it does
 
-**Dashboard** -- visible trial time or active plan status, the full period selector (Today / This Week / 1-15 / 16-End / Full Month / Quarter / Year to Date / Custom range), four
-headline KPIs (gross revenue, operating expenses, net profit, net margin), seven
-operating metrics (total / loaded / deadhead miles, deadhead %, revenue, cost and
-profit per mile), a daily revenue-vs-expense chart, the Money Breakdown, and
-deterministic insight cards.
+**Dashboard** -- visible trial time or active plan status, the full period selector (Today / This Week / 1-15 / 16-End / Full Month / Quarter / Year to Date / Custom range),
+performance KPIs (Booked Revenue, Operating Expenses and Operating Profit),
+liquidity KPIs (Collected Revenue, Accounts Receivable, Cash After Debt Service
+and Safe to Pay Yourself), operating metrics per mile, separate Today Operations
+and Today Cash Activity, planning break-even, charts and deterministic insights.
 
 **Money Breakdown** -- the statement that matters:
 
 ```
-Gross Revenue
+Booked Revenue
 - Operating Expenses
 = Operating Profit
+- financing does not change this performance result
+
+Collected Revenue
+- Operating Expenses
+- Interest Expense
+- Principal Payment
+- Unallocated Debt Service
+= Cash After Debt Service
 - Tax Reserve            (default 20% of operating profit)
-- Maintenance Reserve    (default 5% of gross revenue)
+- Maintenance Reserve    (default 5% of booked revenue)
 - Any other bucket the owner configured
 = SAFE TO PAY YOURSELF
 ```
 
-A reserve is charged against operating profit or against gross revenue,
+A reserve is charged against Operating Profit or against Booked Revenue,
 whichever that bucket is set to. Tax follows profit, and a losing month reserves
 nothing for it -- the base is floored at zero rather than going negative.
 Maintenance follows revenue, because the truck wears out whether or not the
 month was profitable. Safe to Pay Yourself is a planning figure: it is not a
-bank balance and it is not tax advice.
+bank balance and it is not tax advice. An unpaid invoice can improve Operating
+Profit and create Accounts Receivable, but it cannot increase Safe to Pay.
 
-**True cost per mile** -- every operating expense dated in the window divided by
+**Actual cost per mile** -- every operating expense dated in the window divided by
 every mile driven in it, loaded *plus* empty, split into fixed and variable
-lines. Nothing is prorated: if the truck note posts on the 1st, the first half
-of the month really did carry it. Forward-looking tools use a separate rolling
+lines. Nothing is prorated. Debt Service is displayed separately and does not
+change operating cost per mile. Forward-looking tools use a separate rolling
 90-day basis instead, so one annual bill inside the selected period cannot
 change the answer to "what should I quote".
 
@@ -81,8 +90,9 @@ older build; a linked detailed Fuel entry replaces the load fuel estimate so it
 is never counted twice.
 
 **Load profitability score** -- every load is rated GREAT / GOOD / MARGINAL / BAD
-on **profit per total mile**, never on gross rate per mile. Gross rate minus fuel,
-tolls, dispatch, factoring and other trip costs, divided by loaded *plus* deadhead
+on **Contribution Profit per total mile**, never on gross rate per mile. Gross
+Rate minus fuel, tolls, dispatch, factoring, other trip costs and Driver Pay,
+divided by loaded *plus* deadhead miles. Debt Service never changes the rating.
 miles. A $4.19/loaded-mile broker running 35% deadhead rates below a $3.87 broker
 running clean -- and the app says so. Thresholds are editable in Settings.
 
@@ -160,10 +170,10 @@ after at least three runs. Two loads is an anecdote.
 **Fleet** -- up to eight trucks on the paid OnRoad Fleet service, each with its own
 contribution and cost per mile. A truck is never charged a share of the phone bill; business
 overhead is subtracted once, visibly, at the fleet level, so the fleet view ties
-back exactly to the net profit on the dashboard.
+back exactly to Operating Profit on the dashboard.
 
 **Reports** -- current vs previous period across twelve metrics, half-month split,
-fixed vs variable analysis, and four trend charts (revenue vs expenses, net profit,
+fixed vs variable analysis, and four trend charts (revenue vs expenses, Operating Profit,
 revenue per mile, cost per mile). Adds a Year-to-Date period option.
 
 **Truck** -- a read-first profile with full-width odometer, ownership and unit
@@ -282,24 +292,28 @@ returns `0` rather than `Infinity` or `NaN`. See
 | Total Miles | Loaded + Deadhead |
 | Revenue / Loaded Mile | Gross Rate / Loaded Miles |
 | Revenue / Total Mile | Gross Rate / Total Miles |
-| Trip Expenses | Fuel + Tolls + Other |
-| Trip Profit | Gross Rate - Trip Expenses |
-| Profit / Mile (load) | Trip Profit / Total Miles |
-| Period Gross Revenue | sum of load gross rates in the period |
-| Period Expenses | sum of expense-ledger amounts in the period |
-| Net Profit | Gross Revenue - Expenses |
-| Net Margin | Net Profit / Gross Revenue x 100 |
-| Revenue / Cost / Profit per Mile | each divided by period total miles |
+| Direct Trip Costs | Fuel + tolls + dispatch + factoring + other trip costs + driver pay |
+| Contribution Profit | Gross Rate - Direct Trip Costs |
+| Contribution / Mile (load) | Contribution Profit / Total Miles |
+| Booked Revenue | sum of load gross rates in the performance period |
+| Collected Revenue | payment events dated in the cash period; legacy fallback only when the paid date is known |
+| Accounts Receivable | Booked Revenue - all customer payments recorded against those loads |
+| Operating Expenses | operating expense-ledger rows in the period; financing is excluded |
+| Operating Profit | Booked Revenue - Operating Expenses |
+| Operating Margin | Operating Profit / Booked Revenue x 100 |
+| Revenue / Cost / Operating Profit per Mile | each divided by period total miles |
 | Deadhead % | Deadhead Miles / Total Miles x 100 |
 | Deadhead cost | Deadhead Miles x Variable Cost per Mile |
 | Deadhead cost / total mile | Deadhead Cost / Total Miles |
 | Rate dilution | Revenue per Loaded Mile - Revenue per Total Mile |
-| Load rating | GREAT >= $2.00, GOOD >= $1.50, MARGINAL >= $1.00, else BAD (profit per **total** mile, thresholds editable) |
-| True cost per mile | Period Expenses / Period Total Miles (loaded + deadhead), never prorated |
+| Load rating | GREAT >= $2.00, GOOD >= $1.50, MARGINAL >= $1.00, else BAD (Contribution Profit per **total** mile, thresholds editable; debt service never changes it) |
+| Actual cost per mile | Operating Expenses / Period Total Miles (loaded + deadhead), never prorated; debt service is separate |
 | Trailing cost basis | the same, over a rolling 90 days -- used by the calculator, target rate and deadhead costing |
 | Overhead per mile | trailing cost per mile minus fuel, tolls, dispatch and factoring (subtracted as dollars, divided once) |
-| Reserve amount | max(Operating Profit, 0) x % for an operating-profit bucket, Gross Revenue x % for a revenue bucket |
-| Safe to Pay Yourself | Operating Profit - every configured reserve |
+| Debt Service | Interest Expense + Principal Payment + any unallocated legacy debt payment |
+| Cash After Debt Service | Collected Revenue - Operating Expenses - Debt Service |
+| Reserve contribution | max(Operating Profit, 0) x % for an operating-profit bucket, Booked Revenue x % for a revenue bucket |
+| Safe to Pay Yourself | Cash After Debt Service - every configured reserve; unpaid invoices never increase it |
 | Load score | 50 pts profit/mile (full at 1.25x the GREAT floor) + 30 pts margin (full at 60%) + 20 pts deadhead (nothing at 2x the warn level); it never overrules the rating |
 | Truck contribution | the unit's revenue - the unit's own costs; business overhead is subtracted once at the fleet level |
 
@@ -307,7 +321,7 @@ returns `0` rather than `Infinity` or `NaN`. See
 
 Trip-level costs recorded **on a load** (fuel, tolls, dispatch, factoring, other)
 drive per-load profitability and the rating. By default they are also posted to
-the **expense ledger**, so period Net Profit and True Cost / Mile use the same
+the **expense ledger**, so period Operating Profit and Actual Cost / Mile use the same
 dollars. Existing historical loads are not reinterpreted silently; the dashboard
 offers a one-click bookkeeping check to post them. The places that could drift
 write to the ledger automatically --
@@ -479,14 +493,14 @@ npm test
 npm run test:e2e
 ```
 
-The current `node:test` suite contains **272 passing tests**. It covers the parts where a quiet
+The current `node:test` suite contains **352 passing tests**. It covers the parts where a quiet
 mistake costs money rather than throwing an error:
 
 | File | What it pins down |
 | --- | --- |
 | `calculations.test.ts` | division by zero and non-finite input, `roundMoney` symmetry and the `-$0.00` case, trip costs counted once, profit rated per mile *driven* (a $4.00/loaded-mile load with 300 empty miles rates MARGINAL against a plain $3.00 run at GREAT), reserve maths including a losing month |
 | `finance.test.ts` | the product layer: cost per mile refusing to prorate a monthly cost across the halves, the trailing basis falling back when the window is thin, overhead per mile excluding what the calculator asks for directly, reserves and safe-to-pay always reconstructing operating profit, the score never disagreeing with the rating about which load is better, a target rate that really does clear the target after fees, lanes staying directional and unranked below three loads, and a pro-rated goal saying that it was pro-rated |
-| `fleet-migration.test.ts` | a single-truck ledger upgrading in place, and the fleet reconciliation: contributions minus overhead equals the dashboard's net profit, to the cent |
+| `fleet-migration.test.ts` | a single-truck ledger upgrading in place, and the fleet reconciliation: contributions minus overhead equals the dashboard's Operating Profit, to the cent |
 | `plans.test.ts` | prices, limits and ranks matching what is sold, the cockpit closed on Solo and open on OnRoad Pro, paid Fleet access requiring an active provider subscription, a legacy Individual ledger carried up rather than down, truck limits, trial dates, safe downgrades, and a lapsed subscription closing writes |
 | `periods.test.ts` | every period key, leap years, year rollover on the previous-period comparison, week anchoring, a reversed custom range, impossible dates like `2026-02-30`, and that the two halves of a month sum exactly to the full month |
 | `maintenance.test.ts` | overdue on either measure, `BOTH` meaning whichever comes first, urgency scored against the user's own thresholds rather than an assumed miles-per-day, and zero thresholds |

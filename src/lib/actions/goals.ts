@@ -24,6 +24,7 @@ export async function updateGoalsAction(values: unknown): Promise<ActionResult> 
       maxDeadheadPct: parsed.data.maxDeadheadPct,
       targetLoads: parsed.data.targetLoads ?? null,
       workingDaysPerWeek: parsed.data.workingDaysPerWeek,
+      expectedMonthlyMiles: parsed.data.expectedMonthlyMiles,
     });
     revalidatePath("/", "layout");
     return { ok: true };

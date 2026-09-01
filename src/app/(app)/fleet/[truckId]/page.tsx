@@ -71,13 +71,14 @@ export default async function FleetUnitPage({
   const query = scopeQuery(period, truck.id);
   const unitLoads = loadsForTruck(dataset.loads, truck.id);
   const unitExpenses = expensesForTruck(dataset.expenses, truck.id);
-  const summary = summarizePeriod(unitLoads, unitExpenses, period, dataset.settings);
+  const summary = summarizePeriod(unitLoads, unitExpenses, period, dataset.settings, dataset.paymentEvents);
   const fleet = calculateFleetSummary(
     orderedTrucks(dataset.trucks),
     dataset.loads,
     dataset.expenses,
     period,
     dataset.settings,
+    dataset.paymentEvents,
   );
   const contribution = fleet.units.find((unit) => unit.truck.id === truck.id);
   if (!contribution) notFound();

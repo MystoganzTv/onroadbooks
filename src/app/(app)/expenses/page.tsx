@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { CategoryBreakdown } from "@/components/expenses/category-breakdown";
 import { ExpenseFormDialog } from "@/components/expenses/expense-form-dialog";
 import { ExpensesTable } from "@/components/expenses/expenses-table";
+import { DebtReviewPanel } from "@/components/expenses/debt-review-panel";
 import { MiniStat } from "@/components/dashboard/mini-stat";
 import { PeriodControls } from "@/components/dashboard/period-controls";
 import { PageHeader } from "@/components/shared/page-header";
@@ -20,7 +21,7 @@ import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { formatMoneyCompact, formatPercent, formatRate } from "@/lib/formatters";
 import { expensesForTruck, loadsForTruck, orderedTrucks } from "@/lib/fleet";
-import { isOperatingExpenseCategory } from "@/lib/finance/terminology";
+import { isOperatingExpense } from "@/lib/finance/terminology";
 import { defaultEntryDate } from "@/lib/periods";
 import {
   periodFromSearchParams,
@@ -37,7 +38,7 @@ export default async function ExpensesPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { trucks, loads, expenses, fuelEntries, documents, settings } = await getRepository(
+  const { trucks, loads, expenses, fuelEntries, documents, settings, financialObligations, paymentEvents } = await getRepository(
     session.businessId,
   ).getDataset();
   const period = periodFromSearchParams(params);
@@ -55,9 +56,9 @@ export default async function ExpensesPage({
     ratingThresholds,
     linkedFuelByLoad(fuelEntries),
   );
-  const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings);
+  const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings, paymentEvents);
   const operatingPeriodExpenses = periodExpenses.filter((expense) =>
-    isOperatingExpenseCategory(expense.category),
+    isOperatingExpense(expense),
   );
   const categories = categoryTotals(operatingPeriodExpenses, settings);
 
@@ -120,6 +121,8 @@ export default async function ExpensesPage({
           sub="Operating Expenses only"
         />
       </section>
+
+      <DebtReviewPanel expenses={periodExpenses} obligations={financialObligations} trucks={trucks} />
 
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="min-w-0 xl:col-span-2">

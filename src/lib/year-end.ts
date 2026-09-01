@@ -48,7 +48,13 @@ function sheetName(label: string): string {
 }
 
 function coverTable(dataset: Dataset, period: Period, businessName: string): ReportTable {
-  const summary = summarizePeriod(dataset.loads, dataset.expenses, period, dataset.settings);
+  const summary = summarizePeriod(
+    dataset.loads,
+    dataset.expenses,
+    period,
+    dataset.settings,
+    dataset.paymentEvents,
+  );
   const fuel = summarizeFuel(fuelInPeriod(dataset.fuelEntries, period), summary.totalMiles);
   const categories = categoryTotals(
     expensesInPeriod(dataset.expenses, period).filter((expense) =>

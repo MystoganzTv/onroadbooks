@@ -30,6 +30,7 @@ const FIELD_LABELS: Record<string, string> = {
   maxDeadheadPct: "Maximum deadhead",
   targetLoads: "Target loads",
   workingDaysPerWeek: "Working days per week",
+  expectedMonthlyMiles: "Expected monthly miles",
 };
 
 const DAY_OPTIONS = [
@@ -55,6 +56,7 @@ export function GoalsForm({ goals }: { goals: FinancialGoal }) {
     maxDeadheadPct: String(goals.maxDeadheadPct || ""),
     targetLoads: goals.targetLoads != null ? String(goals.targetLoads) : "",
     workingDaysPerWeek: String(goals.workingDaysPerWeek || 6),
+    expectedMonthlyMiles: String(goals.expectedMonthlyMiles || ""),
   });
 
   const set = (key: keyof typeof values, value: string) =>
@@ -74,6 +76,7 @@ export function GoalsForm({ goals }: { goals: FinancialGoal }) {
       maxDeadheadPct: toRequiredNumber(values.maxDeadheadPct),
       targetLoads: values.targetLoads === "" ? null : toRequiredNumber(values.targetLoads),
       workingDaysPerWeek: toRequiredNumber(values.workingDaysPerWeek),
+      expectedMonthlyMiles: toRequiredNumber(values.expectedMonthlyMiles),
     };
 
     const parsed = goalSchema.safeParse(payload);
@@ -184,6 +187,21 @@ export function GoalsForm({ goals }: { goals: FinancialGoal }) {
               inputMode="numeric"
               value={values.targetLoads}
               onChange={(e) => set("targetLoads", e.target.value)}
+            />
+          </Field>
+
+          <Field
+            label="Expected monthly miles"
+            htmlFor="goal-miles"
+            required
+            error={errors.expectedMonthlyMiles}
+            hint="Loaded plus deadhead; used only for planning"
+          >
+            <Input
+              id="goal-miles"
+              inputMode="numeric"
+              value={values.expectedMonthlyMiles}
+              onChange={(e) => set("expectedMonthlyMiles", e.target.value)}
             />
           </Field>
 

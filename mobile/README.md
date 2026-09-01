@@ -9,8 +9,9 @@ de iOS — y ahora conectada de verdad al mismo backend que usa la web.
 
 - **Login** real contra `/api/mobile/login` (o "Ver con datos de muestra"
   para revisar diseño sin cuenta / sin backend desplegado todavía).
-- **Dashboard** (el cockpit): revenue / expenses / net profit, cost per
-  mile, safe to pay, money flow por categoría, últimos loads, reservas.
+- **Dashboard** (el cockpit): booked revenue, cash collected, accounts
+  receivable, operating profit, cash after debt service, cost per mile,
+  safe to pay, money flow por categoría, últimos loads y reservas.
 - **Loads**: lista con rating (GREAT/GOOD/MARGINAL/BAD, igual que
   `ProfitabilityRating` en el backend) y profit por milla.
 - **Expenses**: lista agrupada por categoría, con la categoría real del

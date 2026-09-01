@@ -27,6 +27,8 @@ describe("canonical financial terminology", () => {
       "normalizedCostPerMile",
       "operatingBreakEven",
       "cashBreakEven",
+      "expectedMonthlyMiles",
+      "fixedObligationCoverage",
     ];
 
     assert.deepEqual(Object.keys(FINANCIAL_TERMS), expected);
@@ -40,6 +42,6 @@ describe("canonical financial terminology", () => {
   it("treats unversioned stored calculations as legacy without rewriting them", () => {
     assert.equal(financialModelVersionOf(null), 1);
     assert.equal(financialModelVersionOf({}), 1);
-    assert.equal(financialModelVersionOf({ calculationVersion: FINANCIAL_MODEL_VERSION }), 2);
+    assert.equal(financialModelVersionOf({ calculationVersion: FINANCIAL_MODEL_VERSION }), 3);
   });
 });

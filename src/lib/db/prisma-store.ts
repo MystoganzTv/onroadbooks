@@ -16,8 +16,10 @@ import type {
   ExpenseCategoryId,
   EquipmentType,
   FinancialSettings,
+  FinancialObligation,
   FuelEntry,
   Load,
+  PaymentEvent,
   LoadCapacity,
   MaintenanceBasis,
   MaintenanceRecord,
@@ -35,6 +37,7 @@ import type {
   Truck,
 } from "../types";
 import { defaultCategoryBehavior } from "../categories";
+import { financialTreatmentForCategory } from "../finance/terminology";
 import { defaultGoals, defaultReserveAccounts, defaultSubscription } from "../defaults";
 import { DEFAULT_PLAN, getPlan, isComplimentaryAccess, trialEndsOn } from "../plans";
 import {
@@ -55,9 +58,12 @@ import type {
   DocumentInput,
   DriverInput,
   DriverSettlementInput,
+  DebtPaymentClassificationInput,
   ExpenseInput,
+  FinancialObligationInput,
   FuelEntryInput,
   LoadInput,
+  PaymentEventInput,
   MaintenanceInput,
   Repository,
   GoalInput,
@@ -68,6 +74,7 @@ import type {
   SubscriptionInput,
   TruckInput,
 } from "./repository";
+import { newId } from "./repository";
 
 /**
  * Prisma + PostgreSQL implementation.
@@ -602,8 +609,10 @@ export class PrismaAuthStore implements AuthStore {
       await tx.fuelEntry.deleteMany({ where: { businessId } });
       await tx.maintenanceRecord.deleteMany({ where: { businessId } });
       await tx.driverSettlement.deleteMany({ where: { businessId } });
+      await tx.paymentEvent.deleteMany({ where: { businessId } });
       await tx.expense.deleteMany({ where: { businessId } });
       await tx.load.deleteMany({ where: { businessId } });
+      await tx.financialObligation.deleteMany({ where: { businessId } });
       await tx.driver.deleteMany({ where: { businessId } });
       await tx.truck.deleteMany({ where: { businessId } });
       await tx.reserveTransaction.deleteMany({ where: { businessId } });
@@ -626,6 +635,7 @@ export class PrismaAuthStore implements AuthStore {
           maxDeadheadPct: goals.maxDeadheadPct,
           targetLoads: goals.targetLoads,
           workingDaysPerWeek: goals.workingDaysPerWeek,
+          expectedMonthlyMiles: goals.expectedMonthlyMiles ?? 0,
         },
       });
       for (const account of defaultReserveAccounts(businessId, new Date().toISOString())) {
@@ -736,6 +746,8 @@ export class PrismaRepository implements Repository {
       settlementRows,
       driverRows,
       driverSettlementRows,
+      obligationRows,
+      paymentEventRows,
     ] = await Promise.all([
       // Tie-break on id so same-day rows have a defined order, matching the
       // JSON store rather than whatever Postgres happens to return.
@@ -781,6 +793,14 @@ export class PrismaRepository implements Repository {
         where: { businessId: business.id },
         include: { lines: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
         orderBy: [{ periodStart: "desc" }, { id: "desc" }],
+      }),
+      client.financialObligation.findMany({
+        where: { businessId: business.id },
+        orderBy: [{ active: "desc" }, { name: "asc" }, { id: "asc" }],
+      }),
+      client.paymentEvent.findMany({
+        where: { businessId: business.id },
+        orderBy: [{ date: "desc" }, { id: "desc" }],
       }),
     ]);
 
@@ -843,6 +863,7 @@ export class PrismaRepository implements Repository {
           maxDeadheadPct: num(goalRow.maxDeadheadPct),
           targetLoads: goalRow.targetLoads,
           workingDaysPerWeek: goalRow.workingDaysPerWeek,
+          expectedMonthlyMiles: goalRow.expectedMonthlyMiles,
           updatedAt: goalRow.updatedAt.toISOString(),
         }
       : defaultGoals(business.id);
@@ -903,6 +924,34 @@ export class PrismaRepository implements Repository {
       goals,
       subscription,
       trucks,
+      financialObligations: obligationRows.map(
+        (row): FinancialObligation => ({
+          id: row.id,
+          businessId: row.businessId,
+          truckId: row.truckId,
+          name: row.name,
+          kind: row.kind,
+          counterparty: row.counterparty,
+          startedOn: row.startedOn ? isoDate(row.startedOn) : null,
+          endedOn: row.endedOn ? isoDate(row.endedOn) : null,
+          expectedMonthlyPayment: numOrNull(row.expectedMonthlyPayment),
+          active: row.active,
+          createdAt: row.createdAt.toISOString(),
+        }),
+      ),
+      paymentEvents: paymentEventRows.map(
+        (row): PaymentEvent => ({
+          id: row.id,
+          businessId: row.businessId,
+          loadId: row.loadId,
+          date: isoDate(row.date),
+          amount: num(row.amount),
+          method: row.method,
+          reference: row.reference,
+          notes: row.notes,
+          createdAt: row.createdAt.toISOString(),
+        }),
+      ),
       reserveAccounts,
       reserveTransactions: reserveTransactionRows.map(
         (row): ReserveTransaction => ({
@@ -1028,6 +1077,10 @@ export class PrismaRepository implements Repository {
           description: row.description,
           vendor: row.vendor,
           amount: num(row.amount),
+          financialTreatment:
+            row.financialTreatment ?? financialTreatmentForCategory(row.category),
+          obligationId: row.obligationId,
+          splitGroupId: row.splitGroupId,
           recurring: row.recurring,
           receiptNumber: row.receiptNumber,
           notes: row.notes,
@@ -1186,6 +1239,10 @@ export class PrismaRepository implements Repository {
       const driverId = await ownedDriverId(tx, business.id, input.driverId);
       const existing = await tx.load.findFirst({ where: { id, businessId: business.id } });
       if (!existing) throw new Error("That load does not belong to this workspace.");
+      const payments = await tx.paymentEvent.count({ where: { loadId: id } });
+      if (payments > 0) {
+        throw new Error("A load with recorded customer payments cannot be deleted.");
+      }
       if (existing.truckId !== truckId || existing.driverId !== driverId) {
         const frozen = await tx.driverSettlementLine.count({ where: { loadId: id } });
         if (frozen > 0) {
@@ -1493,6 +1550,10 @@ export class PrismaRepository implements Repository {
       description: input.description.trim(),
       vendor: input.vendor?.trim() || null,
       amount: roundMoney(input.amount),
+      financialTreatment:
+        input.financialTreatment ?? financialTreatmentForCategory(input.category),
+      obligationId: input.obligationId,
+      splitGroupId: input.splitGroupId,
       loadId: input.loadId || null,
       recurring: input.recurring,
       receiptNumber: input.receiptNumber?.trim() || null,
@@ -1550,6 +1611,190 @@ export class PrismaRepository implements Repository {
     }
     const deleted = await client.expense.deleteMany({ where: { id, businessId: business.id } });
     if (deleted.count !== 1) throw new Error("That expense does not belong to this workspace.");
+  }
+
+  async createFinancialObligation(
+    input: FinancialObligationInput,
+  ): Promise<FinancialObligation> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const truckId = input.truckId?.trim() || null;
+    if (truckId && !business.trucks.some((truck) => truck.id === truckId)) {
+      throw new Error("That truck does not belong to this workspace.");
+    }
+    const row = await client.financialObligation.create({
+      data: {
+        businessId: business.id,
+        truckId,
+        name: input.name.trim(),
+        kind: input.kind,
+        counterparty: input.counterparty?.trim() || null,
+        startedOn: input.startedOn ? toDate(input.startedOn) : null,
+        endedOn: input.endedOn ? toDate(input.endedOn) : null,
+        expectedMonthlyPayment: input.expectedMonthlyPayment ?? null,
+        active: input.active ?? true,
+      },
+    });
+    return (await this.getDataset()).financialObligations.find((item) => item.id === row.id)!;
+  }
+
+  async classifyDebtPayment(
+    id: string,
+    input: DebtPaymentClassificationInput,
+  ): Promise<Expense[]> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const affectedIds = await client.$transaction(async (tx) => {
+      const expense = await tx.expense.findFirst({ where: { id, businessId: business.id } });
+      if (!expense) throw new Error("That payment does not belong to this workspace.");
+      if (expense.category !== "TRUCK_PAYMENT") {
+        throw new Error("Only unallocated truck payments can be classified here.");
+      }
+
+      let obligationId = input.obligationId?.trim() || null;
+      if (input.newObligation) {
+        const truckId = input.newObligation.truckId?.trim() || null;
+        if (truckId && !business.trucks.some((truck) => truck.id === truckId)) {
+          throw new Error("That truck does not belong to this workspace.");
+        }
+        const obligation = await tx.financialObligation.create({
+          data: {
+            businessId: business.id,
+            truckId,
+            name: input.newObligation.name.trim(),
+            kind: input.newObligation.kind,
+            counterparty: input.newObligation.counterparty?.trim() || null,
+            startedOn: input.newObligation.startedOn
+              ? toDate(input.newObligation.startedOn)
+              : null,
+            endedOn: input.newObligation.endedOn ? toDate(input.newObligation.endedOn) : null,
+            expectedMonthlyPayment: input.newObligation.expectedMonthlyPayment ?? null,
+            active: input.newObligation.active ?? true,
+          },
+        });
+        obligationId = obligation.id;
+      }
+      const obligation = obligationId
+        ? await tx.financialObligation.findFirst({
+            where: { id: obligationId, businessId: business.id },
+          })
+        : null;
+      if (obligationId && !obligation) {
+        throw new Error("That obligation does not belong to this workspace.");
+      }
+
+      if (input.treatment === "DEBT_UNALLOCATED") {
+        await tx.expense.update({
+          where: { id },
+          data: { financialTreatment: "DEBT_UNALLOCATED", obligationId },
+        });
+        return [id];
+      }
+      if (input.treatment === "OPERATING_LEASE") {
+        if (obligation && obligation.kind !== "OPERATING_LEASE") {
+          throw new Error("Choose an operating-lease obligation for this treatment.");
+        }
+        await tx.expense.update({
+          where: { id },
+          data: {
+            category: "OPERATING_LEASE",
+            financialTreatment: "OPERATING",
+            obligationId,
+          },
+        });
+        return [id];
+      }
+      if (obligation && obligation.kind !== "LOAN") {
+        throw new Error("Choose a loan obligation before recording principal and interest.");
+      }
+      const principal = roundMoney(input.principalAmount ?? 0);
+      const interest = roundMoney(input.interestAmount ?? 0);
+      if (principal < 0 || interest < 0 || roundMoney(principal + interest) !== num(expense.amount)) {
+        throw new Error("Principal plus interest must equal the original payment exactly.");
+      }
+      const splitGroupId = newId("split");
+      if (principal <= 0) {
+        await tx.expense.update({
+          where: { id },
+          data: {
+            category: "INTEREST_EXPENSE",
+            financialTreatment: "INTEREST",
+            amount: interest,
+            obligationId,
+            splitGroupId,
+          },
+        });
+        return [id];
+      }
+      await tx.expense.update({
+        where: { id },
+        data: {
+          category: "PRINCIPAL_PAYMENT",
+          financialTreatment: "PRINCIPAL",
+          amount: principal,
+          obligationId,
+          splitGroupId,
+        },
+      });
+      if (interest <= 0) return [id];
+      const interestRow = await tx.expense.create({
+        data: {
+          businessId: business.id,
+          truckId: expense.truckId,
+          scope: expense.scope,
+          loadId: expense.loadId,
+          date: expense.date,
+          category: "INTEREST_EXPENSE",
+          financialTreatment: "INTEREST",
+          obligationId,
+          splitGroupId,
+          description: `${expense.description} · interest`,
+          vendor: expense.vendor,
+          amount: interest,
+          recurring: expense.recurring,
+          notes: expense.notes,
+        },
+      });
+      return [id, interestRow.id];
+    }, { isolationLevel: "Serializable" });
+    const dataset = await this.getDataset();
+    return dataset.expenses.filter((expense) => affectedIds.includes(expense.id));
+  }
+
+  async createPaymentEvent(input: PaymentEventInput): Promise<PaymentEvent> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const row = await client.$transaction(async (tx) => {
+      const load = await tx.load.findFirst({ where: { id: input.loadId, businessId: business.id } });
+      if (!load?.invoiceNumber) throw new Error("Issue the invoice before recording a payment.");
+      const events = await tx.paymentEvent.findMany({ where: { loadId: load.id } });
+      const recorded = events.length === 0 && load.status === "PAID"
+        ? num(load.grossRate)
+        : events.reduce((total, event) => total + num(event.amount), 0);
+      const remaining = roundMoney(num(load.grossRate) - recorded);
+      if (input.amount > remaining) throw new Error("Payment cannot exceed the invoice balance.");
+      const event = await tx.paymentEvent.create({
+        data: {
+          businessId: business.id,
+          loadId: load.id,
+          date: toDate(input.date),
+          amount: roundMoney(input.amount),
+          method: input.method?.trim() || null,
+          reference: input.reference?.trim() || null,
+          notes: input.notes?.trim() || null,
+        },
+      });
+      const fullyPaid = roundMoney(recorded + input.amount) >= num(load.grossRate);
+      await tx.load.update({
+        where: { id: load.id },
+        data: {
+          status: fullyPaid ? "PAID" : "INVOICED",
+          invoicePaidDate: fullyPaid ? toDate(input.date) : null,
+        },
+      });
+      return event;
+    }, { isolationLevel: "Serializable" });
+    return (await this.getDataset()).paymentEvents.find((event) => event.id === row.id)!;
   }
 
   private fuelData(input: FuelEntryInput) {
@@ -2036,6 +2281,7 @@ export class PrismaRepository implements Repository {
       maxDeadheadPct: input.maxDeadheadPct,
       targetLoads: input.targetLoads ?? null,
       workingDaysPerWeek: input.workingDaysPerWeek,
+      expectedMonthlyMiles: input.expectedMonthlyMiles ?? 0,
     };
     await client.financialGoal.upsert({
       where: { businessId: business.id },

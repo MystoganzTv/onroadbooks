@@ -61,6 +61,7 @@ export async function closeSettlementAction(values: unknown): Promise<ActionResu
       range,
       dataset.settings,
       dataset.reserveAccounts,
+      dataset.paymentEvents,
     );
 
     const settlement = await repository.ensureSettlement(month, half);

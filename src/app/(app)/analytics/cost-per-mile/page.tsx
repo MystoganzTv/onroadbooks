@@ -50,6 +50,7 @@ export default async function CostPerMilePage({
     loads: allLoads,
     expenses: allExpenses,
     settings,
+    paymentEvents,
   } = await getRepository(session.businessId).getDataset();
   const period = periodFromSearchParams(params);
 
@@ -59,7 +60,7 @@ export default async function CostPerMilePage({
   const loads = loadsForTruck(allLoads, truckId);
   const expenses = expensesForTruck(allExpenses, truckId);
 
-  const summary = summarizePeriod(loads, expenses, period, settings);
+  const summary = summarizePeriod(loads, expenses, period, settings, paymentEvents);
   const cost = calculateTrueCostPerMile(loads, expenses, period, settings, period.label);
   const basis = trailingCostBasis(loads, expenses, settings, todayISO());
 

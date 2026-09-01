@@ -10,6 +10,7 @@ import {
   linkedFuelByLoad,
   isDeadheadElevated,
   loadsInPeriod,
+  roundMoney,
   summarizePeriod,
   thresholdsFromSettings,
   withMetricsAll,
@@ -23,7 +24,8 @@ import {
   formatRate,
 } from "@/lib/formatters";
 import { expensesForTruck, loadsForTruck, orderedTrucks } from "@/lib/fleet";
-import { defaultEntryDate } from "@/lib/periods";
+import { overheadCostPerMile, trailingCostBasis } from "@/lib/finance";
+import { defaultEntryDate, todayISO } from "@/lib/periods";
 import { hasFleetAccess } from "@/lib/plans";
 import {
   periodFromSearchParams,
@@ -40,7 +42,7 @@ export default async function LoadsPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { trucks, loads, expenses, fuelEntries, settings, drivers, subscription } = await getRepository(
+  const { trucks, loads, expenses, fuelEntries, settings, drivers, subscription, paymentEvents } = await getRepository(
     session.businessId,
   ).getDataset();
   const period = periodFromSearchParams(params);
@@ -52,11 +54,17 @@ export default async function LoadsPage({
 
   const linkedFuel = linkedFuelByLoad(fuelEntries);
   const periodLoads = withMetricsAll(loadsInPeriod(scopedLoads, period), ratingThresholds, linkedFuel);
-  const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings);
+  const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings, paymentEvents);
   const brokers = [...new Set(loads.map((l) => l.broker).filter(Boolean))].sort() as string[];
 
   const tripExpenses = periodLoads.reduce((sum, load) => sum + load.metrics.tripExpenses, 0);
   const tripProfit = periodLoads.reduce((sum, load) => sum + load.metrics.tripProfit, 0);
+  const costBasis = trailingCostBasis(loads, expenses, settings, todayISO());
+  const allocatedOperatingCosts = roundMoney(
+    summary.totalMiles * overheadCostPerMile(costBasis),
+  );
+  const fullyLoadedOperatingProfit = roundMoney(tripProfit - allocatedOperatingCosts);
+  const debtCashBurden = roundMoney(summary.totalMiles * costBasis.debtServicePerMile);
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
@@ -80,7 +88,7 @@ export default async function LoadsPage({
 
       <section
         aria-label="Load summary"
-        className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
+        className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-9"
       >
         <MiniStat label="Loads" value={formatNumber(summary.loadCount)} sub="in period" />
         <MiniStat
@@ -105,6 +113,24 @@ export default async function LoadsPage({
           value={formatRate(summary.revenuePerMile)}
           tone="info"
           sub={`Contribution Profit ${formatMoneyCompact(tripProfit)}`}
+        />
+        <MiniStat
+          label="Allocated Operating Costs"
+          value={formatMoneyCompact(allocatedOperatingCosts)}
+          tone="negative"
+          sub={`${costBasis.basisLabel} estimate`}
+        />
+        <MiniStat
+          label="Est. Fully Loaded Operating Profit"
+          value={formatMoneyCompact(fullyLoadedOperatingProfit)}
+          tone={fullyLoadedOperatingProfit >= 0 ? "positive" : "negative"}
+          sub="does not change rating"
+        />
+        <MiniStat
+          label="Debt Cash Burden"
+          value={formatMoneyCompact(debtCashBurden)}
+          tone="warning"
+          sub="separate from profitability"
         />
       </section>
 

@@ -31,6 +31,12 @@ export const EXPENSE_CATEGORIES: CategoryDefinition[] = [
     defaultBehavior: "FIXED",
     color: "#4f46e5",
   },
+  {
+    id: "OPERATING_LEASE",
+    label: "Operating Lease",
+    defaultBehavior: "FIXED",
+    color: "#8b5cf6",
+  },
   { id: "MAINTENANCE", label: "Maintenance", defaultBehavior: "VARIABLE", color: "#14b8a6" },
   { id: "REPAIRS", label: "Repairs", defaultBehavior: "VARIABLE", color: "#ef4444" },
   { id: "PARKING", label: "Parking", defaultBehavior: "FIXED", color: "#8b5cf6" },

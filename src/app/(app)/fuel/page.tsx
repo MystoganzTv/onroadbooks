@@ -54,6 +54,7 @@ export default async function FuelPage({
     expenses: allExpenses,
     fuelEntries: allFuel,
     settings,
+    paymentEvents,
   } = await getRepository(session.businessId).getDataset();
   const period = periodFromSearchParams(params);
   const ratingThresholds = thresholdsFromSettings(settings);
@@ -65,7 +66,7 @@ export default async function FuelPage({
   const expenses = expensesForTruck(allExpenses, truckId);
   const fuelEntries = truckId ? allFuel.filter((e) => e.truckId === truckId) : allFuel;
 
-  const summary = summarizePeriod(loads, expenses, period, settings);
+  const summary = summarizePeriod(loads, expenses, period, settings, paymentEvents);
   const periodExpenses = expensesInPeriod(expenses, period);
   const periodFuel = fuelInPeriod(fuelEntries, period);
   const fuel = summarizeFuel(periodFuel, summary.totalMiles);

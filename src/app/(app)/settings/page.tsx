@@ -26,10 +26,10 @@ export default async function SettingsPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { business, settings, goals, subscription, loads, expenses, reserveAccounts } =
+  const { business, settings, goals, subscription, loads, expenses, reserveAccounts, paymentEvents } =
     await getRepository(session.businessId).getDataset();
   const period = periodFromSearchParams(params);
-  const preview = summarizePeriod(loads, expenses, period, settings);
+  const preview = summarizePeriod(loads, expenses, period, settings, paymentEvents);
   const mode = storageMode();
 
   return (

@@ -27,7 +27,7 @@ export function TodayCard({ day, className }: { day: DaySnapshot; className?: st
         <span className="flex items-center gap-2">
           <CalendarCheck className="size-3.5 text-muted-foreground" />
           <span className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            Today
+            Today Operations
           </span>
         </span>
         <span

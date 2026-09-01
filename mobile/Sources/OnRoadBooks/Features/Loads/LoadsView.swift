@@ -65,9 +65,17 @@ private struct LoadDetailRow: View {
             HStack(spacing: OBSpacing.lg) {
                 metric("Rate", load.rate.formatted(.currency(code: "USD").precision(.fractionLength(0))))
                 metric("Miles", "\(Int(load.miles))")
-                metric("Deadhead", "\(Int(load.deadheadMiles)) mi")
-                metric("Profit/mi", load.profitPerMile.formatted(.currency(code: "USD").precision(.fractionLength(2))))
+                metric("Contribution", load.contributionProfit.formatted(.currency(code: "USD").precision(.fractionLength(0))))
+                metric("Contribution/mi", load.contributionProfitPerMile.formatted(.currency(code: "USD").precision(.fractionLength(2))))
             }
+            HStack(spacing: OBSpacing.lg) {
+                metric("Direct costs", load.directTripCosts.formatted(.currency(code: "USD").precision(.fractionLength(0))))
+                metric("Est. operating", load.estimatedFullyLoadedOperatingProfit.formatted(.currency(code: "USD").precision(.fractionLength(0))))
+                metric("Debt burden", load.debtCashBurden.formatted(.currency(code: "USD").precision(.fractionLength(0))))
+            }
+            Text("Allocated operating costs and debt are separate; rating uses Contribution only.")
+                .font(.system(size: 9))
+                .foregroundStyle(OBColor.mutedForeground)
         }
         .padding(.vertical, 6)
     }

@@ -31,6 +31,10 @@ import type {
   ExpenseCategoryId,
   ExpenseScope,
   FinancialSettings,
+  FinancialTreatment,
+  FinancialObligation,
+  FinancialObligationKind,
+  PaymentEvent,
   FuelEntry,
   Load,
   LoadCapacity,
@@ -101,6 +105,37 @@ export interface ExpenseInput {
   loadId?: string | null;
   recurring: boolean;
   receiptNumber?: string | null;
+  notes?: string | null;
+  financialTreatment?: FinancialTreatment;
+  obligationId?: string | null;
+  splitGroupId?: string | null;
+}
+
+export interface FinancialObligationInput {
+  truckId?: string | null;
+  name: string;
+  kind: FinancialObligationKind;
+  counterparty?: string | null;
+  startedOn?: string | null;
+  endedOn?: string | null;
+  expectedMonthlyPayment?: number | null;
+  active?: boolean;
+}
+
+export interface DebtPaymentClassificationInput {
+  obligationId?: string | null;
+  newObligation?: FinancialObligationInput;
+  treatment: "OPERATING_LEASE" | "LOAN_SPLIT" | "DEBT_UNALLOCATED";
+  principalAmount?: number;
+  interestAmount?: number;
+}
+
+export interface PaymentEventInput {
+  loadId: string;
+  date: string;
+  amount: number;
+  method?: string | null;
+  reference?: string | null;
   notes?: string | null;
 }
 
@@ -199,6 +234,7 @@ export interface GoalInput {
   maxDeadheadPct: number;
   targetLoads?: number | null;
   workingDaysPerWeek: number;
+  expectedMonthlyMiles?: number;
 }
 
 export interface ReserveAccountInput {
@@ -264,6 +300,10 @@ export interface Repository {
   createExpense(input: ExpenseInput): Promise<Expense>;
   updateExpense(id: string, input: ExpenseInput): Promise<Expense>;
   deleteExpense(id: string): Promise<void>;
+
+  createFinancialObligation(input: FinancialObligationInput): Promise<FinancialObligation>;
+  classifyDebtPayment(id: string, input: DebtPaymentClassificationInput): Promise<Expense[]>;
+  createPaymentEvent(input: PaymentEventInput): Promise<PaymentEvent>;
 
   createFuelEntry(input: FuelEntryInput): Promise<FuelEntry>;
   updateFuelEntry(id: string, input: FuelEntryInput): Promise<FuelEntry>;

@@ -56,12 +56,12 @@ struct DashboardView: View {
 
             // Hero band — am I making money?
             //
-            // One voice, not three. Net Profit is the answer, so it keeps the
+            // One voice, not three. Operating Profit is the performance answer, so it keeps the
             // green value and the coloured badge; Revenue is the context for
             // it and its change speaks quietly. A fall still shouts, on either.
             HStack(spacing: OBSpacing.sm) {
-                StatTile(label: "Revenue", value: s.revenue, delta: s.revenueDelta, quietDelta: true)
-                StatTile(label: "Net Profit", value: s.netProfit, delta: s.netProfitDelta, valueColor: OBColor.pos)
+                StatTile(label: "Booked Revenue", value: s.bookedRevenue, delta: s.bookedRevenueDelta, quietDelta: true)
+                StatTile(label: "Operating Profit", value: s.operatingProfit, delta: s.operatingProfitDelta, valueColor: OBColor.pos)
             }
             .padding(.horizontal, OBSpacing.md)
 
@@ -71,20 +71,26 @@ struct DashboardView: View {
             // sit here decorated nothing, in a design where colour and shape
             // carry meaning.
             HStack(spacing: OBSpacing.sm) {
-                StatTile(label: "Expenses", value: s.expenses)
+                StatTile(label: "Operating Expenses", value: s.operatingExpenses)
                 StatTile(
-                    label: "Today",
-                    value: s.todayRevenue,
+                    label: "Today Operations",
+                    value: s.todayBookedRevenue,
                     footnote: s.todayLoads == 1 ? "1 load" : "\(s.todayLoads) loads"
                 )
+            }
+            .padding(.horizontal, OBSpacing.md)
+
+            HStack(spacing: OBSpacing.sm) {
+                StatTile(label: "Cash Collected Today", value: s.todayCashCollected)
+                StatTile(label: "Net Cash Activity Today", value: s.todayNetCashActivity)
             }
             .padding(.horizontal, OBSpacing.md)
 
             // Business health — cost per mile / safe to pay
             HStack(spacing: OBSpacing.sm) {
                 VStack(alignment: .leading, spacing: 6) {
-                    LabelXS("True Cost / Mile")
-                    Text(s.trueCostPerMile, format: .currency(code: "USD").precision(.fractionLength(2)))
+                    LabelXS("Actual Cost / Mile")
+                    Text(s.actualCostPerMile, format: .currency(code: "USD").precision(.fractionLength(2)))
                         .font(.title2.weight(.semibold))
                         .monospacedDigit()
                         .foregroundStyle(OBColor.foreground)
@@ -117,7 +123,7 @@ struct DashboardView: View {
                         CategoryBarRow(
                             label: row.label,
                             amount: row.amount,
-                            fraction: s.expenses > 0 ? row.amount / s.expenses : 0
+                            fraction: s.operatingExpenses > 0 ? row.amount / s.operatingExpenses : 0
                         )
                     }
                 }

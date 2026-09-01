@@ -84,7 +84,7 @@ struct DeltaPill: View {
     /// Renders as plain muted text instead of a coloured pill.
     ///
     /// Colour is a voice, and three of them shouting at once is silence. On the
-    /// hero band Net Profit is the answer to "am I making money"; Revenue is the
+    /// hero band Operating Profit is the answer to "am I making money"; Booked Revenue is the
     /// context for it, so its change speaks quietly. A NEGATIVE change is never
     /// quiet, whichever metric it belongs to — that is news.
     var quiet = false

@@ -27,14 +27,14 @@
  *
  *   sum(contributions) - overhead === revenue - every expense
  *
- * which is exactly `summarizePeriod().netProfit`. A fleet view that did not
+ * which is exactly `summarizePeriod().operatingProfit`. A fleet view that did not
  * tie back to the single number on the dashboard would be worse than none.
  */
 
 import { div, roundMoney, sum, summarizePeriod } from "../calculations";
 import { expensesForTruck, loadsForTruck, overheadExpenses } from "../fleet";
 import { inRange, type DateRange } from "../periods";
-import type { Expense, FinancialSettings, Load, Truck } from "../types";
+import type { Expense, FinancialSettings, Load, PaymentEvent, Truck } from "../types";
 import { calculateTrueCostPerMile, type CostPerMile } from "./cost-per-mile";
 import { isDebtServiceCategory, isOperatingExpenseCategory } from "./terminology";
 
@@ -135,6 +135,7 @@ export function calculateFleetSummary(
   expenses: Expense[],
   range: DateRange,
   settings: FinancialSettings,
+  paymentEvents: PaymentEvent[] = [],
 ): FleetSummary {
   const units = trucks.map((truck) => contributionFor(truck, loads, expenses, range, settings));
 
@@ -149,7 +150,7 @@ export function calculateFleetSummary(
       (e) => e.amount,
     ),
   );
-  const financial = summarizePeriod(loads, expenses, range, settings);
+  const financial = summarizePeriod(loads, expenses, range, settings, paymentEvents);
   const debtService = financial.debtService;
   const totalMiles = sum(units, (u) => u.totalMiles);
   const overheadPerMile = div(overhead, totalMiles);

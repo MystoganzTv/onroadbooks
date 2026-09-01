@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { getMobileSession } from "@/lib/auth/mobile";
 import { getRepository } from "@/lib/db";
-import { invoiceAgeDays, nextInvoiceNumber } from "@/lib/invoices";
+import { invoiceAgeDays, invoicePaymentSummary, nextInvoiceNumber } from "@/lib/invoices";
 import { todayISO } from "@/lib/periods";
 
 export const runtime = "nodejs";
@@ -29,7 +29,9 @@ export async function GET(request: NextRequest) {
     (b.invoiceDate ?? b.date).localeCompare(a.invoiceDate ?? a.date),
   );
 
-  const rows = loads.map((load) => ({
+  const rows = loads.map((load) => {
+    const payment = invoicePaymentSummary(load, dataset.paymentEvents);
+    return ({
     loadId: load.id,
     invoiceNumber: load.invoiceNumber ?? null,
     loadNumber: load.loadNumber ?? null,
@@ -44,25 +46,38 @@ export async function GET(request: NextRequest) {
     // Positive means late by that many days; null when there is nothing to be
     // late for. The web page computes overdue from exactly this.
     overdueDays: invoiceAgeDays(load),
-  }));
+    collectedAmount: payment.collected,
+    balanceAmount: payment.balance,
+    paymentEventCount: payment.eventCount,
+  });
+  });
 
   const invoiced = loads.filter((load) => load.invoiceNumber);
-  const outstanding = invoiced.filter((load) => load.status === "INVOICED");
+  const outstanding = invoiced.filter(
+    (load) => invoicePaymentSummary(load, dataset.paymentEvents).balance > 0,
+  );
   const overdue = outstanding.filter((load) => (invoiceAgeDays(load) ?? 0) > 0);
-  const paid = invoiced.filter((load) => load.status === "PAID");
-  const total = (list: typeof loads) => list.reduce((sum, load) => sum + load.grossRate, 0);
+  const outstandingTotal = (list: typeof loads) => list.reduce(
+    (sum, load) => sum + invoicePaymentSummary(load, dataset.paymentEvents).balance,
+    0,
+  );
 
   return NextResponse.json(
     {
       today,
       suggestedNumber: nextInvoiceNumber(loads, today),
       summary: {
-        outstandingAmount: total(outstanding),
+        outstandingAmount: outstandingTotal(outstanding),
         outstandingCount: outstanding.length,
-        overdueAmount: total(overdue),
+        overdueAmount: outstandingTotal(overdue),
         overdueCount: overdue.length,
-        collectedAmount: total(paid),
-        collectedCount: paid.length,
+        collectedAmount: invoiced.reduce(
+          (sum, load) => sum + invoicePaymentSummary(load, dataset.paymentEvents).collected,
+          0,
+        ),
+        collectedCount: invoiced.filter(
+          (load) => invoicePaymentSummary(load, dataset.paymentEvents).collected > 0,
+        ).length,
         uninvoicedCount: loads.filter((load) => !load.invoiceNumber).length,
       },
       invoices: rows,

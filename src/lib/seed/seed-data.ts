@@ -766,6 +766,8 @@ export function buildSeedDataset(): Dataset {
     trucks: [FIXTURE_TRUCK],
     loads: sortedLoads,
     expenses: sortedExpenses,
+    financialObligations: [],
+    paymentEvents: [],
     fuelEntries: fuelEntries.sort(byDateDesc),
     // No user is present: this object is a test fixture, never an account.
     users: [],

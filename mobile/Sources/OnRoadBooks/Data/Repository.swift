@@ -33,6 +33,7 @@ protocol LedgerRepository {
     @discardableResult func createFuelStop(_ stop: NewFuelStop) async throws -> String
     @discardableResult func issueInvoice(loadId: String, _ invoice: NewInvoice) async throws -> String
     @discardableResult func markInvoicePaid(loadId: String, on date: Date) async throws -> String
+    @discardableResult func recordInvoicePayment(loadId: String, amount: Double, on date: Date) async throws -> String
 
     /// Files a photo against a record that already exists. Never queued: a
     /// receipt has nothing to attach itself to until the expense has an id from
