@@ -11,6 +11,7 @@ protocol LedgerRepository {
     func fetchSettlements() async throws -> [SettlementPeriod]
     func fetchFuel() async throws -> FuelLedger
     func fetchInvoices() async throws -> InvoiceLedger
+    func fetchReserves() async throws -> ReserveLedger
 
     /// Both return the new record's id. They throw `APIError.refused` carrying
     /// the server's own sentence when the ledger says no -- an expired trial, a

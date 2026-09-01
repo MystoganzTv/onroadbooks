@@ -106,6 +106,50 @@ struct NewLoad {
     var otherExpenses: Double
 }
 
+// MARK: - Reserves
+
+/// One savings bucket. Distinct from `ReserveAccount`, which is the trimmed
+/// shape the dashboard needs; this carries what the Reserves screen shows.
+struct ReserveBucket: Identifiable, Hashable {
+    let id: String
+    let name: String
+    let balance: Double
+    let periodContributions: Double
+    let periodWithdrawals: Double
+    let targetBalance: Double?
+    /// Percent of the target. Nil when no target is set — and then the screen
+    /// shows no bar at all rather than an empty one.
+    let targetProgress: Double?
+    let rulePct: Double?
+    let ruleBasis: String?
+
+    var ruleLabel: String? {
+        guard let rulePct, rulePct > 0 else { return nil }
+        let basis = ruleBasis == "GROSS_REVENUE" ? "de los ingresos" : "de la ganancia"
+        return "\(Int(rulePct.rounded()))% \(basis)"
+    }
+}
+
+struct ReserveMovement: Identifiable, Hashable {
+    let id: String
+    let accountName: String
+    let date: Date
+    let amount: Double
+    let detail: String
+    /// Posted by closing a settlement rather than entered by hand.
+    let automatic: Bool
+}
+
+struct ReserveLedger {
+    let periodLabel: String
+    let total: Double
+    let periodContributions: Double
+    let periodWithdrawals: Double
+    let safeToPay: Double
+    let accounts: [ReserveBucket]
+    let movements: [ReserveMovement]
+}
+
 // MARK: - Invoices
 
 enum InvoiceStatus: String {

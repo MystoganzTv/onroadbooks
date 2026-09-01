@@ -50,6 +50,12 @@ final class APIRepository: LedgerRepository {
     private func get<T: Decodable>(_ path: String, as type: T.Type) async throws -> T {
         let (data, http) = try await client.send(client.request(path, method: "GET"))
         if http.statusCode == 401 { throw APIError.unauthorized }
+        if http.statusCode == 403,
+           let refusal = try? JSONDecoder().decode(RefusalResponse.self, from: data) {
+            // A plan gate, in the owner's own words. "No se pudo conectar"
+            // would be a lie about a request that worked perfectly.
+            throw APIError.refused(refusal.error)
+        }
         guard http.statusCode == 200 else { throw APIError.requestFailed }
         do {
             return try JSONDecoder().decode(T.self, from: data)
@@ -170,6 +176,10 @@ final class APIRepository: LedgerRepository {
 
         let (data, http) = try await client.send(request)
         return try APIClient.outcome(data, http)
+    }
+
+    func fetchReserves() async throws -> ReserveLedger {
+        try await get("api/mobile/reserves", as: ReservesResponseDTO.self).toDomain()
     }
 
     func fetchInvoices() async throws -> InvoiceLedger {
@@ -327,6 +337,62 @@ private struct NewFuelDTO: Encodable {
         odometer = stop.odometer
         location = stop.location.isEmpty ? nil : stop.location
         jurisdiction = stop.jurisdiction.isEmpty ? nil : stop.jurisdiction.uppercased()
+    }
+}
+
+private struct ReservesResponseDTO: Decodable {
+    struct Account: Decodable {
+        let id: String
+        let name: String
+        let balance: Double
+        let periodContributions: Double
+        let periodWithdrawals: Double
+        let targetBalance: Double?
+        let targetProgress: Double?
+        let rulePct: Double?
+        let ruleBasis: String?
+    }
+
+    struct Movement: Decodable {
+        let id: String
+        let accountName: String
+        let date: String
+        let amount: Double
+        let description: String
+        let automatic: Bool
+    }
+
+    let periodLabel: String
+    let total: Double
+    let periodContributions: Double
+    let periodWithdrawals: Double
+    let safeToPay: Double
+    let accounts: [Account]
+    let movements: [Movement]
+
+    func toDomain() -> ReserveLedger {
+        ReserveLedger(
+            periodLabel: periodLabel,
+            total: total,
+            periodContributions: periodContributions,
+            periodWithdrawals: periodWithdrawals,
+            safeToPay: safeToPay,
+            accounts: accounts.map {
+                ReserveBucket(
+                    id: $0.id, name: $0.name, balance: $0.balance,
+                    periodContributions: $0.periodContributions,
+                    periodWithdrawals: $0.periodWithdrawals,
+                    targetBalance: $0.targetBalance, targetProgress: $0.targetProgress,
+                    rulePct: $0.rulePct, ruleBasis: $0.ruleBasis
+                )
+            },
+            movements: movements.map {
+                ReserveMovement(
+                    id: $0.id, accountName: $0.accountName, date: ISODate.parse($0.date),
+                    amount: $0.amount, detail: $0.description, automatic: $0.automatic
+                )
+            }
+        )
     }
 }
 

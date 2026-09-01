@@ -85,6 +85,42 @@ final class MockRepository: LedgerRepository {
 
     func fetchLoads() async throws -> [Load] { loads }
 
+    func fetchReserves() async throws -> ReserveLedger {
+        // The same three buckets and the same arithmetic as fetchDashboard:
+        // tax 20% of profit, maintenance 5% of revenue, emergency 2% of revenue.
+        ReserveLedger(
+            periodLabel: "August 2026 · Full Month",
+            total: 4469.61,
+            periodContributions: 1415.87,
+            periodWithdrawals: 0,
+            safeToPay: 2235.23,
+            accounts: [
+                ReserveBucket(id: "tax", name: "Tax", balance: 2412.66,
+                              periodContributions: 730.22, periodWithdrawals: 0,
+                              targetBalance: 6000, targetProgress: 40.2,
+                              rulePct: 20, ruleBasis: "OPERATING_PROFIT"),
+                ReserveBucket(id: "maint", name: "Maintenance", balance: 1469.25,
+                              periodContributions: 489.75, periodWithdrawals: 0,
+                              targetBalance: 3000, targetProgress: 48.9,
+                              rulePct: 5, ruleBasis: "GROSS_REVENUE"),
+                ReserveBucket(id: "emerg", name: "Emergency", balance: 587.70,
+                              periodContributions: 195.90, periodWithdrawals: 0,
+                              targetBalance: nil, targetProgress: nil,
+                              rulePct: 2, ruleBasis: "GROSS_REVENUE"),
+            ],
+            movements: [
+                ReserveMovement(id: "m1", accountName: "Tax", date: mockDate(2026, 8, 16),
+                                amount: 370.11, detail: "Cierre Ago 1 – 15", automatic: true),
+                ReserveMovement(id: "m2", accountName: "Maintenance", date: mockDate(2026, 8, 16),
+                                amount: 244.88, detail: "Cierre Ago 1 – 15", automatic: true),
+                ReserveMovement(id: "m3", accountName: "Emergency", date: mockDate(2026, 8, 16),
+                                amount: 97.95, detail: "Cierre Ago 1 – 15", automatic: true),
+                ReserveMovement(id: "m4", accountName: "Maintenance", date: mockDate(2026, 8, 12),
+                                amount: -340.00, detail: "Cambio de aceite + inspección DOT", automatic: false),
+            ]
+        )
+    }
+
     func fetchInvoices() async throws -> InvoiceLedger {
         let outstanding = invoices.filter { $0.isIssued && $0.status == .invoiced }
         let overdue = outstanding.filter(\.isOverdue)

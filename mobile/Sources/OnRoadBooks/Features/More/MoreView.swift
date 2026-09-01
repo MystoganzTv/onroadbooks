@@ -52,6 +52,8 @@ struct MoreView: View {
             FuelView(repository: repository)
         case "Invoices":
             InvoicesView(repository: repository)
+        case "Reserves":
+            ReservesView(repository: repository)
         default:
             ComingSoonView(title: item.title, systemImage: item.icon)
         }
