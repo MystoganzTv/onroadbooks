@@ -14,6 +14,8 @@ import type {
   Driver,
   DriverPayType,
   DriverSettlement,
+  DriverSettlementAdjustment,
+  DriverSettlementAdjustmentType,
   FinancialGoal,
   ReserveAccount,
   ReserveBasis,
@@ -230,6 +232,12 @@ export interface DriverSettlementInput {
   notes?: string | null;
 }
 
+export interface DriverSettlementAdjustmentInput {
+  type: DriverSettlementAdjustmentType;
+  amount: number;
+  reason: string;
+}
+
 export interface GoalInput {
   monthlyRevenueTarget: number;
   monthlyProfitTarget: number;
@@ -295,6 +303,12 @@ export interface Repository {
 
   /** Freezes every still-unsettled assigned load inside the selected period. */
   createDriverSettlement(input: DriverSettlementInput): Promise<DriverSettlement>;
+  /** Draft-only additions and reductions. Paid statements stay immutable. */
+  addDriverSettlementAdjustment(
+    settlementId: string,
+    input: DriverSettlementAdjustmentInput,
+  ): Promise<DriverSettlementAdjustment>;
+  deleteDriverSettlementAdjustment(settlementId: string, adjustmentId: string): Promise<void>;
   /** Posts one Driver Pay expense per frozen line on the selected cash date. */
   payDriverSettlement(id: string, paidOn: string): Promise<DriverSettlement>;
   /** Only drafts can be deleted; paid statements are immutable. */

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { repositoryWith } from "./guards";
 import {
+  driverSettlementAdjustmentSchema,
   driverSettlementPaymentSchema,
   driverSettlementSchema,
 } from "@/lib/schemas";
@@ -17,6 +18,7 @@ function revalidateAccounting() {
   revalidatePath("/dashboard");
   revalidatePath("/fleet");
   revalidatePath("/reports");
+  revalidatePath("/drivers/[id]", "page");
 }
 
 export async function createDriverSettlementAction(values: unknown): Promise<ActionResult> {
@@ -52,6 +54,47 @@ export async function payDriverSettlementAction(values: unknown): Promise<Action
     return { ok: true, id: parsed.data.id };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Could not pay that statement." };
+  }
+}
+
+export async function addDriverSettlementAdjustmentAction(values: unknown): Promise<ActionResult> {
+  const parsed = driverSettlementAdjustmentSchema.safeParse(values);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: "Check the highlighted fields.",
+      fieldErrors: fieldErrorsFrom(parsed.error.issues),
+    };
+  }
+  try {
+    const adjustment = await (
+      await repositoryWith("fleet", "manage_driver_settlements")
+    ).addDriverSettlementAdjustment(parsed.data.settlementId, {
+      type: parsed.data.type,
+      amount: parsed.data.amount,
+      reason: parsed.data.reason,
+    });
+    revalidateAccounting();
+    revalidatePath(`/driver-settlements/${parsed.data.settlementId}`);
+    return { ok: true, id: adjustment.id };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not add that adjustment." };
+  }
+}
+
+export async function deleteDriverSettlementAdjustmentAction(
+  settlementId: string,
+  adjustmentId: string,
+): Promise<ActionResult> {
+  try {
+    await (
+      await repositoryWith("fleet", "manage_driver_settlements")
+    ).deleteDriverSettlementAdjustment(settlementId, adjustmentId);
+    revalidateAccounting();
+    revalidatePath(`/driver-settlements/${settlementId}`);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not delete that adjustment." };
   }
 }
 

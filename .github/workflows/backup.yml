@@ -5,7 +5,7 @@ name: Nightly backup
 # `scripts/backup-database.ts` is the same script that runs on the owner's Mac,
 # so there is one backup format and one implementation: dump, encrypt with
 # AES-256-GCM, then decrypt it again and read it back with pg_restore, failing
-# the run unless all 17 application tables are present.
+# the run unless all 19 application tables are present.
 #
 # The repository is PUBLIC, so the backup is never kept as a workflow artifact:
 # those are world-readable, and an encrypted ledger on the open internet is a

@@ -24,7 +24,11 @@ import {
   reconcileLoadExpenseLedger,
 } from "../load-expenses";
 import { DEFAULT_PLAN, getPlan, isComplimentaryAccess, trialEndsOn } from "../plans";
-import { calculateDriverPay } from "../driver-pay";
+import {
+  allocateDriverSettlementNetPay,
+  calculateDriverPay,
+  driverSettlementTotals,
+} from "../driver-pay";
 import { financialTreatmentForCategory } from "../finance/terminology";
 import type {
   Business,
@@ -60,6 +64,7 @@ import {
   type DocumentInput,
   type DriverInput,
   type DriverSettlementInput,
+  type DriverSettlementAdjustmentInput,
   type DebtPaymentClassificationInput,
   type ExpenseInput,
   type FinancialObligationInput,
@@ -242,6 +247,9 @@ function migrate(dataset: Dataset): Dataset {
   dataset.settlements ??= [];
   dataset.drivers ??= [];
   dataset.driverSettlements ??= [];
+  for (const settlement of dataset.driverSettlements) {
+    settlement.adjustments ??= [];
+  }
 
   const businessId = dataset.business?.id ?? "";
   dataset.goals ??= defaultGoals(businessId);
@@ -1190,6 +1198,7 @@ export class JsonRepository implements Repository {
         status: "DRAFT",
         paidOn: null,
         notes: input.notes?.trim() || null,
+        adjustments: [],
         lines: loads.map((load) => ({
           id: newId("dline"),
           settlementId,
@@ -1211,6 +1220,47 @@ export class JsonRepository implements Repository {
     }, this.businessId);
   }
 
+  async addDriverSettlementAdjustment(
+    settlementId: string,
+    input: DriverSettlementAdjustmentInput,
+  ) {
+    return mutate((dataset) => {
+      if (!Number.isFinite(input.amount) || input.amount <= 0) {
+        throw new Error("Adjustment amount must be greater than zero.");
+      }
+      if (input.reason.trim().length < 2) throw new Error("Explain this adjustment.");
+      const settlement = dataset.driverSettlements.find((row) => row.id === settlementId);
+      if (!settlement) throw new Error("That driver settlement does not belong to this workspace.");
+      if (settlement.status !== "DRAFT") throw new Error("Paid statements cannot be changed.");
+      const adjustment = {
+        id: newId("dadj"),
+        settlementId,
+        type: input.type,
+        amount: roundMoney(input.amount),
+        reason: input.reason.trim(),
+        createdAt: new Date().toISOString(),
+      };
+      const preview = { ...settlement, adjustments: [...settlement.adjustments, adjustment] };
+      if (driverSettlementTotals(preview).netPay < 0) {
+        throw new Error("This adjustment would make net pay negative.");
+      }
+      settlement.adjustments.push(adjustment);
+      return adjustment;
+    }, this.businessId);
+  }
+
+  async deleteDriverSettlementAdjustment(settlementId: string, adjustmentId: string): Promise<void> {
+    await mutate((dataset) => {
+      const settlement = dataset.driverSettlements.find((row) => row.id === settlementId);
+      if (!settlement) throw new Error("That driver settlement does not belong to this workspace.");
+      if (settlement.status !== "DRAFT") throw new Error("Paid statements cannot be changed.");
+      if (!settlement.adjustments.some((row) => row.id === adjustmentId)) {
+        throw new Error("That adjustment does not belong to this statement.");
+      }
+      settlement.adjustments = settlement.adjustments.filter((row) => row.id !== adjustmentId);
+    }, this.businessId);
+  }
+
   async payDriverSettlement(id: string, paidOn: string): Promise<DriverSettlement> {
     return mutate((dataset) => {
       const settlement = dataset.driverSettlements.find((row) => row.id === id);
@@ -1218,6 +1268,7 @@ export class JsonRepository implements Repository {
       if (settlement.status === "PAID") throw new Error("That driver settlement is already paid.");
       const driver = dataset.drivers.find((row) => row.id === settlement.driverId);
       if (!driver) throw new Error("The driver on this settlement no longer exists.");
+      const allocations = allocateDriverSettlementNetPay(settlement);
 
       for (const line of settlement.lines) {
         const load = dataset.loads.find((row) => row.id === line.loadId);
@@ -1225,7 +1276,8 @@ export class JsonRepository implements Repository {
           throw new Error("A load on this draft no longer matches its driver and truck.");
         }
         const expenseId = `expdriver_${line.id}`;
-        if (!dataset.expenses.some((expense) => expense.id === expenseId)) {
+        const allocatedPay = allocations.get(line.id) ?? 0;
+        if (allocatedPay > 0 && !dataset.expenses.some((expense) => expense.id === expenseId)) {
           dataset.expenses.push({
             id: expenseId,
             businessId: dataset.business.id,
@@ -1236,15 +1288,15 @@ export class JsonRepository implements Repository {
             category: "DRIVER_PAY",
             description: `Driver pay · ${driver.name}`,
             vendor: driver.name,
-            amount: line.payAmount,
+            amount: allocatedPay,
             recurring: false,
             receiptNumber: null,
             notes: `Posted automatically from driver settlement ${settlement.id}.`,
             createdAt: new Date().toISOString(),
           });
         }
-        line.expenseId = expenseId;
-        load.driverPay = line.payAmount;
+        line.expenseId = allocatedPay > 0 ? expenseId : null;
+        load.driverPay = allocatedPay;
       }
       settlement.status = "PAID";
       settlement.paidOn = paidOn;

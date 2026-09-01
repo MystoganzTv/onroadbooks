@@ -413,6 +413,19 @@ export const driverSettlementPaymentSchema = z.object({
   paidOn: isoDate,
 });
 
+export const driverSettlementAdjustmentSchema = z.object({
+  settlementId: z.string().trim().min(1),
+  type: z.enum([
+    "ACCESSORIAL_PAY",
+    "REIMBURSEMENT",
+    "DEDUCTION",
+    "ADVANCE",
+    "OTHER_EARNING",
+  ]),
+  amount: money.refine((value) => value > 0, "Amount must be greater than zero"),
+  reason: z.string().trim().min(2, "Explain this adjustment").max(240),
+});
+
 /* ---- Goals ----------------------------------------------------------- */
 
 export const goalSchema = z.object({

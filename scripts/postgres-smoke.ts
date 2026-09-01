@@ -7,7 +7,7 @@
  * generated ids, and a JSON column for the settlement snapshot. This script
  * exercises that seam against a real database.
  *
- *   DATABASE_URL=... npm run db:push && npm run db:seed
+ *   DATABASE_URL=... npm run db:migrate:deploy && npm run db:seed
  *   DATABASE_URL=... npm run smoke:postgres
  *
  * It asserts the rules that cannot be proven without a server:

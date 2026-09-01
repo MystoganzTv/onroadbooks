@@ -158,8 +158,14 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Create the schema
-        run: npx prisma db push --skip-generate
+      - name: Apply versioned migrations
+        run: npm run db:migrate:deploy
+
+      - name: Harden database access
+        run: npm run db:harden
+
+      - name: Verify migrations match the Prisma schema
+        run: npm run db:migrate:verify
 
       - name: Seed the demo dataset
         run: npm run db:seed

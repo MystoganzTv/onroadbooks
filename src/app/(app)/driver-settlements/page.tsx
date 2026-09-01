@@ -1,62 +1,147 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ClipboardList } from "lucide-react";
+import type { ReactNode } from "react";
+import { CalendarDays, CheckCircle2, ClipboardCheck, Clock3, type LucideIcon } from "lucide-react";
 
 import { DriverSettlementActions } from "@/components/driver-settlements/driver-settlement-actions";
 import { DriverSettlementFormDialog } from "@/components/driver-settlements/driver-settlement-form-dialog";
-import { MiniStat } from "@/components/dashboard/mini-stat";
-import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { calculateDriverPay, driverSettlementTotals, unsettledLoadsForDriver } from "@/lib/driver-pay";
-import { formatDateShort, formatMoney, formatNumber } from "@/lib/formatters";
+import { formatDateMedium, formatDateShort, formatMoney, formatRateValue } from "@/lib/formatters";
 import { hasFleetAccess } from "@/lib/plans";
+import { param, periodFromSearchParams, type SearchParams } from "@/lib/period-params";
 import { roleCan } from "@/lib/roles";
+import type { Driver, DriverSettlement } from "@/lib/types";
 
-export const metadata: Metadata = { title: "Driver Settlements" };
+export const metadata: Metadata = { title: "Driver Pay" };
 
-export default async function DriverSettlementsPage() {
+export default async function DriverSettlementsPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const params = await searchParams;
   const session = await requireSession();
   if (!roleCan(session.role ?? "VIEWER", "manage_driver_settlements")) redirect("/dashboard");
   const dataset = await getRepository(session.businessId).getDataset();
   if (!hasFleetAccess(dataset.subscription)) redirect("/settlements");
-  const canManage = true;
-  const availableDrivers = dataset.drivers.filter((driver) =>
-    unsettledLoadsForDriver(dataset.loads, dataset.driverSettlements, driver.id).length > 0,
-  );
-  const draftTotal = dataset.driverSettlements.filter((row) => row.status === "DRAFT").reduce((sum, row) => sum + driverSettlementTotals(row).payAmount, 0);
-  const paidTotal = dataset.driverSettlements.filter((row) => row.status === "PAID").reduce((sum, row) => sum + driverSettlementTotals(row).payAmount, 0);
-  const unsettledLoads = dataset.drivers.flatMap((driver) => unsettledLoadsForDriver(dataset.loads, dataset.driverSettlements, driver.id));
-  const estimated = dataset.drivers.reduce((total, driver) => total + unsettledLoadsForDriver(dataset.loads, dataset.driverSettlements, driver.id).reduce((sum, load) => sum + calculateDriverPay(driver.payType, driver.payRate, load), 0), 0);
 
-  return <div className="space-y-4 p-4 lg:p-6">
-    <PageHeader title="Driver Settlements" description="Prepare pay from assigned loads, review the frozen statement, then post it to the right loads and units." actions={canManage ? <DriverSettlementFormDialog drivers={availableDrivers} /> : null} />
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <MiniStat label="Unsettled loads" value={formatNumber(unsettledLoads.length)} />
-      <MiniStat label="Estimated unprepared" value={formatMoney(estimated)} tone="warning" />
-      <MiniStat label="Draft pay" value={formatMoney(draftTotal)} />
-      <MiniStat label="Paid statements" value={formatMoney(paidTotal)} tone="positive" />
-    </div>
-    <Card><CardContent className="p-0">
-      {dataset.driverSettlements.length === 0 ? <EmptyState icon={ClipboardList} title="No driver statements yet" description={dataset.drivers.length === 0 ? "Add a driver and assign them to loads first." : "Assign loads to a driver, then prepare a statement for their date range."} action={canManage && availableDrivers.length > 0 ? <DriverSettlementFormDialog drivers={availableDrivers} /> : undefined} /> : <div className="overflow-x-auto"><Table>
-        <TableHeader><TableRow><TableHead>Period</TableHead><TableHead>Driver</TableHead><TableHead className="text-right">Loads</TableHead><TableHead className="text-right">Trucks</TableHead><TableHead className="text-right">Gross moved</TableHead><TableHead className="text-right">Driver pay</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
-        <TableBody>{dataset.driverSettlements.map((settlement) => {
-          const total = driverSettlementTotals(settlement);
-          const driver = dataset.drivers.find((row) => row.id === settlement.driverId);
-          return <TableRow key={settlement.id}>
-            <TableCell><Link href={`/driver-settlements/${settlement.id}`} className="font-medium text-primary hover:underline">{formatDateShort(settlement.periodStart)} – {formatDateShort(settlement.periodEnd)}</Link></TableCell>
-            <TableCell>{driver?.name ?? "Unknown driver"}</TableCell><TableCell className="text-right tnum">{total.loads}</TableCell><TableCell className="text-right tnum">{new Set(settlement.lines.map((line) => line.truckId)).size}</TableCell><TableCell className="text-right tnum">{formatMoney(total.grossRevenue)}</TableCell><TableCell className="text-right tnum font-semibold">{formatMoney(total.payAmount)}</TableCell>
-            <TableCell><Badge variant={settlement.status === "PAID" ? "positive" : "warning"}>{settlement.status === "PAID" ? `Paid ${formatDateShort(settlement.paidOn!)}` : "Draft"}</Badge></TableCell>
-            <TableCell><DriverSettlementActions settlement={settlement} /></TableCell>
-          </TableRow>;
-        })}</TableBody>
-      </Table></div>}
-    </CardContent></Card>
-    <p className="text-2xs text-muted-foreground">Preparing a draft does not change profit. Marking it paid creates the operating expenses on the selected payment date and adds the frozen amount to each load’s profitability.</p>
+  const period = periodFromSearchParams(params);
+  const requestedDriver = param(params, "driver", "all");
+  const driverId = dataset.drivers.some((driver) => driver.id === requestedDriver) ? requestedDriver : null;
+  const visibleDrivers = driverId
+    ? dataset.drivers.filter((driver) => driver.id === driverId)
+    : dataset.drivers;
+
+  const needsPreparation = visibleDrivers.flatMap((driver) => {
+    const loads = unsettledLoadsForDriver(dataset.loads, dataset.driverSettlements, driver.id)
+      .filter((load) => load.date >= period.start && load.date <= period.end);
+    if (loads.length === 0) return [];
+    const estimated = loads.reduce(
+      (sum, load) => sum + calculateDriverPay(driver.payType, driver.payRate, load),
+      0,
+    );
+    return [{ driver, loads, estimated }];
+  });
+
+  const inView = dataset.driverSettlements.filter((statement) =>
+    (!driverId || statement.driverId === driverId) &&
+    statement.periodEnd >= period.start && statement.periodStart <= period.end,
+  );
+  // An unpaid draft is an action queue, not history. Never hide money waiting
+  // for review just because the owner changed the reporting period.
+  const drafts = dataset.driverSettlements.filter((statement) =>
+    statement.status === "DRAFT" && (!driverId || statement.driverId === driverId),
+  );
+  const paid = inView.filter((statement) => statement.status === "PAID");
+  const nextPayroll = needsPreparation.reduce((sum, row) => sum + row.estimated, 0);
+  const draftTotal = drafts.reduce((sum, row) => sum + driverSettlementTotals(row).netPay, 0);
+  const paidTotal = paid.reduce((sum, row) => sum + driverSettlementTotals(row).netPay, 0);
+
+  return <div className="space-y-5 p-4 lg:p-6">
+    <PageHeader
+      title="Driver Pay"
+      description="Prepare, review and pay operational driver statements without turning OnRoad Books into payroll software."
+      actions={<DriverSettlementFormDialog drivers={dataset.drivers.filter((driver) => driver.active)} defaultDriverId={driverId ?? undefined} defaultPeriodStart={period.start} defaultPeriodEnd={period.end} />}
+    />
+
+    <form method="get" className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-3">
+      <input type="hidden" name="period" value="custom" />
+      <label className="min-w-48 flex-1 text-xs font-medium text-muted-foreground">Driver
+        <select name="driver" defaultValue={driverId ?? "all"} className="mt-1 h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus-ring">
+          <option value="all">All drivers</option>
+          {dataset.drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}
+        </select>
+      </label>
+      <label className="text-xs font-medium text-muted-foreground">From<Input name="from" type="date" defaultValue={period.start} className="mt-1 w-40" /></label>
+      <label className="text-xs font-medium text-muted-foreground">To<Input name="to" type="date" defaultValue={period.end} className="mt-1 w-40" /></label>
+      <Button type="submit" variant="outline" size="sm">Apply</Button>
+    </form>
+
+    <Card className="overflow-hidden border-primary/30 bg-gradient-to-br from-primary/10 via-card to-card">
+      <CardContent className="grid gap-4 p-5 md:grid-cols-[1.4fr_repeat(3,minmax(0,1fr))] md:items-center">
+        <div><p className="label-xs">Next payroll</p><p className="mt-1 text-3xl font-semibold tracking-tight tnum">{formatMoney(nextPayroll)}</p><p className="mt-1 text-xs text-muted-foreground">Estimated base pay ready through {formatDateMedium(period.end)}</p></div>
+        <WorkflowMetric icon={Clock3} label="Needs preparation" value={formatMoney(nextPayroll)} sub={`${needsPreparation.reduce((sum, row) => sum + row.loads.length, 0)} loads`} />
+        <WorkflowMetric icon={ClipboardCheck} label="Drafts to review" value={formatMoney(draftTotal)} sub={`${drafts.length} statements`} />
+        <WorkflowMetric icon={CheckCircle2} label="Paid" value={formatMoney(paidTotal)} sub={`${paid.length} statements`} />
+      </CardContent>
+    </Card>
+
+    <WorkflowSection number="1" title="Needs preparation" description="Assigned loads that are not on a statement yet." count={needsPreparation.length}>
+      {needsPreparation.length === 0 ? <WorkflowEmpty text="No driver pay needs preparation in this period." /> : <div className="divide-y divide-border/70">
+        {needsPreparation.map(({ driver, loads, estimated }) => {
+          const miles = loads.reduce((sum, load) => sum + load.loadedMiles + load.deadheadMiles, 0);
+          return <div key={driver.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0"><Link href={`/drivers/${driver.id}`} className="font-semibold text-foreground hover:text-primary">{driver.name}</Link><p className="mt-0.5 text-xs text-muted-foreground">{loads.length} unsettled load{loads.length === 1 ? "" : "s"} · {miles.toLocaleString()} mi · {formatMoney(estimated / loads.length)}/load</p></div>
+            <div className="flex items-center justify-between gap-3 sm:justify-end"><p className="tnum text-lg font-semibold text-warn">{formatMoney(estimated)}</p><DriverSettlementFormDialog drivers={[driver]} defaultDriverId={driver.id} defaultPeriodStart={period.start} defaultPeriodEnd={period.end} /></div>
+          </div>;
+        })}
+      </div>}
+    </WorkflowSection>
+
+    <WorkflowSection number="2" title="Drafts to review" description="Check loads and adjustments before money enters the ledger." count={drafts.length}>
+      {drafts.length === 0 ? <WorkflowEmpty text="No drafts are waiting for review." /> : <StatementRows statements={drafts} drivers={dataset.drivers} />}
+    </WorkflowSection>
+
+    <WorkflowSection number="3" title="Paid" description="Permanent driver-facing statements and payment history." count={paid.length}>
+      {paid.length === 0 ? <WorkflowEmpty text="No statements were paid in this period." /> : <StatementRows statements={paid} drivers={dataset.drivers} />}
+    </WorkflowSection>
   </div>;
+}
+
+function WorkflowMetric({ icon: Icon, label, value, sub }: { icon: LucideIcon; label: string; value: string; sub: string }) {
+  return <div className="rounded-lg border border-border/80 bg-background/45 p-3"><div className="flex items-center gap-2 text-muted-foreground"><Icon className="size-4" /><span className="text-2xs font-semibold uppercase tracking-wider">{label}</span></div><p className="mt-2 tnum text-xl font-semibold">{value}</p><p className="text-2xs text-muted-foreground">{sub}</p></div>;
+}
+
+function WorkflowSection({ number, title, description, count, children }: { number: string; title: string; description: string; count: number; children: ReactNode }) {
+  return <Card><CardHeader><div className="flex items-center gap-3"><span className="flex size-7 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">{number}</span><div><CardTitle>{title}</CardTitle><p className="mt-0.5 text-xs text-muted-foreground">{description}</p></div></div><Badge>{count}</Badge></CardHeader><CardContent className="p-0">{children}</CardContent></Card>;
+}
+
+function WorkflowEmpty({ text }: { text: string }) {
+  return <div className="flex items-center gap-3 p-5 text-sm text-muted-foreground"><CheckCircle2 className="size-5 text-pos" />{text}</div>;
+}
+
+function StatementRows({ statements, drivers }: { statements: DriverSettlement[]; drivers: Driver[] }) {
+  return <div className="divide-y divide-border/70">{statements.map((statement) => {
+    const totals = driverSettlementTotals(statement);
+    const driver = drivers.find((row) => row.id === statement.driverId);
+    return <div key={statement.id} className="grid gap-3 p-4 sm:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(6rem,0.55fr))_auto] sm:items-center">
+      <div className="min-w-0"><Link href={`/driver-settlements/${statement.id}`} className="font-semibold text-primary hover:underline">{driver?.name ?? "Unknown driver"}</Link><p className="mt-0.5 text-xs text-muted-foreground"><CalendarDays className="mr-1 inline size-3" />{formatDateShort(statement.periodStart)} – {formatDateShort(statement.periodEnd)}</p></div>
+      <SmallMetric label="Loads" value={String(totals.loads)} />
+      <SmallMetric label="Gross hauled" value={formatMoney(totals.grossRevenue)} />
+      <SmallMetric label="Net pay" value={formatMoney(totals.netPay)} sub={`${formatRateValue(totals.payPerMile)}/mi`} />
+      <DriverSettlementActions settlement={statement} />
+    </div>;
+  })}</div>;
+}
+
+function SmallMetric({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return <div><p className="label-xs">{label}</p><p className="mt-0.5 tnum text-sm font-semibold">{value}</p>{sub ? <p className="text-2xs text-muted-foreground">{sub}</p> : null}</div>;
 }

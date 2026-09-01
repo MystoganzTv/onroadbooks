@@ -31,7 +31,7 @@ export function DriverSettlementActions({ settlement, showView = true }: { settl
         return;
       }
       toast.success("Driver statement paid", {
-        description: `${formatMoney(total.payAmount)} was posted to the operating ledger as Driver Pay.`,
+        description: `${formatMoney(total.netPay)} net pay was posted to the operating ledger as Driver Pay.`,
       });
       setOpen(false);
       router.refresh();
@@ -56,17 +56,17 @@ export function DriverSettlementActions({ settlement, showView = true }: { settl
           <DialogTrigger asChild><Button size="sm"><CreditCard /> Mark paid</Button></DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader><DialogTitle>Post this driver payment?</DialogTitle><DialogDescription>
-              This creates {total.loads} Driver Pay expense{total.loads === 1 ? "" : "s"}, each attached to its original load and truck. Paid statements are permanent.
+              This allocates net pay across {total.loads} load{total.loads === 1 ? "" : "s"} and posts it to the operating ledger. Paid statements are permanent.
             </DialogDescription></DialogHeader>
             <DialogBody className="space-y-3">
-              <div className="rounded-md border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Amount to post</p><p className="mt-1 text-xl font-semibold tnum">{formatMoney(total.payAmount)}</p></div>
+              <div className="rounded-md border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Net pay to post</p><p className="mt-1 text-xl font-semibold tnum">{formatMoney(total.netPay)}</p></div>
               <label className="block text-sm font-medium" htmlFor={`paid-on-${settlement.id}`}>Payment date</label>
               <Input id={`paid-on-${settlement.id}`} type="date" value={paidOn} onChange={(event) => setPaidOn(event.target.value)} />
             </DialogBody>
             <DialogFooter><Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={pending}>Cancel</Button><Button size="sm" onClick={pay} disabled={pending}>{pending ? <Loader2 className="animate-spin" /> : <CreditCard />} Post payment</Button></DialogFooter>
           </DialogContent>
         </Dialog>
-        <ConfirmDelete label={`${total.loads} frozen load${total.loads === 1 ? "" : "s"} · ${formatMoney(total.payAmount)}`} entity="draft" consequences={["the frozen pay calculation (the loads themselves remain untouched)"]} onConfirm={remove} />
+        <ConfirmDelete label={`${total.loads} frozen load${total.loads === 1 ? "" : "s"} · ${formatMoney(total.netPay)}`} entity="draft" consequences={["the frozen pay calculation and its adjustments (the loads themselves remain untouched)"]} onConfirm={remove} />
       </> : null}
     </div>
   );

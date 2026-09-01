@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import Script from "next/script";
 import { Loader2 } from "lucide-react";
 
@@ -19,7 +18,7 @@ type GoogleIdentityApi = {
     parent: HTMLElement,
     options: {
       type: "standard";
-      theme: "outline";
+      theme: "outline_dark";
       size: "large";
       text: "continue_with";
       shape: "rectangular";
@@ -106,7 +105,7 @@ export function AuthOptions({ next = null }: { next?: string | null }) {
 
       window.google.accounts.id.renderButton(buttonRef.current, {
         type: "standard",
-        theme: "outline",
+        theme: "outline_dark",
         size: "large",
         text: "continue_with",
         shape: "rectangular",
@@ -137,7 +136,7 @@ export function AuthOptions({ next = null }: { next?: string | null }) {
         onReady={() => void initializeGoogle()}
         onError={() => setError("Could not load Google sign-in. Try again.")}
       />
-      <div className="relative min-h-10 w-full" aria-busy={pending}>
+      <div className="relative min-h-9 w-full" aria-busy={pending}>
         <div
           ref={buttonRef}
           className={`gis-button-host${pending ? " pointer-events-none opacity-60" : ""}`}
@@ -159,18 +158,6 @@ export function AuthOptions({ next = null }: { next?: string | null }) {
           {error}
         </p>
       ) : null}
-      <p className="text-center text-[10px] leading-relaxed text-muted-foreground">
-        By continuing, you agree to the{" "}
-        <Link href="/terms" className="underline underline-offset-2 hover:text-foreground">
-          Terms
-        </Link>{" "}
-        and acknowledge the{" "}
-        <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">
-          Privacy Policy
-        </Link>
-        .
-      </p>
-
       <div className="flex items-center gap-3 text-2xs uppercase tracking-[0.12em] text-muted-foreground">
         <span className="h-px flex-1 bg-border" />
         Or continue with email

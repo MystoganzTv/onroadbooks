@@ -1112,6 +1112,26 @@ describe("drivers and driver statements", () => {
     assert.equal(statement.lines[0].payAmount, 300);
     assert.equal(statement.lines[0].truckId, truck.id);
 
+    const accessorial = await repo.addDriverSettlementAdjustment(statement.id, {
+      type: "ACCESSORIAL_PAY",
+      amount: 50,
+      reason: "Detention at receiver",
+    });
+    const advance = await repo.addDriverSettlementAdjustment(statement.id, {
+      type: "ADVANCE",
+      amount: 20,
+      reason: "Fuel advance",
+    });
+    await repo.deleteDriverSettlementAdjustment(statement.id, advance.id);
+    await assert.rejects(
+      () => repo.addDriverSettlementAdjustment(statement.id, {
+        type: "DEDUCTION",
+        amount: 1000,
+        reason: "Invalid over-deduction",
+      }),
+      /net pay negative/,
+    );
+
     await assert.rejects(
       () => repo.createDriverSettlement({
         driverId: driver.id,
@@ -1132,12 +1152,16 @@ describe("drivers and driver statements", () => {
     const line = after.driverSettlements.find((row) => row.id === statement.id)!.lines[0];
     const booked = after.expenses.find((row) => row.id === line.expenseId);
     assert.equal(booked?.category, "DRIVER_PAY");
-    assert.equal(booked?.amount, 300);
+    assert.equal(booked?.amount, 350);
     assert.equal(booked?.truckId, truck.id);
     assert.equal(booked?.loadId, load.id);
-    assert.equal(after.loads.find((row) => row.id === load.id)?.driverPay, 300);
+    assert.equal(after.loads.find((row) => row.id === load.id)?.driverPay, 350);
 
     await assert.rejects(() => repo.deleteExpense(booked!.id), /cannot be deleted/);
+    await assert.rejects(
+      () => repo.deleteDriverSettlementAdjustment(statement.id, accessorial.id),
+      /Paid statements cannot be changed/,
+    );
     await assert.rejects(() => repo.deleteLoad(load.id), /paid statements cannot be changed/);
     await assert.rejects(() => repo.deleteDriverSettlement(statement.id), /permanent accounting/);
   });

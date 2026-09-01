@@ -88,6 +88,33 @@ the free plan) and this has to shrink again. The order to cut in: the build
 first (Vercel already builds every push), then the browser and Postgres jobs
 back to pull requests and a nightly schedule. Never the fast gates.
 
+## Database migrations and production deployment
+
+`prisma/schema.prisma` and `prisma/migrations/` are one change. Never deploy a
+schema edit without its migration, and never use `prisma db push` against a
+shared or production database.
+
+The PostgreSQL CI job starts from an empty database and runs, in order:
+
+1. `npm run db:migrate:deploy`;
+2. `npm run db:harden`;
+3. `npm run db:migrate:verify`; and
+4. the seed and real-Postgres smoke suite.
+
+That proves the committed migration history can recreate the declared schema.
+Vercel uses `scripts/vercel-build.mjs`. Preview builds compile without touching
+production. A Production build first applies pending migrations, re-applies the
+idempotent Supabase RLS/Data API hardening, and verifies there is no schema
+drift. Only then does `next build` run, so code that needs a new column cannot
+be promoted before that column exists.
+
+Production schema changes must remain backward-compatible with the currently
+running deployment. Use expand/contract changes: add nullable columns/tables
+first, deploy code that can read both shapes, backfill if needed, and remove old
+schema only in a later release. A failed build can leave an additive migration
+applied even though the new code was not promoted; expand/contract makes that
+safe.
+
 ## Nightly backup in the cloud
 
 `.github/workflows/backup.yml` runs the same `scripts/backup-database.ts` the
@@ -141,7 +168,7 @@ under a scrypt key derived from `BACKUP_PASSPHRASE`, writes
 `onroadbooks-<UTC timestamp>.dump.enc` into `BACKUP_DIR` (default
 `~/OnRoadBooksBackups`, and never inside this repository), then decrypts what
 it just wrote and reads its table of contents back with `pg_restore` to prove
-all 17 application tables are in it. A run that cannot prove that fails.
+all 19 application tables are in it. A run that cannot prove that fails.
 
 Old files are pruned past `BACKUP_KEEP_DAYS` (default 30), except that the
 seven newest always survive -- a machine left off for two months must not
@@ -180,7 +207,7 @@ The drill uses PostgreSQL 17 client tools to:
 1. create a logical, read-only dump of the production `public` schema;
 2. initialize a disposable PostgreSQL cluster on localhost;
 3. restore the dump with stop-on-error semantics;
-4. compare row counts and checksums for all 17 application tables;
+4. compare row counts and checksums for all 19 application tables;
 5. confirm RLS survived the restore; and
 6. stop the temporary server and securely remove the dump and data directory.
 

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, FileText, Fuel, MapPin, Package, Pencil, Receipt } from "lucide-react";
+import { FileText, Fuel, MapPin, Package, Pencil, Receipt } from "lucide-react";
 
 import { DocumentList } from "@/components/documents/document-list";
 import { DocumentUploader } from "@/components/documents/document-uploader";
@@ -9,6 +8,7 @@ import { DeleteLoadButton } from "@/components/loads/delete-load-button";
 import { TripWaterfall } from "@/components/loads/trip-waterfall";
 import { LoadFormDialog } from "@/components/loads/load-form-dialog";
 import { LoadStatusControl } from "@/components/loads/load-status-control";
+import { HistoryBackButton } from "@/components/shared/history-back-button";
 import { Metric } from "@/components/shared/metric";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -91,12 +91,7 @@ export default async function LoadDetailPage({
     <div className="space-y-4 p-4 lg:p-6">
       <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <Button asChild variant="ghost" size="sm" className="-ml-2 mb-1 text-muted-foreground">
-            <Link href="/loads">
-              <ArrowLeft />
-              All loads
-            </Link>
-          </Button>
+          <HistoryBackButton fallbackHref="/loads" label="Back" className="-ml-2 mb-1" />
           <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
             <MapPin className="size-4 shrink-0 text-muted-foreground" />
             <span className="truncate">{route}</span>

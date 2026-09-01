@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ChevronLeft, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 
 import { PeriodControls } from "@/components/dashboard/period-controls";
 import { MiniStat } from "@/components/dashboard/mini-stat";
 import { ExportMenu } from "@/components/reports/export-menu";
+import { HistoryBackButton } from "@/components/shared/history-back-button";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -102,13 +103,11 @@ export default async function FleetUnitPage({
   return (
     <div className="report-doc space-y-4 p-4 lg:p-6 print:p-0">
       <div className="print:hidden">
-        <Link
-          href={`/fleet?${periodQuery(period)}`}
-          className="mb-3 inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeft className="size-3.5" aria-hidden />
-          Back to fleet
-        </Link>
+        <HistoryBackButton
+          fallbackHref={`/fleet?${periodQuery(period)}`}
+          label="Back"
+          className="-ml-2 mb-3"
+        />
         <PageHeader
           title={truck.name}
           description={`${vehicle || "Vehicle details not added"} · ${period.label}`}

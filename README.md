@@ -382,9 +382,17 @@ DIRECT_URL="postgresql://postgres.<ref>:<pw>@aws-0-<region>.pooler.supabase.com:
 
 ```bash
 npm run db:generate   # regenerate the client
-npm run db:push       # create tables
+npm run db:migrate:deploy # create/update tables from versioned migrations
+npm run db:harden     # keep the ledger private from the Supabase Data API
 npm run db:seed       # load the local QA reference fixture
 ```
+
+Schema changes are migration-first. Edit `prisma/schema.prisma`, create a
+reviewable migration with `npm run db:migrate:create -- --name <change>`, then
+apply it locally with `npm run db:migrate:dev`. Commit the schema and migration
+together. `prisma db push` is deliberately not a package script: production
+deployments run `prisma migrate deploy`, harden Data API access, and fail before
+the Next.js build if the resulting database differs from the Prisma schema.
 
 No application code changes. If `DATA_SOURCE` is anything other than `postgres`,
 or `DATABASE_URL` is not a Postgres URL, the app falls back to the JSON store
@@ -412,7 +420,12 @@ single-truck ledger written before any of this upgrades in place -- covered by
 | `npm test` | the test suite (see below) |
 | `npm run test:e2e` | Playwright browser flows against an isolated local ledger |
 | `npm run db:generate` | regenerate the Prisma client |
-| `npm run db:push` | push the schema to Postgres |
+| `npm run db:migrate:create -- --name <change>` | generate a reviewable migration without applying the new change |
+| `npm run db:migrate:dev` | apply pending migrations in development |
+| `npm run db:migrate:deploy` | apply pending migrations in CI, staging or production |
+| `npm run db:migrate:status` | report applied and pending migrations |
+| `npm run db:migrate:verify` | fail when the live schema differs from `schema.prisma` |
+| `npm run db:harden` | enable RLS and revoke Supabase Data API grants |
 | `npm run db:seed` | seed Postgres with the local QA reference fixture |
 | `npm run smoke:postgres` | check the Prisma store against a live database |
 | `npm run certify:database` | audit production RLS/Data API and run an isolated import + Postgres smoke test |

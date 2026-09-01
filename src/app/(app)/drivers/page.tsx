@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { DriverFormDialog } from "@/components/drivers/driver-form-dialog";
@@ -76,7 +77,7 @@ export default async function DriversPage() {
                   const loads = unsettledLoadsForDriver(dataset.loads, dataset.driverSettlements, driver.id);
                   const due = loads.reduce((sum, load) => sum + calculateDriverPay(driver.payType, driver.payRate, load), 0);
                   return <TableRow key={driver.id}>
-                    <TableCell><p className="font-medium">{driver.name}</p><p className="text-2xs text-muted-foreground">{driver.reference ?? "No internal reference"}</p></TableCell>
+                    <TableCell><Link href={`/drivers/${driver.id}`} className="font-medium text-primary hover:underline">{driver.name}</Link><p className="text-2xs text-muted-foreground">{driver.reference ?? "No internal reference"}</p></TableCell>
                     <TableCell>{dataset.trucks.find((truck) => truck.id === driver.defaultTruckId)?.name ?? "Any unit"}</TableCell>
                     <TableCell>{driverPayDescription(driver)}</TableCell>
                     <TableCell className="text-right tnum">{loads.length}</TableCell>

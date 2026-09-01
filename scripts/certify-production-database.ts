@@ -186,7 +186,29 @@ async function certifyIsolatedImport(baseUrl: string): Promise<void> {
       ONROAD_DATA_DIR: fixtureDir,
       IMPORT_BUSINESS_ID: source.business.id,
     };
-    run("npx", ["prisma", "db", "push", "--skip-generate"], env);
+    run("npx", ["prisma", "migrate", "deploy"], env);
+    run(
+      "npx",
+      ["prisma", "db", "execute", "--file", "prisma/harden-data-api.sql", "--schema", "prisma/schema.prisma"],
+      env,
+    );
+    const isolated = new PrismaClient({ datasourceUrl: isolatedUrl });
+    try {
+      const [rls] = await isolated.$queryRaw<Array<{ tables: bigint; protected: bigint }>>`
+        select
+          count(*)::bigint as tables,
+          count(*) filter (where c.relrowsecurity)::bigint as protected
+        from pg_class c
+        join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = current_schema()
+          and c.relkind = 'r'
+          and c.relname in (${Prisma.join(APPLICATION_TABLES)})
+      `;
+      assert.equal(Number(rls?.tables ?? 0), APPLICATION_TABLES.length);
+      assert.equal(Number(rls?.protected ?? 0), APPLICATION_TABLES.length);
+    } finally {
+      await isolated.$disconnect();
+    }
     run(
       process.execPath,
       ["--conditions=react-server", "--import", "tsx", "scripts/import-json-to-postgres.ts"],

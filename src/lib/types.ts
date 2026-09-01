@@ -44,6 +44,13 @@ export type DriverPayType =
 
 export type DriverSettlementStatus = "DRAFT" | "PAID";
 
+export type DriverSettlementAdjustmentType =
+  | "ACCESSORIAL_PAY"
+  | "REIMBURSEMENT"
+  | "DEDUCTION"
+  | "ADVANCE"
+  | "OTHER_EARNING";
+
 /** Explicit financial meaning of an expense row, independent of its UI label. */
 export type FinancialTreatment =
   | "OPERATING"
@@ -710,6 +717,16 @@ export interface DriverSettlementLine {
   createdAt: string;
 }
 
+export interface DriverSettlementAdjustment {
+  id: string;
+  settlementId: string;
+  type: DriverSettlementAdjustmentType;
+  /** Always stored as a positive magnitude; type determines the direction. */
+  amount: number;
+  reason: string;
+  createdAt: string;
+}
+
 export interface DriverSettlement {
   id: string;
   businessId: string;
@@ -720,6 +737,7 @@ export interface DriverSettlement {
   paidOn: string | null;
   notes: string | null;
   lines: DriverSettlementLine[];
+  adjustments: DriverSettlementAdjustment[];
   createdAt: string;
 }
 

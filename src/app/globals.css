@@ -393,10 +393,20 @@
  * Nothing Google renders may exceed its slot, whatever width it decides on.
  */
 .gis-button-host {
+  display: flex;
+  min-height: 2.25rem;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
+  border-radius: calc(var(--radius) - 2px);
 }
 
-.gis-button-host > div,
+.gis-button-host > div {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
 .gis-button-host iframe {
   max-width: 100% !important;
 }

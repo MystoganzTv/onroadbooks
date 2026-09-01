@@ -150,6 +150,14 @@ enum DriverSettlementStatus {
   PAID
 }
 
+enum DriverSettlementAdjustmentType {
+  ACCESSORIAL_PAY
+  REIMBURSEMENT
+  DEDUCTION
+  ADVANCE
+  OTHER_EARNING
+}
+
 enum PlanId {
   /// Kept for rows created before the three-tier catalogue. The application
   /// reads it as OWNER; removing it would make Prisma unable to decode those
@@ -651,10 +659,25 @@ model DriverSettlement {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  lines DriverSettlementLine[]
+  lines       DriverSettlementLine[]
+  adjustments DriverSettlementAdjustment[]
 
   @@index([businessId, periodStart])
   @@index([driverId, periodStart])
+}
+
+model DriverSettlementAdjustment {
+  id           String           @id @default(cuid())
+  settlementId String
+  settlement   DriverSettlement @relation(fields: [settlementId], references: [id], onDelete: Cascade)
+
+  type   DriverSettlementAdjustmentType
+  amount Decimal                        @db.Decimal(12, 2)
+  reason String
+
+  createdAt DateTime @default(now())
+
+  @@index([settlementId, createdAt])
 }
 
 model DriverSettlementLine {

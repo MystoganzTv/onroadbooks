@@ -231,6 +231,13 @@ test.describe.serial("critical browser flows", () => {
       assignDriver: true,
     });
 
+    await page.goto("/drivers");
+    const driverHref = await page.getByRole("link", { name: "Jordan Miles", exact: true }).getAttribute("href");
+    await page.goto(`${driverHref}?month=2026-08&period=full`);
+    await expect(page.getByRole("heading", { name: "Jordan Miles" })).toBeVisible();
+    await expect(page.getByText("Period performance")).toBeVisible();
+    await expect(page.getByText("Loads ready for payroll")).toBeVisible();
+
     await page.goto("/driver-settlements");
     await page.getByRole("button", { name: "Prepare statement" }).first().click();
     await page.locator("#statement-start").fill("2026-08-01");
@@ -238,10 +245,28 @@ test.describe.serial("critical browser flows", () => {
     await page.getByRole("button", { name: "Prepare draft" }).click();
     await expect(page).toHaveURL(/\/driver-settlements\/[^/]+$/);
     await expect(page.getByText("Draft", { exact: true }).first()).toBeVisible();
+    await page.getByRole("button", { name: "Add adjustment" }).click();
+    await page.locator("#adjustment-amount").fill("35");
+    await page.locator("#adjustment-reason").fill("Detention at receiver");
+    await page.getByRole("button", { name: "Add to draft" }).click();
+    await expect(page.getByText("Detention at receiver")).toBeVisible();
+    await expect(page.getByText("Gross pay → adjustments → net pay")).toBeVisible();
+
+    // Back controls follow the path the owner actually took. They must not
+    // guess a fixed destination and discard list/detail context.
+    const statementUrl = page.url();
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await expect(page).toHaveURL(/\/driver-settlements$/);
+    await page.getByRole("link", { name: "View", exact: true }).click();
+    await expect(page).toHaveURL(statementUrl);
+    await page.getByRole("link", { name: /Richmond, VA → Frederick, MD/ }).click();
+    await expect(page).toHaveURL(/\/loads\/[^/]+$/);
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await expect(page).toHaveURL(statementUrl);
 
     await page.getByRole("button", { name: "Mark paid" }).click();
     await page.getByRole("button", { name: "Post payment" }).click();
-    await expect(page.getByText("Paid", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText(/^Paid /).first()).toBeVisible();
   });
 
   test("role boundaries are visible and enforced in the browser", async ({ page }) => {

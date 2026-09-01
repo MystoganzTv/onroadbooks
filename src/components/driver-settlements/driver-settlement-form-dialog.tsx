@@ -26,15 +26,27 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-export function DriverSettlementFormDialog({ drivers }: { drivers: Driver[] }) {
+export function DriverSettlementFormDialog({
+  drivers,
+  defaultDriverId,
+  defaultPeriodStart,
+  defaultPeriodEnd,
+}: {
+  drivers: Driver[];
+  defaultDriverId?: string;
+  defaultPeriodStart?: string;
+  defaultPeriodEnd?: string;
+}) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const today = todayISO();
-  const [driverId, setDriverId] = React.useState(drivers[0]?.id ?? "");
-  const [periodStart, setPeriodStart] = React.useState(`${today.slice(0, 7)}-01`);
-  const [periodEnd, setPeriodEnd] = React.useState(today);
+  const [driverId, setDriverId] = React.useState(
+    drivers.some((driver) => driver.id === defaultDriverId) ? defaultDriverId! : drivers[0]?.id ?? "",
+  );
+  const [periodStart, setPeriodStart] = React.useState(defaultPeriodStart ?? `${today.slice(0, 7)}-01`);
+  const [periodEnd, setPeriodEnd] = React.useState(defaultPeriodEnd ?? today);
   const [notes, setNotes] = React.useState("");
 
   function submit(event: React.FormEvent) {

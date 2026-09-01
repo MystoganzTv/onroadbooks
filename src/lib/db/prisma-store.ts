@@ -3,7 +3,10 @@ import "server-only";
 import type { Prisma } from "@/generated/prisma";
 
 import { roundMoney } from "../calculations";
-import { calculateDriverPay } from "../driver-pay";
+import {
+  allocateDriverSettlementNetPay,
+  calculateDriverPay,
+} from "../driver-pay";
 import type {
   Business,
   User,
@@ -58,6 +61,7 @@ import type {
   DocumentInput,
   DriverInput,
   DriverSettlementInput,
+  DriverSettlementAdjustmentInput,
   DebtPaymentClassificationInput,
   ExpenseInput,
   FinancialObligationInput,
@@ -791,7 +795,10 @@ export class PrismaRepository implements Repository {
       }),
       client.driverSettlement.findMany({
         where: { businessId: business.id },
-        include: { lines: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
+        include: {
+          lines: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
+          adjustments: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
+        },
         orderBy: [{ periodStart: "desc" }, { id: "desc" }],
       }),
       client.financialObligation.findMany({
@@ -1008,6 +1015,14 @@ export class PrismaRepository implements Repository {
           paidOn: row.paidOn ? isoDate(row.paidOn) : null,
           notes: row.notes,
           createdAt: row.createdAt.toISOString(),
+          adjustments: row.adjustments.map((adjustment) => ({
+            id: adjustment.id,
+            settlementId: adjustment.settlementId,
+            type: adjustment.type,
+            amount: num(adjustment.amount),
+            reason: adjustment.reason,
+            createdAt: adjustment.createdAt.toISOString(),
+          })),
           lines: row.lines.map((line) => ({
             id: line.id,
             settlementId: line.settlementId,
@@ -1476,18 +1491,107 @@ export class PrismaRepository implements Repository {
     return dataset.driverSettlements.find((settlement) => settlement.id === row.id)!;
   }
 
+  async addDriverSettlementAdjustment(
+    settlementId: string,
+    input: DriverSettlementAdjustmentInput,
+  ) {
+    if (!Number.isFinite(input.amount) || input.amount <= 0) {
+      throw new Error("Adjustment amount must be greater than zero.");
+    }
+    if (input.reason.trim().length < 2) throw new Error("Explain this adjustment.");
+    const client = await getClient();
+    const business = await this.business(client);
+    const settlement = await client.driverSettlement.findFirst({
+      where: { id: settlementId, businessId: business.id },
+      include: { lines: true, adjustments: true },
+    });
+    if (!settlement) throw new Error("That driver settlement does not belong to this workspace.");
+    if (settlement.status !== "DRAFT") throw new Error("Paid statements cannot be changed.");
+    const basePay = settlement.lines.reduce((sum, line) => sum + num(line.payAmount), 0);
+    const signedExisting = settlement.adjustments.reduce((sum, row) =>
+      sum + (row.type === "DEDUCTION" || row.type === "ADVANCE" ? -num(row.amount) : num(row.amount)), 0);
+    const signedNew = input.type === "DEDUCTION" || input.type === "ADVANCE" ? -input.amount : input.amount;
+    if (roundMoney(basePay + signedExisting + signedNew) < 0) {
+      throw new Error("This adjustment would make net pay negative.");
+    }
+    const row = await client.driverSettlementAdjustment.create({
+      data: {
+        settlementId,
+        type: input.type,
+        amount: input.amount,
+        reason: input.reason.trim(),
+      },
+    });
+    return {
+      id: row.id,
+      settlementId: row.settlementId,
+      type: row.type,
+      amount: num(row.amount),
+      reason: row.reason,
+      createdAt: row.createdAt.toISOString(),
+    };
+  }
+
+  async deleteDriverSettlementAdjustment(settlementId: string, adjustmentId: string): Promise<void> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const settlement = await client.driverSettlement.findFirst({
+      where: { id: settlementId, businessId: business.id },
+    });
+    if (!settlement) throw new Error("That driver settlement does not belong to this workspace.");
+    if (settlement.status !== "DRAFT") throw new Error("Paid statements cannot be changed.");
+    const deleted = await client.driverSettlementAdjustment.deleteMany({
+      where: { id: adjustmentId, settlementId },
+    });
+    if (deleted.count !== 1) throw new Error("That adjustment does not belong to this statement.");
+  }
+
   async payDriverSettlement(id: string, paidOn: string): Promise<DriverSettlement> {
     const client = await getClient();
     const business = await this.business(client);
     await client.$transaction(async (tx) => {
       const settlement = await tx.driverSettlement.findFirst({
         where: { id, businessId: business.id },
-        include: { driver: true, lines: { include: { load: true } } },
+        include: { driver: true, lines: { include: { load: true } }, adjustments: true },
       });
       if (!settlement) {
         throw new Error("That driver settlement does not belong to this workspace.");
       }
       if (settlement.status === "PAID") throw new Error("That driver settlement is already paid.");
+      const domainSettlement: DriverSettlement = {
+        id: settlement.id,
+        businessId: settlement.businessId,
+        driverId: settlement.driverId,
+        periodStart: isoDate(settlement.periodStart),
+        periodEnd: isoDate(settlement.periodEnd),
+        status: settlement.status,
+        paidOn: settlement.paidOn ? isoDate(settlement.paidOn) : null,
+        notes: settlement.notes,
+        createdAt: settlement.createdAt.toISOString(),
+        adjustments: settlement.adjustments.map((row) => ({
+          id: row.id,
+          settlementId: row.settlementId,
+          type: row.type,
+          amount: num(row.amount),
+          reason: row.reason,
+          createdAt: row.createdAt.toISOString(),
+        })),
+        lines: settlement.lines.map((line) => ({
+          id: line.id,
+          settlementId: line.settlementId,
+          loadId: line.loadId,
+          truckId: line.truckId,
+          grossRevenue: num(line.grossRevenue),
+          loadedMiles: line.loadedMiles,
+          totalMiles: line.totalMiles,
+          payType: line.payType,
+          payRate: num(line.payRate),
+          payAmount: num(line.payAmount),
+          expenseId: line.expenseId,
+          createdAt: line.createdAt.toISOString(),
+        })),
+      };
+      const allocations = allocateDriverSettlementNetPay(domainSettlement);
 
       for (const line of settlement.lines) {
         if (
@@ -1497,31 +1601,34 @@ export class PrismaRepository implements Repository {
           throw new Error("A load on this draft no longer matches its driver and truck.");
         }
         const expenseId = `expdriver_${line.id}`;
-        await tx.expense.upsert({
-          where: { id: expenseId },
-          create: {
-            id: expenseId,
-            businessId: business.id,
-            truckId: line.truckId,
-            scope: "TRUCK",
-            loadId: line.loadId,
-            date: toDate(paidOn),
-            category: "DRIVER_PAY",
-            description: `Driver pay · ${settlement.driver.name}`,
-            vendor: settlement.driver.name,
-            amount: line.payAmount,
-            recurring: false,
-            notes: `Posted automatically from driver settlement ${settlement.id}.`,
-          },
-          update: {},
-        });
+        const allocatedPay = allocations.get(line.id) ?? 0;
+        if (allocatedPay > 0) {
+          await tx.expense.upsert({
+            where: { id: expenseId },
+            create: {
+              id: expenseId,
+              businessId: business.id,
+              truckId: line.truckId,
+              scope: "TRUCK",
+              loadId: line.loadId,
+              date: toDate(paidOn),
+              category: "DRIVER_PAY",
+              description: `Driver pay · ${settlement.driver.name}`,
+              vendor: settlement.driver.name,
+              amount: allocatedPay,
+              recurring: false,
+              notes: `Net pay allocated from driver settlement ${settlement.id}.`,
+            },
+            update: {},
+          });
+        }
         await tx.driverSettlementLine.update({
           where: { id: line.id },
-          data: { expenseId },
+          data: { expenseId: allocatedPay > 0 ? expenseId : null },
         });
         await tx.load.update({
           where: { id: line.loadId },
-          data: { driverPay: line.payAmount },
+          data: { driverPay: allocatedPay },
         });
       }
       await tx.driverSettlement.update({

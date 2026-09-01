@@ -343,12 +343,10 @@ export default async function DashboardPage({
         title="The bottom line"
         description={`${period.label} · ${summary.loadCount} ${summary.loadCount === 1 ? "load" : "loads"} · ${formatMiles(summary.totalMiles)}`}
       >
-        <div className="grid gap-3 xl:grid-cols-3">
-          <div className="min-w-0 xl:col-span-2">
+        <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(20rem,0.9fr)]">
+          <div className="min-w-0">
             <HeroMetrics
               summary={summary}
-              previous={priorSummary}
-              ownerPay={cockpit && ownerPlanning ? ownerPay : undefined}
               previousLabel={prior.shortLabel}
               deltas={{
                 revenue: pctChange(summary.bookedRevenue, priorSummary.bookedRevenue),

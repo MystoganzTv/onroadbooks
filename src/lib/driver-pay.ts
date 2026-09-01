@@ -3,6 +3,8 @@ import type {
   Driver,
   DriverPayType,
   DriverSettlement,
+  DriverSettlementAdjustment,
+  DriverSettlementAdjustmentType,
   Load,
 } from "./types";
 
@@ -73,13 +75,87 @@ export function unsettledLoadsForDriver(
 }
 
 export function driverSettlementTotals(settlement: DriverSettlement) {
-  return settlement.lines.reduce(
+  const loadTotals = settlement.lines.reduce(
     (total, line) => ({
       loads: total.loads + 1,
       grossRevenue: roundMoney(total.grossRevenue + line.grossRevenue),
       totalMiles: total.totalMiles + line.totalMiles,
-      payAmount: roundMoney(total.payAmount + line.payAmount),
+      basePay: roundMoney(total.basePay + line.payAmount),
     }),
-    { loads: 0, grossRevenue: 0, totalMiles: 0, payAmount: 0 },
+    { loads: 0, grossRevenue: 0, totalMiles: 0, basePay: 0 },
   );
+  const adjustments = settlement.adjustments ?? [];
+  const accessorialPay = adjustmentTotal(adjustments, "ACCESSORIAL_PAY");
+  const reimbursements = adjustmentTotal(adjustments, "REIMBURSEMENT");
+  const otherEarnings = adjustmentTotal(adjustments, "OTHER_EARNING");
+  const deductions = adjustmentTotal(adjustments, "DEDUCTION");
+  const advances = adjustmentTotal(adjustments, "ADVANCE");
+  const additions = roundMoney(accessorialPay + reimbursements + otherEarnings);
+  const reductions = roundMoney(deductions + advances);
+  const netPay = roundMoney(loadTotals.basePay + additions - reductions);
+
+  return {
+    ...loadTotals,
+    accessorialPay,
+    reimbursements,
+    otherEarnings,
+    deductions,
+    advances,
+    additions,
+    reductions,
+    netPay,
+    /** Backward-compatible name used by existing summaries. It now means net pay. */
+    payAmount: netPay,
+    payPerLoad: loadTotals.loads > 0 ? roundMoney(netPay / loadTotals.loads) : 0,
+    payPerMile: loadTotals.totalMiles > 0 ? roundMoney(netPay / loadTotals.totalMiles) : 0,
+  };
+}
+
+export const DRIVER_ADJUSTMENT_TYPES: {
+  id: DriverSettlementAdjustmentType;
+  label: string;
+  direction: "ADD" | "SUBTRACT";
+}[] = [
+  { id: "ACCESSORIAL_PAY", label: "Accessorial pay", direction: "ADD" },
+  { id: "REIMBURSEMENT", label: "Reimbursement", direction: "ADD" },
+  { id: "OTHER_EARNING", label: "Other earning", direction: "ADD" },
+  { id: "DEDUCTION", label: "Deduction", direction: "SUBTRACT" },
+  { id: "ADVANCE", label: "Advance", direction: "SUBTRACT" },
+];
+
+export function adjustmentDirection(type: DriverSettlementAdjustmentType): 1 | -1 {
+  return type === "DEDUCTION" || type === "ADVANCE" ? -1 : 1;
+}
+
+export function adjustmentTotal(
+  adjustments: DriverSettlementAdjustment[],
+  type: DriverSettlementAdjustmentType,
+): number {
+  return roundMoney(
+    adjustments.reduce((sum, adjustment) =>
+      adjustment.type === type ? sum + adjustment.amount : sum, 0),
+  );
+}
+
+/**
+ * Allocates final net pay back to frozen load lines without losing a cent.
+ * This keeps load profitability and the paid statement on the same total.
+ */
+export function allocateDriverSettlementNetPay(settlement: DriverSettlement): Map<string, number> {
+  const totals = driverSettlementTotals(settlement);
+  const allocations = new Map<string, number>();
+  if (settlement.lines.length === 0) return allocations;
+  if (totals.netPay < 0) throw new Error("Net pay cannot be negative.");
+
+  let allocated = 0;
+  settlement.lines.forEach((line, index) => {
+    const last = index === settlement.lines.length - 1;
+    const share = totals.basePay > 0
+      ? line.payAmount / totals.basePay
+      : 1 / settlement.lines.length;
+    const amount = last ? roundMoney(totals.netPay - allocated) : roundMoney(totals.netPay * share);
+    allocations.set(line.id, amount);
+    allocated = roundMoney(allocated + amount);
+  });
+  return allocations;
 }

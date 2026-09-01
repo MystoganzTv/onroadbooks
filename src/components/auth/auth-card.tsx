@@ -180,6 +180,18 @@ export function AuthCard({
             {pending ? <Loader2 className="animate-spin" /> : null}
             {isSetup ? "Create account" : "Sign in"}
           </Button>
+
+          <p className="text-center text-[10px] leading-relaxed text-muted-foreground">
+            By continuing, you agree to the{" "}
+            <Link href="/terms" className="underline underline-offset-2 hover:text-foreground">
+              Terms
+            </Link>{" "}
+            and acknowledge the{" "}
+            <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">
+              Privacy Policy
+            </Link>
+            .
+          </p>
         </form>
 
         <p className="mt-4 text-center text-2xs leading-relaxed text-muted-foreground">
