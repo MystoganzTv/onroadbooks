@@ -1,24 +1,42 @@
 import SwiftUI
 
-/// "What rate should I ask? Is this load worth it?" — the two questions
-/// the web app's Load Calculator answers, per its own header comment.
-/// `overheadPerMile` here is a placeholder default (see the note under the
-/// field) until it's wired to the real trailing 90-day cost basis from
-/// Settings/the ledger.
+/// "What rate should I ask? Is this load worth it?" — the two questions the web
+/// app's Load Calculator answers.
+///
+/// Every cost assumption comes from THIS truck's ledger, fetched on open: its
+/// own MPG, the price it last paid for diesel, the dispatch and factoring
+/// percentages it actually pays, and its overhead per mile. It used to ship
+/// hardcoded guesses — 6.5 MPG, $3.85 diesel, $0.85/mi — which produced a
+/// confident verdict about somebody else's truck, at the exact moment a broker
+/// is waiting on the phone for an answer.
+///
+/// Nothing is assumed when nothing is known: an unproved MPG leaves the field
+/// empty and the calculator says it cannot cost the load, and an overhead not
+/// backed by enough recorded miles is labelled as such rather than used quietly.
 struct LoadCalculatorView: View {
-    @State private var grossRate: Double = 1800
-    @State private var loadedMiles: Double = 420
-    @State private var deadheadMiles: Double = 45
-    @State private var fuelPrice: Double = 3.85
-    @State private var mpg: Double = 6.5
-    @State private var tolls: Double = 18
+    let repository: LedgerRepository
+
+    @State private var defaults: CalculatorDefaults?
+    @State private var isLoading = true
+    @State private var refusal: String?
+
+    @State private var grossRate: Double = 0
+    @State private var loadedMiles: Double = 0
+    @State private var deadheadMiles: Double = 0
+    @State private var fuelPrice: Double = 0
+    @State private var mpg: Double = 0
+    @State private var tolls: Double = 0
     @State private var dispatchMode: FeeMode = .percent
-    @State private var dispatchValue: Double = 10
+    @State private var dispatchValue: Double = 0
     @State private var factoringMode: FeeMode = .percent
-    @State private var factoringValue: Double = 3
+    @State private var factoringValue: Double = 0
     @State private var otherCost: Double = 0
-    @State private var overheadPerMile: Double = 0.85
-    @State private var targetProfitPerMile: Double = 0.75
+    @State private var overheadPerMile: Double = 0
+    @State private var targetProfitPerMile: Double = 0
+
+    private var thresholds: RatingThresholds {
+        defaults?.thresholds ?? RatingThresholds(great: 1.25, good: 0.75, marginal: 0.25)
+    }
 
     private var estimate: LoadEstimate {
         LoadCalculatorMath.evaluate(
@@ -26,7 +44,8 @@ struct LoadCalculatorView: View {
             fuelPrice: fuelPrice, mpg: mpg, tolls: tolls,
             dispatchMode: dispatchMode, dispatchValue: dispatchValue,
             factoringMode: factoringMode, factoringValue: factoringValue,
-            otherCost: otherCost, overheadPerMile: overheadPerMile
+            otherCost: otherCost, overheadPerMile: overheadPerMile,
+            thresholds: thresholds
         )
     }
 
@@ -42,17 +61,60 @@ struct LoadCalculatorView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: OBSpacing.lg) {
-                resultCard
-                inputsCard
-                targetCard
+        Group {
+            if isLoading {
+                ProgressView().tint(OBColor.primary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let refusal {
+                VStack(spacing: OBSpacing.sm) {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 30))
+                        .foregroundStyle(OBColor.mutedForeground)
+                    Text(refusal)
+                        .font(.subheadline)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(OBColor.mutedForeground)
+                        .padding(.horizontal, OBSpacing.lg)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: OBSpacing.lg) {
+                        resultCard
+                        inputsCard
+                        targetCard
+                    }
+                    .padding(.vertical, OBSpacing.md)
+                }
             }
-            .padding(.vertical, OBSpacing.md)
         }
         .background(OBColor.background)
         .navigationTitle("Load Calculator")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await load() }
+    }
+
+    /// Seeds every cost assumption from the ledger. Anything the ledger cannot
+    /// prove is left at zero, which the estimate treats as "cannot cost this".
+    private func load() async {
+        do {
+            let seeded = try await repository.fetchCalculatorDefaults()
+            defaults = seeded
+            fuelPrice = seeded.fuelPrice ?? 0
+            mpg = seeded.mpg ?? 0
+            dispatchValue = seeded.dispatchPct
+            factoringValue = seeded.factoringPct
+            overheadPerMile = seeded.overheadPerMile
+            targetProfitPerMile = seeded.targetProfitPerMile
+            refusal = nil
+        } catch APIError.refused(let message) {
+            refusal = message
+        } catch {
+            // Offline or a hiccup: the form still works, it just cannot claim
+            // the numbers are his. `defaults` stays nil and the notes say so.
+            refusal = nil
+        }
+        isLoading = false
     }
 
     // MARK: Result — the answer, up top
@@ -113,6 +175,28 @@ struct LoadCalculatorView: View {
         .padding(.horizontal, OBSpacing.md)
     }
 
+    /// Says where the overhead came from, and refuses to imply it is his when
+    /// there are not enough recorded miles behind it.
+    private var overheadNote: String {
+        guard let defaults else {
+            return "Sin conexión al ledger: este número no está sacado de tu camión."
+        }
+        if !defaults.basisSufficient {
+            return "Todavía no hay millas suficientes registradas (\(Int(defaults.basisMiles).formatted()) mi) para respaldar este costo. Trátalo como estimado."
+        }
+        return "Tu costo real de \(defaults.basisLabel): \(Int(defaults.basisMiles).formatted()) mi. Sin combustible, peajes, dispatch ni factoring — esos se cobran arriba."
+    }
+
+    /// Fuel cannot be estimated without an MPG the odometer proved.
+    @ViewBuilder
+    private var mpgNote: some View {
+        if defaults?.mpg == nil && mpg <= 0 {
+            Text("Hacen falta dos lecturas de odómetro en el mismo camión para saber tu MPG. Escríbelo a mano para calcular.")
+                .font(.caption2)
+                .foregroundStyle(OBColor.warn)
+        }
+    }
+
     private func metric(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label.uppercased()).font(.system(size: 9, weight: .semibold)).foregroundStyle(OBColor.mutedForeground)
@@ -130,16 +214,19 @@ struct LoadCalculatorView: View {
                 numberRow("Loaded miles", "mi", value: $loadedMiles)
                 numberRow("Deadhead miles", "mi", value: $deadheadMiles)
                 numberRow("Fuel price", "$/gal", value: $fuelPrice)
-                numberRow("MPG", "mi/gal", value: $mpg)
+                VStack(alignment: .leading, spacing: 4) {
+                    numberRow("MPG", "mi/gal", value: $mpg)
+                    mpgNote
+                }
                 numberRow("Tolls", "$", value: $tolls)
                 feeRow("Dispatch", mode: $dispatchMode, value: $dispatchValue)
                 feeRow("Factoring", mode: $factoringMode, value: $factoringValue)
                 numberRow("Other costs", "$", value: $otherCost)
                 VStack(alignment: .leading, spacing: 4) {
                     numberRow("Overhead / mi", "$/mi", value: $overheadPerMile)
-                    Text("Placeholder — will use your trailing 90-day cost basis once this app reads your ledger.")
+                    Text(overheadNote)
                         .font(.caption2)
-                        .foregroundStyle(OBColor.mutedForeground)
+                        .foregroundStyle(defaults?.basisSufficient == false ? OBColor.warn : OBColor.mutedForeground)
                 }
             }
             .padding(OBSpacing.md)

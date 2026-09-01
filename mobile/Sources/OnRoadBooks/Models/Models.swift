@@ -106,6 +106,38 @@ struct NewLoad {
     var otherExpenses: Double
 }
 
+// MARK: - Load calculator
+
+/// The bands the account actually saved, not bands the app invented.
+struct RatingThresholds: Hashable {
+    let great: Double
+    let good: Double
+    let marginal: Double
+}
+
+/// What the calculator starts from, computed from this truck's own ledger.
+struct CalculatorDefaults {
+    /// Nil when nothing proves it. The app then leaves the field empty and
+    /// refuses to estimate rather than assuming a fleet average.
+    let fuelPrice: Double?
+    let mpg: Double?
+    let dispatchPct: Double
+    let factoringPct: Double
+    /// True cost per mile with fuel, tolls, dispatch and factoring REMOVED —
+    /// those four are entered explicitly, and a rate that still contained them
+    /// would charge them twice.
+    let overheadPerMile: Double
+    let trueCostPerMile: Double
+    let basisLabel: String
+    let basisMiles: Double
+    /// False when there are not enough recorded miles behind the overhead. The
+    /// screen has to say so rather than quietly costing a load against thin data.
+    let basisSufficient: Bool
+    let targetProfitPerMile: Double
+    let deadheadWarnPct: Double
+    let thresholds: RatingThresholds
+}
+
 // MARK: - Analytics
 
 struct LanePerformance: Identifiable, Hashable {

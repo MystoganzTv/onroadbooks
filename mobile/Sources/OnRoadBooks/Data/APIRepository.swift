@@ -201,6 +201,10 @@ final class APIRepository: LedgerRepository {
         try await get("api/mobile/analytics", as: AnalyticsResponseDTO.self).toDomain()
     }
 
+    func fetchCalculatorDefaults() async throws -> CalculatorDefaults {
+        try await get("api/mobile/calculator", as: CalculatorDefaultsDTO.self).toDomain()
+    }
+
     func fetchIfta(quarter: String?) async throws -> IftaReport {
         try await get(
             "api/mobile/ifta",
@@ -425,6 +429,40 @@ private struct NewFuelDTO: Encodable {
         odometer = stop.odometer
         location = stop.location.isEmpty ? nil : stop.location
         jurisdiction = stop.jurisdiction.isEmpty ? nil : stop.jurisdiction.uppercased()
+    }
+}
+
+private struct CalculatorDefaultsDTO: Decodable {
+    struct Thresholds: Decodable {
+        let great: Double
+        let good: Double
+        let marginal: Double
+    }
+
+    let fuelPrice: Double?
+    let mpg: Double?
+    let dispatchPct: Double
+    let factoringPct: Double
+    let overheadPerMile: Double
+    let trueCostPerMile: Double
+    let basisLabel: String
+    let basisMiles: Double
+    let basisSufficient: Bool
+    let targetProfitPerMile: Double
+    let deadheadWarnPct: Double
+    let thresholds: Thresholds
+
+    func toDomain() -> CalculatorDefaults {
+        CalculatorDefaults(
+            fuelPrice: fuelPrice, mpg: mpg,
+            dispatchPct: dispatchPct, factoringPct: factoringPct,
+            overheadPerMile: overheadPerMile, trueCostPerMile: trueCostPerMile,
+            basisLabel: basisLabel, basisMiles: basisMiles, basisSufficient: basisSufficient,
+            targetProfitPerMile: targetProfitPerMile, deadheadWarnPct: deadheadWarnPct,
+            thresholds: RatingThresholds(
+                great: thresholds.great, good: thresholds.good, marginal: thresholds.marginal
+            )
+        )
     }
 }
 

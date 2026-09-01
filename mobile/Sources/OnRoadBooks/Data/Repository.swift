@@ -14,6 +14,7 @@ protocol LedgerRepository {
     func fetchReserves() async throws -> ReserveLedger
     func fetchTruck() async throws -> TruckSummary
     func fetchAnalytics() async throws -> AnalyticsSnapshot
+    func fetchCalculatorDefaults() async throws -> CalculatorDefaults
     func fetchIfta(quarter: String?) async throws -> IftaReport
     func fetchReports() async throws -> [ReportSummary]
     func fetchReportTable(_ reportId: String) async throws -> ReportTable

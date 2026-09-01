@@ -85,6 +85,16 @@ final class MockRepository: LedgerRepository {
 
     func fetchLoads() async throws -> [Load] { loads }
 
+    func fetchCalculatorDefaults() async throws -> CalculatorDefaults {
+        CalculatorDefaults(
+            fuelPrice: 4.465, mpg: 7.0, dispatchPct: 10, factoringPct: 3,
+            overheadPerMile: 0.94, trueCostPerMile: 1.84,
+            basisLabel: "últimos 90 días", basisMiles: 3339, basisSufficient: true,
+            targetProfitPerMile: 0.75, deadheadWarnPct: 20,
+            thresholds: RatingThresholds(great: 1.25, good: 0.75, marginal: 0.25)
+        )
+    }
+
     func fetchAnalytics() async throws -> AnalyticsSnapshot {
         AnalyticsSnapshot(
             periodLabel: "August 2026 · Full Month",

@@ -57,26 +57,18 @@ enum LoadCalculatorMath {
         return mode == .percent ? roundMoney(gross * (safe / 100)) : roundMoney(safe)
     }
 
-    /// Simplified banding pending a real read of the account's saved
-    /// thresholds (Settings → Rating Thresholds on web). Deadhead above
-    /// 40% drops the band by one, echoing the web app's rule that
-    /// "deadhead is never optional."
-    private static func rate(profitPerMile: Double, deadheadPct: Double) -> LoadRating {
-        var band: LoadRating
-        switch profitPerMile {
-        case 1.25...: band = .great
-        case 0.75..<1.25: band = .good
-        case 0.25..<0.75: band = .marginal
-        default: band = .bad
-        }
-        if deadheadPct > 0.40 {
-            switch band {
-            case .great: band = .good
-            case .good: band = .marginal
-            case .marginal, .bad: band = .bad
-            }
-        }
-        return band
+    /// Exactly `rateLoad` from the web app: the account's own saved bands, and
+    /// nothing else.
+    ///
+    /// This used to carry a "deadhead above 40% drops the band" rule that the
+    /// web app does not have — invented here, and it meant the same load could
+    /// be GOOD on a laptop and MARGINAL on a phone. Deadhead is already inside
+    /// profit per mile, because every cost is charged across total miles.
+    private static func rate(profitPerMile: Double, thresholds: RatingThresholds) -> LoadRating {
+        if profitPerMile >= thresholds.great { return .great }
+        if profitPerMile >= thresholds.good { return .good }
+        if profitPerMile >= thresholds.marginal { return .marginal }
+        return .bad
     }
 
     static func evaluate(
@@ -91,7 +83,8 @@ enum LoadCalculatorMath {
         factoringMode: FeeMode,
         factoringValue: Double,
         otherCost: Double,
-        overheadPerMile: Double
+        overheadPerMile: Double,
+        thresholds: RatingThresholds
     ) -> LoadEstimate {
         let loadedMiles = max(0, loadedMiles)
         let deadheadMiles = max(0, deadheadMiles)
@@ -140,7 +133,7 @@ enum LoadCalculatorMath {
             profitPerMile: profitPerMile,
             profitMargin: profitMargin,
             lines: lines,
-            rating: rate(profitPerMile: profitPerMile, deadheadPct: deadheadPct),
+            rating: rate(profitPerMile: profitPerMile, thresholds: thresholds),
             valid: totalMiles > 0 && mpg > 0
         )
     }

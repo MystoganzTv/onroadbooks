@@ -47,7 +47,7 @@ struct MoreView: View {
     private func destination(for item: MoreItem) -> some View {
         switch item.title {
         case "Load Calculator":
-            LoadCalculatorView()
+            LoadCalculatorView(repository: repository)
         case "Fuel":
             FuelView(repository: repository)
         case "Invoices":
