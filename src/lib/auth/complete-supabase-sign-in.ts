@@ -18,11 +18,6 @@ function profileName(metadata: Record<string, unknown>): string | null {
     : null;
 }
 
-function businessName(name: string | null): string {
-  const first = name?.split(/\s+/)[0]?.trim();
-  return first ? `${first}'s Trucking Business` : "My Trucking Business";
-}
-
 /**
  * Creates the app-level session after Supabase has verified an identity.
  * User metadata is used only for display defaults, never for authorization.
@@ -46,7 +41,6 @@ export async function completeSupabaseSignIn(
     appUser = await authStore.createOwner({
       email: user.email,
       name,
-      businessName: businessName(name),
       // Not a valid scrypt hash: this identity may sign in only through its
       // verified Google account unless a password flow is added later.
       passwordHash: "oauth$google",

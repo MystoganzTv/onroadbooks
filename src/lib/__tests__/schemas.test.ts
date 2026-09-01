@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { loadSchema } from "../schemas";
+import { loadSchema, setupSchema } from "../schemas";
 
 const validLoad = {
   date: "2026-08-30",
@@ -43,5 +43,17 @@ describe("loadSchema operational details", () => {
     if (!parsed.success) {
       assert.equal(parsed.error.flatten().fieldErrors.deliveryDate?.[0], "Delivery cannot be before pickup");
     }
+  });
+});
+
+describe("account setup", () => {
+  it("collects credentials without inventing a business name before onboarding", () => {
+    const parsed = setupSchema.safeParse({
+      name: "Test Owner",
+      email: "owner@example.com",
+      password: "strong-enough-password",
+    });
+    assert.equal(parsed.success, true);
+    if (parsed.success) assert.equal(parsed.data.businessName, undefined);
   });
 });

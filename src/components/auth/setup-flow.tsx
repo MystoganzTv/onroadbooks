@@ -16,7 +16,6 @@ import { APP_NAME } from "@/lib/utils";
 import { fieldErrors, validationMessage } from "@/lib/form";
 
 const FIELD_LABELS: Record<string, string> = {
-  businessName: "Business name",
   name: "Your name",
   email: "Email",
   password: "Password",
@@ -33,7 +32,6 @@ export function SetupFlow() {
   const router = useRouter();
 
   const [values, setValues] = React.useState({
-    businessName: "",
     name: "",
     email: "",
     password: "",
@@ -115,17 +113,6 @@ export function SetupFlow() {
               </p>
             </div>
 
-            <Field label="Business name" htmlFor="setup-business" required error={errors.businessName}>
-              <Input
-                id="setup-business"
-                value={values.businessName}
-                onChange={(e) => set("businessName", e.target.value)}
-                placeholder="Padron Freight LLC"
-                maxLength={120}
-                autoFocus
-              />
-            </Field>
-
             <Field label="Your name" htmlFor="setup-name" error={errors.name}>
               <Input
                 id="setup-name"
@@ -133,6 +120,7 @@ export function SetupFlow() {
                 onChange={(e) => set("name", e.target.value)}
                 maxLength={120}
                 autoComplete="name"
+                autoFocus
               />
             </Field>
 

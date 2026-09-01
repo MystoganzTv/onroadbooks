@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, Loader2, Target, TruckIcon } from "lucide-react";
+import { ArrowRight, Building2, Check, Loader2, Target, TruckIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/shared/field";
@@ -29,20 +29,25 @@ interface WelcomeFlowProps {
   planName: string;
 }
 
-const STEPS = ["Your truck", "How you run", "Done"] as const;
+const STEPS = ["Your business", "Your truck", "How you run", "Done"] as const;
+
+function initialBusinessName(name: string): string {
+  if (name === "My Trucking Business" || /^.+['’]s Trucking Business$/.test(name)) return "";
+  return name;
+}
 
 /**
  * What happens after the account exists.
  *
- * Every step is skippable and every step writes through the same server
- * actions the Settings page uses -- there is no separate onboarding write
- * path that could drift from the real one. Nothing here is required, because
- * an owner who wants to look around first should be able to.
+ * Business identity is confirmed once; the operational steps remain
+ * skippable. Every step writes through the same server actions the Settings
+ * and Truck pages use, so onboarding cannot drift into a second data model.
  */
 export function WelcomeFlow({ business, truck, settings, goals, planName }: WelcomeFlowProps) {
   const router = useRouter();
   const [step, setStep] = React.useState(0);
   const [pending, startTransition] = React.useTransition();
+  const [businessName, setBusinessName] = React.useState(initialBusinessName(business.name));
 
   const [truckValues, setTruckValues] = React.useState({
     name: truck.name,
@@ -67,6 +72,31 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
   const setRunValue = (key: keyof typeof runValues, value: string) =>
     setRunValues((prev) => ({ ...prev, [key]: value }));
 
+  function saveBusiness() {
+    if (!businessName.trim()) {
+      toast.error("Enter the business name you want shown across OnRoad Books.");
+      return;
+    }
+    startTransition(async () => {
+      const result = await updateSettingsAction({
+        businessName: businessName.trim(),
+        currency: business.currency,
+        taxReservePct: settings.taxReservePct,
+        maintenanceReservePct: settings.maintenanceReservePct,
+        categoryBehavior: settings.categoryBehavior,
+        ratingGreatPerMile: settings.ratingGreatPerMile,
+        ratingGoodPerMile: settings.ratingGoodPerMile,
+        ratingMarginalPerMile: settings.ratingMarginalPerMile,
+        deadheadWarnPct: settings.deadheadWarnPct,
+        maintenanceWarnMiles: settings.maintenanceWarnMiles,
+        maintenanceWarnDays: settings.maintenanceWarnDays,
+      });
+
+      if (result.ok) setStep(1);
+      else toast.error(result.error);
+    });
+  }
+
   function saveTruck() {
     startTransition(async () => {
       const result = await updateTruckAction({
@@ -83,7 +113,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
           toRequiredNumber(truckValues.currentOdometer) ?? truck.currentOdometer,
       });
 
-      if (result.ok) setStep(1);
+      if (result.ok) setStep(2);
       else toast.error(result.error);
     });
   }
@@ -91,7 +121,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
   function saveHowYouRun() {
     startTransition(async () => {
       const settingsResult = await updateSettingsAction({
-        businessName: business.name,
+        businessName: businessName.trim(),
         currency: business.currency,
         taxReservePct: toNumber(runValues.taxReservePct, settings.taxReservePct),
         maintenanceReservePct: toNumber(
@@ -119,9 +149,10 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
         maxDeadheadPct: goals.maxDeadheadPct,
         targetLoads: goals.targetLoads,
         workingDaysPerWeek: toNumber(runValues.workingDaysPerWeek, goals.workingDaysPerWeek),
+        expectedMonthlyMiles: goals.expectedMonthlyMiles,
       });
 
-      if (goalsResult.ok) setStep(2);
+      if (goalsResult.ok) setStep(3);
       else toast.error(goalsResult.error);
     });
   }
@@ -166,6 +197,47 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
       </ol>
 
       {step === 0 ? (
+        <section className="rounded-lg border border-border bg-card p-5">
+          <div className="flex items-center gap-2">
+            <Building2 className="size-4 text-muted-foreground" />
+            <h1 className="text-md font-semibold tracking-tight">Start with your business</h1>
+          </div>
+          <p className="mt-1 text-2xs text-muted-foreground">
+            Enter the name you want shown on your dashboard, invoices, reports, exports and
+            Business Settings. We do not use your Google name to guess your company name.
+          </p>
+
+          <div className="mt-4">
+            <Field
+              label="Business name"
+              htmlFor="w-business-name"
+              hint="Legal name or the name customers know you by"
+              required
+            >
+              <Input
+                id="w-business-name"
+                value={businessName}
+                onChange={(event) => setBusinessName(event.target.value)}
+                placeholder="Padron Freight LLC"
+                maxLength={120}
+                autoComplete="organization"
+                autoFocus
+                required
+              />
+            </Field>
+          </div>
+
+          <div className="mt-5 flex justify-end">
+            <Button type="button" onClick={saveBusiness} disabled={pending}>
+              {pending ? <Loader2 className="animate-spin" /> : null}
+              Continue
+              <ArrowRight className="size-4" />
+            </Button>
+          </div>
+        </section>
+      ) : null}
+
+      {step === 1 ? (
         <section className="rounded-lg border border-border bg-card p-5">
           <div className="flex items-center gap-2">
             <TruckIcon className="size-4 text-muted-foreground" />
@@ -241,7 +313,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
           </div>
 
           <div className="mt-5 flex items-center justify-between gap-3">
-            <Button type="button" variant="ghost" size="sm" onClick={() => setStep(1)}>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setStep(2)}>
               Skip for now
             </Button>
             <Button type="button" onClick={saveTruck} disabled={pending}>
@@ -253,7 +325,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
         </section>
       ) : null}
 
-      {step === 1 ? (
+      {step === 2 ? (
         <section className="rounded-lg border border-border bg-card p-5">
           <div className="flex items-center gap-2">
             <Target className="size-4 text-muted-foreground" />
@@ -334,7 +406,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
           </div>
 
           <div className="mt-5 flex items-center justify-between gap-3">
-            <Button type="button" variant="ghost" size="sm" onClick={() => setStep(2)}>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setStep(3)}>
               Skip for now
             </Button>
             <Button type="button" onClick={saveHowYouRun} disabled={pending}>
@@ -346,13 +418,13 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
         </section>
       ) : null}
 
-      {step === 2 ? (
+      {step === 3 ? (
         <section className="rounded-lg border border-border bg-card p-6 text-center">
           <div className="mx-auto flex size-10 items-center justify-center rounded-full bg-pos-soft">
             <Check className="size-5 text-pos" />
           </div>
           <h1 className="mt-3 text-lg font-semibold tracking-tight">
-            {business.name} is set up
+            {businessName.trim()} is set up
           </h1>
           <p className="mx-auto mt-1.5 max-w-md text-xs leading-relaxed text-muted-foreground">
             You are starting a 7-day {planName} trial. This workspace is private and empty by

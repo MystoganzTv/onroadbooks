@@ -19,7 +19,9 @@ npm run dev
 ```
 
 Open http://localhost:3000. The first visit lands on `/setup`, where you create
-the workspace owner -- email, password, business name. After that, `/login`.
+the workspace owner credentials. The shared post-auth onboarding then asks for
+the real business name before truck or financial details, so email and Google
+signups never have to invent it. After that, `/login`.
 Owners can invite teammates from Team as Admin, Bookkeeper, Dispatcher or
 Viewer; each person receives an individual sign-in and every permission is
 enforced on the server.
@@ -493,7 +495,7 @@ npm test
 npm run test:e2e
 ```
 
-The current `node:test` suite contains **352 passing tests**. It covers the parts where a quiet
+The current `node:test` suite contains **353 passing tests**. It covers the parts where a quiet
 mistake costs money rather than throwing an error:
 
 | File | What it pins down |

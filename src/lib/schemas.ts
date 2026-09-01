@@ -473,7 +473,9 @@ export const credentialsSchema = z.object({
 });
 
 export const setupSchema = z.object({
-  businessName: z.string().trim().min(1, "Business name is required").max(120),
+  // Business identity is confirmed in the shared post-auth onboarding flow so
+  // email and Google signups follow the same path and neither has to invent it.
+  businessName: z.string().trim().min(1, "Business name is required").max(120).optional(),
   name: z.string().trim().max(120).optional().nullable(),
   email: z.string().trim().toLowerCase().email("Enter a valid email").max(200),
   // 10 characters with no composition rules: length is what actually helps,

@@ -128,13 +128,14 @@ test.describe.serial("critical browser flows", () => {
     await expect(page).toHaveURL(/\/login$/);
 
     await page.goto("/setup");
-    await page.getByLabel("Business name").fill("E2E Trucking LLC");
     await page.getByLabel("Your name").fill("Test Owner");
     await page.getByLabel("Email").fill(ownerEmail);
     await page.getByLabel("Password").fill(password);
     await page.getByRole("button", { name: "Create account", exact: true }).click();
 
     await expect(page).toHaveURL(/\/welcome$/);
+    await page.getByLabel("Business name").fill("E2E Trucking LLC");
+    await page.getByRole("button", { name: "Continue" }).click();
     await page.getByRole("button", { name: "Skip for now" }).click();
     await page.getByRole("button", { name: "Skip for now" }).click();
     await expect(page.getByRole("heading", { name: "E2E Trucking LLC is set up" })).toBeVisible();
