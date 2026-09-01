@@ -15,6 +15,38 @@ the database, or Supabase are unhealthy. It is never cached.
 Failures write structured JSON to Vercel Runtime Logs. Use the deployment and
 request identifiers in those records to correlate an incident.
 
+## Unhandled errors
+
+`src/instrumentation.ts` implements Next's `onRequestError`, which fires for
+page renders, route handlers and server actions alike — the whole server
+surface. Before this, a customer-facing failure surfaced only when the customer
+complained.
+
+Every failure is logged as structured JSON to Vercel Runtime Logs. Set
+`OPERATIONS_ALERT_WEBHOOK_URL` in Vercel Production to also deliver it to a
+Slack- or Discord-compatible incoming webhook — the same channel Stripe
+failures already use.
+
+Three rules make the channel worth keeping:
+
+- **The route pattern is reported, never the URL.** `/loads/[id]` says what
+  broke without putting a customer's record id into a chat room.
+- **`redirect()` and `notFound()` are not failures.** They travel as thrown
+  errors, and paging someone because a signed-out visitor was sent to `/login`
+  is how an alert channel loses its meaning.
+- **One alert, then a count.** A broken route fails on every request. The first
+  occurrence alerts; the rest are logged and suppressed for ten minutes, after
+  which the next alert carries how many happened in between. Failures are
+  grouped by route plus a normalized message, so the same error with different
+  record ids is one problem rather than a hundred.
+
+The suppression state lives in the server instance, and serverless instances
+come and go, so de-duplication is per instance rather than global. That still
+removes the case that matters — one instance failing in a loop — and it is the
+honest limit of doing this without a shared store. If alert volume ever becomes
+a problem across instances, that is the moment to reach for a hosted error
+tracker, not before.
+
 ## Stripe webhook failures
 
 Every accepted Stripe event produces a structured completion record with its

@@ -75,3 +75,137 @@ export async function reportOperationalError(
     clearTimeout(timeout);
   }
 }
+
+/* ---- Unhandled request failures --------------------------------------- */
+
+/**
+ * Alerting on every occurrence is how a pager gets muted.
+ *
+ * A route that starts failing fails on every request, so the first job of an
+ * alert channel is to say "this is broken" once and then stay quiet while it
+ * stays broken -- with a count, which is the part that says how bad it is.
+ *
+ * State is per server instance and serverless instances come and go, so this
+ * de-duplicates within one instance rather than globally. That still removes
+ * the case that matters (one instance failing in a loop) and it is the honest
+ * limit of doing this without a shared store.
+ */
+const ALERT_WINDOW_MS = 10 * 60 * 1000;
+const MAX_TRACKED_FAILURES = 200;
+
+interface FailureRecord {
+  count: number;
+  firstSeen: number;
+  lastAlerted: number;
+}
+
+const failures = new Map<string, FailureRecord>();
+
+/**
+ * Groups the same failure together across requests: ids, uuids and bare
+ * numbers vary per request and would otherwise make every occurrence look
+ * like a brand new problem.
+ */
+export function failureFingerprint(route: string, message: string): string {
+  const normalized = message
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "<id>")
+    .replace(/\b[0-9a-z]{16,}\b/gi, "<id>")
+    .replace(/\d+/g, "<n>")
+    .trim()
+    .slice(0, 200);
+  return `${route}|${normalized}`;
+}
+
+export interface AlertDecision {
+  /** Send an alert for this occurrence. */
+  alert: boolean;
+  /** How many times this failure has happened since the last alert, this one included. */
+  occurrences: number;
+}
+
+export function shouldAlert(fingerprint: string, now = Date.now()): AlertDecision {
+  const record = failures.get(fingerprint);
+
+  if (!record) {
+    if (failures.size >= MAX_TRACKED_FAILURES) {
+      // Evict the oldest rather than growing without limit: a failure that
+      // sprays unique messages must not become a memory leak on top of
+      // whatever else it is doing.
+      const oldest = [...failures.entries()].sort((a, b) => a[1].firstSeen - b[1].firstSeen)[0];
+      if (oldest) failures.delete(oldest[0]);
+    }
+    failures.set(fingerprint, { count: 1, firstSeen: now, lastAlerted: now });
+    return { alert: true, occurrences: 1 };
+  }
+
+  record.count += 1;
+  if (now - record.lastAlerted >= ALERT_WINDOW_MS) {
+    const occurrences = record.count;
+    record.count = 0;
+    record.lastAlerted = now;
+    return { alert: true, occurrences };
+  }
+  return { alert: false, occurrences: record.count };
+}
+
+/** Test seam. Never called by the application. */
+export function resetFailureTracking(): void {
+  failures.clear();
+}
+
+/**
+ * Next's redirect() and notFound() travel as thrown errors. They are control
+ * flow, not failures, and paging someone because a signed-out visitor was sent
+ * to /login is exactly how an alert channel loses its meaning.
+ */
+export function isControlFlowError(error: unknown): boolean {
+  const digest = (error as { digest?: unknown })?.digest;
+  if (typeof digest !== "string") return false;
+  return digest.startsWith("NEXT_REDIRECT") || digest === "NEXT_NOT_FOUND" || digest === "NEXT_HTTP_ERROR_FALLBACK;404";
+}
+
+export interface RequestFailure {
+  /** The route pattern, never the concrete URL: a path can carry ids. */
+  route: string;
+  method?: string;
+  routerKind?: string;
+  routeType?: string;
+}
+
+/**
+ * Every unhandled server error in the app, from one place. Wired up in
+ * `src/instrumentation.ts` through Next's `onRequestError` hook, which sees
+ * page renders, route handlers and server actions alike.
+ */
+export async function reportRequestError(
+  error: unknown,
+  failure: RequestFailure,
+  now = Date.now(),
+): Promise<{ reported: boolean; alerted: boolean }> {
+  if (isControlFlowError(error)) return { reported: false, alerted: false };
+
+  const message = errorMessage(error);
+  const decision = shouldAlert(failureFingerprint(failure.route, message), now);
+
+  if (!decision.alert) {
+    // Still logged, so the count in Vercel's logs stays truthful even while
+    // the alert channel is deliberately quiet.
+    operationalLog("error", "Unhandled request failure (alert suppressed)", {
+      ...failure,
+      error: message,
+      occurrences: decision.occurrences,
+    });
+    return { reported: true, alerted: false };
+  }
+
+  const headline =
+    decision.occurrences > 1
+      ? `Unhandled failure on ${failure.route} (${decision.occurrences} times since the last alert)`
+      : `Unhandled failure on ${failure.route}`;
+
+  const { delivered } = await reportOperationalError(headline, error, {
+    ...failure,
+    occurrences: decision.occurrences,
+  });
+  return { reported: true, alerted: delivered };
+}
