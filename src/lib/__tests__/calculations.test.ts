@@ -5,6 +5,7 @@ import {
   analyzeDeadhead,
   brokerPerformance,
   div,
+  linkedFuelByLoad,
   loadMetrics,
   moneyBreakdown,
   rateLoad,
@@ -264,6 +265,74 @@ describe("brokerPerformance", () => {
     const groups = brokerPerformance(rows);
     assert.equal(groups.length, 1);
     assert.equal(groups[0].broker, "No broker");
+  });
+});
+
+describe("linked fuel supersedes the load's own estimate", () => {
+  const fill = (over: Partial<FuelEntry>): FuelEntry => ({
+    id: "f", businessId: "b", truckId: "t", loadId: null, date: "2026-08-05",
+    gallons: 100, pricePerGallon: 3.85, totalCost: 385, odometer: null,
+    location: null, jurisdiction: null, expenseId: null, notes: null,
+    createdAt: "2026-08-05T00:00:00.000Z", ...over,
+  });
+
+  // The ledger already drops a load's own fuel row once a real fill-up is
+  // linked to it (reconcileLoadExpenseLedger). If the load's own profit kept
+  // using the estimate, the same trip would report two different profits on
+  // the same screen -- which is exactly what production did before this.
+  it("prices the trip on the real fill-up, not the number typed on the load", () => {
+    const trip = load({
+      grossRate: 2100, loadedMiles: 660, deadheadMiles: 40,
+      fuelCost: 280, tolls: 20, dispatchFee: 105, factoringFee: 63, otherExpenses: 32,
+    });
+
+    const estimated = loadMetrics(trip);
+    assert.equal(estimated.tripExpenses, 500);
+    assert.equal(estimated.tripProfit, 1600);
+
+    const actual = loadMetrics(trip, undefined, 385);
+    assert.equal(actual.tripExpenses, 605);
+    assert.equal(actual.tripProfit, 1495);
+    assert.equal(roundMoney(actual.profitPerMile), 2.14);
+  });
+
+  it("can turn a load that looked great into one that is merely good", () => {
+    // $1,600 over 700 total miles. On the $100 estimate the trip keeps
+    // $2.14/mi and rates GREAT; on the $400 that actually went in the tank it
+    // keeps $1.71/mi, which is only GOOD.
+    const trip = load({
+      grossRate: 1600, loadedMiles: 600, deadheadMiles: 100,
+      fuelCost: 100, tolls: 0, dispatchFee: 0, factoringFee: 0, otherExpenses: 0,
+    });
+    assert.equal(loadMetrics(trip, thresholdsFromSettings(settings)).rating, "GREAT");
+    assert.equal(loadMetrics(trip, thresholdsFromSettings(settings), 400).rating, "GOOD");
+  });
+
+  it("adds every fill-up linked to the same load and ignores unlinked ones", () => {
+    const totals = linkedFuelByLoad([
+      fill({ id: "f1", loadId: "l", totalCost: 190 }),
+      fill({ id: "f2", loadId: "l", totalCost: 385 }),
+      fill({ id: "f3", loadId: null, totalCost: 999 }),
+      fill({ id: "f4", loadId: "other", totalCost: 50 }),
+    ]);
+    assert.equal(totals.get("l"), 575);
+    assert.equal(totals.get("other"), 50);
+    assert.equal(totals.size, 2);
+  });
+
+  it("leaves a load with no linked fill-up on its own estimate", () => {
+    const totals = linkedFuelByLoad([fill({ loadId: null })]);
+    const trip = load({ grossRate: 1000, loadedMiles: 500, fuelCost: 200 });
+    const m = loadMetrics(trip, undefined, totals.get(trip.id));
+    assert.equal(m.tripExpenses, 200);
+    assert.equal(m.tripProfit, 800);
+  });
+
+  it("treats a linked fill-up of zero as the real number, not as missing", () => {
+    const trip = load({ grossRate: 1000, loadedMiles: 500, fuelCost: 200 });
+    const m = loadMetrics(trip, undefined, 0);
+    assert.equal(m.tripExpenses, 0);
+    assert.equal(m.tripProfit, 1000);
   });
 });
 

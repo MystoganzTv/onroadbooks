@@ -12,6 +12,7 @@ import {
   categoryTotals,
   expensesInPeriod,
   fuelInPeriod,
+  linkedFuelByLoad,
   loadsInPeriod,
   summarizeFuel,
   summarizePeriod,
@@ -86,7 +87,11 @@ export function buildReport(
   const truckName = (id: string | null) =>
     id ? (truckById(dataset.trucks, id)?.name ?? "Unknown truck") : "Business overhead";
   const thresholds = thresholdsFromSettings(settings);
-  const periodLoads = withMetricsAll(loadsInPeriod(loads, period), thresholds);
+  const periodLoads = withMetricsAll(
+    loadsInPeriod(loads, period),
+    thresholds,
+    linkedFuelByLoad(dataset.fuelEntries),
+  );
   const periodExpenses = expensesInPeriod(expenses, period);
   const periodFuel = fuelInPeriod(fuelEntries, period);
   const summary = summarizePeriod(loads, expenses, period, settings);

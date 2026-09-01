@@ -32,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireSession } from "@/lib/auth";
 import {
+  linkedFuelByLoad,
   categoryTotals,
   expensesInPeriod,
   loadsInPeriod,
@@ -154,7 +155,7 @@ export default async function DashboardPage({
   const cockpit = planAllows(dataset.subscription, "cockpit");
 
   const periodLoads = scoreLoads(
-    withMetricsAll(loadsInPeriod(loads, period), ratingThresholds),
+    withMetricsAll(loadsInPeriod(loads, period), ratingThresholds, linkedFuelByLoad(dataset.fuelEntries)),
     ratingThresholds,
     settings.deadheadWarnPct,
   );

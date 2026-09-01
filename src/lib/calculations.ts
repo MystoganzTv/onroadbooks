@@ -119,10 +119,43 @@ export function rateLoad(
   return "BAD";
 }
 
+/**
+ * What each load's own fuel really cost, keyed by load id.
+ *
+ * A load carries the fuel figure typed on the rate confirmation -- an
+ * estimate. The moment a real fill-up is linked to that load the estimate is
+ * superseded: `reconcileLoadExpenseLedger` already drops the load's fuel row
+ * from the ledger so the diesel is not counted twice. The load's own
+ * economics have to follow the same number, or the same trip reports two
+ * different profits on the same screen.
+ *
+ * Only loads that actually have a linked fill-up appear here; everything else
+ * keeps using its own estimate.
+ */
+export function linkedFuelByLoad(
+  fuelEntries: Pick<FuelEntry, "loadId" | "totalCost">[],
+): Map<string, number> {
+  const totals = new Map<string, number>();
+  for (const entry of fuelEntries) {
+    if (!entry.loadId) continue;
+    totals.set(entry.loadId, num(totals.get(entry.loadId)) + num(entry.totalCost));
+  }
+  for (const [loadId, total] of totals) totals.set(loadId, roundMoney(total));
+  return totals;
+}
+
+/** The fuel figure a load's own profit must be built on. */
+export function effectiveFuelCost(load: Load, linkedFuelCost?: number): number {
+  return linkedFuelCost === undefined ? num(load.fuelCost) : num(linkedFuelCost);
+}
+
 /** Every trip cost on a load, itemised for the waterfall. */
-export function tripExpenseLines(load: Load): { key: string; label: string; amount: number }[] {
+export function tripExpenseLines(
+  load: Load,
+  linkedFuelCost?: number,
+): { key: string; label: string; amount: number }[] {
   return [
-    { key: "fuel", label: "Fuel", amount: load.fuelCost },
+    { key: "fuel", label: "Fuel", amount: effectiveFuelCost(load, linkedFuelCost) },
     { key: "tolls", label: "Tolls", amount: load.tolls },
     { key: "dispatch", label: "Dispatch", amount: load.dispatchFee },
     { key: "factoring", label: "Factoring", amount: load.factoringFee },
@@ -131,12 +164,16 @@ export function tripExpenseLines(load: Load): { key: string; label: string; amou
   ];
 }
 
-export function loadMetrics(load: Load, thresholds?: RatingThresholds): LoadMetrics {
+export function loadMetrics(
+  load: Load,
+  thresholds?: RatingThresholds,
+  linkedFuelCost?: number,
+): LoadMetrics {
   const totalMiles = num(load.loadedMiles) + num(load.deadheadMiles);
   // Summed defensively: a row written by an older build can be missing a fee
   // column, and a raw + would turn the whole waterfall into NaN -> 0.
   const tripExpenses =
-    num(load.fuelCost) +
+    effectiveFuelCost(load, linkedFuelCost) +
     num(load.tolls) +
     num(load.dispatchFee) +
     num(load.factoringFee) +
@@ -158,12 +195,24 @@ export function loadMetrics(load: Load, thresholds?: RatingThresholds): LoadMetr
   };
 }
 
-export function withMetrics(load: Load, thresholds?: RatingThresholds): LoadWithMetrics {
-  return { ...load, metrics: loadMetrics(load, thresholds) };
+export function withMetrics(
+  load: Load,
+  thresholds?: RatingThresholds,
+  linkedFuelCost?: number,
+): LoadWithMetrics {
+  return { ...load, metrics: loadMetrics(load, thresholds, linkedFuelCost) };
 }
 
-export function withMetricsAll(loads: Load[], thresholds?: RatingThresholds): LoadWithMetrics[] {
-  return loads.map((load) => withMetrics(load, thresholds));
+/**
+ * `linkedFuel` comes from `linkedFuelByLoad(dataset.fuelEntries)`. Passing it
+ * is what keeps a load's profit on the same diesel the ledger charged it.
+ */
+export function withMetricsAll(
+  loads: Load[],
+  thresholds?: RatingThresholds,
+  linkedFuel?: Map<string, number>,
+): LoadWithMetrics[] {
+  return loads.map((load) => withMetrics(load, thresholds, linkedFuel?.get(load.id)));
 }
 
 /* ---- Period filtering ----------------------------------------------- */

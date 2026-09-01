@@ -18,7 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth";
-import { loadsInPeriod, thresholdsFromSettings, withMetricsAll } from "@/lib/calculations";
+import { linkedFuelByLoad, loadsInPeriod, thresholdsFromSettings, withMetricsAll } from "@/lib/calculations";
 import { getRepository } from "@/lib/db";
 import {
   bestBroker,
@@ -64,7 +64,7 @@ export default async function BrokersPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { trucks, loads: allLoads, settings, subscription } = await getRepository(
+  const { trucks, loads: allLoads, fuelEntries, settings, subscription } = await getRepository(
     session.businessId,
   ).getDataset();
   const period = periodFromSearchParams(params);
@@ -91,7 +91,11 @@ export default async function BrokersPage({
   const sort: BrokerSort = SORT_KEYS.includes(sortParam) ? sortParam : "profit";
 
   const thresholds = thresholdsFromSettings(settings);
-  const periodLoads = withMetricsAll(loadsInPeriod(loads, period), thresholds);
+  const periodLoads = withMetricsAll(
+    loadsInPeriod(loads, period),
+    thresholds,
+    linkedFuelByLoad(fuelEntries),
+  );
   const brokers = calculateBrokerPerformance(periodLoads, thresholds);
   const ranked = sortBrokers(brokers, sort);
 

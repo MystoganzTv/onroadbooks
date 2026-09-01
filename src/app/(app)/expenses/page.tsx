@@ -8,6 +8,7 @@ import { PeriodControls } from "@/components/dashboard/period-controls";
 import { PageHeader } from "@/components/shared/page-header";
 import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import {
+  linkedFuelByLoad,
   categoryTotals,
   expensesInPeriod,
   loadsInPeriod,
@@ -35,7 +36,7 @@ export default async function ExpensesPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { trucks, loads, expenses, documents, settings } = await getRepository(
+  const { trucks, loads, expenses, fuelEntries, documents, settings } = await getRepository(
     session.businessId,
   ).getDataset();
   const period = periodFromSearchParams(params);
@@ -48,7 +49,11 @@ export default async function ExpensesPage({
   const scopedExpenses = expensesForTruck(expenses, scopeTruckId);
 
   const periodExpenses = expensesInPeriod(scopedExpenses, period);
-  const periodLoads = withMetricsAll(loadsInPeriod(scopedLoads, period), ratingThresholds);
+  const periodLoads = withMetricsAll(
+    loadsInPeriod(scopedLoads, period),
+    ratingThresholds,
+    linkedFuelByLoad(fuelEntries),
+  );
   const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings);
   const categories = categoryTotals(periodExpenses, settings);
 

@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  linkedFuelByLoad,
   fuelInPeriod,
   loadsInPeriod,
   summarizeFuel,
@@ -63,7 +64,11 @@ export default async function FuelPage({
   const summary = summarizePeriod(loads, expenses, period, settings);
   const periodFuel = fuelInPeriod(fuelEntries, period);
   const fuel = summarizeFuel(periodFuel, summary.totalMiles);
-  const periodLoads = withMetricsAll(loadsInPeriod(loads, period), ratingThresholds);
+  const periodLoads = withMetricsAll(
+    loadsInPeriod(loads, period),
+    ratingThresholds,
+    linkedFuelByLoad(allFuel),
+  );
 
   const lastOdometer =
     fuelEntries

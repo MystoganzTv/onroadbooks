@@ -7,6 +7,7 @@ import { MiniStat } from "@/components/dashboard/mini-stat";
 import { PageHeader } from "@/components/shared/page-header";
 import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import {
+  linkedFuelByLoad,
   isDeadheadElevated,
   loadsInPeriod,
   summarizePeriod,
@@ -39,7 +40,7 @@ export default async function LoadsPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { trucks, loads, expenses, settings, drivers, subscription } = await getRepository(
+  const { trucks, loads, expenses, fuelEntries, settings, drivers, subscription } = await getRepository(
     session.businessId,
   ).getDataset();
   const period = periodFromSearchParams(params);
@@ -49,7 +50,8 @@ export default async function LoadsPage({
   const scopedLoads = loadsForTruck(loads, scopeTruckId);
   const scopedExpenses = expensesForTruck(expenses, scopeTruckId);
 
-  const periodLoads = withMetricsAll(loadsInPeriod(scopedLoads, period), ratingThresholds);
+  const linkedFuel = linkedFuelByLoad(fuelEntries);
+  const periodLoads = withMetricsAll(loadsInPeriod(scopedLoads, period), ratingThresholds, linkedFuel);
   const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings);
   const brokers = [...new Set(loads.map((l) => l.broker).filter(Boolean))].sort() as string[];
 

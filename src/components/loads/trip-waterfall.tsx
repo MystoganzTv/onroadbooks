@@ -10,8 +10,22 @@ import { RatingVerdict } from "./rating-badge";
  * order, profit at the bottom. Bar widths are proportional to the gross rate
  * so the size of each bite is legible at a glance, not just its number.
  */
-export function TripWaterfall({ load, metrics }: { load: Load; metrics: LoadMetrics }) {
-  const lines = tripExpenseLines(load);
+export function TripWaterfall({
+  load,
+  metrics,
+  linkedFuelCost,
+}: {
+  load: Load;
+  metrics: LoadMetrics;
+  /**
+   * Set when real fill-ups are linked to this load. Their total replaces the
+   * fuel figure typed on the load, exactly as the expense ledger does, so the
+   * waterfall and the ledger never disagree about the same trip.
+   */
+  linkedFuelCost?: number;
+}) {
+  const lines = tripExpenseLines(load, linkedFuelCost);
+  const fuelFromFillUps = linkedFuelCost !== undefined;
   const scale = (value: number) =>
     load.grossRate > 0 ? Math.max((Math.abs(value) / load.grossRate) * 100, 0.6) : 0;
 
@@ -39,6 +53,7 @@ export function TripWaterfall({ load, metrics }: { load: Load; metrics: LoadMetr
               <Row
                 key={line.key}
                 label={line.label}
+                hint={line.key === "fuel" && fuelFromFillUps ? "from linked fill-ups" : undefined}
                 value={-line.amount}
                 width={scale(line.amount)}
                 barClass="bg-neg"
@@ -85,6 +100,7 @@ export function TripWaterfall({ load, metrics }: { load: Load; metrics: LoadMetr
 
 function Row({
   label,
+  hint,
   value,
   width,
   barClass,
@@ -92,6 +108,7 @@ function Row({
   muted,
 }: {
   label: string;
+  hint?: string;
   value: number;
   width: number;
   barClass: string;
@@ -108,6 +125,9 @@ function Row({
           )}
         >
           {label}
+          {hint ? (
+            <span className="ml-1.5 text-2xs font-normal text-muted-foreground">{hint}</span>
+          ) : null}
         </span>
         <span
           className={cn(

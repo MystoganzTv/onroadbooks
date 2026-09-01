@@ -18,7 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth";
-import { loadsInPeriod, thresholdsFromSettings, withMetricsAll } from "@/lib/calculations";
+import { linkedFuelByLoad, loadsInPeriod, thresholdsFromSettings, withMetricsAll } from "@/lib/calculations";
 import { getRepository } from "@/lib/db";
 import { calculateLanePerformance, LANE_MIN_LOADS } from "@/lib/finance/lanes";
 import {
@@ -52,7 +52,7 @@ export default async function LanesPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
-  const { trucks, loads: allLoads, settings, subscription } = await getRepository(
+  const { trucks, loads: allLoads, fuelEntries, settings, subscription } = await getRepository(
     session.businessId,
   ).getDataset();
   const period = periodFromSearchParams(params);
@@ -79,7 +79,11 @@ export default async function LanesPage({
   const loads = loadsForTruck(allLoads, truckId);
 
   const thresholds = thresholdsFromSettings(settings);
-  const periodLoads = withMetricsAll(loadsInPeriod(loads, period), thresholds);
+  const periodLoads = withMetricsAll(
+    loadsInPeriod(loads, period),
+    thresholds,
+    linkedFuelByLoad(fuelEntries),
+  );
   const lanes = calculateLanePerformance(periodLoads, thresholds, LANE_MIN_LOADS, grouping);
 
   const qualified = lanes.filter((l) => l.qualified);

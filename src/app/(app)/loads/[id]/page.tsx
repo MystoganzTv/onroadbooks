@@ -16,7 +16,12 @@ import { Separator } from "@/components/ui/separator";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { hasFleetAccess } from "@/lib/plans";
-import { isDeadheadElevated, loadMetrics, thresholdsFromSettings } from "@/lib/calculations";
+import {
+  isDeadheadElevated,
+  linkedFuelByLoad,
+  loadMetrics,
+  thresholdsFromSettings,
+} from "@/lib/calculations";
 import { calculateLoadScore } from "@/lib/finance/load-score";
 import { LoadScoreBreakdown } from "@/components/cockpit/load-score-badge";
 import {
@@ -44,7 +49,13 @@ export default async function LoadDetailPage({
   const load = dataset.loads.find((item) => item.id === id);
   if (!load) notFound();
 
-  const metrics = loadMetrics(load, thresholdsFromSettings(dataset.settings));
+  // A real fill-up linked to this load supersedes the fuel figure typed on the
+  // rate confirmation. The ledger already drops the load's own fuel row when
+  // that happens, so the trip's profit and its score have to use the same
+  // diesel or the page contradicts itself.
+  const linkedFuel = dataset.fuelEntries.filter((entry) => entry.loadId === load.id);
+  const linkedFuelCost = linkedFuelByLoad(linkedFuel).get(load.id);
+  const metrics = loadMetrics(load, thresholdsFromSettings(dataset.settings), linkedFuelCost);
   const score = calculateLoadScore(
     metrics,
     thresholdsFromSettings(dataset.settings),
@@ -52,7 +63,6 @@ export default async function LoadDetailPage({
   );
   const brokers = [...new Set(dataset.loads.map((l) => l.broker).filter(Boolean))].sort() as string[];
   const linkedExpenses = dataset.expenses.filter((expense) => expense.loadId === load.id);
-  const linkedFuel = dataset.fuelEntries.filter((entry) => entry.loadId === load.id);
   const documents = dataset.documents.filter((doc) => doc.loadId === load.id);
   const route = `${load.originCity}, ${load.originState} to ${load.destinationCity}, ${load.destinationState}`;
 
@@ -107,7 +117,7 @@ export default async function LoadDetailPage({
         <div className="min-w-0 space-y-4 lg:col-span-2">
         <LoadScoreBreakdown score={score} />
 
-        <TripWaterfall load={load} metrics={metrics} />
+        <TripWaterfall load={load} metrics={metrics} linkedFuelCost={linkedFuelCost} />
 
         <Card>
           <CardHeader>
