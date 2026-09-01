@@ -122,7 +122,15 @@ async function main() {
     const restoredUrl = `postgresql://postgres@127.0.0.1:${port}/onroadbooks_restore?schema=public`;
     run(
       binaries.restore,
-      ["--dbname", databaseUrl(restoredUrl), "--exit-on-error", "--no-owner", "--no-privileges", dumpPath],
+      [
+        "--dbname", databaseUrl(restoredUrl),
+        "--clean",
+        "--if-exists",
+        "--exit-on-error",
+        "--no-owner",
+        "--no-privileges",
+        dumpPath,
+      ],
       "logical backup restore",
     );
     await verifyRestore(sourceUrl, restoredUrl);

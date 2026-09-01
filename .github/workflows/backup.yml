@@ -38,13 +38,17 @@ jobs:
       BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       BACKUP_EMAIL: ${{ secrets.BACKUP_EMAIL }}
-      # Anywhere outside the checkout; the script refuses to write inside it.
-      BACKUP_DIR: ${{ runner.temp }}/onroadbooks-backups
       AUTH_SECRET: unused-by-this-script
       NEXT_TELEMETRY_DISABLED: "1"
 
     steps:
       - uses: actions/checkout@v4
+
+      # `runner.temp` is not available while GitHub parses a job-level `env`,
+      # but RUNNER_TEMP is present once the runner starts. Keep the encrypted
+      # dump outside the checkout so the backup script accepts the destination.
+      - name: Prepare backup destination
+        run: echo "BACKUP_DIR=$RUNNER_TEMP/onroadbooks-backups" >> "$GITHUB_ENV"
 
       - uses: actions/setup-node@v4
         with:

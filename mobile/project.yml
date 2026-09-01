@@ -49,7 +49,7 @@ targets:
         NSCameraUsageDescription: Para tomar la foto del recibo y adjuntarla al gasto.
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.onroadbooks.mobile
+        PRODUCT_BUNDLE_IDENTIFIER: com.mystodev.onroadbooks
         PRODUCT_NAME: OnRoad Books
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"

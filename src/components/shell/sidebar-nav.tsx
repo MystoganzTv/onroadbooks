@@ -1,8 +1,9 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, ChevronRight, LogOut } from "lucide-react";
+import { Building2, ChevronDown, ChevronRight, LogOut } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "./brand-logo";
@@ -30,8 +31,26 @@ export function SidebarNav({
   onNavigate,
 }: SidebarNavProps) {
   const pathname = usePathname();
+  const navId = React.useId();
   const settingsActive =
     pathname === "/settings" || pathname.startsWith("/settings/");
+  const visibleGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter(
+      (item) => (hasFleet || !item.fleetOnly) && (isAdmin || !item.adminOnly),
+    ),
+  })).filter((group) => group.items.length > 0);
+  const activeGroup = visibleGroups.find((group) =>
+    group.items.some((item) => isNavActive(item, pathname)),
+  );
+  const activeGroupLabel = activeGroup?.label;
+  const [expandedGroup, setExpandedGroup] = React.useState<string | null>(
+    activeGroupLabel ?? visibleGroups[0]?.label ?? null,
+  );
+
+  React.useEffect(() => {
+    if (activeGroupLabel) setExpandedGroup(activeGroupLabel);
+  }, [activeGroupLabel]);
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -45,19 +64,37 @@ export function SidebarNav({
         </div>
       </div>
 
-      <nav className="flex-1 space-y-3 overflow-y-auto p-2" aria-label="Main">
-        {NAV_GROUPS.map((group) => {
-          const items = group.items.filter(
-            (item) => (hasFleet || !item.fleetOnly) && (isAdmin || !item.adminOnly),
-          );
-          if (items.length === 0) return null;
+      <nav className="flex-1 space-y-1 overflow-y-auto p-2" aria-label="Main">
+        {visibleGroups.map((group) => {
+          const expanded = expandedGroup === group.label;
+          const groupId = `${navId}-${group.label.toLowerCase().replaceAll(" ", "-")}`;
+
           return (
-          <div key={group.label}>
-            <p className="px-2.5 pb-1 text-2xs font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/60">
-              {group.label}
-            </p>
-            <ul className="space-y-0.5">
-              {items.map((item) => {
+            <div key={group.label}>
+              <button
+                type="button"
+                aria-expanded={expanded}
+                aria-controls={groupId}
+                onClick={() => setExpandedGroup(expanded ? null : group.label)}
+                className={cn(
+                  "flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-2xs font-semibold uppercase tracking-[0.14em] transition-colors",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                  expanded
+                    ? "text-sidebar-strong"
+                    : "text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-strong",
+                )}
+              >
+                <span>{group.label}</span>
+                <ChevronDown
+                  aria-hidden="true"
+                  className={cn(
+                    "size-3.5 transition-transform",
+                    expanded ? "rotate-180" : "rotate-0",
+                  )}
+                />
+              </button>
+              <ul id={groupId} hidden={!expanded} className="mt-0.5 space-y-0.5">
+                {group.items.map((item) => {
                   const active = isNavActive(item, pathname);
                   return (
                     <li key={item.href}>
@@ -84,8 +121,8 @@ export function SidebarNav({
                     </li>
                   );
                 })}
-            </ul>
-          </div>
+              </ul>
+            </div>
           );
         })}
       </nav>
