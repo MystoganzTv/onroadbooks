@@ -16,6 +16,9 @@ const PUBLIC_PATHS = [
   "/invite/accept",
   "/api/auth",
   "/api/health",
+  // Vercel Cron has no application session cookie. The route performs its
+  // own bearer-token check against CRON_SECRET before touching any ledger.
+  "/api/cron/monthly-expenses",
   "/api/stripe/webhook",
 ];
 

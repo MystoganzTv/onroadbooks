@@ -33,6 +33,10 @@ function safeKey(key: string): string {
 
 export class LocalDocumentStorage implements DocumentStorage {
   async healthcheck(): Promise<void> {
+    // A clean checkout has no data directory yet. Local persistence creates
+    // it on first use, so readiness should verify that creation succeeds
+    // instead of reporting a false failure until the first account is made.
+    await fs.mkdir(dataDirectory(), { recursive: true });
     await fs.access(dataDirectory());
   }
 
