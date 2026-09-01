@@ -181,6 +181,9 @@ async function seedFresh(): Promise<Dataset> {
       purchasePrice: null,
       monthlyPayment: null,
       monthlyInsurance: null,
+      axleCount: null,
+      registeredGrossWeightLbs: null,
+      operatesInMultipleIftaJurisdictions: null,
       startingOdometer: 0,
       currentOdometer: 0,
       active: true,
@@ -925,6 +928,9 @@ export class JsonAuthStore implements AuthStore {
           purchasePrice: null,
           monthlyPayment: null,
           monthlyInsurance: null,
+          axleCount: null,
+          registeredGrossWeightLbs: null,
+          operatesInMultipleIftaJurisdictions: null,
           startingOdometer: 0,
           currentOdometer: 0,
           active: true,
@@ -1634,6 +1640,10 @@ export class JsonRepository implements Repository {
         purchasePrice: input.purchasePrice ?? null,
         monthlyPayment: input.monthlyPayment ?? null,
         monthlyInsurance: input.monthlyInsurance ?? null,
+        axleCount: input.axleCount ?? null,
+        registeredGrossWeightLbs: input.registeredGrossWeightLbs ?? null,
+        operatesInMultipleIftaJurisdictions:
+          input.operatesInMultipleIftaJurisdictions ?? null,
         startingOdometer: input.startingOdometer,
         currentOdometer: input.currentOdometer,
         active: true,
@@ -1661,6 +1671,15 @@ export class JsonRepository implements Repository {
         purchasePrice: input.purchasePrice ?? null,
         monthlyPayment: input.monthlyPayment ?? null,
         monthlyInsurance: input.monthlyInsurance ?? null,
+        axleCount: input.axleCount === undefined ? target.axleCount ?? null : input.axleCount,
+        registeredGrossWeightLbs:
+          input.registeredGrossWeightLbs === undefined
+            ? target.registeredGrossWeightLbs ?? null
+            : input.registeredGrossWeightLbs,
+        operatesInMultipleIftaJurisdictions:
+          input.operatesInMultipleIftaJurisdictions === undefined
+            ? target.operatesInMultipleIftaJurisdictions ?? null
+            : input.operatesInMultipleIftaJurisdictions,
         startingOdometer: input.startingOdometer,
         currentOdometer: input.currentOdometer,
       });

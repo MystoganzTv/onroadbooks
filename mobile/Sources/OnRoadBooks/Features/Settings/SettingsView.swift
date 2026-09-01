@@ -15,6 +15,13 @@ struct SettingsView: View {
                     .foregroundStyle(OBColor.foreground)
                     .padding(.vertical, 4)
                     .listRowBackground(OBColor.card)
+                NavigationLink {
+                    ComingSoonView(title: "Access & Roles", systemImage: "person.3.fill")
+                } label: {
+                    Label("Access & Roles", systemImage: "person.3.fill")
+                        .foregroundStyle(OBColor.foreground)
+                }
+                .listRowBackground(OBColor.card)
             } header: {
                 Text("Account").foregroundStyle(OBColor.mutedForeground)
             }

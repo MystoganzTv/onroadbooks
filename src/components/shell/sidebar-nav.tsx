@@ -8,7 +8,13 @@ import { Building2, ChevronDown, ChevronRight, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "./brand-logo";
 import { DisplayMenu } from "./display-menu";
-import { isNavActive, NAV_GROUPS } from "./nav-items";
+import {
+  isNavActive,
+  isNavVisibleToRole,
+  navAvailability,
+  NAV_GROUPS,
+  type NavigationReadiness,
+} from "./nav-items";
 import {
   getCollapsedGroups,
   getCollapsedGroupsOnServer,
@@ -25,6 +31,7 @@ interface SidebarNavProps {
   hasFleet?: boolean;
   isAdmin?: boolean;
   role?: MemberRole;
+  readiness?: NavigationReadiness;
   onNavigate?: () => void;
 }
 
@@ -34,6 +41,7 @@ export function SidebarNav({
   hasFleet = false,
   isAdmin = false,
   role = "VIEWER",
+  readiness,
   onNavigate,
 }: SidebarNavProps) {
   const pathname = usePathname();
@@ -43,7 +51,10 @@ export function SidebarNav({
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter(
-      (item) => (hasFleet || !item.fleetOnly) && (isAdmin || !item.adminOnly),
+      (item) =>
+        (hasFleet || !item.fleetOnly) &&
+        (isAdmin || !item.adminOnly) &&
+        isNavVisibleToRole(item, role),
     ),
   })).filter((group) => group.items.length > 0);
   // Every group is open until it is deliberately closed, and navigating never
@@ -111,28 +122,49 @@ export function SidebarNav({
               <ul id={groupId} hidden={!expanded} className="mt-0.5 space-y-0.5">
                 {group.items.map((item) => {
                   const active = isNavActive(item, pathname);
+                  const availability = navAvailability(item, readiness);
+                  const content = (
+                    <>
+                      <item.icon
+                        className={cn(
+                          "size-4.5 shrink-0",
+                          active ? "text-primary" : "opacity-70",
+                        )}
+                      />
+                      <span className="truncate">{item.label}</span>
+                      {!availability.enabled && availability.badge ? (
+                        <span className="ml-auto shrink-0 rounded border border-sidebar-border px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide">
+                          {availability.badge}
+                        </span>
+                      ) : null}
+                    </>
+                  );
                   return (
                     <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        onClick={onNavigate}
-                        aria-current={active ? "page" : undefined}
-                        className={cn(
-                          "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                          active
-                            ? "bg-sidebar-accent text-sidebar-strong"
-                            : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-strong",
-                        )}
-                      >
-                        <item.icon
+                      {availability.enabled ? (
+                        <Link
+                          href={item.href}
+                          onClick={onNavigate}
+                          aria-current={active ? "page" : undefined}
                           className={cn(
-                            "size-4.5 shrink-0",
-                            active ? "text-primary" : "opacity-70",
+                            "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
+                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                            active
+                              ? "bg-sidebar-accent text-sidebar-strong"
+                              : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-strong",
                           )}
-                        />
-                        {item.label}
-                      </Link>
+                        >
+                          {content}
+                        </Link>
+                      ) : (
+                        <span
+                          aria-disabled="true"
+                          title={availability.reason}
+                          className="flex cursor-not-allowed items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium text-sidebar-foreground opacity-45"
+                        >
+                          {content}
+                        </span>
+                      )}
                     </li>
                   );
                 })}

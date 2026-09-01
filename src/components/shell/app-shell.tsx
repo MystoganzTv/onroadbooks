@@ -10,7 +10,7 @@ import { APP_NAME } from "@/lib/utils";
 import { BrandLogo } from "./brand-logo";
 import { SidebarNav } from "./sidebar-nav";
 import { DisplayMenu } from "./display-menu";
-import { isNavActive, PRIMARY_NAV } from "./nav-items";
+import { isNavActive, PRIMARY_NAV, type NavigationReadiness } from "./nav-items";
 import type { MemberRole } from "@/lib/types";
 
 interface AppShellProps {
@@ -19,6 +19,7 @@ interface AppShellProps {
   hasFleet?: boolean;
   isAdmin?: boolean;
   role?: MemberRole;
+  readiness?: NavigationReadiness;
   children: React.ReactNode;
 }
 
@@ -28,6 +29,7 @@ export function AppShell({
   hasFleet = false,
   isAdmin = false,
   role = "VIEWER",
+  readiness,
   children,
 }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -45,6 +47,7 @@ export function AppShell({
           hasFleet={hasFleet}
           isAdmin={isAdmin}
           role={role}
+          readiness={readiness}
         />
       </aside>
 
@@ -58,6 +61,7 @@ export function AppShell({
             hasFleet={hasFleet}
             isAdmin={isAdmin}
             role={role}
+            readiness={readiness}
             onNavigate={() => setMobileOpen(false)}
           />
         </DialogContent>

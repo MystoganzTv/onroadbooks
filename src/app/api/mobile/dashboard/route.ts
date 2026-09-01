@@ -25,6 +25,7 @@ import {
 import { FINANCIAL_MODEL_VERSION, isOperatingExpense } from "@/lib/finance/terminology";
 import { periodFromSearchParams } from "@/lib/period-params";
 import { previousPeriod, todayISO } from "@/lib/periods";
+import { roleCan } from "@/lib/roles";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,6 +43,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const session = await getMobileSession(request);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const ownerPlanning = roleCan(session.role ?? "VIEWER", "manage_owner_finances");
 
   const period = periodFromSearchParams(Object.fromEntries(request.nextUrl.searchParams));
   const prior = previousPeriod(period);
@@ -51,13 +53,30 @@ export async function GET(request: NextRequest) {
   const { loads, expenses, settings, goals, reserveAccounts, reserveTransactions, fuelEntries, paymentEvents, financialObligations } = dataset;
 
   const thresholds = thresholdsFromSettings(settings);
-  const summary = buildFinancialSummary(loads, expenses, paymentEvents, period, settings, reserveAccounts);
-  const priorSummary = buildFinancialSummary(loads, expenses, paymentEvents, prior, settings, reserveAccounts);
+  const ownerReserveAccounts = ownerPlanning ? reserveAccounts : [];
+  const summary = buildFinancialSummary(
+    loads,
+    expenses,
+    paymentEvents,
+    period,
+    settings,
+    ownerReserveAccounts,
+  );
+  const priorSummary = buildFinancialSummary(
+    loads,
+    expenses,
+    paymentEvents,
+    prior,
+    settings,
+    ownerReserveAccounts,
+  );
 
-  const reserveRules = resolveReserveRules(settings, reserveAccounts);
+  const reserveRules = ownerPlanning ? resolveReserveRules(settings, reserveAccounts) : [];
   const ownerPay = summary;
   const costBasis = calculateTrueCostPerMile(loads, expenses, period, settings, period.label);
-  const balances = calculateReserveBalances(reserveAccounts, reserveTransactions, period);
+  const balances = ownerPlanning
+    ? calculateReserveBalances(reserveAccounts, reserveTransactions, period)
+    : [];
 
   const periodLoads = scoreLoads(
     withMetricsAll(loadsInPeriod(loads, period), thresholds, linkedFuelByLoad(fuelEntries)),
@@ -124,7 +143,7 @@ export async function GET(request: NextRequest) {
       revenueDeltaPct: pctChange(summary.bookedRevenue, priorSummary.bookedRevenue),
       netProfitDeltaPct: pctChange(summary.operatingProfit, priorSummary.operatingProfit),
       trueCostPerMile: costBasis.actualCostPerMile,
-      safeToPay: ownerPay.safeToPay,
+      safeToPay: ownerPlanning ? ownerPay.safeToPay : null,
       totalMiles: summary.totalMiles,
       deadheadPct: summary.deadheadPct,
       today: {

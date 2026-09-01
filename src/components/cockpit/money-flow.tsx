@@ -14,6 +14,7 @@ interface MoneyFlowProps {
   /** Categories past this many are folded into one "Other" row. */
   maxRows?: number;
   className?: string;
+  showOwnerPlanning?: boolean;
 }
 
 /**
@@ -34,6 +35,7 @@ export function MoneyFlow({
   periodLabel,
   maxRows = 7,
   className,
+  showOwnerPlanning = true,
 }: MoneyFlowProps) {
   const revenue = ownerPay.bookedRevenue;
   const width = (value: number) =>
@@ -152,7 +154,7 @@ export function MoneyFlow({
       />
 
       {/* Reserves out */}
-      {ownerPay.reserves.length > 0 ? (
+      {showOwnerPlanning && ownerPay.reserves.length > 0 ? (
         <div className="space-y-2 border-t border-border px-4 py-3">
           <div className="flex items-center gap-1.5 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
             <ArrowDown className="size-3" />
@@ -179,32 +181,39 @@ export function MoneyFlow({
       ) : null}
 
       {/* What is left */}
-      <div
-        className={cn(
-          "border-t-2 px-4 py-4",
-          ownerPay.safeToPay >= 0 ? "border-pos/40 bg-pos-soft/40" : "border-neg/40 bg-neg-soft/40",
-        )}
-      >
-        <div className="flex items-baseline justify-between gap-3">
-          <span className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            Safe to Pay Yourself
-          </span>
-          <span
-            className={cn(
-              "tnum text-3xl font-semibold tracking-tight",
-              ownerPay.safeToPay >= 0 ? "text-pos" : "text-neg",
-            )}
-          >
-            {formatMoneyCompact(ownerPay.safeToPay)}
-          </span>
+      {showOwnerPlanning ? (
+        <div
+          className={cn(
+            "border-t-2 px-4 py-4",
+            ownerPay.safeToPay >= 0
+              ? "border-pos/40 bg-pos-soft/40"
+              : "border-neg/40 bg-neg-soft/40",
+          )}
+        >
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Safe to Pay Yourself
+            </span>
+            <span
+              className={cn(
+                "tnum text-3xl font-semibold tracking-tight",
+                ownerPay.safeToPay >= 0 ? "text-pos" : "text-neg",
+              )}
+            >
+              {formatMoneyCompact(ownerPay.safeToPay)}
+            </span>
+          </div>
+          <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-surface-sunken">
+            <div
+              className={cn(
+                "h-full rounded-full",
+                ownerPay.safeToPay >= 0 ? "bg-pos" : "bg-neg",
+              )}
+              style={{ width: width(ownerPay.safeToPay) }}
+            />
+          </div>
         </div>
-        <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-surface-sunken">
-          <div
-            className={cn("h-full rounded-full", ownerPay.safeToPay >= 0 ? "bg-pos" : "bg-neg")}
-            style={{ width: width(ownerPay.safeToPay) }}
-          />
-        </div>
-      </div>
+      ) : null}
     </div>
   );
 }

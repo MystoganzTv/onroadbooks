@@ -5,12 +5,16 @@ import { getRepository } from "@/lib/db";
 import { DRIVER_PAY_TYPES } from "@/lib/driver-pay";
 import { toCsv } from "@/lib/export";
 import { hasFleetAccess } from "@/lib/plans";
+import { roleCan } from "@/lib/roles";
 
 export const runtime = "nodejs";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  if (!roleCan(session.role ?? "VIEWER", "manage_driver_settlements")) {
+    return NextResponse.json({ error: "Driver pay access is not available for this role." }, { status: 403 });
+  }
   const dataset = await getRepository(session.businessId).getDataset();
   if (!hasFleetAccess(dataset.subscription)) return NextResponse.json({ error: "Fleet access required." }, { status: 403 });
   const { id } = await params;

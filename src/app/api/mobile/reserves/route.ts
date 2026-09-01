@@ -8,6 +8,7 @@ import { calculateReserveBalances, totalReserved } from "@/lib/finance/reserves"
 import { periodFromSearchParams } from "@/lib/period-params";
 import { capabilityRefusal, planAllows } from "@/lib/plans";
 import { FINANCIAL_MODEL_VERSION } from "@/lib/finance/terminology";
+import { roleCan } from "@/lib/roles";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +24,9 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const session = await getMobileSession(request);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!roleCan(session.role ?? "VIEWER", "manage_owner_finances")) {
+    return NextResponse.json({ error: "Owner access required." }, { status: 403 });
+  }
 
   const period = periodFromSearchParams(Object.fromEntries(request.nextUrl.searchParams));
   const dataset = await getRepository(session.businessId).getDataset();

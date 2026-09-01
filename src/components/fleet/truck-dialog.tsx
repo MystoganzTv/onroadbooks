@@ -18,6 +18,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { createTruckAction } from "@/lib/actions/trucks";
 import { fieldErrors, focusFirstError, validationMessage } from "@/lib/form";
 import { truckSchema } from "@/lib/schemas";
@@ -31,6 +38,8 @@ const FIELD_LABELS: Record<string, string> = {
   model: "Model",
   startingOdometer: "Starting odometer",
   currentOdometer: "Current odometer",
+  axleCount: "Power-unit axles",
+  registeredGrossWeightLbs: "Registered gross/combined weight",
 };
 
 /** Adding a unit to the fleet. Refused server-side when the plan is full. */
@@ -55,6 +64,9 @@ export function TruckDialog({
     odometer: "",
     monthlyPayment: "",
     monthlyInsurance: "",
+    axleCount: "",
+    registeredGrossWeightLbs: "",
+    operatesInMultipleIftaJurisdictions: "UNKNOWN",
     acquiredOn: todayISO(),
   });
 
@@ -79,6 +91,12 @@ export function TruckDialog({
       purchasePrice: null,
       monthlyPayment: toRequiredNumber(values.monthlyPayment) ?? null,
       monthlyInsurance: toRequiredNumber(values.monthlyInsurance) ?? null,
+      axleCount: toRequiredNumber(values.axleCount) ?? null,
+      registeredGrossWeightLbs: toRequiredNumber(values.registeredGrossWeightLbs) ?? null,
+      operatesInMultipleIftaJurisdictions:
+        values.operatesInMultipleIftaJurisdictions === "UNKNOWN"
+          ? null
+          : values.operatesInMultipleIftaJurisdictions === "YES",
       // A truck joins the fleet at the odometer it is on; that reading is both
       // where its history starts and where it is right now.
       startingOdometer: odometer,
@@ -199,6 +217,47 @@ export function TruckDialog({
                 value={values.monthlyInsurance}
                 onChange={(e) => set("monthlyInsurance", e.target.value)}
               />
+            </Field>
+            <Field label="Power-unit axles" htmlFor="new-truck-axles" error={errors.axleCount}>
+              <Input
+                id="new-truck-axles"
+                inputMode="numeric"
+                value={values.axleCount}
+                onChange={(e) => set("axleCount", e.target.value)}
+                placeholder="2"
+              />
+            </Field>
+            <Field
+              label="Registered gross/combined weight"
+              htmlFor="new-truck-weight"
+              hint="lb"
+              error={errors.registeredGrossWeightLbs}
+            >
+              <Input
+                id="new-truck-weight"
+                inputMode="numeric"
+                value={values.registeredGrossWeightLbs}
+                onChange={(e) => set("registeredGrossWeightLbs", e.target.value)}
+                placeholder="26000"
+              />
+            </Field>
+            <Field
+              label="Operating area"
+              htmlFor="new-truck-ifta-jurisdictions"
+              className="sm:col-span-2"
+              hint="Will this unit operate in two or more IFTA jurisdictions?"
+            >
+              <Select
+                value={values.operatesInMultipleIftaJurisdictions}
+                onValueChange={(value) => set("operatesInMultipleIftaJurisdictions", value)}
+              >
+                <SelectTrigger id="new-truck-ifta-jurisdictions"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="UNKNOWN">Not sure yet</SelectItem>
+                  <SelectItem value="YES">Two or more IFTA jurisdictions</SelectItem>
+                  <SelectItem value="NO">One jurisdiction only</SelectItem>
+                </SelectContent>
+              </Select>
             </Field>
             <Field
               label="In service since"

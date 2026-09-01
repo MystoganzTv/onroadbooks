@@ -136,12 +136,16 @@ test.describe.serial("critical browser flows", () => {
     await expect(page).toHaveURL(/\/welcome$/);
     await page.getByLabel("Business name").fill("E2E Trucking LLC");
     await page.getByRole("button", { name: "Continue" }).click();
-    await page.getByRole("button", { name: "Skip for now" }).click();
+    await page.getByRole("button", { name: "Keep Truck 1 for now" }).click();
     await page.getByRole("button", { name: "Skip for now" }).click();
     await expect(page.getByRole("heading", { name: "E2E Trucking LLC is set up" })).toBeVisible();
     await page.getByRole("button", { name: /Open the dashboard/ }).click();
     await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.getByRole("heading", { name: "Business Overview" })).toBeVisible();
+
+    await page.goto("/truck");
+    await expect(page.getByText("Setup incomplete").first()).toBeVisible();
+    await expect(page.getByText("No operating history yet")).toBeVisible();
   });
 
   test("owner records a load, uploads its document and records an expense", async ({ page }) => {
@@ -164,6 +168,15 @@ test.describe.serial("critical browser flows", () => {
     await page.getByRole("button", { name: "Add expense", exact: true }).last().click();
     await expect(page.getByRole("dialog")).toBeHidden();
     await expect(page.getByText("E2E parking and permits").first()).toBeVisible();
+
+    await page.goto("/truck");
+    await page.getByRole("button", { name: "Update truck" }).click();
+    await page.locator("#truck-axles").fill("2");
+    await page.locator("#truck-registered-weight").fill("33000");
+    await page.locator("#truck-ifta-jurisdictions").click();
+    await page.getByRole("option", { name: "Two or more IFTA jurisdictions" }).click();
+    await page.getByRole("button", { name: "Save truck" }).click();
+    await expect(page.getByText("IFTA tracking recommended")).toBeVisible();
 
     await page.goto("/plans");
     await expect(page.getByText(/Online billing is being configured/).first()).toBeVisible();
@@ -265,14 +278,23 @@ test.describe.serial("critical browser flows", () => {
     await page.locator("#expense-amount").fill("10");
     await page.locator("#expense-description").fill("Viewer must not create this");
     await page.getByRole("button", { name: "Add expense", exact: true }).last().click();
-    await expect(page.getByText("Viewer access does not allow that change.")).toBeVisible();
+    await expect(page.getByText("Viewer (legacy) access does not allow that change.")).toBeVisible();
 
     await page.context().clearCookies();
     await login(page, "bookkeeper.e2e@example.com");
     await page.goto("/drivers");
     await expect(page.getByRole("button", { name: "Add driver", exact: true })).toHaveCount(0);
     await page.goto("/team");
-    await expect(page.getByText("Only the workspace owner can invite members or change roles.")).toBeVisible();
+    await expect(page).toHaveURL(/\/settings#access-roles$/);
+    await expect(page.getByRole("heading", { name: "Access & Roles" })).toBeVisible();
+    await expect(page.getByText("Only the workspace owner can invite people or change roles.")).toBeVisible();
+    await expect(page.getByText("Owner financial settings")).toBeVisible();
+    await page.goto("/reserves");
+    await expect(page.getByText("Reserve balances, rules and movements are available only to the workspace owner.")).toBeVisible();
+    await page.goto("/settlements");
+    await expect(page.getByText(/Owner Settlement close\/reopen controls are available only/)).toBeVisible();
+    await page.goto("/driver-settlements");
+    await expect(page).toHaveURL(/\/dashboard$/);
 
     await page.context().clearCookies();
     await login(page, "dispatcher.e2e@example.com");
@@ -282,7 +304,8 @@ test.describe.serial("critical browser flows", () => {
     await page.context().clearCookies();
     await login(page, "admin.e2e@example.com");
     await page.goto("/team");
-    await expect(page.getByText("Only the workspace owner can invite members or change roles.")).toBeVisible();
+    await expect(page).toHaveURL(/\/settings#access-roles$/);
+    await expect(page.getByText("Only the workspace owner can invite people or change roles.")).toBeVisible();
   });
 
   test("authenticated shell remains usable at a phone viewport", async ({ page }) => {

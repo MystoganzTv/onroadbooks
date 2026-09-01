@@ -22,9 +22,10 @@ Open http://localhost:3000. The first visit lands on `/setup`, where you create
 the workspace owner credentials. The shared post-auth onboarding then asks for
 the real business name before truck or financial details, so email and Google
 signups never have to invent it. After that, `/login`.
-Owners can invite teammates from Team as Admin, Bookkeeper, Dispatcher or
-Viewer; each person receives an individual sign-in and every permission is
-enforced on the server.
+Owners manage ongoing collaborators under Settings → Access & Roles. Admin,
+Bookkeeper and Dispatcher receive individual sign-ins; Viewer is no longer
+assignable. Driver records never create app access. For periodic accounting,
+the PDF/XLSX packet is the recommended handoff instead of an invitation.
 
 No database setup required: the app boots on a local JSON store. The account you
 create receives a private, empty workspace and a guided first-run setup; the
@@ -495,7 +496,7 @@ npm test
 npm run test:e2e
 ```
 
-The current `node:test` suite contains **353 passing tests**. It covers the parts where a quiet
+The current `node:test` suite contains **362 passing tests**. It covers the parts where a quiet
 mistake costs money rather than throwing an error:
 
 | File | What it pins down |
@@ -549,10 +550,11 @@ secret and three recurring Price IDs; production health checks fail when that
 configuration is incomplete, and synchronization failures are logged and can
 be forwarded immediately to the operations alert webhook.
 
-Fleet workspaces include individual sign-ins, Owner/Admin/Bookkeeper/Dispatcher/
-Viewer roles, email invitations through Supabase Auth, drivers, load assignment
-and frozen driver-pay statements. `/setup` creates the first workspace owner;
-additional people join through `/invite/accept`.
+Fleet workspaces include individual sign-ins and Owner/Admin/Bookkeeper/Dispatcher
+roles, email invitations through Supabase Auth, drivers, load assignment and
+frozen driver-pay statements. `/setup` creates the first workspace owner;
+additional people join through `/invite/accept`. Existing Viewer rows remain
+read-only for compatibility but the role cannot be assigned again.
 
 The Supabase storage adapter is selected by `DOCUMENT_STORAGE=supabase`. Its
 signed upload, metadata lookup, signed download, byte-for-byte verification and

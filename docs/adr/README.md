@@ -31,6 +31,7 @@ The format is in [0000-template.md](0000-template.md); the practice itself is
 | [0006](0006-business-scoped-repository.md) | `businessId` from the session, asserted on every access | Accepted |
 | [0018](0018-server-actions-validated-with-zod.md) | Server actions validated with zod, returning a typed result | Accepted |
 | [0023](0023-backups-are-ours-encrypted-and-verified.md) | Back the ledger up ourselves — encrypted, verified, off the platform | Accepted |
+| [0026](0026-memberships-support-multiple-businesses.md) | Move access from users to business memberships | Proposed |
 
 ### The money
 

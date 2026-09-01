@@ -816,6 +816,13 @@ describe("upgrading an older ledger", () => {
     assert.equal(dataset.settings.deadheadWarnPct, 20);
     assert.equal(dataset.settings.maintenanceWarnMiles, 2000);
     assert.ok(dataset.settings.categoryBehavior);
+    assert.equal(dataset.trucks[0].axleCount, null);
+    assert.equal(dataset.trucks[0].registeredGrossWeightLbs, null);
+    assert.equal(
+      dataset.trucks[0].operatesInMultipleIftaJurisdictions,
+      null,
+      "an older truck keeps an unknown IFTA profile instead of being classified silently",
+    );
     assert.deepEqual(dataset.documents, []);
     assert.deepEqual(dataset.maintenanceRecords, []);
     assert.deepEqual(dataset.users, []);

@@ -53,6 +53,8 @@ export interface InsightInput {
   brokers: BrokerScore[];
   lanes: LanePerformance[];
   maintenance: MaintenanceHealth;
+  /** Owner-only planning language and reserve coverage. */
+  includeOwnerPlanning?: boolean;
 }
 
 const usd = (value: number, digits = 0) =>
@@ -80,6 +82,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
     brokers,
     lanes,
     maintenance,
+    includeOwnerPlanning = true,
   } = input;
 
   const out: RankedInsight[] = [];
@@ -216,7 +219,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
   }
 
   /* -- Reserves and the truck ---------------------------------------------- */
-  if (maintenance.coverage !== null && maintenance.upcomingCost > 0) {
+  if (includeOwnerPlanning && maintenance.coverage !== null && maintenance.upcomingCost > 0) {
     out.push({
       id: "maintenance-coverage",
       tone: maintenance.coverage >= 1 ? "positive" : "warning",
@@ -233,7 +236,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
     });
   }
 
-  if (ownerPay.safeToPay > 0) {
+  if (includeOwnerPlanning && ownerPay.safeToPay > 0) {
     out.push({
       id: "take-home",
       tone: ownerPay.takeHomeRate >= 30 ? "positive" : "neutral",
@@ -250,7 +253,9 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
       id: "outstanding",
       tone: "warning",
       priority: 62,
-      text: `${usd(summary.accountsReceivable)} of this period's Booked Revenue is Accounts Receivable and cannot fund Safe to Pay Yourself until collected.`,
+      text: includeOwnerPlanning
+        ? `${usd(summary.accountsReceivable)} of this period's Booked Revenue is Accounts Receivable and cannot fund Safe to Pay Yourself until collected.`
+        : `${usd(summary.accountsReceivable)} of this period's Booked Revenue remains in Accounts Receivable and has not been collected.`,
     });
   }
 

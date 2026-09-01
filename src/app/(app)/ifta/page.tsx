@@ -15,7 +15,12 @@ import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { formatMiles, formatMoney, formatRateValue } from "@/lib/formatters";
 import { calculateIftaReport, currentIftaQuarter, iftaRateKey, normalizeJurisdictionMiles } from "@/lib/ifta";
-import { orderedTrucks } from "@/lib/fleet";
+import { activeTrucks, orderedTrucks, truckById } from "@/lib/fleet";
+import {
+  fleetIftaApplicability,
+  iftaApplicability,
+  iftaApplicabilityLabel,
+} from "@/lib/ifta-eligibility";
 import { param, truckFromSearchParams, type SearchParams } from "@/lib/period-params";
 import { roleCan } from "@/lib/roles";
 
@@ -38,8 +43,58 @@ export default async function IftaPage({ searchParams }: { searchParams: Promise
   const requested = param(params, "quarter", currentIftaQuarter());
   const quarter = /^\d{4}-Q[1-4]$/.test(requested) ? requested : currentIftaQuarter();
   const truckId = truckFromSearchParams(params, dataset.trucks);
+  const selectedTruck = truckById(dataset.trucks, truckId);
+  const applicability = selectedTruck
+    ? iftaApplicability(selectedTruck)
+    : fleetIftaApplicability(activeTrucks(dataset.trucks));
+  const hasIftaHistory =
+    dataset.loads.some(
+      (load) => (!truckId || load.truckId === truckId) && load.jurisdictionMiles.length > 0,
+    ) ||
+    dataset.fuelEntries.some(
+      (entry) => (!truckId || entry.truckId === truckId) && Boolean(entry.jurisdiction),
+    );
+
+  if (applicability !== "LIKELY_REQUIRED" && !hasIftaHistory) {
+    const unknown = applicability === "UNKNOWN";
+    return (
+      <div className="space-y-4 p-4 lg:p-6">
+        <PageHeader
+          title="IFTA"
+          description="IFTA tools appear only when the vehicle and operating profile make them relevant."
+        />
+        <Card className="mx-auto max-w-2xl">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle>{iftaApplicabilityLabel(applicability)}</CardTitle>
+              <Badge variant={unknown ? "warning" : "outline"}>
+                {unknown ? "Setup needed" : "Not indicated"}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm leading-relaxed text-muted-foreground">
+            <p>
+              {unknown
+                ? "Add the power-unit axle count, registered gross or combined weight, and whether the truck operates in two or more IFTA jurisdictions. OnRoad will not guess this for an existing vehicle."
+                : "Based on the current vehicle and operating profile, this unit does not appear to need IFTA tracking. The filing workspace stays inactive so an irrelevant zero report does not become part of your normal workflow."}
+            </p>
+            <p>
+              The standard qualification test covers cross-jurisdiction operation with more than
+              26,000 lb, three or more power-unit axles, or a combination above 26,000 lb. Local
+              exemptions can differ, so confirm the result with your base jurisdiction.
+            </p>
+            <Button asChild size="sm">
+              <Link href={selectedTruck ? `/truck?truck=${selectedTruck.id}` : "/truck"}>
+                {unknown ? "Complete truck profile" : "Review truck profile"}
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   const report = calculateIftaReport(dataset, quarter, truckId);
-  const canManage = roleCan(session.role ?? "VIEWER", "manage_finances");
+  const canManage = roleCan(session.role ?? "VIEWER", "manage_ifta");
   const rates = Object.fromEntries(report.jurisdictions.flatMap((row) => {
     const rate = dataset.settings.iftaTaxRates[iftaRateKey(quarter, row.jurisdiction)];
     return Number.isFinite(rate) ? [[row.jurisdiction, rate]] : [];

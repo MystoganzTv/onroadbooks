@@ -118,6 +118,12 @@ export interface Truck {
   purchasePrice: number | null;
   monthlyPayment: number | null;
   monthlyInsurance: number | null;
+  /** Power-unit axles. Missing historical data remains unknown. */
+  axleCount?: number | null;
+  /** Registered gross vehicle or combination weight, in pounds. */
+  registeredGrossWeightLbs?: number | null;
+  /** Whether this unit operates in two or more IFTA member jurisdictions. */
+  operatesInMultipleIftaJurisdictions?: boolean | null;
   startingOdometer: number;
   currentOdometer: number;
   active: boolean;

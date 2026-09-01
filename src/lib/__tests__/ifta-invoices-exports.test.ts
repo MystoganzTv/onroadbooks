@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { calculateIftaReport, iftaRateKey, IFTA_JURISDICTIONS } from "../ifta";
+import { fleetIftaApplicability, iftaApplicability } from "../ifta-eligibility";
 import {
   duplicateInvoiceNumber,
   invoiceIssueOutcome,
@@ -33,6 +34,69 @@ describe("IFTA reporting", () => {
     assert.equal(report.netTaxDue, 0.8);
     dataset.fuelEntries[0].jurisdiction = null;
     assert.equal(calculateIftaReport(dataset, "2026-Q3").complete, false);
+  });
+});
+
+describe("IFTA applicability", () => {
+  it("requires both cross-jurisdiction operation and a qualifying vehicle", () => {
+    assert.equal(
+      iftaApplicability({
+        axleCount: 2,
+        registeredGrossWeightLbs: 26_000,
+        operatesInMultipleIftaJurisdictions: true,
+      }),
+      "LIKELY_NOT_REQUIRED",
+    );
+    assert.equal(
+      iftaApplicability({
+        axleCount: 2,
+        registeredGrossWeightLbs: 26_001,
+        operatesInMultipleIftaJurisdictions: true,
+      }),
+      "LIKELY_REQUIRED",
+    );
+    assert.equal(
+      iftaApplicability({
+        axleCount: 3,
+        registeredGrossWeightLbs: 18_000,
+        operatesInMultipleIftaJurisdictions: true,
+      }),
+      "LIKELY_REQUIRED",
+    );
+    assert.equal(
+      iftaApplicability({
+        axleCount: 3,
+        registeredGrossWeightLbs: 33_000,
+        operatesInMultipleIftaJurisdictions: false,
+      }),
+      "LIKELY_NOT_REQUIRED",
+    );
+  });
+
+  it("preserves unknown history instead of inventing an IFTA classification", () => {
+    assert.equal(
+      iftaApplicability({
+        axleCount: null,
+        registeredGrossWeightLbs: null,
+        operatesInMultipleIftaJurisdictions: null,
+      }),
+      "UNKNOWN",
+    );
+    assert.equal(
+      fleetIftaApplicability([
+        {
+          axleCount: 2,
+          registeredGrossWeightLbs: 20_000,
+          operatesInMultipleIftaJurisdictions: false,
+        },
+        {
+          axleCount: null,
+          registeredGrossWeightLbs: null,
+          operatesInMultipleIftaJurisdictions: null,
+        },
+      ]),
+      "UNKNOWN",
+    );
   });
 });
 

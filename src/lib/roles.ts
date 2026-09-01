@@ -13,6 +13,8 @@ export const PERMISSION_IDS = [
   "manage_fuel",
   "manage_maintenance",
   "manage_finances",
+  "manage_ifta",
+  "manage_owner_finances",
 ] as const;
 
 export type Permission = (typeof PERMISSION_IDS)[number];
@@ -22,7 +24,9 @@ export interface RoleDefinition {
   description: string;
 }
 
-export const ASSIGNABLE_ROLES = ["ADMIN", "BOOKKEEPER", "DISPATCHER", "VIEWER"] as const;
+// VIEWER remains in the persisted enum so an existing account is not rewritten,
+// but it cannot be selected for a new invitation or role change.
+export const ASSIGNABLE_ROLES = ["ADMIN", "BOOKKEEPER", "DISPATCHER"] as const;
 export type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
 
 export const ROLE_DEFINITIONS: Record<MemberRole, RoleDefinition> = {
@@ -32,19 +36,20 @@ export const ROLE_DEFINITIONS: Record<MemberRole, RoleDefinition> = {
   },
   ADMIN: {
     label: "Admin",
-    description: "All operations and settings, without billing or member management.",
+    description:
+      "Operations and business setup, without billing, access management, reserves or owner-pay planning.",
   },
   BOOKKEEPER: {
     label: "Bookkeeper",
-    description: "Expenses, fuel, driver pay, settlements, reserves and financial reporting.",
+    description: "Expenses, fuel, invoices, collections, reports and exports.",
   },
   DISPATCHER: {
     label: "Dispatcher",
     description: "Loads, drivers, fuel and truck service records.",
   },
   VIEWER: {
-    label: "Viewer",
-    description: "Read-only access to the workspace.",
+    label: "Viewer (legacy)",
+    description: "Legacy read-only access. This role can no longer be assigned.",
   },
 };
 
@@ -62,6 +67,8 @@ const PERMISSIONS: Record<MemberRole, ReadonlySet<Permission>> = {
     "manage_fuel",
     "manage_maintenance",
     "manage_finances",
+    "manage_ifta",
+    "manage_owner_finances",
   ]),
   ADMIN: new Set<Permission>([
     "manage_business",
@@ -73,18 +80,19 @@ const PERMISSIONS: Record<MemberRole, ReadonlySet<Permission>> = {
     "manage_fuel",
     "manage_maintenance",
     "manage_finances",
+    "manage_ifta",
   ]),
   BOOKKEEPER: new Set<Permission>([
     "manage_expenses",
     "manage_fuel",
     "manage_finances",
-    "manage_driver_settlements",
   ]),
   DISPATCHER: new Set<Permission>([
     "manage_loads",
     "manage_fuel",
     "manage_maintenance",
     "manage_drivers",
+    "manage_ifta",
   ]),
   VIEWER: new Set<Permission>(),
 };
@@ -98,5 +106,8 @@ export function permissionRefusal(role: MemberRole, permission: Permission): str
   if (permission === "manage_billing") return "Only the workspace owner can manage billing.";
   if (permission === "manage_team") return "Only the workspace owner can manage team members.";
   if (permission === "manage_account") return "Only the workspace owner can reset or delete the account.";
+  if (permission === "manage_owner_finances") {
+    return "Reserves, Safe to Pay Yourself and Owner Settlement controls are available only to the workspace owner.";
+  }
   return `${label} access does not allow that change.`;
 }

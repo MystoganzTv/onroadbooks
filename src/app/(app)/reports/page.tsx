@@ -122,7 +122,7 @@ export default async function ReportsPage({
         <PageHeader
           title="Reports"
           description={`${period.label} - compared against ${prior.label}`}
-          actions={<ExportMenu query={query} />}
+          actions={<ExportMenu query={query} year={Number(period.month.slice(0, 4))} />}
         />
       </div>
 
@@ -130,6 +130,16 @@ export default async function ReportsPage({
         <PeriodControls period={period} />
         <TruckSwitcher trucks={orderedTrucks(trucks)} selectedId={truckId} />
       </div>
+
+      <Card className="border-info/30 bg-info-soft/30 print:hidden">
+        <CardContent className="p-4 text-xs leading-relaxed text-muted-foreground">
+          <span className="font-semibold text-foreground">Recommended for your accountant:</span>{" "}
+          download the year-end XLSX packet or print the current report to PDF. Invite a
+          Bookkeeper only when they need ongoing access to expenses, fuel, invoices, collections,
+          reports and exports. Owner reserves and Safe to Pay Yourself are excluded from the
+          accountant packet.
+        </CardContent>
+      </Card>
 
       <ReportLetterhead
         businessName={business.name}

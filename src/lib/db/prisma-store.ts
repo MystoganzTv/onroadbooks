@@ -906,6 +906,9 @@ export class PrismaRepository implements Repository {
       purchasePrice: numOrNull(row.purchasePrice),
       monthlyPayment: numOrNull(row.monthlyPayment),
       monthlyInsurance: numOrNull(row.monthlyInsurance),
+      axleCount: row.axleCount,
+      registeredGrossWeightLbs: row.registeredGrossWeightLbs,
+      operatesInMultipleIftaJurisdictions: row.operatesInMultipleIftaJurisdictions,
       startingOdometer: row.startingOdometer,
       currentOdometer: row.currentOdometer,
       active: row.active,
@@ -2178,6 +2181,10 @@ export class PrismaRepository implements Repository {
         purchasePrice: input.purchasePrice ?? null,
         monthlyPayment: input.monthlyPayment ?? null,
         monthlyInsurance: input.monthlyInsurance ?? null,
+        axleCount: input.axleCount ?? null,
+        registeredGrossWeightLbs: input.registeredGrossWeightLbs ?? null,
+        operatesInMultipleIftaJurisdictions:
+          input.operatesInMultipleIftaJurisdictions ?? null,
         startingOdometer: input.startingOdometer,
         currentOdometer: input.currentOdometer,
       },
@@ -2207,6 +2214,16 @@ export class PrismaRepository implements Repository {
         purchasePrice: input.purchasePrice ?? null,
         monthlyPayment: input.monthlyPayment ?? null,
         monthlyInsurance: input.monthlyInsurance ?? null,
+        ...(input.axleCount === undefined ? {} : { axleCount: input.axleCount }),
+        ...(input.registeredGrossWeightLbs === undefined
+          ? {}
+          : { registeredGrossWeightLbs: input.registeredGrossWeightLbs }),
+        ...(input.operatesInMultipleIftaJurisdictions === undefined
+          ? {}
+          : {
+              operatesInMultipleIftaJurisdictions:
+                input.operatesInMultipleIftaJurisdictions,
+            }),
         startingOdometer: input.startingOdometer,
         currentOdometer: input.currentOdometer,
       },

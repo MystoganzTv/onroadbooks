@@ -17,7 +17,7 @@ async function ownerWithFleet() {
   const session = await requirePermission("manage_team");
   const { subscription } = await getRepository(session.businessId).getDataset();
   if (!hasFleetAccess(subscription)) {
-    throw new Error("Team access is included with an active OnRoad Fleet plan.");
+    throw new Error("Access & Roles is included with an active OnRoad Fleet plan.");
   }
   return session;
 }
@@ -60,6 +60,7 @@ export async function inviteMemberAction(values: unknown): Promise<ActionResult>
       throw error;
     }
 
+    revalidatePath("/settings");
     revalidatePath("/team");
     return { ok: true, id: member.id };
   } catch (error) {
@@ -78,6 +79,7 @@ export async function updateMemberRoleAction(values: unknown): Promise<ActionRes
       session.businessId,
       parsed.data.role,
     );
+    revalidatePath("/settings");
     revalidatePath("/team");
     return { ok: true, id: member.id };
   } catch (error) {
@@ -103,6 +105,7 @@ export async function removeMemberAction(userId: string): Promise<ActionResult> 
       // secondary auth cleanup failed; surface the failure in server logs.
       console.error("[team-remove] Supabase identity cleanup failed", error);
     }
+    revalidatePath("/settings");
     revalidatePath("/team");
     return { ok: true, id: userId };
   } catch (error) {

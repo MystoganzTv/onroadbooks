@@ -144,7 +144,6 @@ export default async function FleetPage({
                     <TableHead className="text-right">Its own costs</TableHead>
                     <TableHead className="text-right">Contribution</TableHead>
                     <TableHead className="text-right">$/mi</TableHead>
-                    <TableHead className="text-right">Share</TableHead>
                     <TableHead className="text-right">Details</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -187,9 +186,6 @@ export default async function FleetPage({
                       </TableCell>
                       <TableCell className="text-right tnum">
                         {formatRateValue(unit.contributionPerMile)}
-                      </TableCell>
-                      <TableCell className="text-right tnum text-muted-foreground">
-                        {unit.loadCount === 0 ? "--" : formatPercent(unit.shareOfContribution)}
                       </TableCell>
                       <TableCell className="text-right">
                         <Link

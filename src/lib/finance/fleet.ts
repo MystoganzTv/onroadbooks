@@ -53,8 +53,6 @@ export interface TruckContribution {
   revenuePerMile: number;
   directCostPerMile: number;
   contributionPerMile: number;
-  /** Share of the fleet's total contribution, 0-100. */
-  shareOfContribution: number;
   cost: CostPerMile;
 }
 
@@ -90,7 +88,7 @@ function contributionFor(
   expenses: Expense[],
   range: DateRange,
   settings: FinancialSettings,
-): Omit<TruckContribution, "shareOfContribution"> {
+): TruckContribution {
   const unitLoads = loadsForTruck(loads, truck.id).filter((l) => inRange(l.date, range));
   const unitExpenses = expensesForTruck(expenses, truck.id).filter((e) => inRange(e.date, range));
 
@@ -156,12 +154,7 @@ export function calculateFleetSummary(
   const overheadPerMile = div(overhead, totalMiles);
 
   return {
-    units: units
-      .map((unit) => ({
-        ...unit,
-        shareOfContribution: div(unit.contribution, contribution) * 100,
-      }))
-      .sort((a, b) => b.contribution - a.contribution),
+    units: units.sort((a, b) => b.contribution - a.contribution),
     revenue,
     collectedRevenue: financial.collectedRevenue,
     accountsReceivable: financial.accountsReceivable,

@@ -33,7 +33,6 @@ private let moreGroups: [MoreGroup] = [
         MoreItem(title: "Analytics", icon: "chart.bar.fill", fleetOnly: false),
         MoreItem(title: "Reports", icon: "chart.bar.doc.horizontal.fill", fleetOnly: false),
         MoreItem(title: "Fleet", icon: "truck.box.fill", fleetOnly: true),
-        MoreItem(title: "Team", icon: "person.3.fill", fleetOnly: true),
         MoreItem(title: "Truck", icon: "steeringwheel", fleetOnly: false),
     ]),
 ]

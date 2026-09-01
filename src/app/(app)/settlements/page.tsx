@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { planAllows } from "@/lib/plans";
+import { roleCan } from "@/lib/roles";
 import {
   calculateSettlement,
   selectSettlementView,
@@ -39,6 +40,19 @@ export default async function SettlementsPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
+  if (!roleCan(session.role ?? "VIEWER", "manage_owner_finances")) {
+    return (
+      <div className="space-y-4 p-4 lg:p-6">
+        <PageHeader title="Owner Settlements" description="Owner-only closeout workspace." />
+        <Card className="mx-auto max-w-2xl">
+          <CardContent className="p-6 text-sm leading-relaxed text-muted-foreground">
+            Safe to Pay Yourself and Owner Settlement close/reopen controls are available only to
+            the workspace owner.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   const dataset = await getRepository(session.businessId).getDataset();
   const { loads, expenses, settings, reserveAccounts, settlements } = dataset;
 

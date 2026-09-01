@@ -20,7 +20,7 @@ de iOS — y ahora conectada de verdad al mismo backend que usa la web.
 - **Load Calculator**: "¿me conviene este load?" y "¿qué tarifa pido?",
   portado fórmula por fórmula de `src/lib/finance/load-calculator.ts`.
 - **More**: el resto de la navegación (Fuel, Invoices, Reserves, IFTA,
-  Analytics, Reports, Fleet, Team, Truck, Drivers, Admin) como placeholders
+  Analytics, Reports, Fleet, Truck, Drivers, Admin) como placeholders
   "Coming soon" — la información arquitectónica ya está ahí, lista para
   llenarse pantalla por pantalla.
 - **Settings**: cierre de sesión real (borra el token del Keychain).

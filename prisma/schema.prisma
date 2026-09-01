@@ -408,17 +408,22 @@ model Truck {
   businessId String
   business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
-  name             String
-  year             Int?
-  make             String?
-  model            String?
-  vin              String?
-  purchasePrice    Decimal? @db.Decimal(12, 2)
-  monthlyPayment   Decimal? @db.Decimal(12, 2)
-  monthlyInsurance Decimal? @db.Decimal(12, 2)
-  startingOdometer Int      @default(0)
-  currentOdometer  Int      @default(0)
-  active           Boolean  @default(true)
+  name                                String
+  year                                Int?
+  make                                String?
+  model                               String?
+  vin                                 String?
+  purchasePrice                       Decimal? @db.Decimal(12, 2)
+  monthlyPayment                      Decimal? @db.Decimal(12, 2)
+  monthlyInsurance                    Decimal? @db.Decimal(12, 2)
+  /// Facts used to assess whether this unit is likely subject to IFTA.
+  /// Null means the owner has not answered yet; historical units are never guessed.
+  axleCount                           Int?
+  registeredGrossWeightLbs            Int?
+  operatesInMultipleIftaJurisdictions Boolean?
+  startingOdometer                    Int      @default(0)
+  currentOdometer                     Int      @default(0)
+  active                              Boolean  @default(true)
 
   /// When the unit joined the fleet, and when it left. A sold truck keeps all
   /// of its history and keeps appearing in past reports; it simply stops being

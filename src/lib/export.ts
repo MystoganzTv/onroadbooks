@@ -50,7 +50,7 @@ export const REPORTS: ReportDefinition[] = [
   { id: "loads", label: "Loads Report", description: "Every load with its full profitability stack" },
   { id: "expenses", label: "Expense Report", description: "Ledger detail with fixed / variable split" },
   { id: "fuel", label: "Fuel Report", description: "Fill-ups, gallons, price and odometer" },
-  { id: "profit-loss", label: "Financial Summary", description: "Performance, collections, debt service and reserves" },
+  { id: "profit-loss", label: "Financial Summary", description: "Performance, collections and debt service" },
   { id: "mileage", label: "Mileage Report", description: "Loaded, deadhead and total miles by load" },
   { id: "maintenance", label: "Maintenance Report", description: "Service history and next service due" },
 ];
@@ -74,6 +74,7 @@ export function buildReport(
   dataset: Dataset,
   period: Period,
   truckId: string | null = null,
+  includeOwnerPlanning = true,
 ): ReportTable {
   const selectedTruck = truckById(dataset.trucks, truckId);
   if (truckId && !selectedTruck) throw new Error("That truck does not belong to this workspace.");
@@ -285,7 +286,8 @@ export function buildReport(
                   "Excluded here; see Whole fleet for what the business keeps.",
                 ],
               ]
-            : [
+            : includeOwnerPlanning
+              ? [
                 [],
                 ["RESERVES", "", "", ""],
                 ...pay.reserves.map((reserve) => [
@@ -296,7 +298,8 @@ export function buildReport(
                 ]),
                 ["Total reserves", money(pay.reserveTotal), "", "Every active bucket"],
                 ["Safe to Pay Yourself", money(pay.safeToPay), "", "Cash After Debt Service less Reserve Contributions"],
-              ]),
+              ]
+              : []),
           [],
           ["BROKERS", "", "", ""],
           ...brokerPerformance(periodLoads, thresholds).map((broker) => [

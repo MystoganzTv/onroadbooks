@@ -23,13 +23,14 @@ export const metadata: Metadata = { title: "Driver Statement" };
 export default async function DriverSettlementDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await requireSession();
+  if (!roleCan(session.role ?? "VIEWER", "manage_driver_settlements")) redirect("/dashboard");
   const dataset = await getRepository(session.businessId).getDataset();
   if (!hasFleetAccess(dataset.subscription)) redirect("/settlements");
   const settlement = dataset.driverSettlements.find((row) => row.id === id);
   if (!settlement) notFound();
   const driver = dataset.drivers.find((row) => row.id === settlement.driverId);
   const totals = driverSettlementTotals(settlement);
-  const canManage = roleCan(session.role ?? "VIEWER", "manage_driver_settlements");
+  const canManage = true;
 
   return <div className="space-y-4 p-4 lg:p-6">
     <Button asChild variant="ghost" size="sm" className="print:hidden"><Link href="/driver-settlements"><ArrowLeft /> All driver statements</Link></Button>

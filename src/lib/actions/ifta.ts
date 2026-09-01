@@ -12,7 +12,7 @@ export async function saveIftaRatesAction(values: unknown): Promise<ActionResult
   const parsed = iftaRatesSchema.safeParse(values);
   if (!parsed.success) return { ok: false, error: "Check the quarter and tax rates." };
   try {
-    const session = await requireWritableSession("manage_finances");
+    const session = await requireWritableSession("manage_ifta");
     const repository = getRepository(session.businessId);
     const dataset = await repository.getDataset();
     const rates = { ...dataset.settings.iftaTaxRates };
@@ -40,7 +40,7 @@ export async function saveLoadIftaMilesAction(
 
   try {
     const repository = getRepository(
-      (await requireWritableSession("manage_finances")).businessId,
+      (await requireWritableSession("manage_ifta")).businessId,
     );
     const load = await repository.updateLoadJurisdictionMiles(loadId, parsed.data);
     revalidatePath("/ifta");

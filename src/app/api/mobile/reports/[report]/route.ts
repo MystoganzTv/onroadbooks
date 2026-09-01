@@ -14,6 +14,7 @@ import { toPdf } from "@/lib/export-pdf";
 import { toXlsx } from "@/lib/export-xlsx";
 import { truckById } from "@/lib/fleet";
 import { periodFromSearchParams, truckFromSearchParams } from "@/lib/period-params";
+import { roleCan } from "@/lib/roles";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,7 +48,13 @@ export async function GET(
   const dataset = await getRepository(session.businessId).getDataset();
   const truckId = truckFromSearchParams(search, dataset.trucks);
   const truck = truckById(dataset.trucks, truckId);
-  const table = buildReport(report as ReportId, dataset, period, truckId);
+  const table = buildReport(
+    report as ReportId,
+    dataset,
+    period,
+    truckId,
+    roleCan(session.role ?? "VIEWER", "manage_owner_finances"),
+  );
 
   const requested = request.nextUrl.searchParams.get("format");
   if (!requested) {

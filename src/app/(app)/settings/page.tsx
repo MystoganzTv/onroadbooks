@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Database, FileText } from "lucide-react";
+import Link from "next/link";
+import { Database, FileText, Users } from "lucide-react";
 
 import { DisplaySettings } from "@/components/settings/display-settings";
 import { AccountDangerZone } from "@/components/settings/account-danger-zone";
@@ -8,12 +9,16 @@ import { SettingsForm } from "@/components/settings/settings-form";
 import { PageHeader } from "@/components/shared/page-header";
 import { BrandLogo } from "@/components/shell/brand-logo";
 import { CurrentPlanCard } from "@/components/subscription/current-plan-card";
+import { TeamManager } from "@/components/team/team-manager";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { summarizePeriod } from "@/lib/calculations";
 import { requireSession } from "@/lib/auth";
-import { getRepository, storageMode } from "@/lib/db";
+import { getAuthStore, getRepository, storageMode } from "@/lib/db";
 import { periodFromSearchParams, type SearchParams } from "@/lib/period-params";
+import { hasFleetAccess } from "@/lib/plans";
+import { roleCan } from "@/lib/roles";
 import { todayISO } from "@/lib/periods";
 import { APP_NAME } from "@/lib/utils";
 
@@ -26,32 +31,50 @@ export default async function SettingsPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
+  const dataset = await getRepository(session.businessId).getDataset();
   const { business, settings, goals, subscription, loads, expenses, reserveAccounts, paymentEvents } =
-    await getRepository(session.businessId).getDataset();
+    dataset;
   const period = periodFromSearchParams(params);
   const preview = summarizePeriod(loads, expenses, period, settings, paymentEvents);
   const mode = storageMode();
+  const role = session.role ?? "VIEWER";
+  const owner = role === "OWNER";
+  const canManageBusiness = roleCan(role, "manage_business");
+  const hasFleet = hasFleetAccess(subscription);
+  const members = hasFleet ? await getAuthStore().listMembers(session.businessId) : [];
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <PageHeader
-        title="Business Settings"
-        description="Reserve percentages, targets and expense classification apply to every period in the app."
+        title="Settings"
+        description="Business configuration, personal display preferences, plan details, and access controls."
       />
 
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="min-w-0 xl:col-span-2">
-          <SettingsForm
-            business={business}
-            settings={settings}
-            preview={preview}
-            previewLabel={period.label}
-            reserveAccounts={reserveAccounts}
-          />
+          {owner ? (
+            <SettingsForm
+              business={business}
+              settings={settings}
+              preview={preview}
+              previewLabel={period.label}
+              reserveAccounts={reserveAccounts}
+            />
+          ) : (
+            <Card>
+              <CardHeader><CardTitle>Owner financial settings</CardTitle></CardHeader>
+              <CardContent className="p-4 text-sm leading-relaxed text-muted-foreground">
+                Reserve rules and Safe to Pay Yourself settings are visible only to the workspace
+                owner.
+              </CardContent>
+            </Card>
+          )}
 
-          <div className="mt-4">
-            <GoalsForm goals={goals} />
-          </div>
+          {canManageBusiness ? (
+            <div className="mt-4">
+              <GoalsForm goals={goals} />
+            </div>
+          ) : null}
 
           <div className="mt-4">
             <DisplaySettings />
@@ -62,7 +85,7 @@ export default async function SettingsPage({
           <CurrentPlanCard
             subscription={subscription}
             today={todayISO()}
-            canManage={(session.role ?? "VIEWER") === "OWNER"}
+            canManage={owner}
           />
 
           <Card>
@@ -122,7 +145,43 @@ export default async function SettingsPage({
         </div>
       </div>
 
-      {(session.role ?? "VIEWER") === "OWNER" ? (
+      <section id="access-roles" className="scroll-mt-20 space-y-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <Users className="size-4 text-primary" />
+            <h2 className="text-base font-semibold">Access &amp; Roles</h2>
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            App sign-ins are for ongoing collaboration. Adding a driver never creates app access.
+          </p>
+        </div>
+        {hasFleet ? (
+          <TeamManager
+            members={members.map(({ id, email, name, role: memberRole, joinedAt, invitedAt }) => ({
+              id,
+              email,
+              name,
+              role: memberRole,
+              joinedAt,
+              invitedAt,
+            }))}
+            canManage={roleCan(role, "manage_team")}
+          />
+        ) : (
+          <Card>
+            <CardContent className="flex flex-col items-start gap-3 p-5 text-sm text-muted-foreground">
+              <p>Multiple sign-ins and role-based access are included with OnRoad Fleet.</p>
+              {owner ? (
+                <Button asChild size="sm"><Link href="/plans">View Fleet plan</Link></Button>
+              ) : (
+                <p className="font-medium text-foreground">Ask the owner about Fleet access.</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </section>
+
+      {owner ? (
         <AccountDangerZone email={session.email} />
       ) : null}
     </div>

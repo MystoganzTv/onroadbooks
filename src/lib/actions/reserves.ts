@@ -28,7 +28,9 @@ export async function createReserveAccountAction(values: unknown): Promise<Actio
   }
 
   try {
-    const account = await (await repositoryWith("cockpit")).createReserveAccount(parsed.data);
+    const account = await (
+      await repositoryWith("cockpit", "manage_owner_finances")
+    ).createReserveAccount(parsed.data);
     revalidate();
     return { ok: true, id: account.id };
   } catch (error) {
@@ -50,7 +52,7 @@ export async function updateReserveAccountAction(
   }
 
   try {
-    await (await repositoryWith("cockpit")).updateReserveAccount(
+    await (await repositoryWith("cockpit", "manage_owner_finances")).updateReserveAccount(
       id,
       parsed.data,
     );
@@ -63,7 +65,7 @@ export async function updateReserveAccountAction(
 
 export async function deleteReserveAccountAction(id: string): Promise<ActionResult> {
   try {
-    await (await repositoryWith("cockpit")).deleteReserveAccount(id);
+    await (await repositoryWith("cockpit", "manage_owner_finances")).deleteReserveAccount(id);
     revalidate();
     return { ok: true };
   } catch (error) {
@@ -82,7 +84,9 @@ export async function createReserveTransactionAction(values: unknown): Promise<A
   }
 
   try {
-    const txn = await (await repositoryWith("cockpit")).createReserveTransaction(parsed.data);
+    const txn = await (
+      await repositoryWith("cockpit", "manage_owner_finances")
+    ).createReserveTransaction(parsed.data);
     revalidate();
     return { ok: true, id: txn.id };
   } catch (error) {
@@ -92,7 +96,7 @@ export async function createReserveTransactionAction(values: unknown): Promise<A
 
 export async function deleteReserveTransactionAction(id: string): Promise<ActionResult> {
   try {
-    await (await repositoryWith("cockpit")).deleteReserveTransaction(id);
+    await (await repositoryWith("cockpit", "manage_owner_finances")).deleteReserveTransaction(id);
     revalidate();
     return { ok: true };
   } catch (error) {

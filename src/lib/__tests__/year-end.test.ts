@@ -85,6 +85,15 @@ describe("the year-end packet", () => {
     assert.equal(labels.some((label) => label.includes("tax owed") || label.includes("tax due")), false);
   });
 
+  it("excludes owner reserve planning from the accountant packet", () => {
+    const labels = buildYearEndPacket(dataset, 2026, "EPS Logistics LLC").tables
+      .flatMap((table) => table.rows)
+      .map((row) => String(row[0]));
+    assert.equal(labels.some((label) => label.startsWith("Reserve balance")), false);
+    assert.equal(labels.includes("Safe to Pay Yourself"), false);
+    assert.equal(labels.includes("RESERVES"), false);
+  });
+
   it("is empty rather than wrong for a year with no records", () => {
     assert.equal(value("Booked Revenue", 1999), 0);
     assert.equal(value("Loads recorded", 1999), 0);

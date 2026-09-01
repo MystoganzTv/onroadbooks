@@ -170,6 +170,13 @@ describe("export consistency with the app", () => {
     assert.equal(Number(safeRow![1]), pay.safeToPay);
   });
 
+  it("removes owner planning from a Bookkeeper financial export", () => {
+    const table = buildReport("profit-loss", dataset, period, null, false);
+    const labels = table.rows.map((row) => String(row[0]));
+    assert.equal(labels.includes("RESERVES"), false);
+    assert.equal(labels.includes("Safe to Pay Yourself"), false);
+  });
+
   it("mileage report prices deadhead exactly like the dashboard card", () => {
     const basis = calculateTrueCostPerMile(
       dataset.loads,

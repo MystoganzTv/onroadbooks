@@ -25,10 +25,12 @@ export function TruckHealthPanel({
   health,
   limit = 5,
   className,
+  showReserve = true,
 }: {
   health: MaintenanceHealth;
   limit?: number;
   className?: string;
+  showReserve?: boolean;
 }) {
   const items = health.items.slice(0, limit);
 
@@ -74,24 +76,28 @@ export function TruckHealthPanel({
           </ul>
         )}
 
-        <div className="grid grid-cols-3 gap-3 border-t border-border p-4">
+        <div className={cn("grid gap-3 border-t border-border p-4", showReserve ? "grid-cols-3" : "grid-cols-1")}>
           <Figure
             label="Due soon"
             value={health.upcomingCost > 0 ? formatMoneyCompact(health.upcomingCost) : "—"}
             tone={health.upcomingCost > 0 ? "text-warn" : undefined}
           />
-          <Figure label="Reserve" value={formatMoneyCompact(health.reserveBalance)} />
-          <Figure
-            label="Coverage"
-            value={health.coverage !== null ? `${health.coverage.toFixed(2)}x` : "—"}
-            tone={
-              health.coverage === null
-                ? undefined
-                : health.coverage >= 1
-                  ? "text-pos"
-                  : "text-neg"
-            }
-          />
+          {showReserve ? (
+            <>
+              <Figure label="Reserve" value={formatMoneyCompact(health.reserveBalance)} />
+              <Figure
+                label="Coverage"
+                value={health.coverage !== null ? `${health.coverage.toFixed(2)}x` : "—"}
+                tone={
+                  health.coverage === null
+                    ? undefined
+                    : health.coverage >= 1
+                      ? "text-pos"
+                      : "text-neg"
+                }
+              />
+            </>
+          ) : null}
         </div>
 
         {health.unpricedCount > 0 ? (

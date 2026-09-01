@@ -42,6 +42,13 @@ export default async function DriversPage() {
         description="Assign operational pay terms once, then attach each load to the person who ran it."
         actions={canManage ? <DriverFormDialog trucks={dataset.trucks} /> : null}
       />
+      <div className="rounded-lg border border-info/30 bg-info-soft/40 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
+        <span className="font-semibold text-foreground">
+          Adding a driver does not give them app access.
+        </span>{" "}
+        Drivers are operational records for load assignment and pay statements. App access is
+        managed separately under Settings → Access &amp; Roles.
+      </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <MiniStat label="Active drivers" value={formatNumber(active.length)} />
         <MiniStat label="Unsettled loads" value={formatNumber(unsettled.length)} />
@@ -54,7 +61,7 @@ export default async function DriversPage() {
             <EmptyState
               icon={Users}
               title="No drivers yet"
-              description="Add the first driver, choose a pay method, then assign loads to them."
+              description="Add the first driver, choose a pay method, then assign loads to them. This does not create a sign-in."
               action={canManage ? <DriverFormDialog trucks={dataset.trucks} /> : undefined}
             />
           ) : (

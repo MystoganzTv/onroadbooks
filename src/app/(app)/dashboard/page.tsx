@@ -90,6 +90,7 @@ import {
 import { defaultEntryDate, monthLabel, previousPeriod, todayISO } from "@/lib/periods";
 import { recurringExpenseSuggestions } from "@/lib/recurring-expenses";
 import { roleCan } from "@/lib/roles";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -119,6 +120,8 @@ export default async function DashboardPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
+  const role = session.role ?? "VIEWER";
+  const ownerPlanning = roleCan(role, "manage_owner_finances");
   const dataset = await getRepository(session.businessId).getDataset();
   const period = periodFromSearchParams(params);
   const prior = previousPeriod(period);
@@ -208,7 +211,9 @@ export default async function DashboardPage({
   const lanes = calculateLanePerformance(periodLoads, ratingThresholds);
   const { best, worst } = bestAndWorst(periodLoads);
 
-  const balances = calculateReserveBalances(reserveAccounts, reserveTransactions, period);
+  const balances = ownerPlanning
+    ? calculateReserveBalances(reserveAccounts, reserveTransactions, period)
+    : [];
   const maintenanceReserve = reserveBalanceFor(balances, "MAINTENANCE");
   // Health is reported for one unit at a time, because "miles remaining" is a
   // fact about a specific odometer.
@@ -235,18 +240,18 @@ export default async function DashboardPage({
     brokers,
     lanes,
     maintenance,
+    includeOwnerPlanning: ownerPlanning,
   });
 
   const buckets = periodBuckets(loads, expenses, period);
   const query = scopeQuery(period, truckId);
   const brokerNames = [...new Set(loads.map((l) => l.broker).filter(Boolean))].sort() as string[];
   const settlementHref =
-    period.key === "first" || period.key === "second"
+    ownerPlanning && (period.key === "first" || period.key === "second")
       ? `/settlements?month=${period.month}&half=${period.key === "first" ? "FIRST" : "SECOND"}`
       : undefined;
   const hasLedgerHistory = allLoads.length > 0 || allExpenses.length > 0;
 
-  const role = session.role ?? "VIEWER";
   const loadAction = roleCan(role, "manage_loads") ? (
     <LoadFormDialog
       brokers={brokerNames}
@@ -343,7 +348,7 @@ export default async function DashboardPage({
             <HeroMetrics
               summary={summary}
               previous={priorSummary}
-              ownerPay={cockpit ? ownerPay : undefined}
+              ownerPay={cockpit && ownerPlanning ? ownerPay : undefined}
               previousLabel={prior.shortLabel}
               deltas={{
                 revenue: pctChange(summary.bookedRevenue, priorSummary.bookedRevenue),
@@ -352,18 +357,25 @@ export default async function DashboardPage({
               }}
             />
           </div>
-          {cockpit ? (
+          {cockpit && ownerPlanning ? (
             <SafeToPayCard
               ownerPay={ownerPay}
               periodLabel={period.label}
               href={settlementHref}
               className="min-w-0"
             />
-          ) : (
+          ) : ownerPlanning ? (
             <PlanGate
               capability="cockpit"
               what="Set aside tax and maintenance as each half-month closes, and see what is genuinely free to take out."
             />
+          ) : (
+            <Card className="min-w-0">
+              <CardHeader><CardTitle>Owner planning</CardTitle></CardHeader>
+              <CardContent className="p-4 text-xs leading-relaxed text-muted-foreground">
+                Reserves and Safe to Pay Yourself are visible only to the workspace owner.
+              </CardContent>
+            </Card>
           )}
         </div>
       </Section>
@@ -432,6 +444,7 @@ export default async function DashboardPage({
             ownerPay={ownerPay}
             categories={categories}
             periodLabel={period.label}
+            showOwnerPlanning={ownerPlanning}
             className="min-w-0 xl:col-span-2"
           />
           <Card className="min-w-0">
@@ -482,9 +495,12 @@ export default async function DashboardPage({
       ) : null}
 
       {/* ---- Reserves and the truck ------------------------------------- */}
-      <Section title="Reserves and the truck" description="Am I setting enough aside">
+      <Section
+        title={ownerPlanning ? "Reserves and the truck" : "Truck condition"}
+        description={ownerPlanning ? "Am I setting enough aside" : "Maintenance due and upcoming cost"}
+      >
         <div className="grid gap-3 lg:grid-cols-2">
-          {cockpit ? (
+          {cockpit && ownerPlanning ? (
             <ReservesPanel
               balances={balances}
               planned={ownerPay.reserves}
@@ -492,7 +508,11 @@ export default async function DashboardPage({
               className="min-w-0"
             />
           ) : null}
-          <TruckHealthPanel health={maintenance} className="min-w-0" />
+          <TruckHealthPanel
+            health={maintenance}
+            showReserve={ownerPlanning}
+            className={cn("min-w-0", !ownerPlanning && "lg:col-span-2")}
+          />
         </div>
       </Section>
 

@@ -368,6 +368,9 @@ export const truckSchema = z.object({
   purchasePrice: money.optional().nullable(),
   monthlyPayment: money.optional().nullable(),
   monthlyInsurance: money.optional().nullable(),
+  axleCount: z.number().int().min(2).max(10).optional().nullable(),
+  registeredGrossWeightLbs: z.number().int().min(1_000).max(200_000).optional().nullable(),
+  operatesInMultipleIftaJurisdictions: z.boolean().optional().nullable(),
   startingOdometer: z.number().int().min(0).max(5_000_000),
   currentOdometer: z.number().int().min(0).max(5_000_000),
 });

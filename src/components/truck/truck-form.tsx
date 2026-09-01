@@ -10,7 +10,15 @@ import { fieldErrors, focusFirstError, validationMessage } from "@/lib/form";
 import { Button } from "@/components/ui/button";
 import { CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { updateTruckAction } from "@/lib/actions/settings";
+import { iftaApplicability, iftaApplicabilityLabel } from "@/lib/ifta-eligibility";
 import { truckSchema } from "@/lib/schemas";
 import type { Truck } from "@/lib/types";
 import { toNumber, toRequiredNumber } from "@/lib/utils";
@@ -25,6 +33,16 @@ function initialState(truck: Truck) {
     purchasePrice: truck.purchasePrice ? String(truck.purchasePrice) : "",
     monthlyPayment: truck.monthlyPayment ? String(truck.monthlyPayment) : "",
     monthlyInsurance: truck.monthlyInsurance ? String(truck.monthlyInsurance) : "",
+    axleCount: truck.axleCount ? String(truck.axleCount) : "",
+    registeredGrossWeightLbs: truck.registeredGrossWeightLbs
+      ? String(truck.registeredGrossWeightLbs)
+      : "",
+    operatesInMultipleIftaJurisdictions:
+      truck.operatesInMultipleIftaJurisdictions == null
+        ? "UNKNOWN"
+        : truck.operatesInMultipleIftaJurisdictions
+          ? "YES"
+          : "NO",
     startingOdometer: String(truck.startingOdometer),
     currentOdometer: String(truck.currentOdometer),
   };
@@ -39,6 +57,8 @@ const FIELD_LABELS: Record<string, string> = {
   purchasePrice: "Purchase price",
   monthlyPayment: "Monthly payment",
   monthlyInsurance: "Monthly insurance",
+  axleCount: "Power-unit axles",
+  registeredGrossWeightLbs: "Registered gross/combined weight",
   startingOdometer: "Starting odometer",
   currentOdometer: "Current odometer",
 };
@@ -72,6 +92,14 @@ export function TruckForm({
       purchasePrice: values.purchasePrice ? toNumber(values.purchasePrice) : null,
       monthlyPayment: values.monthlyPayment ? toNumber(values.monthlyPayment) : null,
       monthlyInsurance: values.monthlyInsurance ? toNumber(values.monthlyInsurance) : null,
+      axleCount: values.axleCount ? toNumber(values.axleCount) : null,
+      registeredGrossWeightLbs: values.registeredGrossWeightLbs
+        ? toNumber(values.registeredGrossWeightLbs)
+        : null,
+      operatesInMultipleIftaJurisdictions:
+        values.operatesInMultipleIftaJurisdictions === "UNKNOWN"
+          ? null
+          : values.operatesInMultipleIftaJurisdictions === "YES",
       startingOdometer: toRequiredNumber(values.startingOdometer),
       currentOdometer: toRequiredNumber(values.currentOdometer),
     };
@@ -109,6 +137,17 @@ export function TruckForm({
       }
     });
   }
+
+  const iftaStatus = iftaApplicability({
+    axleCount: values.axleCount ? toNumber(values.axleCount) : null,
+    registeredGrossWeightLbs: values.registeredGrossWeightLbs
+      ? toNumber(values.registeredGrossWeightLbs)
+      : null,
+    operatesInMultipleIftaJurisdictions:
+      values.operatesInMultipleIftaJurisdictions === "UNKNOWN"
+        ? null
+        : values.operatesInMultipleIftaJurisdictions === "YES",
+  });
 
   return (
     <form
@@ -170,6 +209,70 @@ export function TruckForm({
                 maxLength={24}
               />
             </Field>
+          </div>
+
+          <div className="space-y-3 rounded-lg border border-border bg-surface-sunken/40 p-3">
+            <div>
+              <p className="text-xs font-semibold">IFTA qualification profile</p>
+              <p className="mt-0.5 text-2xs leading-relaxed text-muted-foreground">
+                These facts decide whether IFTA tools are relevant. Historical units remain
+                unknown until you confirm them.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Power-unit axles" htmlFor="truck-axles" error={errors.axleCount}>
+                <Input
+                  id="truck-axles"
+                  type="number"
+                  min={2}
+                  max={10}
+                  step={1}
+                  value={values.axleCount}
+                  onChange={(e) => set("axleCount", e.target.value)}
+                  placeholder="2"
+                />
+              </Field>
+              <Field
+                label="Registered gross/combined weight"
+                htmlFor="truck-registered-weight"
+                hint="lb"
+                error={errors.registeredGrossWeightLbs}
+              >
+                <Input
+                  id="truck-registered-weight"
+                  type="number"
+                  min={1_000}
+                  max={200_000}
+                  step={1}
+                  value={values.registeredGrossWeightLbs}
+                  onChange={(e) => set("registeredGrossWeightLbs", e.target.value)}
+                  placeholder="26000"
+                />
+              </Field>
+            </div>
+            <Field
+              label="Operating area"
+              htmlFor="truck-ifta-jurisdictions"
+              hint="Will this unit operate in two or more IFTA states or Canadian provinces?"
+            >
+              <Select
+                value={values.operatesInMultipleIftaJurisdictions}
+                onValueChange={(value) => set("operatesInMultipleIftaJurisdictions", value)}
+              >
+                <SelectTrigger id="truck-ifta-jurisdictions"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="UNKNOWN">Not sure yet</SelectItem>
+                  <SelectItem value="YES">Two or more IFTA jurisdictions</SelectItem>
+                  <SelectItem value="NO">One jurisdiction only</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <p className="text-2xs leading-relaxed text-muted-foreground">
+              <span className="font-semibold text-foreground">
+                {iftaApplicabilityLabel(iftaStatus)}.
+              </span>{" "}
+              Confirm exemptions and filing treatment with your base jurisdiction.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">

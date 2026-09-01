@@ -28,6 +28,8 @@ import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { activeTrucks, orderedTrucks, primaryTruck, truckById } from "@/lib/fleet";
 import { hasFleetAccess, planOf, truckAllowance } from "@/lib/plans";
+import { iftaApplicability } from "@/lib/ifta-eligibility";
+import { roleCan } from "@/lib/roles";
 import { truckFromSearchParams, type SearchParams } from "@/lib/period-params";
 import { thresholdsFrom, upcomingMaintenance } from "@/lib/maintenance";
 import { calculateMaintenanceHealth } from "@/lib/finance/maintenance-health";
@@ -44,6 +46,7 @@ export default async function TruckPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
+  const ownerPlanning = roleCan(session.role ?? "VIEWER", "manage_owner_finances");
   const dataset = await getRepository(session.businessId).getDataset();
 
   // One unit at a time: miles remaining and reserve coverage are facts about a
@@ -68,7 +71,9 @@ export default async function TruckPage({
   const dueSoon = upcoming.filter((item) => item.status === "DUE_SOON").length;
 
   // Can the maintenance bucket actually pay for what is coming?
-  const balances = calculateReserveBalances(dataset.reserveAccounts, dataset.reserveTransactions);
+  const balances = ownerPlanning
+    ? calculateReserveBalances(dataset.reserveAccounts, dataset.reserveTransactions)
+    : [];
   const health = calculateMaintenanceHealth(
     records,
     truck,
@@ -78,6 +83,14 @@ export default async function TruckPage({
   );
 
   const description = [truck.year, truck.make, truck.model].filter(Boolean).join(" ");
+  const profileIncomplete = !description || iftaApplicability(truck) === "UNKNOWN";
+  const hasLifetimeActivity =
+    lifetime.loadCount > 0 ||
+    lifetime.bookedRevenue !== 0 ||
+    lifetime.operatingExpenses !== 0 ||
+    lifetime.totalMiles > 0 ||
+    lifetime.debtService !== 0 ||
+    lifetime.collectedRevenue !== 0;
 
   // What the plan actually allows, checked against the units that exist. The
   // add button reads this; the server action checks it again on submit,
@@ -101,8 +114,10 @@ export default async function TruckPage({
             ) : dueSoon > 0 ? (
               <Badge variant="warning">{dueSoon} approaching</Badge>
             ) : null}
-            <Badge variant={truck.active ? "positive" : "outline"}>
-              {truck.active ? "Active" : "Retired"}
+            <Badge
+              variant={!truck.active ? "outline" : profileIncomplete ? "warning" : "positive"}
+            >
+              {!truck.active ? "Retired" : profileIncomplete ? "Setup incomplete" : "Active"}
             </Badge>
             <MaintenanceFormDialog currentOdometer={truck.currentOdometer} truckId={truck.id} />
           </>
@@ -202,8 +217,14 @@ export default async function TruckPage({
                     {description || "Vehicle details not added"}
                   </p>
                 </div>
-                <Badge variant={truck.active ? "positive" : "outline"}>
-                  {truck.active ? "Selected · Active" : "Selected · Retired"}
+                <Badge
+                  variant={!truck.active ? "outline" : profileIncomplete ? "warning" : "positive"}
+                >
+                  {!truck.active
+                    ? "Selected · Retired"
+                    : profileIncomplete
+                      ? "Selected · Setup incomplete"
+                      : "Selected · Active"}
                 </Badge>
               </div>
             </div>
@@ -211,45 +232,66 @@ export default async function TruckPage({
         </div>
       </section>
 
-      <section
-        aria-label="Lifetime economics"
-        className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8"
-      >
-        <MiniStat
-          label="Booked Revenue"
-          value={formatMoneyCompact(lifetime.bookedRevenue)}
-          tone="info"
-          sub={`${lifetime.loadCount} loads`}
-        />
-        <MiniStat
-          label="Operating Expenses"
-          value={formatMoneyCompact(lifetime.operatingExpenses)}
-          tone="negative"
-        />
-        <MiniStat
-          label="Operating Profit"
-          value={formatMoneyCompact(lifetime.operatingProfit)}
-          tone={lifetime.operatingProfit >= 0 ? "positive" : "negative"}
-        />
-        <MiniStat label="Total Miles" value={formatNumber(lifetime.totalMiles)} sub="from loads" />
-        <MiniStat
-          label="Actual Cost / Mile"
-          value={formatRate(lifetime.actualCostPerMile)}
-          tone="negative"
-        />
-        <MiniStat
-          label="Operating Profit / Mile"
-          value={formatRate(lifetime.operatingProfitPerMile)}
-          tone={lifetime.operatingProfitPerMile >= 0 ? "positive" : "negative"}
-        />
-        <MiniStat label="Debt Service" value={formatMoneyCompact(lifetime.debtService)} tone="negative" />
-        <MiniStat
-          label="Cash After Debt Service"
-          value={formatMoneyCompact(lifetime.cashAfterDebtService)}
-          sub={`${formatMoneyCompact(lifetime.collectedRevenue)} collected`}
-          tone={lifetime.cashAfterDebtService >= 0 ? "positive" : "negative"}
-        />
-      </section>
+      {hasLifetimeActivity ? (
+        <section
+          aria-label="Lifetime economics"
+          className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8"
+        >
+          <MiniStat
+            label="Booked Revenue"
+            value={formatMoneyCompact(lifetime.bookedRevenue)}
+            tone="info"
+            sub={`${lifetime.loadCount} loads`}
+          />
+          <MiniStat
+            label="Operating Expenses"
+            value={formatMoneyCompact(lifetime.operatingExpenses)}
+            tone="negative"
+          />
+          <MiniStat
+            label="Operating Profit"
+            value={formatMoneyCompact(lifetime.operatingProfit)}
+            tone={lifetime.operatingProfit >= 0 ? "positive" : "negative"}
+          />
+          <MiniStat label="Total Miles" value={formatNumber(lifetime.totalMiles)} sub="from loads" />
+          <MiniStat
+            label="Actual Cost / Mile"
+            value={formatRate(lifetime.actualCostPerMile)}
+            tone="negative"
+          />
+          <MiniStat
+            label="Operating Profit / Mile"
+            value={formatRate(lifetime.operatingProfitPerMile)}
+            tone={lifetime.operatingProfitPerMile >= 0 ? "positive" : "negative"}
+          />
+          <MiniStat label="Debt Service" value={formatMoneyCompact(lifetime.debtService)} tone="negative" />
+          <MiniStat
+            label="Cash After Debt Service"
+            value={formatMoneyCompact(lifetime.cashAfterDebtService)}
+            sub={`${formatMoneyCompact(lifetime.collectedRevenue)} collected`}
+            tone={lifetime.cashAfterDebtService >= 0 ? "positive" : "negative"}
+          />
+        </section>
+      ) : (
+        <Card>
+          <CardContent className="flex items-start gap-3 p-4 lg:p-5">
+            <span
+              className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
+              aria-hidden
+            >
+              <TruckIcon className="size-4" />
+            </span>
+            <div>
+              <p className="text-sm font-semibold">No operating history yet</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Financial and mileage metrics will appear after this unit receives its first load,
+                expense, fuel purchase or debt-service entry. Zero cards are hidden until there is
+                real activity to measure.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs defaultValue="overview">
         <TabsList>
@@ -269,7 +311,7 @@ export default async function TruckPage({
         <TabsContent value="maintenance" className="mt-4 space-y-4">
           <div className="grid gap-4 xl:grid-cols-3">
             <div className="min-w-0 space-y-4 xl:col-span-1">
-              <TruckHealthPanel health={health} />
+              <TruckHealthPanel health={health} showReserve={ownerPlanning} />
               <UpcomingMaintenance
                 items={upcoming}
                 currentOdometer={truck.currentOdometer}
@@ -321,6 +363,7 @@ export default async function TruckPage({
             milesPerGallon={fuel.milesPerGallon}
             activeTruckCount={running}
             canRestore={allowance.canAdd}
+            profileIncomplete={profileIncomplete}
           />
         </TabsContent>
       </Tabs>

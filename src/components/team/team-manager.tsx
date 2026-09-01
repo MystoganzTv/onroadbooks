@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, MailPlus, Trash2, Users } from "lucide-react";
+import Link from "next/link";
+import { FileSpreadsheet, Loader2, MailPlus, Trash2, Users } from "lucide-react";
 
 import {
   inviteMemberAction,
@@ -97,7 +98,7 @@ export function TeamManager({ members, canManage }: TeamManagerProps) {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Users className="size-4 text-primary" />
-            <CardTitle>Workspace members</CardTitle>
+            <CardTitle>People with app access</CardTitle>
           </div>
           <Badge variant="outline">{members.length} total</Badge>
         </CardHeader>
@@ -133,6 +134,11 @@ export function TeamManager({ members, canManage }: TeamManagerProps) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      {member.role === "VIEWER" ? (
+                        <SelectItem value="VIEWER" disabled>
+                          Viewer (legacy)
+                        </SelectItem>
+                      ) : null}
                       {ASSIGNABLE_ROLES.map((value) => (
                         <SelectItem key={value} value={value}>
                           {ROLE_DEFINITIONS[value].label}
@@ -161,6 +167,24 @@ export function TeamManager({ members, canManage }: TeamManagerProps) {
       </Card>
 
       <div className="space-y-4">
+        <Card className="border-info/30 bg-info-soft/30">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <FileSpreadsheet className="size-4 text-info" />
+              <CardTitle>Recommended for your accountant</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3 text-xs leading-relaxed text-muted-foreground">
+            <p>
+              Send the PDF/XLSX accountant package for periodic review or tax preparation. Invite
+              a Bookkeeper only when they need ongoing collaboration inside this company.
+            </p>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/reports">Open reports and exports</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
         {canManage ? (
           <Card>
             <CardHeader>
@@ -180,9 +204,9 @@ export function TeamManager({ members, canManage }: TeamManagerProps) {
                   <Input id="member-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required maxLength={254} />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium">Role</label>
+                  <label htmlFor="member-role" className="mb-1 block text-xs font-medium">Role</label>
                   <Select value={role} onValueChange={(value) => setRole(value as AssignableRole)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger id="member-role"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {ASSIGNABLE_ROLES.map((value) => (
                         <SelectItem key={value} value={value}>{ROLE_DEFINITIONS[value].label}</SelectItem>
@@ -195,13 +219,17 @@ export function TeamManager({ members, canManage }: TeamManagerProps) {
                   {pending ? <Loader2 className="animate-spin" /> : <MailPlus />}
                   Send invitation
                 </Button>
+                <p className="text-2xs leading-relaxed text-muted-foreground">
+                  This invitation is tied to this company. Drivers are added separately and do not
+                  receive app access.
+                </p>
               </form>
             </CardContent>
           </Card>
         ) : (
           <Card>
             <CardContent className="p-4 text-sm leading-relaxed text-muted-foreground">
-              Only the workspace owner can invite members or change roles.
+              Only the workspace owner can invite people or change roles.
             </CardContent>
           </Card>
         )}
@@ -213,7 +241,7 @@ export function TeamManager({ members, canManage }: TeamManagerProps) {
         ) : null}
 
         <Card>
-          <CardHeader><CardTitle>Permission boundaries</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Role boundaries</CardTitle></CardHeader>
           <CardContent className="space-y-3 text-xs leading-relaxed text-muted-foreground">
             {ASSIGNABLE_ROLES.map((value) => (
               <div key={value}>
@@ -221,7 +249,10 @@ export function TeamManager({ members, canManage }: TeamManagerProps) {
                 <p>{ROLE_DEFINITIONS[value].description}</p>
               </div>
             ))}
-            <p className="border-t border-border pt-3">Billing, member management, account reset and account deletion always remain with the Owner.</p>
+            <p className="border-t border-border pt-3">
+              Billing, access management, reserves, Safe to Pay Yourself, Owner Settlement
+              close/reopen, account reset and account deletion always remain with the Owner.
+            </p>
           </CardContent>
         </Card>
       </div>

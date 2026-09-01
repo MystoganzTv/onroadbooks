@@ -22,9 +22,10 @@ export const metadata: Metadata = { title: "Driver Settlements" };
 
 export default async function DriverSettlementsPage() {
   const session = await requireSession();
+  if (!roleCan(session.role ?? "VIEWER", "manage_driver_settlements")) redirect("/dashboard");
   const dataset = await getRepository(session.businessId).getDataset();
   if (!hasFleetAccess(dataset.subscription)) redirect("/settlements");
-  const canManage = roleCan(session.role ?? "VIEWER", "manage_driver_settlements");
+  const canManage = true;
   const availableDrivers = dataset.drivers.filter((driver) =>
     unsettledLoadsForDriver(dataset.loads, dataset.driverSettlements, driver.id).length > 0,
   );

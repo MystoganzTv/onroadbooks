@@ -18,8 +18,7 @@ import { REPORTS } from "@/lib/export";
  * exactly what is on screen. Print remains useful for the visual dashboard;
  * the dropdown generates native accountant files without a browser dialog.
  */
-export function ExportMenu({ query }: { query: string }) {
-  const year = new Date().getFullYear();
+export function ExportMenu({ query, year }: { query: string; year: number }) {
   return (
     <div className="flex items-center gap-2 print:hidden">
       <Button variant="outline" size="sm" onClick={() => window.print()}>
@@ -31,18 +30,18 @@ export function ExportMenu({ query }: { query: string }) {
         <DropdownMenuTrigger asChild>
           <Button size="sm">
             <Download />
-            Export
+            Accountant package
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-[16.5rem]">
-          <DropdownMenuLabel>Accountant exports</DropdownMenuLabel>
+          <DropdownMenuLabel>Recommended accountant handoff</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {/* One attachment beats six. Everything below is in here already. */}
           <DropdownMenuItem asChild className="justify-between gap-3">
             <a href={`/api/export/year-end?year=${year}`} download>
               <span className="min-w-0">
-                <span className="block truncate font-medium">Year-end packet · {year}</span>
-                <span className="block truncate text-2xs text-muted-foreground">The whole year in one workbook</span>
+                <span className="block truncate font-medium">Year-end XLSX packet · {year}</span>
+                <span className="block truncate text-2xs text-muted-foreground">Recommended · the whole year in one workbook</span>
               </span>
               <FileSpreadsheet className="size-4 shrink-0" />
             </a>

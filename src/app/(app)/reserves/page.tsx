@@ -25,6 +25,7 @@ import {
 } from "@/lib/formatters";
 import { periodFromSearchParams, type SearchParams } from "@/lib/period-params";
 import { planAllows } from "@/lib/plans";
+import { roleCan } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Reserves" };
@@ -43,6 +44,18 @@ export default async function ReservesPage({
 }) {
   const params = await searchParams;
   const session = await requireSession();
+  if (!roleCan(session.role ?? "VIEWER", "manage_owner_finances")) {
+    return (
+      <div className="space-y-4 p-4 lg:p-6">
+        <PageHeader title="Reserves" description="Owner planning workspace." />
+        <Card className="mx-auto max-w-2xl">
+          <CardContent className="p-6 text-sm leading-relaxed text-muted-foreground">
+            Reserve balances, rules and movements are available only to the workspace owner.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   const { loads, expenses, settings, reserveAccounts, reserveTransactions, subscription, paymentEvents } =
     await getRepository(session.businessId).getDataset();
 

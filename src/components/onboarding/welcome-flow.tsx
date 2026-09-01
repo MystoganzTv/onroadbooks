@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { updateGoalsAction } from "@/lib/actions/goals";
 import { updateSettingsAction, updateTruckAction } from "@/lib/actions/settings";
 import { formatMoney } from "@/lib/formatters";
+import { iftaApplicability, iftaApplicabilityLabel } from "@/lib/ifta-eligibility";
 import type { Business, FinancialGoal, FinancialSettings, Truck } from "@/lib/types";
 import { cn, toNumber, toRequiredNumber } from "@/lib/utils";
 
@@ -57,6 +58,16 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
     currentOdometer: String(truck.currentOdometer || ""),
     monthlyPayment: truck.monthlyPayment ? String(truck.monthlyPayment) : "",
     monthlyInsurance: truck.monthlyInsurance ? String(truck.monthlyInsurance) : "",
+    axleCount: truck.axleCount ? String(truck.axleCount) : "",
+    registeredGrossWeightLbs: truck.registeredGrossWeightLbs
+      ? String(truck.registeredGrossWeightLbs)
+      : "",
+    operatesInMultipleIftaJurisdictions:
+      truck.operatesInMultipleIftaJurisdictions == null
+        ? "UNKNOWN"
+        : truck.operatesInMultipleIftaJurisdictions
+          ? "YES"
+          : "NO",
   });
 
   const [runValues, setRunValues] = React.useState({
@@ -108,6 +119,13 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
         purchasePrice: truck.purchasePrice,
         monthlyPayment: toRequiredNumber(truckValues.monthlyPayment) ?? null,
         monthlyInsurance: toRequiredNumber(truckValues.monthlyInsurance) ?? null,
+        axleCount: toRequiredNumber(truckValues.axleCount) ?? null,
+        registeredGrossWeightLbs:
+          toRequiredNumber(truckValues.registeredGrossWeightLbs) ?? null,
+        operatesInMultipleIftaJurisdictions:
+          truckValues.operatesInMultipleIftaJurisdictions === "UNKNOWN"
+            ? null
+            : truckValues.operatesInMultipleIftaJurisdictions === "YES",
         startingOdometer: truck.startingOdometer,
         currentOdometer:
           toRequiredNumber(truckValues.currentOdometer) ?? truck.currentOdometer,
@@ -163,6 +181,15 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
 
   const workingDays = toNumber(runValues.workingDaysPerWeek, 6);
   const dailyTarget = toNumber(runValues.monthlyProfitTarget) / Math.max(1, Math.round(workingDays * 4.345));
+  const currentIftaStatus = iftaApplicability({
+    axleCount: toRequiredNumber(truckValues.axleCount) ?? null,
+    registeredGrossWeightLbs:
+      toRequiredNumber(truckValues.registeredGrossWeightLbs) ?? null,
+    operatesInMultipleIftaJurisdictions:
+      truckValues.operatesInMultipleIftaJurisdictions === "UNKNOWN"
+        ? null
+        : truckValues.operatesInMultipleIftaJurisdictions === "YES",
+  });
 
   return (
     <div className="mx-auto w-full max-w-2xl p-4 py-8 lg:py-12">
@@ -247,6 +274,11 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
             Insurance contributes to operating cost per mile. The truck payment is tracked
             separately as debt-service cash burden. You can change this later on the Truck page.
           </p>
+          <p className="mt-2 rounded-md border border-info/25 bg-info-soft px-3 py-2 text-2xs leading-relaxed text-muted-foreground">
+            Your workspace already includes a starter unit named {truck.name}. Keeping it for now
+            lets every load, expense, fuel purchase and service record belong to a truck. Its
+            profile will remain marked as incomplete until you add the vehicle details.
+          </p>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <Field label="Name it" htmlFor="w-name" hint="However you refer to it">
@@ -292,6 +324,48 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
                 />
               </div>
             </Field>
+            <Field label="Power-unit axles" htmlFor="w-axles" hint="Three or more may qualify regardless of weight">
+              <Input
+                id="w-axles"
+                inputMode="numeric"
+                value={truckValues.axleCount}
+                onChange={(e) => setTruckValue("axleCount", e.target.value)}
+                placeholder="2"
+              />
+            </Field>
+            <Field
+              label="Registered gross/combined weight"
+              htmlFor="w-registered-weight"
+              hint="Pounds shown on the registration; include the combination when applicable"
+            >
+              <Input
+                id="w-registered-weight"
+                inputMode="numeric"
+                value={truckValues.registeredGrossWeightLbs}
+                onChange={(e) => setTruckValue("registeredGrossWeightLbs", e.target.value)}
+                placeholder="26000"
+              />
+            </Field>
+            <Field
+              label="Operating area"
+              htmlFor="w-ifta-jurisdictions"
+              hint="Will this unit operate in two or more IFTA states or Canadian provinces?"
+              className="sm:col-span-2"
+            >
+              <Select
+                value={truckValues.operatesInMultipleIftaJurisdictions}
+                onValueChange={(value) =>
+                  setTruckValue("operatesInMultipleIftaJurisdictions", value)
+                }
+              >
+                <SelectTrigger id="w-ifta-jurisdictions"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="UNKNOWN">Not sure yet</SelectItem>
+                  <SelectItem value="YES">Two or more IFTA jurisdictions</SelectItem>
+                  <SelectItem value="NO">One jurisdiction only</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
             <Field label="Monthly truck payment" htmlFor="w-payment">
               <Input
                 id="w-payment"
@@ -312,9 +386,22 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
             </Field>
           </div>
 
+          <div
+            className={cn(
+              "mt-3 rounded-md border px-3 py-2 text-2xs leading-relaxed",
+              currentIftaStatus === "LIKELY_REQUIRED"
+                ? "border-warn/40 bg-warn-soft text-warn"
+                : "border-border bg-surface-sunken/60 text-muted-foreground",
+            )}
+          >
+            <span className="font-semibold">{iftaApplicabilityLabel(currentIftaStatus)}.</span>{" "}
+            OnRoad uses the 26,000 lb / three-axle qualification test and cross-jurisdiction
+            operation. Confirm exemptions and filing treatment with your base jurisdiction.
+          </div>
+
           <div className="mt-5 flex items-center justify-between gap-3">
             <Button type="button" variant="ghost" size="sm" onClick={() => setStep(2)}>
-              Skip for now
+              Keep {truck.name} for now
             </Button>
             <Button type="button" onClick={saveTruck} disabled={pending}>
               {pending ? <Loader2 className="animate-spin" /> : null}

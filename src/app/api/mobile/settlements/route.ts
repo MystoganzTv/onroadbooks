@@ -5,6 +5,7 @@ import { getRepository } from "@/lib/db";
 import { calculateSettlement, settlementId, settlementWindows } from "@/lib/finance/settlement";
 import { currentMonth, shiftMonth, todayISO } from "@/lib/periods";
 import { financialModelVersionOf } from "@/lib/finance/terminology";
+import { roleCan } from "@/lib/roles";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +19,9 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const session = await getMobileSession(request);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!roleCan(session.role ?? "VIEWER", "manage_owner_finances")) {
+    return NextResponse.json({ error: "Owner access required." }, { status: 403 });
+  }
 
   const monthsBack = Number(request.nextUrl.searchParams.get("months") ?? "3") || 3;
   const toMonth = currentMonth();

@@ -112,7 +112,7 @@ export default async function FleetUnitPage({
         <PageHeader
           title={truck.name}
           description={`${vehicle || "Vehicle details not added"} · ${period.label}`}
-          actions={<ExportMenu query={query} />}
+          actions={<ExportMenu query={query} year={Number(period.month.slice(0, 4))} />}
         />
       </div>
 

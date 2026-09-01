@@ -18,7 +18,7 @@ const STEPS = [
     icon: Gauge,
     number: "03",
     title: "Know what you kept",
-    description: "Cost per mile, reserves and safe owner pay calculate automatically.",
+    description: "Cost per mile and cash performance calculate automatically.",
   },
 ] as const;
 

@@ -6,7 +6,6 @@ import {
   summarizePeriod,
 } from "./calculations";
 import { buildReport, REPORT_IDS, type ReportTable, type ReportId } from "./export";
-import { calculateReserveBalances } from "./finance/reserves";
 import { dayCount, type Period } from "./periods";
 import type { Dataset } from "./types";
 import {
@@ -62,12 +61,6 @@ function coverTable(dataset: Dataset, period: Period, businessName: string): Rep
     ),
     dataset.settings,
   );
-  const reserves = calculateReserveBalances(
-    dataset.reserveAccounts,
-    dataset.reserveTransactions,
-    period,
-  );
-
   const rows: (string | number)[][] = [
     ["Business", businessName],
     ["Year", period.label],
@@ -101,13 +94,6 @@ function coverTable(dataset: Dataset, period: Period, businessName: string): Rep
     rows.push([`  ${category.label}`, money(category.amount)]);
   }
 
-  if (reserves.length > 0) {
-    rows.push(["", ""]);
-    for (const reserve of reserves) {
-      rows.push([`Reserve balance — ${reserve.account.name}`, money(reserve.balance)]);
-    }
-  }
-
   rows.push(["", ""]);
   rows.push([
     "Note",
@@ -139,7 +125,9 @@ export function buildYearEndPacket(
   const sheetNames = ["Summary"];
 
   for (const id of REPORT_IDS as ReportId[]) {
-    tables.push(buildReport(id, dataset, period));
+    // This is the recommended accountant handoff. Owner reserve planning and
+    // Safe to Pay Yourself are intentionally excluded from every sheet.
+    tables.push(buildReport(id, dataset, period, null, false));
     sheetNames.push(sheetName(id.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())));
   }
 

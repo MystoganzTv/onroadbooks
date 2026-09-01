@@ -18,7 +18,9 @@ export async function updateSettingsAction(values: unknown): Promise<ActionResul
   }
 
   try {
-    const repository = getRepository((await requireWritableSession("manage_business")).businessId);
+    const repository = getRepository(
+      (await requireWritableSession("manage_owner_finances")).businessId,
+    );
     await repository.updateBusiness({
       name: parsed.data.businessName,
       currency: parsed.data.currency.toUpperCase(),
