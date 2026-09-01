@@ -46,7 +46,7 @@ struct RootTabView: View {
             SettlementsView(repository: repository)
                 .tabItem { Label("Settlements", systemImage: "wallet.pass.fill") }
 
-            MoreView(accountLabel: accountLabel, onSignOut: onSignOut)
+            MoreView(repository: repository, accountLabel: accountLabel, onSignOut: onSignOut)
                 .tabItem { Label("More", systemImage: "ellipsis.circle.fill") }
         }
         .tint(OBColor.primary)

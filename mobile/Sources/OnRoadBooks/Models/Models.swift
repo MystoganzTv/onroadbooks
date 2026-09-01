@@ -106,6 +106,48 @@ struct NewLoad {
     var otherExpenses: Double
 }
 
+// MARK: - Fuel
+
+struct FuelStop: Identifiable, Hashable {
+    let id: String
+    let date: Date
+    let gallons: Double
+    let pricePerGallon: Double
+    let totalCost: Double
+    let odometer: Int?
+    let location: String?
+    let jurisdiction: String?
+}
+
+struct FuelSummary {
+    let totalGallons: Double
+    let totalCost: Double
+    let averagePricePerGallon: Double
+    let fuelCostPerMile: Double
+    let entryCount: Int
+    /// Nil until ONE truck has two odometer readings. The web app refuses to
+    /// print a number here rather than guess one, and so does this screen —
+    /// subtracting one truck's odometer from another's is what produced
+    /// triple-digit "MPG" the first time around.
+    let milesPerGallon: Double?
+    let odometerMiles: Double?
+}
+
+struct FuelLedger {
+    let summary: FuelSummary
+    let entries: [FuelStop]
+}
+
+struct NewFuelStop {
+    var date: Date
+    var gallons: Double
+    var pricePerGallon: Double
+    var totalCost: Double
+    var odometer: Int?
+    var location: String
+    var jurisdiction: String
+}
+
 struct ReserveAccount: Identifiable {
     let id: String
     let name: String

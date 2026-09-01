@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { roleCan } from "../roles";
-import { expenseSchema, loadSchema } from "../schemas";
+import { expenseSchema, fuelSchema, loadSchema } from "../schemas";
 
 /**
  * The iOS app posts JSON straight at `/api/mobile/loads` and
@@ -43,10 +43,34 @@ const expenseFromPhone = {
   recurring: false,
 };
 
+const fuelFromPhone = {
+  date: "2026-09-01",
+  gallons: 92.4,
+  pricePerGallon: 4.465,
+  totalCost: 412.6,
+  odometer: 268_412,
+  location: "Pilot #442, Joplin, MO",
+  jurisdiction: "MO",
+};
+
 describe("what the iOS app posts", () => {
   it("is accepted by the same schema the web form uses", () => {
     assert.equal(loadSchema.safeParse(loadFromPhone).success, true);
     assert.equal(expenseSchema.safeParse(expenseFromPhone).success, true);
+    assert.equal(fuelSchema.safeParse(fuelFromPhone).success, true);
+  });
+
+  it("accepts a fill-up with nothing but the pump numbers", () => {
+    const { odometer: _o, location: _l, jurisdiction: _j, ...pumpOnly } = fuelFromPhone;
+    assert.equal(fuelSchema.safeParse(pumpOnly).success, true);
+  });
+
+  it("refuses a fill-up that would make MPG meaningless or the cost wrong", () => {
+    assert.equal(fuelSchema.safeParse({ ...fuelFromPhone, gallons: 0 }).success, false);
+    assert.equal(fuelSchema.safeParse({ ...fuelFromPhone, pricePerGallon: 0 }).success, false);
+    assert.equal(fuelSchema.safeParse({ ...fuelFromPhone, totalCost: 0 }).success, false);
+    // The app lets a driver type any two letters; the jurisdiction list decides.
+    assert.equal(fuelSchema.safeParse({ ...fuelFromPhone, jurisdiction: "ZZ" }).success, false);
   });
 
   it("still validates with the optional fields left out", () => {
@@ -93,5 +117,11 @@ describe("the permission each mobile write asks for", () => {
     assert.equal(roleCan("BOOKKEEPER", "manage_loads"), false);
     assert.equal(roleCan("DISPATCHER", "manage_loads"), true);
     assert.equal(roleCan("DISPATCHER", "manage_expenses"), false);
+  });
+
+  it("lets everyone who touches a truck record fuel, and a viewer still not", () => {
+    assert.equal(roleCan("BOOKKEEPER", "manage_fuel"), true);
+    assert.equal(roleCan("DISPATCHER", "manage_fuel"), true);
+    assert.equal(roleCan("VIEWER", "manage_fuel"), false);
   });
 });

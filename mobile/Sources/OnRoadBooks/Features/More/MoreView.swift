@@ -39,6 +39,7 @@ private let moreGroups: [MoreGroup] = [
 ]
 
 struct MoreView: View {
+    let repository: LedgerRepository
     let accountLabel: String
     var onSignOut: (() -> Void)?
 
@@ -47,6 +48,8 @@ struct MoreView: View {
         switch item.title {
         case "Load Calculator":
             LoadCalculatorView()
+        case "Fuel":
+            FuelView(repository: repository)
         default:
             ComingSoonView(title: item.title, systemImage: item.icon)
         }

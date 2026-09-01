@@ -52,7 +52,55 @@ final class MockRepository: LedgerRepository {
             ExpenseEntry(id: "e6", date: mockDate(2026, 8, 5), category: "Other", note: "ELD subscription + phone plan", amount: 214.50),
     ]
 
+    /// Two fill-ups on the same truck, with odometer readings 1,247 miles
+    /// apart on 178.4 gallons — so demo mode shows a real 7.0 MPG instead of a
+    /// dash, and the span rule is visible in the data itself.
+    private var fuel: [FuelStop] = [
+        FuelStop(id: "f1", date: mockDate(2026, 8, 27), gallons: 92.4, pricePerGallon: 4.465,
+                 totalCost: 412.60, odometer: 268_412, location: "Pilot #442, Joplin, MO", jurisdiction: "MO"),
+        FuelStop(id: "f2", date: mockDate(2026, 8, 20), gallons: 86.0, pricePerGallon: 4.513,
+                 totalCost: 388.10, odometer: 267_165, location: "Love's, Amarillo, TX", jurisdiction: "TX"),
+    ]
+
     func fetchLoads() async throws -> [Load] { loads }
+
+    func fetchFuel() async throws -> FuelLedger {
+        let gallons = fuel.reduce(0) { $0 + $1.gallons }
+        let cost = fuel.reduce(0) { $0 + $1.totalCost }
+        let odometers = fuel.compactMap(\.odometer).sorted()
+        // Same rule as the server: a span needs two readings, and the gallons
+        // that fuelled it exclude the first fill-up.
+        let spanMiles = odometers.count >= 2 ? Double(odometers.last! - odometers.first!) : nil
+        let spanGallons = fuel.sorted { ($0.odometer ?? 0) < ($1.odometer ?? 0) }
+            .dropFirst().reduce(0) { $0 + $1.gallons }
+
+        return FuelLedger(
+            summary: FuelSummary(
+                totalGallons: gallons,
+                totalCost: cost,
+                averagePricePerGallon: gallons > 0 ? cost / gallons : 0,
+                fuelCostPerMile: cost / 3339,      // the demo month's total miles
+                entryCount: fuel.count,
+                milesPerGallon: (spanMiles ?? 0) > 0 && spanGallons > 0 ? spanMiles! / spanGallons : nil,
+                odometerMiles: spanMiles
+            ),
+            entries: fuel
+        )
+    }
+
+    @discardableResult
+    func createFuelStop(_ stop: NewFuelStop) async throws -> String {
+        let id = "demo-\(UUID().uuidString.prefix(8))"
+        fuel.insert(
+            FuelStop(id: id, date: stop.date, gallons: stop.gallons,
+                     pricePerGallon: stop.pricePerGallon, totalCost: stop.totalCost,
+                     odometer: stop.odometer,
+                     location: stop.location.isEmpty ? nil : stop.location,
+                     jurisdiction: stop.jurisdiction.isEmpty ? nil : stop.jurisdiction.uppercased()),
+            at: 0
+        )
+        return id
+    }
 
     func fetchExpenses() async throws -> ExpenseLedger {
         // A short, obviously partial list: the real one is served by

@@ -106,6 +106,15 @@ final class APIRepository: LedgerRepository {
         try await post("api/mobile/expenses", body: NewExpenseDTO(expense))
     }
 
+    func fetchFuel() async throws -> FuelLedger {
+        try await get("api/mobile/fuel", as: FuelResponseDTO.self).toDomain()
+    }
+
+    @discardableResult
+    func createFuelStop(_ stop: NewFuelStop) async throws -> String {
+        try await post("api/mobile/fuel", body: NewFuelDTO(stop))
+    }
+
     func fetchSettlements() async throws -> [SettlementPeriod] {
         try await get("api/mobile/settlements", as: SettlementsResponseDTO.self).settlements.map { $0.toDomain() }
     }
@@ -173,6 +182,79 @@ private struct ExpensesResponseDTO: Decodable {
     let periodLabel: String
     let expenses: [ExpenseDTO]
     let categories: [CategoryOptionDTO]
+}
+
+private struct FuelResponseDTO: Decodable {
+    struct Summary: Decodable {
+        let totalGallons: Double
+        let totalCost: Double
+        let averagePricePerGallon: Double
+        let fuelCostPerMile: Double
+        let entryCount: Int
+        let milesPerGallon: Double?
+        let odometerMiles: Double?
+    }
+
+    struct Entry: Decodable {
+        let id: String
+        let date: String
+        let gallons: Double
+        let pricePerGallon: Double
+        let totalCost: Double
+        let odometer: Double?
+        let location: String?
+        let jurisdiction: String?
+    }
+
+    let periodLabel: String
+    let summary: Summary
+    let entries: [Entry]
+
+    func toDomain() -> FuelLedger {
+        FuelLedger(
+            summary: FuelSummary(
+                totalGallons: summary.totalGallons,
+                totalCost: summary.totalCost,
+                averagePricePerGallon: summary.averagePricePerGallon,
+                fuelCostPerMile: summary.fuelCostPerMile,
+                entryCount: summary.entryCount,
+                milesPerGallon: summary.milesPerGallon,
+                odometerMiles: summary.odometerMiles
+            ),
+            entries: entries.map { entry in
+                FuelStop(
+                    id: entry.id,
+                    date: ISODate.parse(entry.date),
+                    gallons: entry.gallons,
+                    pricePerGallon: entry.pricePerGallon,
+                    totalCost: entry.totalCost,
+                    odometer: entry.odometer.map { Int($0) },
+                    location: entry.location,
+                    jurisdiction: entry.jurisdiction
+                )
+            }
+        )
+    }
+}
+
+private struct NewFuelDTO: Encodable {
+    let date: String
+    let gallons: Double
+    let pricePerGallon: Double
+    let totalCost: Double
+    let odometer: Int?
+    let location: String?
+    let jurisdiction: String?
+
+    init(_ stop: NewFuelStop) {
+        date = ISODate.day(stop.date)
+        gallons = stop.gallons
+        pricePerGallon = stop.pricePerGallon
+        totalCost = stop.totalCost
+        odometer = stop.odometer
+        location = stop.location.isEmpty ? nil : stop.location
+        jurisdiction = stop.jurisdiction.isEmpty ? nil : stop.jurisdiction.uppercased()
+    }
 }
 
 private struct CreatedDTO: Decodable { let id: String }
