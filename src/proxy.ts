@@ -16,6 +16,11 @@ const PUBLIC_PATHS = [
   "/invite/accept",
   "/api/auth",
   "/api/health",
+  // The iOS app authenticates with its own Authorization: Bearer token
+  // (see src/lib/auth/mobile.ts), never the web session cookie this proxy
+  // checks for -- so every /api/mobile/* route, /login included, must pass
+  // through here and do its own check, exactly like /api/auth above.
+  "/api/mobile",
   // Vercel Cron has no application session cookie. The route performs its
   // own bearer-token check against CRON_SECRET before touching any ledger.
   "/api/cron/monthly-expenses",

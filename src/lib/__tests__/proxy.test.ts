@@ -17,6 +17,13 @@ describe("network proxy boundary", () => {
     assert.equal(response.headers.get("x-middleware-next"), "1");
   });
 
+  it("lets the mobile API reach its own bearer-token check, cookie or not", () => {
+    const response = proxy(new NextRequest("https://onroadbooks.com/api/mobile/dashboard"));
+
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("x-middleware-next"), "1");
+  });
+
   it("keeps every other private API behind an application session", async () => {
     const response = proxy(new NextRequest("https://onroadbooks.com/api/documents"));
 
