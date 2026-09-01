@@ -19,6 +19,7 @@ import { REPORTS } from "@/lib/export";
  * the dropdown generates native accountant files without a browser dialog.
  */
 export function ExportMenu({ query }: { query: string }) {
+  const year = new Date().getFullYear();
   return (
     <div className="flex items-center gap-2 print:hidden">
       <Button variant="outline" size="sm" onClick={() => window.print()}>
@@ -35,6 +36,17 @@ export function ExportMenu({ query }: { query: string }) {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-[16.5rem]">
           <DropdownMenuLabel>Accountant exports</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {/* One attachment beats six. Everything below is in here already. */}
+          <DropdownMenuItem asChild className="justify-between gap-3">
+            <a href={`/api/export/year-end?year=${year}`} download>
+              <span className="min-w-0">
+                <span className="block truncate font-medium">Year-end packet · {year}</span>
+                <span className="block truncate text-2xs text-muted-foreground">The whole year in one workbook</span>
+              </span>
+              <FileSpreadsheet className="size-4 shrink-0" />
+            </a>
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           {REPORTS.map((report) => <DropdownMenuItem key={report.id} className="justify-between gap-3 focus:bg-transparent">
             <span className="min-w-0"><span className="block truncate">{report.label}</span><span className="block truncate text-2xs text-muted-foreground">{report.description}</span></span>
