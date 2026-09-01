@@ -111,7 +111,13 @@ export function AuthOptions({ next = null }: { next?: string | null }) {
         text: "continue_with",
         shape: "rectangular",
         logo_alignment: "left",
-        width: Math.max(240, Math.floor(buttonRef.current.clientWidth)),
+        // Google renders a fixed-width iframe and adds its own chrome on top
+        // of whatever number it is given, so it must be clamped to the range
+        // Google accepts AND contained by CSS -- see `.gis-button-host` in
+        // globals.css. Unclamped, the button came out ~20px wider than its slot
+        // and shoved the whole sign-in page sideways inside the iOS app's
+        // sign-in sheet, which is narrower than a browser tab.
+        width: Math.min(400, Math.max(200, Math.floor(buttonRef.current.clientWidth) || 280)),
       });
     } catch (initializationError) {
       initializedRef.current = false;
@@ -134,7 +140,7 @@ export function AuthOptions({ next = null }: { next?: string | null }) {
       <div className="relative min-h-10 w-full" aria-busy={pending}>
         <div
           ref={buttonRef}
-          className={pending ? "pointer-events-none opacity-60" : undefined}
+          className={`gis-button-host${pending ? " pointer-events-none opacity-60" : ""}`}
         />
         {pending ? (
           <div

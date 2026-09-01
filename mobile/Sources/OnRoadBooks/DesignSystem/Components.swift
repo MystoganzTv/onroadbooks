@@ -81,6 +81,13 @@ enum PerformanceDirection { case up, down, neutral }
 struct DeltaPill: View {
     let text: String
     let direction: PerformanceDirection
+    /// Renders as plain muted text instead of a coloured pill.
+    ///
+    /// Colour is a voice, and three of them shouting at once is silence. On the
+    /// hero band Net Profit is the answer to "am I making money"; Revenue is the
+    /// context for it, so its change speaks quietly. A NEGATIVE change is never
+    /// quiet, whichever metric it belongs to — that is news.
+    var quiet = false
 
     private var color: Color {
         switch direction {
@@ -104,13 +111,16 @@ struct DeltaPill: View {
         }
     }
 
+    private var isQuiet: Bool { quiet && direction != .down }
+
     var body: some View {
         Label(text, systemImage: symbol)
-            .font(.system(size: 12, weight: .semibold))
+            .font(.system(size: 12, weight: isQuiet ? .medium : .semibold))
             .labelStyle(.titleAndIcon)
-            .foregroundStyle(color)
-            .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(soft, in: Capsule())
+            .foregroundStyle(isQuiet ? OBColor.mutedForeground : color)
+            .padding(.horizontal, isQuiet ? 0 : 8)
+            .padding(.vertical, 3)
+            .background(isQuiet ? Color.clear : soft, in: Capsule())
     }
 }
 
@@ -121,13 +131,23 @@ struct StatTile: View {
     let value: Double
     var delta: (text: String, direction: PerformanceDirection)?
     var valueColor: Color = OBColor.foreground
+    /// A supporting metric: its change reads as text, not as a badge.
+    var quietDelta = false
+    /// One line under the value — miles, a count, whatever makes the number
+    /// mean something.
+    var footnote: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             LabelXS(label)
             MoneyText(amount: value, color: valueColor)
             if let delta {
-                DeltaPill(text: delta.text, direction: delta.direction)
+                DeltaPill(text: delta.text, direction: delta.direction, quiet: quietDelta)
+            }
+            if let footnote {
+                Text(footnote)
+                    .font(.caption)
+                    .foregroundStyle(OBColor.mutedForeground)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -183,25 +203,34 @@ struct CategoryBarRow: View {
     let amount: Double
     let fraction: Double // 0...1 of the total
 
+    /// A rounded, filled track reads as progress toward a target, and there is
+    /// no target here — this is how one month's spending divides up. The share
+    /// is stated in words next to the amount, and the mark is a square-ended
+    /// segment on a hairline rule rather than a bar that fills.
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .firstTextBaseline) {
                 Text(label).font(.subheadline).foregroundStyle(OBColor.foreground)
-                Spacer()
+                Spacer(minLength: OBSpacing.sm)
+                Text("\(Int((fraction * 100).rounded()))%")
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(OBColor.mutedForeground)
                 Text(amount, format: .currency(code: "USD").precision(.fractionLength(0)))
                     .font(.subheadline.weight(.medium))
                     .monospacedDigit()
-                    .foregroundStyle(OBColor.mutedForeground)
+                    .foregroundStyle(OBColor.foreground)
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(OBColor.surfaceRaised)
-                    Capsule()
-                        .fill(OBColor.info.opacity(0.75))
-                        .frame(width: max(4, geo.size.width * fraction))
+                    Rectangle().fill(OBColor.border).frame(height: 1)
+                        .frame(maxHeight: .infinity, alignment: .center)
+                    Rectangle()
+                        .fill(OBColor.info.opacity(0.7))
+                        .frame(width: max(3, geo.size.width * fraction), height: 3)
                 }
             }
-            .frame(height: 6)
+            .frame(height: 3)
         }
     }
 }

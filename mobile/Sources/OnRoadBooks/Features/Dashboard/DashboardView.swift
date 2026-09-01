@@ -55,29 +55,29 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: OBSpacing.lg) {
 
             // Hero band — am I making money?
+            //
+            // One voice, not three. Net Profit is the answer, so it keeps the
+            // green value and the coloured badge; Revenue is the context for
+            // it and its change speaks quietly. A fall still shouts, on either.
             HStack(spacing: OBSpacing.sm) {
-                StatTile(label: "Revenue", value: s.revenue, delta: s.revenueDelta)
+                StatTile(label: "Revenue", value: s.revenue, delta: s.revenueDelta, quietDelta: true)
                 StatTile(label: "Net Profit", value: s.netProfit, delta: s.netProfitDelta, valueColor: OBColor.pos)
             }
             .padding(.horizontal, OBSpacing.md)
 
-            StatTile(label: "Expenses", value: s.expenses)
-                .padding(.horizontal, OBSpacing.md)
-
-            // Today strip
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    LabelXS("Today")
-                    Text("\(s.todayLoads) load · \(s.todayRevenue, format: .currency(code: "USD").precision(.fractionLength(0)))")
-                        .font(.subheadline.weight(.medium))
-                        .monospacedDigit()
-                        .foregroundStyle(OBColor.foreground)
-                }
-                Spacer()
-                Image(systemName: "sun.max.fill").foregroundStyle(OBColor.warn)
+            // Expenses is context too, so it sits at the same weight as the
+            // rest instead of taking the widest card on the screen for a number
+            // you cannot act on. Today rides beside it — the sun that used to
+            // sit here decorated nothing, in a design where colour and shape
+            // carry meaning.
+            HStack(spacing: OBSpacing.sm) {
+                StatTile(label: "Expenses", value: s.expenses)
+                StatTile(
+                    label: "Today",
+                    value: s.todayRevenue,
+                    footnote: s.todayLoads == 1 ? "1 load" : "\(s.todayLoads) loads"
+                )
             }
-            .padding(OBSpacing.md)
-            .obPanel()
             .padding(.horizontal, OBSpacing.md)
 
             // Business health — cost per mile / safe to pay
