@@ -1,21 +1,19 @@
 name: CI
 
-# A private repository meters Actions minutes, so this runs what tells us
-# something and stops paying for what does not.
+# The repository is public, so Actions minutes are unlimited and nothing here
+# is shaped by a bill. What stays are the changes that cost no safety:
 #
 #   - main and pull requests only. Pushing a work branch used to run the whole
 #     suite twice, once for the push and again for the PR.
 #   - nothing here tests Swift, Markdown or ADRs, so a commit touching only
-#     those starts no job at all.
-#   - every push gets the fast gates: types, lint, and the money maths. Those
-#     are the ones that catch a real mistake, and they finish in about two
-#     minutes.
-#   - the browser suite and the real-Postgres suite run on pull requests and
-#     once a night, not on every push. They are the slowest third of the bill
-#     and they almost never fail on a commit that already passed the fast gates.
-#   - `npm run build` is gone: Vercel builds every push already, and a broken
-#     build fails the deployment where you would look for it anyway. Paying
-#     GitHub to compile the same commit twice buys nothing.
+#     those starts no job at all. That is waste and noise, not thrift.
+#   - Chromium is cached against package-lock.json, because downloading the
+#     same binary every run is a minute of nothing.
+#
+# Every gate runs on every push again: types, lint, the money maths, the
+# browser suite and the real-Postgres suite. When minutes were metered those
+# last two were cut back to nightly; free minutes buy that safety back, and
+# safety is what they were.
 on:
   push:
     branches: [main]
@@ -28,8 +26,6 @@ on:
       - "mobile/**"
       - "docs/**"
       - "**/*.md"
-  schedule:
-    - cron: "40 7 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -78,9 +74,6 @@ jobs:
 
   browser:
     name: The app in a real browser
-    # Pull requests and the nightly run. A push that passed the fast gates has
-    # not broken the browser suite in practice, and this is the expensive third.
-    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -121,14 +114,15 @@ jobs:
       - name: Browser tests
         run: npm run test:e2e
 
+      - name: Build
+        run: npm run build
+
   postgres:
     name: The Postgres store, against a real database
-    # Same reasoning as the browser job. The suite in `verify` proves the
-    # arithmetic against the JSON store, and `store-contract` only compares the
-    # two stores' method NAMES. Everything the Prisma store does differently --
-    # foreign keys, transactions, generated ids, the snapshot JSON column -- is
-    # only ever exercised here, which is why it still runs every night.
-    if: github.event_name != 'push'
+    # The suite in `verify` proves the arithmetic against the JSON store, and
+    # `store-contract` only compares the two stores' method NAMES. Everything
+    # the Prisma store does differently -- foreign keys, transactions,
+    # generated ids, the snapshot JSON column -- is only ever exercised here.
     runs-on: ubuntu-latest
     timeout-minutes: 15
 

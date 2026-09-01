@@ -23,6 +23,7 @@
     "certify:invitations": "node --conditions=react-server --import tsx scripts/certify-production-invitations.ts",
     "certify:backup-restore": "node --conditions=react-server --import tsx scripts/certify-backup-restore.ts",
     "backup": "node --import tsx scripts/backup-database.ts",
+    "backup:mail": "node --import tsx scripts/mail-backup.ts",
     "postinstall": "prisma generate"
   },
   "overrides": {

@@ -68,38 +68,47 @@ internet noise into an alert storm.
 
 ## What CI costs, and why it runs the way it does
 
-The repository is private, so Actions minutes are metered (2,000/month on the
-free plan) instead of unlimited. `.github/workflows/ci.yml` is shaped by that:
+The repository is public, so Actions minutes are unlimited and nothing in
+`.github/workflows/ci.yml` is shaped by a bill. Every gate runs on every push:
+types, lint, the money maths, the browser suite, the real-Postgres suite and
+the build.
 
-- **Every push to main gets the fast gates** — types, lint and the money maths.
-  About two minutes, and they are the ones that catch a real mistake.
-- **The browser suite and the real-Postgres suite run on pull requests and once
-  a night**, not on every push. They are the slow third of the bill and they do
-  not fail on a commit that already passed the fast gates.
+What is still trimmed costs no safety:
+
+- **main and pull requests only.** Pushing a work branch used to run everything
+  twice, once for the push and again for the PR.
 - **Nothing runs for a commit that only touches `mobile/`, `docs/` or
-  Markdown.** No job here tests Swift or an ADR.
-- **`npm run build` is not in CI.** Vercel builds every push already; a broken
-  build fails the deployment, which is where you would look for it. Paying
-  GitHub to compile the same commit twice buys nothing.
-- Chromium is cached against `package-lock.json`, so it downloads only when
+  Markdown.** No job here tests Swift or an ADR — that is waste and noise, not
+  thrift.
+- **Chromium is cached** against `package-lock.json`, so it downloads only when
   Playwright's version changes.
 
-If minutes ever get tight again, the next thing to cut is the nightly
-Postgres job down to weekdays — not the fast gates.
+If the repository is ever made private, minutes become metered (2,000/month on
+the free plan) and this has to shrink again. The order to cut in: the build
+first (Vercel already builds every push), then the browser and Postgres jobs
+back to pull requests and a nightly schedule. Never the fast gates.
 
 ## Nightly backup in the cloud
 
 `.github/workflows/backup.yml` runs the same `scripts/backup-database.ts` the
-Mac runs, so there is one backup format and one implementation. It needs two
-repository secrets: `DATABASE_URL` and `BACKUP_PASSPHRASE` — the same
-passphrase as the local backups, so one secret opens either copy.
+Mac runs, so there is one backup format and one implementation.
 
-The encrypted dump is kept as a workflow artifact for 90 days.
+**The encrypted dump is never kept as a workflow artifact.** The repository is
+public and artifacts are world-readable; an encrypted ledger on the open
+internet is a countdown, not a backup. Actions *secrets* stay secret in a public
+repository, so the job runs fine — it just needs somewhere private to put the
+file, and that is the owner's inbox, through the Resend account this app already
+uses for auth mail and error alerts. No bucket and no new vendor.
 
-**This is only safe because the repository is private.** Artifacts of a public
-repository are world-readable, and an encrypted ledger on the open internet is
-a countdown, not a backup. If this repository is ever made public again, delete
-that workflow in the same commit.
+**Never add `upload-artifact` to that workflow while the repository is public.**
+
+Four repository secrets: `DATABASE_URL`, `BACKUP_PASSPHRASE` (the same
+passphrase as the local backups, so one secret opens either copy),
+`RESEND_API_KEY` and `BACKUP_EMAIL`.
+
+`scripts/lib/backup-email.ts` refuses to send anything past 38 MB rather than
+mailing half a ledger. The day that throws is the day nightly backups need
+object storage, and a loud failure is the only honest way to learn it.
 
 ## The year-end packet
 

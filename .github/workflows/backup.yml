@@ -7,10 +7,14 @@ name: Nightly backup
 # AES-256-GCM, then decrypt it again and read it back with pg_restore, failing
 # the run unless all 17 application tables are present.
 #
-# This lives in Actions only because the repository is PRIVATE. Artifacts of a
-# public repository are world-readable, and an encrypted ledger sitting on the
-# open internet is not a backup strategy — it is a countdown. If this repo is
-# ever made public again, delete this workflow in the same commit.
+# The repository is PUBLIC, so the backup is never kept as a workflow artifact:
+# those are world-readable, and an encrypted ledger on the open internet is a
+# countdown, not a backup. Actions SECRETS stay secret in a public repo, so the
+# job can run — it just needs somewhere private to put the file, and that is
+# his inbox, through the Resend account this app already uses for auth mail and
+# error alerts. No bucket, no new vendor.
+#
+# NEVER add upload-artifact to this workflow while the repo is public.
 on:
   schedule:
     # 08:10 UTC, a few minutes after the monthly-costs cron so a backup taken
@@ -32,6 +36,8 @@ jobs:
       DIRECT_URL: ${{ secrets.DATABASE_URL }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      BACKUP_EMAIL: ${{ secrets.BACKUP_EMAIL }}
       # Anywhere outside the checkout; the script refuses to write inside it.
       BACKUP_DIR: ${{ runner.temp }}/onroadbooks-backups
       AUTH_SECRET: unused-by-this-script
@@ -62,10 +68,6 @@ jobs:
       - name: Back up and verify
         run: npm run backup
 
-      - name: Keep it
-        uses: actions/upload-artifact@v4
-        with:
-          name: ledger-backup-${{ github.run_id }}
-          path: ${{ runner.temp }}/onroadbooks-backups/*.dump.enc
-          retention-days: 90
-          if-no-files-found: error
+      # Somewhere private, which a public repo's artifacts are not.
+      - name: Mail it
+        run: npm run backup:mail -- "$(ls -1 "$BACKUP_DIR"/*.dump.enc | head -1)"

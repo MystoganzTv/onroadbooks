@@ -97,13 +97,40 @@ into a customer-data breach.
 - `certify:backup-restore` remains the deeper check — it restores and compares
   row checksums — and is still the drill to run before a migration.
 
+## 2026-09-01 amendment: a nightly copy that does not need a laptop
+
+Enrique's objection was correct and this ADR had not answered it: a backup that
+runs only while a laptop is awake is the wrong shape for a product that lives in
+the cloud.
+
+What changed is narrower than it looks. The rejection of **GitHub Actions
+artifacts** stands and is now written into the workflow itself — the repository
+is public, artifacts are world-readable, and an encrypted ledger on the open
+internet is a countdown. But that objection was to the *destination*, not to
+Actions. Secrets in a public repository stay secret, so the job may run; it just
+needs somewhere private to leave the file.
+
+That somewhere is his inbox, through the Resend account already sending this
+app's auth mail and its error alerts. `.github/workflows/backup.yml` runs the
+same `scripts/backup-database.ts` — one format, one implementation, same
+verify-by-reading-it-back — and mails the ciphertext. No bucket, no new vendor,
+no account to remember, and Resend and the mailbox both only ever hold AES-256-GCM
+ciphertext.
+
+The local launchd backup stays. Two copies in two places is what having backups
+means, and the Mac one is the copy that survives losing access to the mailbox.
+
+`scripts/lib/backup-email.ts` refuses anything past 38 MB rather than mailing a
+truncated ledger. That ceiling is the trigger to move to object storage, and it
+fails loudly so the move is a decision rather than a discovery.
+
 ## Guardrails
 
 - A new model in `prisma/schema.prisma` is added to `APPLICATION_TABLES` in the
   same commit, or the next backup quietly ships without it.
 - Never write a backup, or a decrypted dump, anywhere inside the repository.
-- Never put a database dump in CI artifacts, in Supabase Storage, or anywhere
-  else that shares an account with production.
+- Never put a database dump in CI artifacts (the repository is public), in
+  Supabase Storage, or anywhere else that shares an account with production.
 - A decrypted dump is deleted the moment the restore finishes.
 - Verify the oldest file you keep, not only the newest — retention that quietly
   rotted is the failure this is meant to prevent.
