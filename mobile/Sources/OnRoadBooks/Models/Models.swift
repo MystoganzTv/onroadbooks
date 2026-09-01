@@ -106,6 +106,74 @@ struct NewLoad {
     var otherExpenses: Double
 }
 
+// MARK: - Analytics
+
+struct LanePerformance: Identifiable, Hashable {
+    let id: String
+    let label: String
+    let loadCount: Int
+    let revenue: Double
+    let profitPerMile: Double
+    let deadheadPct: Double
+    let rating: LoadRating
+    /// Only set on lanes that are not ranked yet.
+    let loadsNeeded: Int?
+}
+
+struct BrokerPerformance: Identifiable, Hashable {
+    var id: String { broker }
+    let broker: String
+    let loadCount: Int
+    let revenue: Double
+    let profitPerMile: Double
+    let deadheadPct: Double
+    let outstanding: Double
+    let rating: LoadRating
+}
+
+struct AnalyticsSnapshot {
+    let periodLabel: String
+    /// How many loads a lane needs before it is ranked at all (ADR-0014: refuse
+    /// to rank thin data).
+    let minLoads: Int
+    let qualifiedCount: Int
+    let best: [LanePerformance]
+    let worst: [LanePerformance]
+    let emerging: [LanePerformance]
+    let brokers: [BrokerPerformance]
+}
+
+// MARK: - IFTA
+
+struct IftaJurisdiction: Identifiable, Hashable {
+    var id: String { jurisdiction }
+    let jurisdiction: String
+    let totalMiles: Double
+    let taxableMiles: Double
+    let taxPaidGallons: Double
+    let netTaxableGallons: Double
+    let taxRate: Double?
+    let taxDue: Double?
+}
+
+struct IftaReport {
+    let quarter: String
+    let start: Date
+    let end: Date
+    /// False while miles are unassigned or a jurisdiction has no rate. The
+    /// screen then shows what is missing instead of a number that looks filable.
+    let complete: Bool
+    let totalFleetMiles: Double
+    let assignedMiles: Double
+    let unassignedMiles: Double
+    let totalGallons: Double
+    let unassignedGallons: Double
+    let fleetMpg: Double
+    let missingRateJurisdictions: [String]
+    let netTaxDue: Double?
+    let jurisdictions: [IftaJurisdiction]
+}
+
 // MARK: - The truck
 
 enum DueStatus: String {

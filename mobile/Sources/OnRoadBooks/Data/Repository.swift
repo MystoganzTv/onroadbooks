@@ -13,6 +13,8 @@ protocol LedgerRepository {
     func fetchInvoices() async throws -> InvoiceLedger
     func fetchReserves() async throws -> ReserveLedger
     func fetchTruck() async throws -> TruckSummary
+    func fetchAnalytics() async throws -> AnalyticsSnapshot
+    func fetchIfta(quarter: String?) async throws -> IftaReport
     func fetchReports() async throws -> [ReportSummary]
     func fetchReportTable(_ reportId: String) async throws -> ReportTable
     /// Renders the report as a file and returns a local URL to hand to the

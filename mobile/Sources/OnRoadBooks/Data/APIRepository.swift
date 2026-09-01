@@ -47,8 +47,19 @@ final class APIRepository: LedgerRepository {
         self.isOnline = isOnline
     }
 
-    private func get<T: Decodable>(_ path: String, as type: T.Type) async throws -> T {
-        let (data, http) = try await client.send(client.request(path, method: "GET"))
+    private func get<T: Decodable>(
+        _ path: String,
+        query: [URLQueryItem] = [],
+        as type: T.Type
+    ) async throws -> T {
+        var request = client.request(path, method: "GET")
+        if !query.isEmpty, let url = request.url,
+           var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            components.queryItems = query
+            request.url = components.url
+        }
+
+        let (data, http) = try await client.send(request)
         if http.statusCode == 401 { throw APIError.unauthorized }
         if http.statusCode == 403,
            let refusal = try? JSONDecoder().decode(RefusalResponse.self, from: data) {
@@ -184,6 +195,18 @@ final class APIRepository: LedgerRepository {
 
     func fetchTruck() async throws -> TruckSummary {
         try await get("api/mobile/truck", as: TruckResponseDTO.self).toDomain()
+    }
+
+    func fetchAnalytics() async throws -> AnalyticsSnapshot {
+        try await get("api/mobile/analytics", as: AnalyticsResponseDTO.self).toDomain()
+    }
+
+    func fetchIfta(quarter: String?) async throws -> IftaReport {
+        try await get(
+            "api/mobile/ifta",
+            query: quarter.map { [URLQueryItem(name: "quarter", value: $0)] } ?? [],
+            as: IftaResponseDTO.self
+        ).toDomain()
     }
 
     func fetchReports() async throws -> [ReportSummary] {
@@ -402,6 +425,115 @@ private struct NewFuelDTO: Encodable {
         odometer = stop.odometer
         location = stop.location.isEmpty ? nil : stop.location
         jurisdiction = stop.jurisdiction.isEmpty ? nil : stop.jurisdiction.uppercased()
+    }
+}
+
+private struct AnalyticsResponseDTO: Decodable {
+    struct Lane: Decodable {
+        let key: String
+        let label: String
+        let loadCount: Int
+        let revenue: Double
+        let profitPerMile: Double
+        let deadheadPct: Double
+        let rating: String
+        let loadsNeeded: Int?
+    }
+
+    struct Broker: Decodable {
+        let broker: String
+        let loadCount: Int
+        let revenue: Double
+        let profitPerMile: Double
+        let deadheadPct: Double
+        let outstanding: Double
+        let rating: String
+    }
+
+    let periodLabel: String
+    let minLoads: Int
+    let qualifiedCount: Int
+    let best: [Lane]
+    let worst: [Lane]
+    let emerging: [Lane]
+    let brokers: [Broker]
+
+    private func lane(_ row: Lane) -> LanePerformance {
+        LanePerformance(
+            id: row.key, label: row.label, loadCount: row.loadCount, revenue: row.revenue,
+            profitPerMile: row.profitPerMile, deadheadPct: row.deadheadPct,
+            rating: LoadRating(rawValue: row.rating) ?? .marginal,
+            loadsNeeded: row.loadsNeeded
+        )
+    }
+
+    func toDomain() -> AnalyticsSnapshot {
+        AnalyticsSnapshot(
+            periodLabel: periodLabel,
+            minLoads: minLoads,
+            qualifiedCount: qualifiedCount,
+            best: best.map(lane),
+            worst: worst.map(lane),
+            emerging: emerging.map(lane),
+            brokers: brokers.map { row in
+                BrokerPerformance(
+                    broker: row.broker, loadCount: row.loadCount, revenue: row.revenue,
+                    profitPerMile: row.profitPerMile, deadheadPct: row.deadheadPct,
+                    outstanding: row.outstanding,
+                    rating: LoadRating(rawValue: row.rating) ?? .marginal
+                )
+            }
+        )
+    }
+}
+
+private struct IftaResponseDTO: Decodable {
+    struct Jurisdiction: Decodable {
+        let jurisdiction: String
+        let totalMiles: Double
+        let taxableMiles: Double
+        let taxPaidGallons: Double
+        let netTaxableGallons: Double
+        let taxRate: Double?
+        let taxDue: Double?
+    }
+
+    let quarter: String
+    let start: String
+    let end: String
+    let complete: Bool
+    let totalFleetMiles: Double
+    let assignedMiles: Double
+    let unassignedMiles: Double
+    let totalGallons: Double
+    let unassignedGallons: Double
+    let fleetMpg: Double
+    let missingRateJurisdictions: [String]
+    let netTaxDue: Double?
+    let jurisdictions: [Jurisdiction]
+
+    func toDomain() -> IftaReport {
+        IftaReport(
+            quarter: quarter,
+            start: ISODate.parse(start),
+            end: ISODate.parse(end),
+            complete: complete,
+            totalFleetMiles: totalFleetMiles,
+            assignedMiles: assignedMiles,
+            unassignedMiles: unassignedMiles,
+            totalGallons: totalGallons,
+            unassignedGallons: unassignedGallons,
+            fleetMpg: fleetMpg,
+            missingRateJurisdictions: missingRateJurisdictions,
+            netTaxDue: netTaxDue,
+            jurisdictions: jurisdictions.map {
+                IftaJurisdiction(
+                    jurisdiction: $0.jurisdiction, totalMiles: $0.totalMiles,
+                    taxableMiles: $0.taxableMiles, taxPaidGallons: $0.taxPaidGallons,
+                    netTaxableGallons: $0.netTaxableGallons, taxRate: $0.taxRate, taxDue: $0.taxDue
+                )
+            }
+        )
     }
 }
 

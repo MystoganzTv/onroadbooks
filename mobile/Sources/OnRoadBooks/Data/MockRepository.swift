@@ -85,6 +85,60 @@ final class MockRepository: LedgerRepository {
 
     func fetchLoads() async throws -> [Load] { loads }
 
+    func fetchAnalytics() async throws -> AnalyticsSnapshot {
+        AnalyticsSnapshot(
+            periodLabel: "August 2026 · Full Month",
+            minLoads: 3,
+            qualifiedCount: 1,
+            best: [
+                LanePerformance(id: "IL-OH", label: "IL → OH", loadCount: 3, revenue: 6420,
+                                profitPerMile: 1.84, deadheadPct: 4.2, rating: .great, loadsNeeded: nil),
+            ],
+            worst: [],
+            emerging: [
+                LanePerformance(id: "AZ-NM", label: "AZ → NM", loadCount: 1, revenue: 980,
+                                profitPerMile: 0.31, deadheadPct: 31.1, rating: .bad, loadsNeeded: 2),
+                LanePerformance(id: "TX-TN", label: "TX → TN", loadCount: 2, revenue: 1640,
+                                profitPerMile: 1.42, deadheadPct: 7.8, rating: .good, loadsNeeded: 1),
+            ],
+            brokers: [
+                BrokerPerformance(broker: "Werner Logistics", loadCount: 3, revenue: 6420,
+                                  profitPerMile: 1.84, deadheadPct: 4.2, outstanding: 2850, rating: .great),
+                BrokerPerformance(broker: "TQL", loadCount: 2, revenue: 1640,
+                                  profitPerMile: 1.42, deadheadPct: 7.8, outstanding: 1640, rating: .good),
+                BrokerPerformance(broker: "Landstar", loadCount: 1, revenue: 640,
+                                  profitPerMile: 0.98, deadheadPct: 28.3, outstanding: 0, rating: .marginal),
+            ]
+        )
+    }
+
+    func fetchIfta(quarter: String?) async throws -> IftaReport {
+        // Deliberately incomplete: 210 miles unassigned and NM with no rate, so
+        // demo mode shows the refusal rather than a number that looks filable.
+        IftaReport(
+            quarter: quarter ?? "2026-Q3",
+            start: mockDate(2026, 7, 1),
+            end: mockDate(2026, 9, 30),
+            complete: false,
+            totalFleetMiles: 3339,
+            assignedMiles: 3129,
+            unassignedMiles: 210,
+            totalGallons: 478.4,
+            unassignedGallons: 30.1,
+            fleetMpg: 6.98,
+            missingRateJurisdictions: ["NM"],
+            netTaxDue: nil,
+            jurisdictions: [
+                IftaJurisdiction(jurisdiction: "TX", totalMiles: 1240, taxableMiles: 1240,
+                                 taxPaidGallons: 186.2, netTaxableGallons: -8.6, taxRate: 0.20, taxDue: -1.72),
+                IftaJurisdiction(jurisdiction: "OH", totalMiles: 980, taxableMiles: 980,
+                                 taxPaidGallons: 92.4, netTaxableGallons: 48.0, taxRate: 0.47, taxDue: 22.56),
+                IftaJurisdiction(jurisdiction: "NM", totalMiles: 465, taxableMiles: 465,
+                                 taxPaidGallons: 0, netTaxableGallons: 66.6, taxRate: nil, taxDue: nil),
+            ]
+        )
+    }
+
     func fetchTruck() async throws -> TruckSummary {
         // The same August demo figures as everywhere else: $9,795 in, $6,143.90
         // out, 3,339 miles. Change one, check the others still add up.

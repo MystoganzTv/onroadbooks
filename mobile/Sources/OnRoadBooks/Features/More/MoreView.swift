@@ -58,6 +58,10 @@ struct MoreView: View {
             TruckView(repository: repository)
         case "Reports":
             ReportsView(repository: repository)
+        case "Analytics":
+            AnalyticsView(repository: repository)
+        case "IFTA":
+            IftaView(repository: repository)
         default:
             ComingSoonView(title: item.title, systemImage: item.icon)
         }
