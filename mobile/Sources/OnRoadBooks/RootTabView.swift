@@ -8,6 +8,8 @@ import SwiftUI
 struct RootTabView: View {
     let repository: LedgerRepository
     let accountLabel: String
+    /// Shown on the dashboard. Nil in demo mode and on accounts with no name.
+    let greetingName: String?
     /// Both absent in demo mode, which has nothing to send and nowhere to send
     /// it. Held as plain optionals rather than as @ObservedObject so demo mode
     /// never builds a queue or starts a path monitor it will not use; the views
@@ -24,12 +26,14 @@ struct RootTabView: View {
     init(
         repository: LedgerRepository,
         accountLabel: String,
+        greetingName: String? = nil,
         queue: WriteQueue? = nil,
         monitor: NetworkMonitor? = nil,
         onSignOut: (() -> Void)? = nil
     ) {
         self.repository = repository
         self.accountLabel = accountLabel
+        self.greetingName = greetingName
         self.queue = queue
         self.monitor = monitor
         self.onSignOut = onSignOut
@@ -51,7 +55,7 @@ struct RootTabView: View {
 
     var body: some View {
         TabView {
-            DashboardView(repository: repository)
+            DashboardView(repository: repository, greetingName: greetingName)
                 .tabItem { Label("Dashboard", systemImage: "gauge.with.dots.needle.67percent") }
 
             LoadsView(repository: repository)

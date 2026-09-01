@@ -27,6 +27,36 @@ struct LoginView: View {
                 }
 
                 VStack(spacing: OBSpacing.sm) {
+                    Button {
+                        focusedField = nil
+                        Task { await authSession.continueWithGoogle() }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "globe")
+                                .font(.subheadline.weight(.semibold))
+                            Text("Continuar con Google").fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, OBSpacing.sm + 2)
+                    }
+                    .background(OBColor.surfaceRaised, in: RoundedRectangle(cornerRadius: OBRadius.control))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: OBRadius.control)
+                            .stroke(OBColor.border, lineWidth: 1)
+                    )
+                    .foregroundStyle(OBColor.foreground)
+                    .disabled(authSession.isAuthenticating)
+
+                    HStack(spacing: OBSpacing.sm) {
+                        Rectangle().fill(OBColor.border).frame(height: 1)
+                        Text("o con tu contraseña")
+                            .font(.caption)
+                            .foregroundStyle(OBColor.mutedForeground)
+                            .fixedSize()
+                        Rectangle().fill(OBColor.border).frame(height: 1)
+                    }
+                    .padding(.vertical, 2)
+
                     TextField("Correo", text: $email)
                         .textContentType(.username)
                         .keyboardType(.emailAddress)

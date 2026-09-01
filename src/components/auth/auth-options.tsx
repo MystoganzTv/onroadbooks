@@ -43,7 +43,7 @@ async function hashNonce(nonce: string): Promise<string> {
     .join("");
 }
 
-export function AuthOptions() {
+export function AuthOptions({ next = null }: { next?: string | null }) {
   const buttonRef = React.useRef<HTMLDivElement>(null);
   const initializedRef = React.useRef(false);
   const [pending, setPending] = React.useState(false);
@@ -92,7 +92,7 @@ export function AuthOptions() {
             if (!response.ok || !result?.redirectTo) {
               throw new Error(result?.error ?? "Google sign-in could not be completed.");
             }
-            window.location.assign(result.redirectTo);
+            window.location.assign(next ?? result.redirectTo);
           } catch (callbackError) {
             setError(
               callbackError instanceof Error
@@ -121,7 +121,7 @@ export function AuthOptions() {
           : "Could not initialize Google sign-in.",
       );
     }
-  }, [clientId]);
+  }, [clientId, next]);
 
   return (
     <div className="space-y-3">

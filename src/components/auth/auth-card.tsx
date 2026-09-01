@@ -21,10 +21,13 @@ export function AuthCard({
   mode,
   initialError = null,
   initialNotice = null,
+  next = null,
 }: {
   mode: "login" | "setup";
   initialError?: string | null;
   initialNotice?: string | null;
+  /** Already validated as a path on this site by `safeNextPath`. */
+  next?: string | null;
 }) {
   const router = useRouter();
   const isSetup = mode === "setup";
@@ -61,6 +64,13 @@ export function AuthCard({
         return;
       }
 
+      if (next) {
+        // A full navigation, not a router push: `next` can be a route handler
+        // that redirects out of the browser entirely (the iOS handoff), which
+        // client-side routing cannot follow.
+        window.location.assign(next);
+        return;
+      }
       router.replace("/dashboard");
       router.refresh();
     } catch {
@@ -92,7 +102,7 @@ export function AuthCard({
           noValidate
           className="space-y-4 rounded-lg border border-border bg-card p-5"
         >
-          <AuthOptions />
+          <AuthOptions next={next} />
 
           {isSetup ? (
             <>

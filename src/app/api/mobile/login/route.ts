@@ -38,5 +38,9 @@ export async function POST(request: Request) {
     token,
     expiresAt: new Date(exp * 1000).toISOString(),
     email: user.email,
+    // For the greeting on the app's dashboard. Null when the account has no
+    // name on it -- the app then greets without one rather than inventing
+    // something out of the email address.
+    name: user.name,
   });
 }

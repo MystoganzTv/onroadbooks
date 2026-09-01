@@ -10,15 +10,29 @@ import SwiftUI
 ///   Am I saving enough? → reserves
 struct DashboardView: View {
     @StateObject private var viewModel: DashboardViewModel
+    /// The account's first name, or nil. Never derived from an email address.
+    private let greetingName: String?
 
-    init(repository: LedgerRepository) {
+    init(repository: LedgerRepository, greetingName: String? = nil) {
         _viewModel = StateObject(wrappedValue: DashboardViewModel(repository: repository))
+        self.greetingName = greetingName
+    }
+
+    /// The cockpit is opened at 4am before a run and at 9pm after one, so the
+    /// greeting follows the clock rather than assuming an office day.
+    private var greeting: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        let time = hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches"
+        guard let greetingName, !greetingName.isEmpty else { return time }
+        return "\(time), \(greetingName)"
     }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                OBScreenHeader(title: "Dashboard", subtitle: viewModel.snapshot?.periodLabel)
+                // "Dashboard" was dead weight: the tab bar underneath already
+                // says it. The greeting earns the line instead.
+                OBScreenHeader(title: greeting, subtitle: viewModel.snapshot?.periodLabel)
 
                 ScrollView {
                     if let snapshot = viewModel.snapshot {

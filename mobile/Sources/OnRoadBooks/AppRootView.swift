@@ -24,6 +24,7 @@ struct AppRootView: View {
                         isOnline: { [flag = monitor.flag] in flag.current }
                     ),
                     accountLabel: authSession.email ?? "Signed in",
+                    greetingName: authSession.firstName,
                     queue: queue,
                     monitor: monitor,
                     onSignOut: { authSession.logout() }
