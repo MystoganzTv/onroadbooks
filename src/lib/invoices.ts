@@ -1,4 +1,26 @@
-import type { Load } from "./types";
+import type { Load, PaymentStatus } from "./types";
+
+/**
+ * What issuing an invoice does to a load's status and payment date.
+ *
+ * A load that is already PAID stays paid. Owner-operators are routinely
+ * quick-paid or factored before the paperwork is cut, so attaching the
+ * document to money already collected must not turn it back into a
+ * receivable -- doing so drops the load out of "Collected" and into
+ * "Outstanding", and the owner is left chasing an invoice that is settled.
+ *
+ * Anything else becomes INVOICED with no payment date: that is the whole
+ * point of issuing it.
+ */
+export function invoiceIssueOutcome(
+  load: Pick<Load, "status" | "invoicePaidDate">,
+  invoiceDate: string,
+): { status: PaymentStatus; invoicePaidDate: string | null } {
+  if (load.status !== "PAID") return { status: "INVOICED", invoicePaidDate: null };
+  // Paid before it was ever invoiced: the invoice date is the closest honest
+  // stand-in, and leaving it null would strand the load without one.
+  return { status: "PAID", invoicePaidDate: load.invoicePaidDate ?? invoiceDate };
+}
 
 export function nextInvoiceNumber(loads: Load[], date: string): string {
   const year = date.slice(0, 4);

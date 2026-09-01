@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireWritableSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
+import { invoiceIssueOutcome } from "@/lib/invoices";
 import { invoiceSchema } from "@/lib/schemas";
 import { fieldErrorsFrom, type ActionResult } from "./types";
 
@@ -46,8 +47,8 @@ export async function issueInvoiceAction(loadId: string, values: unknown): Promi
       billToEmail: parsed.data.billToEmail || null,
       billToAddress: parsed.data.billToAddress || null,
       invoiceNotes: parsed.data.invoiceNotes || null,
-      invoicePaidDate: null,
-      status: "INVOICED",
+      // Issuing the document never un-collects money already in the bank.
+      ...invoiceIssueOutcome(load, parsed.data.invoiceDate),
     });
     revalidateInvoicePaths(loadId);
     return { ok: true, id: loadId };

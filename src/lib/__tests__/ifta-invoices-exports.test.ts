@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { calculateIftaReport, iftaRateKey, IFTA_JURISDICTIONS } from "../ifta";
-import { nextInvoiceNumber } from "../invoices";
+import { invoiceIssueOutcome, nextInvoiceNumber } from "../invoices";
 import { freightMarket } from "../markets";
 import { buildSeedDataset } from "../seed/seed-data";
 import { toPdf } from "../export-pdf";
@@ -28,6 +28,39 @@ describe("IFTA reporting", () => {
     assert.equal(report.netTaxDue, 0.8);
     dataset.fuelEntries[0].jurisdiction = null;
     assert.equal(calculateIftaReport(dataset, "2026-Q3").complete, false);
+  });
+});
+
+describe("issuing an invoice", () => {
+  it("does not un-collect a load that was already paid", () => {
+    // Quick-pay and factoring both land the money before the paperwork. The
+    // bug this replaces flipped such a load back to INVOICED, which moved
+    // $2,100 out of "Collected" and into "Outstanding" on a load that was
+    // settled.
+    const outcome = invoiceIssueOutcome(
+      { status: "PAID", invoicePaidDate: "2026-08-20" },
+      "2026-08-31",
+    );
+    assert.deepEqual(outcome, { status: "PAID", invoicePaidDate: "2026-08-20" });
+  });
+
+  it("backfills a payment date when the load was paid before it had an invoice", () => {
+    const outcome = invoiceIssueOutcome({ status: "PAID", invoicePaidDate: null }, "2026-08-31");
+    assert.deepEqual(outcome, { status: "PAID", invoicePaidDate: "2026-08-31" });
+  });
+
+  it("moves a pending load to invoiced with no payment date", () => {
+    assert.deepEqual(
+      invoiceIssueOutcome({ status: "PENDING", invoicePaidDate: null }, "2026-08-31"),
+      { status: "INVOICED", invoicePaidDate: null },
+    );
+  });
+
+  it("clears a stale payment date when re-issuing an unpaid invoice", () => {
+    assert.deepEqual(
+      invoiceIssueOutcome({ status: "INVOICED", invoicePaidDate: "2026-07-01" }, "2026-08-31"),
+      { status: "INVOICED", invoicePaidDate: null },
+    );
   });
 });
 
