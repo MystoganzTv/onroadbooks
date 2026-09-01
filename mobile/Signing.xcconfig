@@ -1,0 +1,12 @@
+// Quien firma la app. Xcode necesita tu Team ID para archivar y subir a
+// TestFlight, y el .xcodeproj se regenera con `xcodegen generate` -- asi que
+// si lo pones en Xcode se te borra en la siguiente regeneracion. Ponlo aqui
+// una vez y sobrevive.
+//
+// Tu Team ID son 10 caracteres. Lo ves en:
+//   https://developer.apple.com/account  ->  Membership details  ->  Team ID
+//
+// No es un secreto: va dentro de cualquier app publicada. Puedes commitearlo
+// sin problema, o dejarlo fuera si prefieres.
+
+DEVELOPMENT_TEAM =
