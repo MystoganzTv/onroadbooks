@@ -29,12 +29,24 @@ export function LoadScoreBadge({
 /**
  * The score with its three components spelled out, so the answer to "why did
  * this load score 87?" is always on the screen.
+ *
+ * `showBasis` adds the one line that stops this score from contradicting the
+ * Load Calculator. This one rates the trip on its own costs -- what the load
+ * contributed. The calculator also charges the truck's overhead per mile, so
+ * the same trip scores lower there. Both are right; only the question differs.
  */
 export function LoadScoreBreakdown({
   score,
+  showBasis,
   className,
 }: {
   score: LoadScore;
+  /**
+   * "trip" for a booked load, scored on its own costs; "loaded" for the
+   * calculator, which also charges overhead. Naming the basis is what keeps
+   * the two screens from looking like they disagree.
+   */
+  showBasis?: "trip" | "loaded";
   className?: string;
 }) {
   const style = RATING_STYLE[score.rating];
@@ -73,6 +85,19 @@ export function LoadScoreBreakdown({
           </li>
         ))}
       </ul>
+
+      {showBasis === "trip" ? (
+        <p className="mt-3 border-t border-current/20 pt-3 text-2xs opacity-70">
+          Scored on this trip&apos;s own costs — what the load contributed. The Load Calculator
+          also charges the truck&apos;s overhead per mile, so the same trip scores lower there.
+        </p>
+      ) : showBasis === "loaded" ? (
+        <p className="mt-3 border-t border-current/20 pt-3 text-2xs opacity-70">
+          Scored after the truck&apos;s overhead per mile, not just this trip&apos;s costs. A
+          booked load&apos;s own page scores it on trip costs alone, so the same numbers rate
+          higher there.
+        </p>
+      ) : null}
     </div>
   );
 }

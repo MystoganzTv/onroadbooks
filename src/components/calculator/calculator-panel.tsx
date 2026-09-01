@@ -391,7 +391,7 @@ function EvaluateResult({
         </CardContent>
       </Card>
 
-      <LoadScoreBreakdown score={estimate.score} />
+      <LoadScoreBreakdown score={estimate.score} showBasis="loaded" />
 
       <Card>
         <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">

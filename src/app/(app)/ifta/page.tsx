@@ -58,7 +58,14 @@ export default async function IftaPage({ searchParams }: { searchParams: Promise
       <Button asChild size="sm" variant="outline"><a href={`/api/export/ifta?${baseQuery.toString()}&format=pdf`}><Download /> PDF</a></Button>
     </div>
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <MiniStat label="Fleet MPG" value={report.fleetMpg ? report.fleetMpg.toFixed(2) : "—"} sub={`${report.totalGallons.toFixed(1)} gallons`} />
+      {/*
+        Spelled out as a division on purpose. This is the IFTA method -- every
+        mile in the quarter over every gallon bought in it -- and it does not
+        match the tank-to-tank MPG on the Fuel page, which ignores the gallons
+        bought before the first odometer reading. Two different numbers for the
+        same truck is alarming until you can see which question each answers.
+      */}
+      <MiniStat label="Fleet MPG" value={report.fleetMpg ? report.fleetMpg.toFixed(2) : "—"} sub={`${formatMiles(report.totalFleetMiles)} ÷ ${report.totalGallons.toFixed(1)} gal`} />
       <MiniStat label="IFTA miles" value={formatMiles(report.assignedMiles)} sub={`${formatMiles(report.totalFleetMiles)} fleet miles`} />
       <MiniStat label="Net tax due" value={report.netTaxDue == null ? "Incomplete" : formatMoney(report.netTaxDue)} tone={report.netTaxDue != null && report.netTaxDue < 0 ? "positive" : "warning"} sub="Credits shown negative" />
       <MiniStat label="Filing status" value={report.complete ? "Ready" : "Review"} tone={report.complete ? "positive" : "warning"} sub={`${report.start} to ${report.end}`} />
@@ -75,5 +82,6 @@ export default async function IftaPage({ searchParams }: { searchParams: Promise
       </TableRow></TableHeader><TableBody>{report.jurisdictions.map((row) => <TableRow key={row.jurisdiction}><TableCell className="font-medium">{row.jurisdiction}</TableCell><TableCell className="text-right tnum">{formatMiles(row.totalMiles)}</TableCell><TableCell className="text-right tnum">{formatMiles(row.taxableMiles)}</TableCell><TableCell className="text-right tnum">{row.taxPaidGallons.toFixed(2)}</TableCell><TableCell className="text-right tnum">{row.taxableGallons.toFixed(2)}</TableCell><TableCell className="text-right tnum">{row.netTaxableGallons.toFixed(2)}</TableCell><TableCell className="text-right tnum">{row.taxRate == null ? "Missing" : formatRateValue(row.taxRate)}</TableCell><TableCell className="text-right font-medium tnum">{row.taxDue == null ? "—" : formatMoney(row.taxDue)}</TableCell></TableRow>)}</TableBody></Table></div>}
     </CardContent></Card>
     <p className="text-2xs text-muted-foreground">IFTA mileage must reflect the actual route in each jurisdiction. Onroad Books never guesses it from origin and destination. Confirm rates and filing treatment with your base jurisdiction.</p>
+    <p className="text-2xs text-muted-foreground">Fleet MPG here is every mile in the quarter divided by every gallon bought in it, which is the method the filing uses. The <Link href="/fuel" className="text-primary underline underline-offset-2">Fuel</Link> page reports tank-to-tank MPG instead — it skips the gallons bought before the first odometer reading — so the two figures are not meant to match.</p>
   </div>;
 }

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { Gauge } from "lucide-react";
 
@@ -159,6 +160,15 @@ export default async function FuelPage({
             calculation between each consecutive pair of readings, so a bad tank stands out
             immediately. Entries without an odometer reading still count toward fuel spend but are
             skipped for MPG.
+          </p>
+          <p className="mt-2 max-w-3xl text-xs leading-relaxed text-muted-foreground">
+            IFTA reports a different figure on purpose: it divides every mile in the quarter by
+            every gallon bought in it, including the tank you were already running on. Expect the
+            number on the{" "}
+            <Link href="/ifta" className="text-primary underline underline-offset-2">
+              IFTA
+            </Link>{" "}
+            page to be lower until several fill-ups are on record.
           </p>
         </CardContent>
       </Card>

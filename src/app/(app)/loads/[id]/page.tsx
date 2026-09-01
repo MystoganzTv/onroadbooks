@@ -115,7 +115,7 @@ export default async function LoadDetailPage({
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="min-w-0 space-y-4 lg:col-span-2">
-        <LoadScoreBreakdown score={score} />
+        <LoadScoreBreakdown score={score} showBasis="trip" />
 
         <TripWaterfall load={load} metrics={metrics} linkedFuelCost={linkedFuelCost} />
 
