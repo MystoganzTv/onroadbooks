@@ -1,0 +1,53 @@
+name: OnRoadBooksMobile
+options:
+  bundleIdPrefix: com.onroadbooks
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+configs:
+  Debug: debug
+  Release: release
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    DEVELOPMENT_TEAM: ""
+targets:
+  OnRoadBooks:
+    type: application
+    platform: iOS
+    sources:
+      - Sources/OnRoadBooks
+      - path: Resources
+        buildPhase: resources
+    info:
+      path: Generated/Info.plist
+      properties:
+        CFBundleDisplayName: OnRoad Books
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIUserInterfaceStyle: Dark
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.onroadbooks.mobile
+        PRODUCT_NAME: OnRoad Books
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+schemes:
+  OnRoadBooks:
+    build:
+      targets:
+        OnRoadBooks: all
+    run:
+      config: Debug
+    archive:
+      config: Release
