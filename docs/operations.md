@@ -22,10 +22,17 @@ page renders, route handlers and server actions alike — the whole server
 surface. Before this, a customer-facing failure surfaced only when the customer
 complained.
 
-Every failure is logged as structured JSON to Vercel Runtime Logs. Set
-`OPERATIONS_ALERT_WEBHOOK_URL` in Vercel Production to also deliver it to a
-Slack- or Discord-compatible incoming webhook — the same channel Stripe
-failures already use.
+Every failure is logged as structured JSON to Vercel Runtime Logs. To be told
+about it, set two variables in Vercel Production:
+
+- `RESEND_API_KEY` — a key from the same Resend account that already sends this
+  app's auth mail, on a domain already verified there.
+- `OPERATIONS_ALERT_EMAIL` — where alerts land. Comma-separate for more than one.
+
+Email is the default on purpose: it is the inbox the owner already reads, and
+nobody should have to adopt a chat app to find out their app broke.
+`OPERATIONS_ALERT_WEBHOOK_URL` remains supported for a Slack or Discord channel
+and is used only when no alert email is configured.
 
 Three rules make the channel worth keeping:
 

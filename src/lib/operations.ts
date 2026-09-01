@@ -24,8 +24,57 @@ export function operationalLog(level: LogLevel, message: string, context: LogCon
 }
 
 /**
- * Logs every operational failure and, when configured, sends a compact alert
- * to a Slack/Discord-compatible webhook. Alert delivery is best effort: a
+ * Sends the alert by email through Resend — the account that already sends
+ * this app's auth mail, with `onroadbooks.com` already verified on it. No new
+ * vendor, no chat app to adopt, and it lands in the inbox he actually reads.
+ *
+ * Returns "unconfigured" when there is nothing set up, so the caller can fall
+ * back to the webhook rather than treating silence as a delivery.
+ */
+async function sendAlertEmail(
+  subject: string,
+  body: string,
+): Promise<"sent" | "failed" | "unconfigured"> {
+  const key = process.env.RESEND_API_KEY?.trim();
+  const to = process.env.OPERATIONS_ALERT_EMAIL?.trim();
+  if (!key || !to) return "unconfigured";
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3_000);
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: process.env.OPERATIONS_ALERT_FROM?.trim() || "OnRoad Books <no-reply@onroadbooks.com>",
+        to: to.split(",").map((address) => address.trim()).filter(Boolean),
+        subject: `OnRoad Books: ${subject}`,
+        text: body,
+      }),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      operationalLog("error", "Operations alert email failed", {
+        alertStatus: response.status,
+        originalMessage: subject,
+      });
+      return "failed";
+    }
+    return "sent";
+  } catch (error) {
+    operationalLog("error", "Operations alert email failed", {
+      alertError: errorMessage(error),
+      originalMessage: subject,
+    });
+    return "failed";
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * Logs every operational failure and, when configured, sends a compact alert —
+ * by email through Resend, or to a Slack/Discord-compatible webhook. Alert delivery is best effort: a
  * broken notification channel must never replace the original application
  * error or make Stripe retry for a second reason.
  */
@@ -37,9 +86,6 @@ export async function reportOperationalError(
   const detail = errorMessage(error);
   operationalLog("error", message, { ...context, error: detail });
 
-  const url = process.env.OPERATIONS_ALERT_WEBHOOK_URL?.trim();
-  if (!url) return { delivered: false };
-
   const summary = [
     `OnRoad Books: ${message}`,
     context.route ? `Route: ${context.route}` : null,
@@ -47,6 +93,15 @@ export async function reportOperationalError(
     context.eventId ? `ID: ${context.eventId}` : null,
     `Error: ${detail}`,
   ].filter(Boolean).join("\n");
+
+  // Email first: it is where he already is. The webhook stays supported for
+  // anyone who wants a chat channel, but nobody should have to adopt Discord
+  // to find out their app broke.
+  const email = await sendAlertEmail(message, summary);
+  if (email !== "unconfigured") return { delivered: email === "sent" };
+
+  const url = process.env.OPERATIONS_ALERT_WEBHOOK_URL?.trim();
+  if (!url) return { delivered: false };
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 3_000);

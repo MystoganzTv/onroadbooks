@@ -12,6 +12,8 @@ import {
 beforeEach(() => {
   resetFailureTracking();
   delete process.env.OPERATIONS_ALERT_WEBHOOK_URL;
+  delete process.env.RESEND_API_KEY;
+  delete process.env.OPERATIONS_ALERT_EMAIL;
 });
 
 describe("grouping one failure across requests", () => {
@@ -81,7 +83,7 @@ describe("what is not a failure", () => {
     );
   });
 
-  it("reports a real failure even with no webhook configured", async () => {
+  it("reports a real failure even with nowhere to send it", async () => {
     const result = await reportRequestError(new Error("Connection terminated"), { route: "/dashboard" });
     // Logged either way; "alerted" only says whether a channel took it.
     assert.deepEqual(result, { reported: true, alerted: false });
