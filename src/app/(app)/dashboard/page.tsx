@@ -161,7 +161,12 @@ export default async function DashboardPage({
   );
   const periodExpenses = expensesInPeriod(expenses, period);
   const categories = categoryTotals(periodExpenses, settings);
+  // Split by whether the cost's date has arrived. What is due but still
+  // missing is a real gap in the books; what is merely dated later this month
+  // is not late, it is scheduled -- the nightly job posts it on its day.
   const monthlySuggestions = recurringExpenseSuggestions(dataset, period.month, truckId);
+  const monthlyDue = monthlySuggestions.filter((suggestion) => suggestion.date <= today);
+  const monthlyScheduled = monthlySuggestions.filter((suggestion) => suggestion.date > today);
 
   const costBasis = calculateTrueCostPerMile(loads, expenses, period, settings, period.label);
   const deadhead = calculateDeadheadCost(summary, costBasis, settings, goals.maxDeadheadPct);
@@ -289,8 +294,10 @@ export default async function DashboardPage({
       </div>
 
       <BookkeepingAlerts
-        monthlyCount={monthlySuggestions.length}
-        monthlyTotal={monthlySuggestions.reduce((total, expense) => total + expense.amount, 0)}
+        dueCount={monthlyDue.length}
+        dueTotal={monthlyDue.reduce((total, expense) => total + expense.amount, 0)}
+        scheduledCount={monthlyScheduled.length}
+        scheduledTotal={monthlyScheduled.reduce((total, expense) => total + expense.amount, 0)}
         month={period.month}
         monthLabel={monthLabel(period.month)}
         truckId={truckId}

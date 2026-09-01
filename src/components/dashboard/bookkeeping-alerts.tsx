@@ -2,24 +2,42 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Repeat2 } from "lucide-react";
+import { CalendarClock, Loader2, Repeat2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { addMonthlyExpensesAction } from "@/lib/actions/bookkeeping";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/formatters";
+import { cn } from "@/lib/utils";
 
 interface BookkeepingAlertsProps {
-  monthlyCount: number;
-  monthlyTotal: number;
+  /** Fixed costs whose date has passed and that are still not in the books. */
+  dueCount: number;
+  dueTotal: number;
+  /** Fixed costs dated later this month. Not late -- just not yet. */
+  scheduledCount: number;
+  scheduledTotal: number;
   month: string;
   monthLabel: string;
   truckId: string | null;
 }
 
+/**
+ * The monthly fixed costs the books are still missing.
+ *
+ * The nightly job posts each cost on its own date, so in the normal month
+ * there is nothing here at all. What is left is one of two things, and they
+ * do not deserve the same colour: something DUE and still missing (the job
+ * has not run yet, or this is a past month it will never touch) is a real gap
+ * and keeps the warning treatment and the button; something dated later this
+ * month is simply scheduled, and is shown as a quiet note so the owner knows
+ * the cost is coming without being told to act on it.
+ */
 export function BookkeepingAlerts({
-  monthlyCount,
-  monthlyTotal,
+  dueCount,
+  dueTotal,
+  scheduledCount,
+  scheduledTotal,
   month,
   monthLabel,
   truckId,
@@ -27,18 +45,34 @@ export function BookkeepingAlerts({
   const router = useRouter();
   const [pending, startTransition] = React.useTransition();
 
-  if (monthlyCount === 0) return null;
+  if (dueCount === 0 && scheduledCount === 0) return null;
+
+  const actionable = dueCount > 0;
 
   function run() {
     startTransition(async () => {
       const result = await addMonthlyExpensesAction(month, truckId);
       if (result.ok) {
-        toast.success("Monthly expenses synchronized");
+        toast.success("Monthly expenses added");
         router.refresh();
       } else {
         toast.error(result.error);
       }
     });
+  }
+
+  if (!actionable) {
+    return (
+      <section className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-4 py-2.5">
+        <CalendarClock className="size-4 shrink-0 text-muted-foreground" />
+        <p className="text-2xs text-muted-foreground">
+          {formatMoney(scheduledTotal)} of fixed costs
+          {scheduledCount === 1 ? " is" : " are"} scheduled later in {monthLabel} —{" "}
+          {scheduledCount === 1 ? "it posts" : "they post"} automatically on{" "}
+          {scheduledCount === 1 ? "its date" : "their dates"}.
+        </p>
+      </section>
+    );
   }
 
   return (
@@ -54,17 +88,20 @@ export function BookkeepingAlerts({
           <Repeat2 className="mt-0.5 size-4 shrink-0 text-warn" />
           <div>
             <p className="text-sm font-medium">
-              {monthlyCount} monthly expense{monthlyCount === 1 ? " needs" : "s need"}{" "}
-              attention for {monthLabel}
+              {dueCount} monthly expense{dueCount === 1 ? " is" : "s are"} missing for{" "}
+              {monthLabel}
             </p>
-            <p className="mt-0.5 text-2xs text-muted-foreground">
-              Sync {formatMoney(monthlyTotal)} from truck payment, insurance or recurring templates.
+            <p className={cn("mt-0.5 text-2xs text-muted-foreground")}>
+              Add {formatMoney(dueTotal)} from truck payment, insurance or recurring templates.
+              {scheduledCount > 0
+                ? ` ${formatMoney(scheduledTotal)} more is dated later this month and posts on its own.`
+                : ""}
             </p>
           </div>
         </div>
         <Button size="sm" variant="outline" onClick={run} disabled={pending}>
           {pending ? <Loader2 className="animate-spin" /> : null}
-          Sync monthly expenses
+          Add them now
         </Button>
       </div>
     </section>

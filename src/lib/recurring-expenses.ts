@@ -33,6 +33,26 @@ function categoryKey(truckId: string, category: ExpenseCategoryId) {
   return `${truckId}:${category}`;
 }
 
+/**
+ * The suggestions that are actually due, i.e. whose date has arrived.
+ *
+ * The scheduled job posts these without asking. A cost dated the 15th is not
+ * money spent on the 3rd, so posting the whole month up front would put spend
+ * in the ledger before it happened and make every figure that divides by it
+ * wrong for a fortnight. What is not due yet stays a suggestion, and the
+ * dashboard keeps offering it.
+ */
+export function dueRecurringExpenses(
+  dataset: Dataset,
+  month: string,
+  today: string,
+  selectedTruckId: string | null = null,
+): RecurringExpenseSuggestion[] {
+  return recurringExpenseSuggestions(dataset, month, selectedTruckId).filter(
+    (suggestion) => suggestion.date <= today,
+  );
+}
+
 export function recurringExpenseSuggestions(
   dataset: Dataset,
   month: string,
