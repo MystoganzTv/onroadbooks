@@ -57,8 +57,8 @@ export function RevenueExpenseChart({
           iconSize={8}
           wrapperStyle={{ fontSize: 11, color: "hsl(var(--muted-foreground))" }}
         />
-        <Bar dataKey="revenue" name="Booked Revenue" fill="hsl(var(--pos))" radius={[2, 2, 0, 0]} maxBarSize={26} />
-        <Bar dataKey="expenses" name="Operating Expenses" fill="hsl(var(--neg))" radius={[2, 2, 0, 0]} maxBarSize={26} />
+        <Bar dataKey="revenue" name="You earned" fill="hsl(var(--pos))" radius={[2, 2, 0, 0]} maxBarSize={26} />
+        <Bar dataKey="expenses" name="Business expenses" fill="hsl(var(--neg))" radius={[2, 2, 0, 0]} maxBarSize={26} />
       </BarChart>
     </ResponsiveContainer>
   );

@@ -96,7 +96,7 @@ export function calculateGoalProgress(
     const pct = div(summary.bookedRevenue, target) * 100;
     out.push({
       key: "revenue",
-      label: "Booked Revenue",
+      label: "You earned",
       current: summary.bookedRevenue,
       target,
       pct,
@@ -113,7 +113,7 @@ export function calculateGoalProgress(
     const pct = div(summary.operatingProfit, target) * 100;
     out.push({
       key: "profit",
-      label: "Operating Profit",
+      label: "Your business made",
       current: summary.operatingProfit,
       target,
       pct,
@@ -129,7 +129,7 @@ export function calculateGoalProgress(
     const pct = div(summary.profitPerMile, goals.targetProfitPerMile) * 100;
     out.push({
       key: "profitPerMile",
-      label: "Operating Profit / mile",
+      label: "Profit / mile",
       current: summary.profitPerMile,
       target: goals.targetProfitPerMile,
       pct,
@@ -311,10 +311,10 @@ export function calculateDaySnapshot(
   const statement = empty
     ? "Nothing recorded yet today."
     : target <= 0
-      ? `${money(profit)} of Operating Profit today across ${dayLoads.length} ${dayLoads.length === 1 ? "load" : "loads"}. Set a monthly Operating Profit target to see a daily pace.`
+      ? `${money(profit)} of business profit today across ${dayLoads.length} ${dayLoads.length === 1 ? "load" : "loads"}. Set a monthly profit target to see a daily pace.`
       : delta >= 0
-        ? `You are ${money(delta)} above your daily Operating Profit target of ${money(target)}.`
-        : `You are ${money(delta)} below your daily Operating Profit target of ${money(target)}.`;
+        ? `You are ${money(delta)} above your daily profit target of ${money(target)}.`
+        : `You are ${money(delta)} below your daily profit target of ${money(target)}.`;
 
   return {
     date,

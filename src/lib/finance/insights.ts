@@ -107,7 +107,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
         id: "ppm-trend",
         tone: delta >= 0 ? "positive" : "negative",
         priority: 90,
-        text: `Operating Profit per mile ${delta >= 0 ? "improved" : "declined"} ${Math.abs(delta).toFixed(1)}% versus ${previousLabel}, ${rate(previous.profitPerMile)} to ${rate(summary.profitPerMile)}.`,
+        text: `Profit per mile ${delta >= 0 ? "improved" : "declined"} ${Math.abs(delta).toFixed(1)}% versus ${previousLabel}, ${rate(previous.profitPerMile)} to ${rate(summary.profitPerMile)}.`,
       });
     }
   }
@@ -241,7 +241,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
       id: "take-home",
       tone: ownerPay.takeHomeRate >= 30 ? "positive" : "neutral",
       priority: 65,
-      text: `After Debt Service and ${usd(ownerPay.reserveTotal)} of Reserve Contributions, Safe to Pay Yourself is ${usd(ownerPay.safeToPay)}, or ${ownerPay.takeHomeRate.toFixed(1)}c of every Collected Revenue dollar.`.replace(
+      text: `After debt payments and ${usd(ownerPay.reserveTotal)} of suggested set-asides, ${usd(ownerPay.safeToPay)} is available to you, or ${ownerPay.takeHomeRate.toFixed(1)}c of every collected dollar.`.replace(
         "c of",
         " cents of",
       ),
@@ -254,8 +254,8 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
       tone: "warning",
       priority: 62,
       text: includeOwnerPlanning
-        ? `${usd(summary.accountsReceivable)} of this period's Booked Revenue is Accounts Receivable and cannot fund Safe to Pay Yourself until collected.`
-        : `${usd(summary.accountsReceivable)} of this period's Booked Revenue remains in Accounts Receivable and has not been collected.`,
+        ? `${usd(summary.accountsReceivable)} of what you earned is still owed and cannot become available cash until collected.`
+        : `${usd(summary.accountsReceivable)} of what you earned is still owed and has not been collected.`,
     });
   }
 

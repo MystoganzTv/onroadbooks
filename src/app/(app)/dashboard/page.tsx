@@ -14,7 +14,6 @@ import { InsightsPanel } from "@/components/cockpit/insights-panel";
 import { LanePanel } from "@/components/cockpit/lane-panel";
 import { MoneyFlow } from "@/components/cockpit/money-flow";
 import { ReservesPanel } from "@/components/cockpit/reserves-panel";
-import { SafeToPayCard } from "@/components/cockpit/safe-to-pay-card";
 import { Section } from "@/components/cockpit/section";
 import { TodayCard } from "@/components/cockpit/today-card";
 import { TodayCashCard } from "@/components/cockpit/today-cash-card";
@@ -27,6 +26,10 @@ import { RecentLoads } from "@/components/dashboard/recent-loads";
 import { ExpenseFormDialog } from "@/components/expenses/expense-form-dialog";
 import { LoadFormDialog } from "@/components/loads/load-form-dialog";
 import { PageHeader } from "@/components/shared/page-header";
+import {
+  ActionableProblemBanner,
+  ActionableProblemList,
+} from "@/components/shared/actionable-problem";
 import { PlanGate } from "@/components/shared/plan-gate";
 import { DashboardSubscriptionStatus } from "@/components/subscription/dashboard-subscription-status";
 import { TruckSwitcher } from "@/components/fleet/truck-switcher";
@@ -71,6 +74,8 @@ import {
   LANE_MIN_LOADS,
   reserveBalanceFor,
   scoreLoads,
+  selectActionableFinancialProblems,
+  selectOwnerMoneyPresentation,
 } from "@/lib/finance";
 import {
   formatMiles,
@@ -181,6 +186,13 @@ export default async function DashboardPage({
     ratingThresholds,
     settings.deadheadWarnPct,
   );
+  const loadsWithPaymentEvents = new Set(paymentEvents.map((event) => event.loadId));
+  const missingPaymentDateCount = periodLoads.filter(
+    (load) =>
+      load.status === "PAID" &&
+      !load.invoicePaidDate &&
+      !loadsWithPaymentEvents.has(load.id),
+  ).length;
   const periodExpenses = expensesInPeriod(expenses, period);
   const categories = categoryTotals(periodExpenses.filter(isOperatingExpense), settings);
   // Split by whether the cost's date has arrived. What is due but still
@@ -214,6 +226,23 @@ export default async function DashboardPage({
   const balances = ownerPlanning
     ? calculateReserveBalances(reserveAccounts, reserveTransactions, period)
     : [];
+  const reserveFundingGap = balances.reduce((gap, balance) => {
+    const target = balance.account.targetBalance ?? 0;
+    return gap + Math.max(target - balance.balance, 0);
+  }, 0);
+  const moneyPresentation = selectOwnerMoneyPresentation({
+    ...summary,
+    reserveTotal: cockpit && ownerPlanning ? summary.reserveTotal : null,
+    safeToPay: cockpit && ownerPlanning ? summary.safeToPay : null,
+  });
+  const actionableProblems = selectActionableFinancialProblems({
+    unallocatedCollectedRevenue: summary.unallocatedCollectedRevenue,
+    missingPaymentDateCount,
+    unallocatedDebtService: ownerPlanning ? summary.unallocatedDebtService : 0,
+    reserveFundingGap: cockpit && ownerPlanning ? reserveFundingGap : 0,
+  });
+  const paymentDateProblem = actionableProblems.find((problem) => problem.id === "payment-dates");
+  const secondaryProblems = actionableProblems.filter((problem) => problem.id !== "payment-dates");
   const maintenanceReserve = reserveBalanceFor(balances, "MAINTENANCE");
   // Health is reported for one unit at a time, because "miles remaining" is a
   // fact about a specific odometer.
@@ -246,10 +275,6 @@ export default async function DashboardPage({
   const buckets = periodBuckets(loads, expenses, period);
   const query = scopeQuery(period, truckId);
   const brokerNames = [...new Set(loads.map((l) => l.broker).filter(Boolean))].sort() as string[];
-  const settlementHref =
-    ownerPlanning && (period.key === "first" || period.key === "second")
-      ? `/settlements?month=${period.month}&half=${period.key === "first" ? "FIRST" : "SECOND"}`
-      : undefined;
   const hasLedgerHistory = allLoads.length > 0 || allExpenses.length > 0;
 
   const loadAction = roleCan(role, "manage_loads") ? (
@@ -328,6 +353,32 @@ export default async function DashboardPage({
         <TruckSwitcher trucks={orderedTrucks(trucks)} selectedId={truckId} />
       </div>
 
+      {paymentDateProblem ? <ActionableProblemBanner problem={paymentDateProblem} /> : null}
+
+      {/* ---- The bottom line ------------------------------------------- */}
+      <Section
+        title="The bottom line"
+        description={`${period.label} · ${summary.loadCount} ${summary.loadCount === 1 ? "load" : "loads"} · ${formatMiles(summary.totalMiles)}`}
+      >
+        <HeroMetrics
+          summary={summary}
+          presentation={moneyPresentation}
+          previousLabel={prior.shortLabel}
+          deltas={{
+            revenue: pctChange(summary.bookedRevenue, priorSummary.bookedRevenue),
+            profit: pctChange(summary.operatingProfit, priorSummary.operatingProfit),
+            profitPerMile: pctChange(summary.profitPerMile, priorSummary.profitPerMile),
+          }}
+          showOwnerPlanning={ownerPlanning}
+        />
+        {ownerPlanning && !cockpit ? (
+          <PlanGate
+            capability="cockpit"
+            what="Set aside tax and maintenance as each half-month closes, and see what is genuinely free to take out."
+          />
+        ) : null}
+      </Section>
+
       <BookkeepingAlerts
         dueCount={monthlyDue.length}
         dueTotal={monthlyDue.reduce((total, expense) => total + expense.amount, 0)}
@@ -337,46 +388,7 @@ export default async function DashboardPage({
         monthLabel={monthLabel(period.month)}
         truckId={truckId}
       />
-
-      {/* ---- The bottom line ------------------------------------------- */}
-      <Section
-        title="The bottom line"
-        description={`${period.label} · ${summary.loadCount} ${summary.loadCount === 1 ? "load" : "loads"} · ${formatMiles(summary.totalMiles)}`}
-      >
-        <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(20rem,0.9fr)]">
-          <div className="min-w-0">
-            <HeroMetrics
-              summary={summary}
-              previousLabel={prior.shortLabel}
-              deltas={{
-                revenue: pctChange(summary.bookedRevenue, priorSummary.bookedRevenue),
-                profit: pctChange(summary.operatingProfit, priorSummary.operatingProfit),
-                profitPerMile: pctChange(summary.profitPerMile, priorSummary.profitPerMile),
-              }}
-            />
-          </div>
-          {cockpit && ownerPlanning ? (
-            <SafeToPayCard
-              ownerPay={ownerPay}
-              periodLabel={period.label}
-              href={settlementHref}
-              className="min-w-0"
-            />
-          ) : ownerPlanning ? (
-            <PlanGate
-              capability="cockpit"
-              what="Set aside tax and maintenance as each half-month closes, and see what is genuinely free to take out."
-            />
-          ) : (
-            <Card className="min-w-0">
-              <CardHeader><CardTitle>Owner planning</CardTitle></CardHeader>
-              <CardContent className="p-4 text-xs leading-relaxed text-muted-foreground">
-                Reserves and Safe to Pay Yourself are visible only to the workspace owner.
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </Section>
+      <ActionableProblemList problems={secondaryProblems} />
 
       {/* ---- Today ------------------------------------------------------ */}
       <div className="grid gap-3 xl:grid-cols-2">
@@ -449,7 +461,7 @@ export default async function DashboardPage({
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Route className="size-3.5 text-muted-foreground" />
-                <CardTitle>Booked Revenue vs Operating Expenses</CardTitle>
+                <CardTitle>You Earned vs Business Expenses</CardTitle>
               </div>
               <span className="text-2xs text-muted-foreground">
                 {period.days > 62 ? "By month" : "By day"}

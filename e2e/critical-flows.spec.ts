@@ -343,4 +343,25 @@ test.describe.serial("critical browser flows", () => {
     await expect(page).toHaveURL(/\/loads$/);
     await expect(page.getByRole("heading", { name: "Loads" })).toBeVisible();
   });
+
+  test("owner financial cockpit answers questions and keeps details progressive", async ({ page }) => {
+    await login(page);
+    await page.goto("/dashboard?month=2026-08&period=month");
+    await expect(page.getByRole("heading", { name: "Financial performance" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Your cash" })).toBeVisible();
+    await expect(page.getByText("You earned", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Your business made", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Collected", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Business cash out", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Available to you", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("When cash is available", { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Where is my money?" })).toBeVisible();
+    await expect(page.getByText("Financial details", { exact: true }).first()).toBeVisible();
+
+    await page.goto("/settlements?month=2026-08&half=SECOND");
+    await expect(page.getByRole("heading", { name: "Owner Settlements" })).toBeVisible();
+    await expect(page.getByText("Half-month payday", { exact: true })).toBeVisible();
+    await expect(page.getByText("Available to pay yourself", { exact: true })).toBeVisible();
+    await expect(page.getByText(/Financial details · model v/)).toBeVisible();
+  });
 });

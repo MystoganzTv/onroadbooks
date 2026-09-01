@@ -45,3 +45,4 @@ export * from "./insights";
 export * from "./financial-summary";
 export * from "./cash-activity";
 export * from "./planning";
+export * from "./presentation";

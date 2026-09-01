@@ -985,7 +985,7 @@ describe("calculateDaySnapshot", () => {
     assert.equal(day.revenue, 1420);
     assert.equal(day.profit, 1034);
     assert.equal(day.verdict, "GOOD");
-    assert.match(day.statement, /above your daily Operating Profit target/);
+    assert.match(day.statement, /above your daily profit target/);
   });
 
   it("says nothing happened rather than reporting a bad day", () => {

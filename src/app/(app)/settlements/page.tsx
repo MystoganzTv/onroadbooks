@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 
 import { SettlementDetail } from "@/components/settlements/settlement-detail";
 import { PageHeader } from "@/components/shared/page-header";
 import { PlanGate } from "@/components/shared/plan-gate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { planAllows } from "@/lib/plans";
@@ -14,6 +16,7 @@ import {
   selectSettlementView,
   settlementWindows,
 } from "@/lib/finance/settlement";
+import { selectOwnerMoneyPresentation } from "@/lib/finance/presentation";
 import { formatMoneyCompact, formatPercent, formatRateValue } from "@/lib/formatters";
 import { param, type SearchParams } from "@/lib/period-params";
 import { currentMonth, shiftMonth, todayISO } from "@/lib/periods";
@@ -60,7 +63,7 @@ export default async function SettlementsPage({
     return (
       <div className="space-y-4 p-4 lg:p-6">
         <PageHeader
-          title="Settlements"
+          title="Owner Settlements"
           description="The twice-monthly review: 1-15 and 16 to month end."
         />
         <PlanGate
@@ -103,19 +106,26 @@ export default async function SettlementsPage({
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <PageHeader
-        title="Settlements"
-        description="Twice a month, the truck settles up: what came in, what went out, what is safe to take."
+        title="Owner Settlements"
+        description="Your half-month payday: what the truck earned, what the business kept, and what is available to you."
       />
 
       {openComplete.length > 0 ? (
-        <div className="rounded-lg border border-info/40 bg-info-soft/50 px-4 py-3">
-          <p className="text-xs text-foreground">
-            {openComplete.length} finished{" "}
-            {openComplete.length === 1 ? "period is" : "periods are"} still open.{" "}
-            {openComplete.length === 1
-              ? "Closing it freezes the figures and posts its reserves."
-              : "Closing them freezes their figures and posts their reserves."}
-          </p>
+        <div className="flex flex-col gap-3 rounded-lg border border-info/40 bg-info-soft/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold text-foreground">
+              {openComplete.length} finished {openComplete.length === 1 ? "payday is" : "paydays are"} ready to review
+            </p>
+            <p className="mt-0.5 text-2xs text-muted-foreground">
+              Review the money, then settle the period to freeze its figures and post its reserves.
+            </p>
+          </div>
+          <Button asChild size="sm" variant="outline">
+            <Link href={`/settlements?month=${openComplete[0].month}&half=${openComplete[0].half}`}>
+              Review payday
+              <ArrowRight className="size-3.5" />
+            </Link>
+          </Button>
         </div>
       ) : null}
 
@@ -147,8 +157,19 @@ export default async function SettlementsPage({
                 </p>
               ) : (
                 <ul className="divide-y divide-border/70">
-                  {history.map((view) => (
-                    <li key={view.id}>
+                  {history.map((view) => {
+                    const presentation = selectOwnerMoneyPresentation({
+                      bookedRevenue: view.figures.bookedRevenue ?? view.figures.grossRevenue,
+                      operatingProfit: view.figures.operatingProfit,
+                      collectedRevenue: view.figures.collectedRevenue ?? null,
+                      accountsReceivable: view.figures.accountsReceivable ?? null,
+                      unallocatedCollectedRevenue: view.figures.unallocatedCollectedRevenue ?? null,
+                      operatingExpenses: view.figures.operatingExpenses,
+                      debtService: view.figures.debtService ?? null,
+                      reserveTotal: view.figures.reserveTotal,
+                      safeToPay: view.figures.safeToPay,
+                    });
+                    return <li key={view.id}>
                       <Link
                         href={`/settlements?month=${view.month}&half=${view.half}`}
                         className="block px-4 py-2.5 transition-colors hover:bg-accent/50 focus-ring"
@@ -157,13 +178,13 @@ export default async function SettlementsPage({
                           <span className="min-w-0 truncate text-xs font-medium text-foreground">
                             {view.shortLabel}
                           </span>
-                          <span
-                            className={cn(
-                              "shrink-0 tnum text-sm font-semibold",
-                              view.figures.safeToPay >= 0 ? "text-pos" : "text-neg",
-                            )}
-                          >
-                            {formatMoneyCompact(view.figures.safeToPay)}
+                          <span className="shrink-0 text-right">
+                            <span className="block text-[0.625rem] uppercase tracking-wide text-muted-foreground">Available</span>
+                            <span className={cn("block tnum text-sm font-semibold", presentation.availableToYou.state === "KNOWN" && presentation.availableToYou.amount > 0 ? "text-pos" : "text-info")}>
+                              {presentation.availableToYou.state === "KNOWN"
+                                ? formatMoneyCompact(presentation.availableToYou.amount)
+                                : "Unknown"}
+                            </span>
                           </span>
                         </div>
                         <div className="mt-0.5 flex items-center justify-between gap-2">
@@ -185,8 +206,8 @@ export default async function SettlementsPage({
                           </span>
                         </div>
                       </Link>
-                    </li>
-                  ))}
+                    </li>;
+                  })}
                 </ul>
               )}
             </CardContent>

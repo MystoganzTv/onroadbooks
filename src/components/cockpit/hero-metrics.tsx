@@ -1,193 +1,212 @@
 import {
-  Banknote,
-  ChartNoAxesCombined,
-  Gauge,
-  ReceiptText,
+  CircleDollarSign,
   TrendingDown,
   TrendingUp,
+  WalletCards,
 } from "lucide-react";
 
 import { DeltaBadge } from "@/components/shared/delta-badge";
 import { formatMoneyCompact, formatRate } from "@/lib/formatters";
+import type {
+  MoneyValue,
+  OwnerMoneyPresentation,
+} from "@/lib/finance/presentation";
+import type { FinancialSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import type { PeriodSummary } from "@/lib/types";
 
 interface HeroMetricsProps {
-  summary: PeriodSummary;
+  summary: FinancialSummary;
+  presentation: OwnerMoneyPresentation;
   previousLabel: string;
   deltas: { revenue: number; profit: number; profitPerMile: number };
+  showOwnerPlanning?: boolean;
 }
 
-/**
- * The executive read of the period. This is intentionally one composed
- * surface rather than four equal KPI cards: operating profit is the answer,
- * while revenue, rate and costs explain it.
- */
+/** Profit and cash are peers, never one blended accounting conclusion. */
 export function HeroMetrics({
   summary,
+  presentation,
   previousLabel,
   deltas,
+  showOwnerPlanning = true,
 }: HeroMetricsProps) {
+  const answers = presentation.answers;
   const profitable = summary.operatingProfit >= 0;
-  const marginWidth = Math.max(0, Math.min(100, summary.netMargin));
+  const fundingGap = presentation.cashFundingGap.state === "KNOWN"
+    ? presentation.cashFundingGap.amount
+    : null;
 
   return (
-    <section className="relative overflow-hidden rounded-xl border border-border bg-card shadow-[0_18px_50px_-38px_rgba(0,0,0,0.75)]">
-      <div
+    <div className="grid gap-3 xl:grid-cols-[1.08fr_0.92fr]">
+      <section
         className={cn(
-          "pointer-events-none absolute inset-x-0 top-0 h-28 opacity-70",
+          "overflow-hidden rounded-xl border shadow-[0_20px_55px_-42px_rgba(0,0,0,0.85)]",
           profitable
-            ? "bg-[radial-gradient(ellipse_at_top_left,hsl(var(--pos)/0.16),transparent_62%)]"
-            : "bg-[radial-gradient(ellipse_at_top_left,hsl(var(--neg)/0.16),transparent_62%)]",
+            ? "border-pos/30 bg-[linear-gradient(145deg,hsl(var(--pos)/0.16),hsl(var(--card))_64%)]"
+            : "border-neg/30 bg-[linear-gradient(145deg,hsl(var(--neg)/0.15),hsl(var(--card))_64%)]",
         )}
-        aria-hidden
-      />
-
-      <header className="relative flex flex-wrap items-center justify-between gap-3 border-b border-border/80 px-5 py-4">
-        <div className="flex items-center gap-3">
+      >
+        <header className="flex items-center justify-between gap-3 border-b border-border/70 px-5 py-4">
+          <div className="flex items-center gap-2">
+            <CircleDollarSign className={cn("size-4", profitable ? "text-pos" : "text-neg")} />
+            <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground">
+              Financial performance
+            </h2>
+          </div>
           <span
             className={cn(
-              "grid size-9 place-items-center rounded-lg border",
+              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-2xs font-semibold uppercase tracking-[0.12em]",
               profitable
-                ? "border-pos/25 bg-pos-soft text-pos"
-                : "border-neg/25 bg-neg-soft text-neg",
+                ? "border-pos/35 bg-pos-soft text-pos"
+                : "border-neg/35 bg-neg-soft text-neg",
             )}
           >
-            <ChartNoAxesCombined className="size-4" />
+            {profitable ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+            {profitable ? "Profitable" : "Loss"}
           </span>
-          <div>
-            <h3 className="text-sm font-semibold tracking-tight">Financial performance</h3>
-            <p className="mt-0.5 text-2xs text-muted-foreground">Period operating result</p>
-          </div>
-        </div>
-        <span
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-2xs font-semibold uppercase tracking-[0.12em]",
-            profitable
-              ? "border-pos/30 bg-pos-soft text-pos"
-              : "border-neg/30 bg-neg-soft text-neg",
-          )}
-        >
-          {profitable ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
-          {profitable ? "Profitable" : "Needs attention"}
-        </span>
-      </header>
+        </header>
 
-      <div className="relative grid md:grid-cols-[minmax(0,1.35fr)_minmax(15rem,0.95fr)]">
-        <div className="border-b border-border/80 px-5 py-5 md:border-b-0 md:border-r">
-          <p className="label-xs">Operating profit</p>
+        <div className="px-5 py-6">
+          <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            Your business made
+          </p>
           <p
             className={cn(
-              "mt-3 text-[clamp(2.35rem,4vw,3.75rem)] font-semibold tnum leading-none tracking-[-0.045em]",
+              "mt-2 text-[clamp(2.75rem,5vw,4.75rem)] font-semibold leading-none tracking-[-0.055em] tnum",
               profitable ? "text-pos" : "text-neg",
             )}
           >
             {formatMoneyCompact(summary.operatingProfit)}
           </p>
-          <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <div className="mt-3">
             <DeltaBadge value={deltas.profit} label={`vs ${previousLabel}`} />
-            <span className="text-2xs text-muted-foreground">·</span>
-            <span className="text-2xs text-muted-foreground tnum">
-              {summary.netMargin.toFixed(1)}% operating margin
-            </span>
           </div>
+        </div>
 
-          <div className="mt-6">
-            <div className="mb-2 flex items-center justify-between text-2xs text-muted-foreground">
-              <span>Revenue retained after operating costs</span>
-              <span className="font-medium text-foreground tnum">{summary.netMargin.toFixed(1)}%</span>
-            </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-surface-sunken">
-              <div
-                className={cn("h-full rounded-full", profitable ? "bg-pos" : "bg-neg")}
-                style={{ width: `${marginWidth}%` }}
+        <dl className="grid gap-px border-t border-border/70 bg-border/70 sm:grid-cols-3">
+          <PerformanceFact label="You earned" value={formatMoneyCompact(summary.bookedRevenue)} tone="info" />
+          <PerformanceFact label="Business expenses" value={`-${formatMoneyCompact(summary.operatingExpenses)}`} tone="negative" />
+          <PerformanceFact label="Profit / mile" value={formatRate(summary.profitPerMile)} tone={profitable ? "positive" : "negative"} />
+        </dl>
+      </section>
+
+      <section className="overflow-hidden rounded-xl border border-border bg-card shadow-[0_20px_55px_-42px_rgba(0,0,0,0.85)]">
+        <header className="flex items-center gap-2 border-b border-border px-5 py-4">
+          <WalletCards className="size-4 text-info" />
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground">Your cash</h2>
+            <p className="mt-0.5 text-2xs text-muted-foreground">What came in and what had to go out</p>
+          </div>
+        </header>
+
+        <dl className="divide-y divide-border/70 px-5">
+          <CashFact label="Collected" value={answers.collected.value} tone="info" />
+          <CashFact label="Business cash out" value={answers.spent.value} tone="negative" negative />
+          <CashFact label="Debt payments" value={answers.debtPayments.value} tone="negative" negative />
+        </dl>
+
+        {showOwnerPlanning ? (
+          <div className="border-t-2 border-info/35 bg-info-soft/25 px-5 py-4">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  Available to you
+                </p>
+                <p className="mt-1 text-2xs text-muted-foreground">How much can I take?</p>
+              </div>
+              <MoneyValueText
+                value={presentation.availableToYou}
+                className="text-4xl font-semibold leading-none tracking-[-0.045em] text-info"
               />
             </div>
+            {fundingGap !== null && fundingGap > 0 ? (
+              <p className="mt-3 border-t border-neg/20 pt-3 text-sm font-semibold text-neg tnum">
+                Funding gap: {formatMoneyCompact(fundingGap)}
+              </p>
+            ) : null}
           </div>
-        </div>
+        ) : null}
 
-        <div className="grid grid-cols-2 divide-x divide-border/80 md:grid-cols-1 md:divide-x-0 md:divide-y">
-          <SupportingMetric
-            label="Booked revenue"
-            value={formatMoneyCompact(summary.bookedRevenue)}
-            icon={Banknote}
-            tone="info"
-          >
-            <DeltaBadge value={deltas.revenue} label={`vs ${previousLabel}`} />
-          </SupportingMetric>
-          <SupportingMetric
-            label="Profit per mile"
-            value={formatRate(summary.profitPerMile)}
-            icon={Gauge}
-            tone={summary.profitPerMile >= 0 ? "positive" : "negative"}
-          >
-            <DeltaBadge value={deltas.profitPerMile} />
-            <span className="text-2xs text-muted-foreground tnum">
-              across {Math.round(summary.totalMiles).toLocaleString()} mi
-            </span>
-          </SupportingMetric>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 divide-x divide-border/80 border-t border-border/80 bg-surface-sunken/45">
-        <FooterMetric
-          label="Operating expenses"
-          value={formatMoneyCompact(summary.operatingExpenses)}
-          icon={ReceiptText}
-        />
-        <FooterMetric label="Actual cost / mi" value={formatRate(summary.costPerMile)} icon={Gauge} />
-        <FooterMetric label="Revenue / mi" value={formatRate(summary.revenuePerMile)} icon={TrendingUp} />
-      </div>
-    </section>
+        {showOwnerPlanning && summary.reserves.length > 0 ? (
+          <div className="border-t border-border bg-surface-sunken/45 px-5 py-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                When cash is available
+              </p>
+              <p className="text-xs font-semibold text-warn tnum">
+                Suggested set aside: {formatMoneyCompact(summary.reserveTotal)}
+              </p>
+            </div>
+            <dl className="mt-2 space-y-1.5">
+              {summary.reserves.map((reserve) => (
+                <div key={reserve.accountId} className="flex items-baseline justify-between gap-3 text-2xs">
+                  <dt className="text-muted-foreground">{reserveLabel(reserve.kind, reserve.name)}</dt>
+                  <dd className="font-medium text-foreground tnum">{formatMoneyCompact(reserve.amount)}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ) : null}
+      </section>
+    </div>
   );
 }
 
-type SupportingTone = "info" | "positive" | "negative";
-
-function SupportingMetric({
+function PerformanceFact({
   label,
   value,
-  icon: Icon,
   tone,
-  children,
 }: {
   label: string;
   value: string;
-  icon: typeof Banknote;
-  tone: SupportingTone;
-  children: React.ReactNode;
+  tone: "info" | "positive" | "negative";
 }) {
-  const toneClass =
-    tone === "info" ? "text-info" : tone === "positive" ? "text-pos" : "text-neg";
-
+  const color = tone === "positive" ? "text-pos" : tone === "negative" ? "text-neg" : "text-info";
   return (
-    <div className="min-w-0 px-4 py-4 sm:px-5">
-      <div className="flex items-center justify-between gap-2">
-        <p className="label-xs">{label}</p>
-        <Icon className={cn("size-3.5 shrink-0", toneClass)} />
-      </div>
-      <p className={cn("mt-2 text-2xl font-semibold tnum tracking-tight", toneClass)}>{value}</p>
-      <div className="mt-1.5 flex min-h-4 flex-wrap items-center gap-x-2 gap-y-1">{children}</div>
+    <div className="bg-card/80 px-5 py-4">
+      <dt className="text-2xs font-medium text-muted-foreground">{label}</dt>
+      <dd className={cn("mt-1 text-lg font-semibold tracking-tight tnum", color)}>{value}</dd>
     </div>
   );
 }
 
-function FooterMetric({
+function CashFact({
   label,
   value,
-  icon: Icon,
+  tone,
+  negative = false,
 }: {
   label: string;
-  value: string;
-  icon: typeof Gauge;
+  value: MoneyValue;
+  tone: "info" | "negative";
+  negative?: boolean;
 }) {
+  const display = value.state === "KNOWN"
+    ? `${negative && value.amount > 0 ? "-" : ""}${formatMoneyCompact(value.amount)}`
+    : null;
   return (
-    <div className="min-w-0 px-3 py-3.5 sm:px-4">
-      <div className="flex items-center gap-1.5 text-muted-foreground">
-        <Icon className="hidden size-3 shrink-0 sm:block" />
-        <p className="truncate text-[0.625rem] font-semibold uppercase tracking-[0.1em]">{label}</p>
-      </div>
-      <p className="mt-1.5 truncate text-sm font-semibold tnum text-foreground sm:text-base">{value}</p>
+    <div className="flex items-baseline justify-between gap-4 py-3">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className={cn("text-base font-semibold tnum", tone === "negative" ? "text-neg" : "text-info")}>
+        {display ?? <span className="text-xs text-muted-foreground">Not enough data</span>}
+      </dd>
     </div>
   );
+}
+
+function MoneyValueText({ value, className }: { value: MoneyValue; className?: string }) {
+  if (value.state === "UNKNOWN") {
+    return (
+      <p className={cn("text-sm text-muted-foreground", className)} title={value.reason}>
+        Not enough data
+      </p>
+    );
+  }
+  return <p className={cn("tnum", className)}>{formatMoneyCompact(value.amount)}</p>;
+}
+
+function reserveLabel(kind: string, name: string): string {
+  if (kind === "TAX") return "Suggested tax set-aside";
+  if (kind === "MAINTENANCE") return "Suggested maintenance set-aside";
+  return `Suggested ${name.toLocaleLowerCase()} set-aside`;
 }

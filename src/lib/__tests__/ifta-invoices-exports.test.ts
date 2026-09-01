@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import ExcelJS from "exceljs";
 
 import { calculateIftaReport, iftaRateKey, IFTA_JURISDICTIONS } from "../ifta";
 import { fleetIftaApplicability, iftaApplicability } from "../ifta-eligibility";
@@ -12,7 +13,8 @@ import {
 import { freightMarket } from "../markets";
 import { buildSeedDataset } from "../seed/seed-data";
 import { toPdf } from "../export-pdf";
-import { toXlsx } from "../export-xlsx";
+import { toXlsx, toXlsxWorkbook } from "../export-xlsx";
+import { buildYearEndPacket } from "../year-end";
 
 describe("IFTA reporting", () => {
   it("contains exactly the 48 contiguous states and 10 Canadian provinces", () => {
@@ -183,6 +185,40 @@ describe("native exports", () => {
   it("creates a real XLSX package", async () => {
     const bytes = await toXlsx(table);
     assert.equal(Buffer.from(bytes).subarray(0, 2).toString(), "PK");
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(bytes.buffer as ArrayBuffer);
+    const sheet = workbook.getWorksheet("Report")!;
+    assert.equal(sheet.getCell("A4").value, "Name");
+    assert.equal(sheet.getCell("A5").value, "'=unsafe");
+    assert.equal(sheet.views[0]?.showGridLines, false);
+    assert.equal((sheet.views[0] as ExcelJS.WorksheetViewFrozen | undefined)?.ySplit, 4);
+  });
+  it("turns the year-end packet into an executive workbook", async () => {
+    const packet = buildYearEndPacket(buildSeedDataset(), 2026, "EPS Logistics LLC");
+    const bytes = await toXlsxWorkbook(packet.tables, packet.sheetNames);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(bytes.buffer as ArrayBuffer);
+
+    assert.deepEqual(workbook.worksheets.map((sheet) => sheet.name), packet.sheetNames);
+    const summary = workbook.getWorksheet("Summary")!;
+    assert.match(String(summary.getCell("A1").value), /EPS Logistics LLC.*2026 YEAR-END REPORT/);
+    assert.equal(summary.getCell("A6").value, 37_570);
+    assert.equal(summary.getCell("A6").numFmt, '$#,##0.00;[Red]($#,##0.00);-');
+    assert.equal(summary.views[0]?.showGridLines, false);
+    assert.match(String(summary.pageSetup.printArea), /^A1:H/);
+
+    const loads = workbook.getWorksheet("Loads")!;
+    assert.equal(loads.getCell("A3").value, "LOAD & ROUTE");
+    assert.equal(loads.getCell("A4").value, "Truck");
+    assert.equal(loads.getCell("N3").value, "MILEAGE");
+    assert.ok(loads.autoFilter);
+    if (typeof loads.autoFilter === "string") {
+      assert.equal(loads.autoFilter, "A4:AG4");
+    } else {
+      assert.deepEqual(loads.autoFilter.from, { row: 4, column: 1 });
+    }
+    assert.equal((loads.views[0] as ExcelJS.WorksheetViewFrozen | undefined)?.ySplit, 4);
   });
   it("creates a real PDF document", async () => {
     const bytes = await toPdf(table);

@@ -127,7 +127,7 @@ export function GoalProgressCard({
               {projection.workingDaysRemaining} working{" "}
               {projection.workingDaysRemaining === 1 ? "day" : "days"} left at{" "}
               {formatMoney(projection.revenuePerWorkingDay)} a day. Straight-line projection from
-              the pace so far, not Booked Revenue already earned.
+              the pace so far, not money already earned.
             </p>
           </div>
         ) : null}
