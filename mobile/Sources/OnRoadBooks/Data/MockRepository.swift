@@ -85,6 +85,62 @@ final class MockRepository: LedgerRepository {
 
     func fetchLoads() async throws -> [Load] { loads }
 
+    func fetchTruck() async throws -> TruckSummary {
+        // The same August demo figures as everywhere else: $9,795 in, $6,143.90
+        // out, 3,339 miles. Change one, check the others still add up.
+        TruckSummary(
+            periodLabel: "August 2026 · Full Month",
+            name: "Unit 1",
+            detail: "2021 Freightliner Cascadia",
+            vin: nil,
+            odometer: 268_412,
+            truckCount: 1,
+            revenue: 9795.00,
+            expenses: 6143.90,
+            profit: 3651.10,
+            miles: 3339,
+            costPerMile: 1.84,
+            revenuePerMile: 2.93,
+            profitPerMile: 1.09,
+            loadCount: 5,
+            milesPerGallon: 7.0,
+            fuelCostPerMile: 0.40,
+            due: [
+                MaintenanceDueItem(id: "OIL_CHANGE", label: "Oil change", status: .dueSoon,
+                                   dueDate: mockDate(2026, 9, 20), dueOdometer: 273_000,
+                                   milesRemaining: 4588, daysRemaining: 19),
+                MaintenanceDueItem(id: "DOT_INSPECTION", label: "DOT inspection", status: .ok,
+                                   dueDate: mockDate(2027, 5, 12), dueOdometer: nil,
+                                   milesRemaining: nil, daysRemaining: 253),
+            ]
+        )
+    }
+
+    func fetchReports() async throws -> [ReportSummary] {
+        [
+            ReportSummary(id: "loads", label: "Loads Report", description: "Every load with its full profitability stack"),
+            ReportSummary(id: "expenses", label: "Expense Report", description: "Ledger detail with fixed / variable split"),
+            ReportSummary(id: "fuel", label: "Fuel Report", description: "Fill-ups, gallons, price and odometer"),
+            ReportSummary(id: "profit-loss", label: "Profit & Loss Summary", description: "Revenue, costs by category, reserves"),
+        ]
+    }
+
+    func fetchReportTable(_ reportId: String) async throws -> ReportTable {
+        ReportTable(
+            title: "Loads — August 2026",
+            columns: ["Date", "Lane", "Broker", "Rate", "Miles", "Profit/mi"],
+            rows: [
+                ["2026-08-28", "Chicago, IL → Columbus, OH", "Werner Logistics", "2850.00", "368", "1.98"],
+                ["2026-08-25", "Dallas, TX → Memphis, TN", "TQL", "1640.00", "490", "1.42"],
+                ["2026-08-22", "Atlanta, GA → Charlotte, NC", "Coyote", "980.00", "264", "1.35"],
+            ]
+        )
+    }
+
+    func downloadReport(_ reportId: String, format: String) async throws -> URL {
+        throw APIError.refused("Los exports necesitan una cuenta real. Entra con tu cuenta para descargarlos.")
+    }
+
     func fetchReserves() async throws -> ReserveLedger {
         // The same three buckets and the same arithmetic as fetchDashboard:
         // tax 20% of profit, maintenance 5% of revenue, emergency 2% of revenue.

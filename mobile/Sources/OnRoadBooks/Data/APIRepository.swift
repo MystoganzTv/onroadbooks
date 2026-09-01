@@ -182,6 +182,53 @@ final class APIRepository: LedgerRepository {
         try await get("api/mobile/reserves", as: ReservesResponseDTO.self).toDomain()
     }
 
+    func fetchTruck() async throws -> TruckSummary {
+        try await get("api/mobile/truck", as: TruckResponseDTO.self).toDomain()
+    }
+
+    func fetchReports() async throws -> [ReportSummary] {
+        try await get("api/mobile/reports", as: ReportsResponseDTO.self)
+            .reports.map { ReportSummary(id: $0.id, label: $0.label, description: $0.description) }
+    }
+
+    func fetchReportTable(_ reportId: String) async throws -> ReportTable {
+        let response = try await get("api/mobile/reports/\(reportId)", as: ReportTableResponseDTO.self)
+        return ReportTable(
+            title: response.table.title,
+            columns: response.table.columns,
+            rows: response.table.rows.map { row in row.map(\.text) }
+        )
+    }
+
+    func downloadReport(_ reportId: String, format: String) async throws -> URL {
+        var request = client.request("api/mobile/reports/\(reportId)", method: "GET")
+        if let url = request.url,
+           var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            components.queryItems = [URLQueryItem(name: "format", value: format)]
+            request.url = components.url
+        }
+
+        let (data, http) = try await client.send(request)
+        if http.statusCode == 401 { throw APIError.unauthorized }
+        guard http.statusCode == 200 else { throw APIError.requestFailed }
+
+        // The server already named the file for the accountant, period and
+        // truck included. Keep that name rather than inventing a worse one.
+        let fallback = "\(reportId).\(format)"
+        let name = http.value(forHTTPHeaderField: "Content-Disposition")
+            .flatMap { header -> String? in
+                guard let range = header.range(of: "filename=\"") else { return nil }
+                let rest = header[range.upperBound...]
+                guard let end = rest.firstIndex(of: "\"") else { return nil }
+                return String(rest[..<end])
+            } ?? fallback
+
+        let destination = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+        try? FileManager.default.removeItem(at: destination)
+        try data.write(to: destination, options: .atomic)
+        return destination
+    }
+
     func fetchInvoices() async throws -> InvoiceLedger {
         try await get("api/mobile/invoices", as: InvoicesResponseDTO.self).toDomain()
     }
@@ -338,6 +385,115 @@ private struct NewFuelDTO: Encodable {
         location = stop.location.isEmpty ? nil : stop.location
         jurisdiction = stop.jurisdiction.isEmpty ? nil : stop.jurisdiction.uppercased()
     }
+}
+
+private struct TruckResponseDTO: Decodable {
+    struct Truck: Decodable {
+        let id: String
+        let name: String
+        let detail: String?
+        let vin: String?
+        let odometer: Int
+    }
+
+    struct Lifetime: Decodable {
+        let revenue: Double
+        let expenses: Double
+        let profit: Double
+        let miles: Double
+        let costPerMile: Double
+        let revenuePerMile: Double
+        let profitPerMile: Double
+        let loadCount: Int
+    }
+
+    struct Due: Decodable {
+        let type: String
+        let label: String
+        let status: String
+        let dueDate: String?
+        let dueOdometer: Double?
+        let milesRemaining: Double?
+        let daysRemaining: Double?
+    }
+
+    let periodLabel: String
+    let truck: Truck
+    let truckCount: Int
+    let lifetime: Lifetime
+    let milesPerGallon: Double?
+    let fuelCostPerMile: Double
+    let due: [Due]
+
+    func toDomain() -> TruckSummary {
+        TruckSummary(
+            periodLabel: periodLabel,
+            name: truck.name,
+            detail: truck.detail,
+            vin: truck.vin,
+            odometer: truck.odometer,
+            truckCount: truckCount,
+            revenue: lifetime.revenue,
+            expenses: lifetime.expenses,
+            profit: lifetime.profit,
+            miles: lifetime.miles,
+            costPerMile: lifetime.costPerMile,
+            revenuePerMile: lifetime.revenuePerMile,
+            profitPerMile: lifetime.profitPerMile,
+            loadCount: lifetime.loadCount,
+            milesPerGallon: milesPerGallon,
+            fuelCostPerMile: fuelCostPerMile,
+            due: due.map { item in
+                MaintenanceDueItem(
+                    id: item.type,
+                    label: item.label,
+                    status: DueStatus(rawValue: item.status) ?? .unscheduled,
+                    dueDate: item.dueDate.map(ISODate.parse),
+                    dueOdometer: item.dueOdometer.map { Int($0) },
+                    milesRemaining: item.milesRemaining.map { Int($0) },
+                    daysRemaining: item.daysRemaining.map { Int($0) }
+                )
+            }
+        )
+    }
+}
+
+private struct ReportsResponseDTO: Decodable {
+    struct Report: Decodable {
+        let id: String
+        let label: String
+        let description: String
+    }
+    let reports: [Report]
+}
+
+/// A report cell is a string or a number on the wire, because that is what the
+/// CSV and XLSX renderers need. The phone only ever prints it.
+private struct ReportCell: Decodable {
+    let text: String
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let value = try? container.decode(String.self) {
+            text = value
+        } else if let value = try? container.decode(Double.self) {
+            text = value == value.rounded() && abs(value) < 1e15
+                ? String(Int(value))
+                : String(format: "%.2f", value)
+        } else {
+            text = ""
+        }
+    }
+}
+
+private struct ReportTableResponseDTO: Decodable {
+    struct Table: Decodable {
+        let title: String
+        let columns: [String]
+        let rows: [[ReportCell]]
+    }
+    let periodLabel: String
+    let table: Table
 }
 
 private struct ReservesResponseDTO: Decodable {

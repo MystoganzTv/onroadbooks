@@ -106,6 +106,65 @@ struct NewLoad {
     var otherExpenses: Double
 }
 
+// MARK: - The truck
+
+enum DueStatus: String {
+    case ok = "OK"
+    case dueSoon = "DUE_SOON"
+    case overdue = "OVERDUE"
+    case unscheduled = "UNSCHEDULED"
+}
+
+struct MaintenanceDueItem: Identifiable, Hashable {
+    let id: String
+    let label: String
+    let status: DueStatus
+    let dueDate: Date?
+    let dueOdometer: Int?
+    /// Negative once overdue; nil when the item is not measured that way.
+    let milesRemaining: Int?
+    let daysRemaining: Int?
+}
+
+struct TruckSummary {
+    let periodLabel: String
+    let name: String
+    let detail: String?
+    let vin: String?
+    let odometer: Int
+    let truckCount: Int
+
+    let revenue: Double
+    let expenses: Double
+    let profit: Double
+    let miles: Double
+    let costPerMile: Double
+    let revenuePerMile: Double
+    let profitPerMile: Double
+    let loadCount: Int
+
+    /// Nil until the odometer proves it — same rule as the Fuel screen.
+    let milesPerGallon: Double?
+    let fuelCostPerMile: Double
+    let due: [MaintenanceDueItem]
+}
+
+// MARK: - Reports
+
+struct ReportSummary: Identifiable, Hashable {
+    let id: String
+    let label: String
+    let description: String
+}
+
+/// Columns and rows exactly as `buildReport` defines them on the server, so a
+/// report added there shows up here with no new build and no second layout.
+struct ReportTable {
+    let title: String
+    let columns: [String]
+    let rows: [[String]]
+}
+
 // MARK: - Reserves
 
 /// One savings bucket. Distinct from `ReserveAccount`, which is the trimmed

@@ -54,6 +54,10 @@ struct MoreView: View {
             InvoicesView(repository: repository)
         case "Reserves":
             ReservesView(repository: repository)
+        case "Truck":
+            TruckView(repository: repository)
+        case "Reports":
+            ReportsView(repository: repository)
         default:
             ComingSoonView(title: item.title, systemImage: item.icon)
         }

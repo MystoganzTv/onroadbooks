@@ -12,6 +12,12 @@ protocol LedgerRepository {
     func fetchFuel() async throws -> FuelLedger
     func fetchInvoices() async throws -> InvoiceLedger
     func fetchReserves() async throws -> ReserveLedger
+    func fetchTruck() async throws -> TruckSummary
+    func fetchReports() async throws -> [ReportSummary]
+    func fetchReportTable(_ reportId: String) async throws -> ReportTable
+    /// Renders the report as a file and returns a local URL to hand to the
+    /// share sheet. A report on a phone is usually not read — it is sent.
+    func downloadReport(_ reportId: String, format: String) async throws -> URL
 
     /// Both return the new record's id. They throw `APIError.refused` carrying
     /// the server's own sentence when the ledger says no -- an expired trial, a
