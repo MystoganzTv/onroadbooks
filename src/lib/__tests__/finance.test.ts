@@ -32,6 +32,7 @@ import { calculateReserveBalances } from "../finance/reserves";
 import {
   buildSettlementSnapshot,
   settlementBounds,
+  selectSettlementView,
   settlementWindows,
 } from "../finance/settlement";
 import { buildCockpitInsights } from "../finance/insights";
@@ -1059,6 +1060,58 @@ describe("settlements", () => {
     const windows = settlementWindows("2025-12", "2026-01");
     assert.equal(windows.length, 4);
     assert.deepEqual(windows[0], { month: "2026-01", half: "SECOND" });
+  });
+});
+
+describe("selectSettlementView", () => {
+  // Only the fields the selector reads. Views arrive newest first.
+  const view = (
+    month: string,
+    half: "FIRST" | "SECOND",
+    over: { complete?: boolean; status?: "OPEN" | "CLOSED"; loadCount?: number } = {},
+  ) =>
+    ({
+      id: `${month}-${half}`,
+      month,
+      half,
+      status: over.status ?? "OPEN",
+      complete: over.complete ?? false,
+      figures: { loadCount: over.loadCount ?? 0 },
+    }) as unknown as Parameters<typeof selectSettlementView>[0][number];
+
+  const liveHalf = view("2026-08", "SECOND", { complete: false, loadCount: 1 });
+  const emptyFinished = view("2026-08", "FIRST", { complete: true, loadCount: 0 });
+
+  it("honours the window named in the URL", () => {
+    const picked = selectSettlementView([liveHalf, emptyFinished], "2026-08", "first");
+    assert.equal(picked?.half, "FIRST");
+  });
+
+  it("opens the finished window when there is something to settle in it", () => {
+    const finishedWithLoads = view("2026-08", "FIRST", { complete: true, loadCount: 3 });
+    const picked = selectSettlementView([liveHalf, finishedWithLoads]);
+    assert.equal(picked?.half, "FIRST");
+  });
+
+  it("skips an empty finished window for the live one that has the money", () => {
+    // The bug this replaces: on the 31st the page opened on an all-zero
+    // "1 to 15" while the half-month actually being run sat in History.
+    const picked = selectSettlementView([liveHalf, emptyFinished]);
+    assert.equal(picked?.half, "SECOND");
+  });
+
+  it("still opens a closed window even with no loads in it", () => {
+    const closedEmpty = view("2026-08", "FIRST", { complete: true, status: "CLOSED", loadCount: 0 });
+    const quietLive = view("2026-08", "SECOND", { complete: false, loadCount: 0 });
+    const picked = selectSettlementView([quietLive, closedEmpty]);
+    assert.equal(picked?.half, "FIRST");
+  });
+
+  it("falls back to the current window when nothing has activity at all", () => {
+    const quietLive = view("2026-08", "SECOND", { complete: false, loadCount: 0 });
+    const quietPast = view("2026-08", "FIRST", { complete: true, loadCount: 0 });
+    assert.equal(selectSettlementView([quietLive, quietPast])?.half, "SECOND");
+    assert.equal(selectSettlementView([]), undefined);
   });
 });
 

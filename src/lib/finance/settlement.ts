@@ -147,6 +147,40 @@ export interface SettlementView {
   complete: boolean;
 }
 
+/**
+ * Which settlement the page opens on.
+ *
+ * In order: the one named in the URL, then the most recent FINISHED window
+ * that still has something to act on -- that is what the owner came to close.
+ *
+ * The last step matters more than it looks. A finished window with no loads
+ * and no close is nothing to act on, and defaulting to it means opening a
+ * page of zeroes while the money sits in the window that is still running:
+ * on the 31st the owner wants this half-month, not the empty first half they
+ * never ran a load in. So an empty finished window yields to the most recent
+ * window that actually has activity, and only then to the current one.
+ */
+export function selectSettlementView(
+  views: SettlementView[],
+  monthParam?: string,
+  halfParam?: string,
+): SettlementView | undefined {
+  const half = (halfParam ?? "").toUpperCase();
+  const explicit =
+    half === "FIRST" || half === "SECOND"
+      ? views.find((view) => view.month === monthParam && view.half === half)
+      : undefined;
+  const worthShowing = (view: SettlementView) =>
+    view.status === "CLOSED" || view.figures.loadCount > 0;
+
+  return (
+    explicit ??
+    views.find((view) => view.complete && worthShowing(view)) ??
+    views.find(worthShowing) ??
+    views[0]
+  );
+}
+
 export function calculateSettlement(
   month: string,
   half: SettlementHalf,

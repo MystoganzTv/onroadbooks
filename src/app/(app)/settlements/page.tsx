@@ -8,11 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { planAllows } from "@/lib/plans";
-import { calculateSettlement, settlementWindows } from "@/lib/finance/settlement";
+import {
+  calculateSettlement,
+  selectSettlementView,
+  settlementWindows,
+} from "@/lib/finance/settlement";
 import { formatMoneyCompact, formatPercent, formatRateValue } from "@/lib/formatters";
 import { param, type SearchParams } from "@/lib/period-params";
 import { currentMonth, shiftMonth, todayISO } from "@/lib/periods";
-import type { SettlementHalf } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Settlements" };
@@ -73,17 +76,7 @@ export default async function SettlementsPage({
     ),
   );
 
-  // Default to the most recent window that has actually finished; that is the
-  // one the owner is here to settle.
-  const selected =
-    views.find(
-      (view) =>
-        view.month === monthParam &&
-        (halfParam === "FIRST" || halfParam === "SECOND") &&
-        view.half === (halfParam as SettlementHalf),
-    ) ??
-    views.find((view) => view.complete) ??
-    views[0];
+  const selected = selectSettlementView(views, monthParam, halfParam);
 
   const history = views.filter(
     (view) => view.id !== selected?.id && (view.status === "CLOSED" || view.figures.loadCount > 0),
