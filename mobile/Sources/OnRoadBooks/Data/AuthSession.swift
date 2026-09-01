@@ -13,8 +13,15 @@ final class AuthSession: ObservableObject {
     @Published var isAuthenticating = false
     @Published var lastError: String?
 
-    private let keychainKey = "onroadbooks.mobile.token"
+    fileprivate static let tokenKey = "onroadbooks.mobile.token"
+    private let keychainKey = AuthSession.tokenKey
     private let emailDefaultsKey = "onroadbooks.mobile.email"
+
+    /// The token straight from the Keychain, with no `AuthSession` instance
+    /// needed. `WriteQueue` outlives any one screen and is built before the
+    /// session object exists, so it reads the store rather than an object —
+    /// and a token refreshed by a new login is picked up automatically.
+    static func storedToken() -> String? { KeychainHelper.read(key: tokenKey) }
 
     init() {
         token = KeychainHelper.read(key: keychainKey)

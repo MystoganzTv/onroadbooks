@@ -6,6 +6,11 @@ enum APIError: LocalizedError {
     case decodingFailed
     /// The server understood the request and refused it, in its own words.
     case refused(String)
+    /// The request never produced an answer. `TransportFailure.neverSent` says
+    /// whether the server could have acted on it anyway.
+    case transport(TransportFailure)
+    /// Sent, then the connection died. We do not know if it landed.
+    case unconfirmed
 
     var errorDescription: String? {
         switch self {
@@ -13,35 +18,37 @@ enum APIError: LocalizedError {
         case .requestFailed: return "No se pudo conectar. Revisa la señal e intenta otra vez."
         case .decodingFailed: return "El servidor respondió algo que la app no entiende."
         case .refused(let message): return message
+        case .transport(let failure): return failure.message
+        case .unconfirmed:
+            return "Se perdió la conexión al enviarlo y no sabemos si se guardó. Quedó en Pendientes para que lo revises."
         }
     }
 }
 
-/// Talks to the `/api/mobile/*` routes added to the OnRoad Books web app —
-/// see that repo's `src/lib/auth/mobile.ts` and project memory
-/// `onroadbooks_mobile.md` for why this is a plain HTTP client and not a
-/// database client. Every route is read-only for now.
+/// Talks to the `/api/mobile/*` routes in the OnRoad Books web app — a plain
+/// HTTP client, no database driver (see project memory `onroadbooks_mobile.md`).
+///
+/// Writes go through `WriteQueue` when there is no signal, which is most of a
+/// long haul. The rule those two share: a write is only ever sent again by
+/// itself when we know the server never saw it.
 final class APIRepository: LedgerRepository {
-    private let baseURL: URL
-    private let tokenProvider: () -> String?
+    private let client: APIClient
+    private let queue: WriteQueue?
+    private let isOnline: () -> Bool
 
-    init(baseURL: URL = APIConfig.baseURL, tokenProvider: @escaping () -> String?) {
-        self.baseURL = baseURL
-        self.tokenProvider = tokenProvider
-    }
-
-    private func authorized(_ path: String, method: String) -> URLRequest {
-        var request = URLRequest(url: baseURL.appendingPathComponent(path))
-        request.httpMethod = method
-        if let token = tokenProvider() {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        return request
+    init(
+        baseURL: URL = APIConfig.baseURL,
+        tokenProvider: @escaping () -> String?,
+        queue: WriteQueue? = nil,
+        isOnline: @escaping () -> Bool = { true }
+    ) {
+        client = APIClient(baseURL: baseURL, tokenProvider: tokenProvider)
+        self.queue = queue
+        self.isOnline = isOnline
     }
 
     private func get<T: Decodable>(_ path: String, as type: T.Type) async throws -> T {
-        let (data, response) = try await URLSession.shared.data(for: authorized(path, method: "GET"))
-        guard let http = response as? HTTPURLResponse else { throw APIError.requestFailed }
+        let (data, http) = try await client.send(client.request(path, method: "GET"))
         if http.statusCode == 401 { throw APIError.unauthorized }
         guard http.statusCode == 200 else { throw APIError.requestFailed }
         do {
@@ -51,33 +58,47 @@ final class APIRepository: LedgerRepository {
         }
     }
 
-    /// POST a body and return the created record's id.
+    /// POST a write, or hold it until there is signal.
     ///
-    /// A refusal from the ledger is not a network failure: 4xx responses carry
-    /// `{ error, fieldErrors }` written for the owner, so surface that sentence
-    /// instead of a generic "something went wrong". A 422 also names the field,
-    /// which is worth more than the summary line on a small screen.
-    private func post<Body: Encodable>(_ path: String, body: Body) async throws -> String {
-        var request = authorized(path, method: "POST")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(body)
+    /// `summary` and `amount` are what the owner will see in Pendientes, so
+    /// they are written for a person, not for a log.
+    private func post<Body: Encodable>(
+        _ path: String,
+        body: Body,
+        summary: String,
+        amount: Double? = nil
+    ) async throws -> String {
+        let encoded = try JSONEncoder().encode(body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse else { throw APIError.requestFailed }
-        if http.statusCode == 401 { throw APIError.unauthorized }
-
-        if http.statusCode == 200 || http.statusCode == 201 {
-            guard let created = try? JSONDecoder().decode(CreatedDTO.self, from: data) else {
-                throw APIError.decodingFailed
+        // Known offline: queue it without attempting. Nothing ambiguous ever
+        // enters the queue this way, which is the whole point of asking first.
+        if let queue, !isOnline() {
+            return await MainActor.run {
+                queue.enqueue(path: path, body: encoded, summary: summary, amount: amount)
             }
-            return created.id
         }
 
-        if let refusal = try? JSONDecoder().decode(RefusalDTO.self, from: data) {
-            let field = refusal.fieldErrors?.sorted(by: { $0.key < $1.key }).first
-            throw APIError.refused(field.map { "\($0.value)" } ?? refusal.error)
+        do {
+            let (data, http) = try await client.send(client.post(path, body: encoded))
+            return try APIClient.outcome(data, http)
+        } catch APIError.transport(let failure) {
+            guard let queue else { throw APIError.transport(failure) }
+            if failure.neverSent {
+                return await MainActor.run {
+                    queue.enqueue(path: path, body: encoded, summary: summary, amount: amount)
+                }
+            }
+            // Died in flight. It may be in the ledger already, so it waits for
+            // a person rather than retrying itself.
+            await MainActor.run {
+                queue.enqueue(
+                    path: path, body: encoded, summary: summary, amount: amount,
+                    state: .attention,
+                    note: "Se perdió la conexión al enviarlo. Puede que ya esté guardado — revísalo antes de reintentar."
+                )
+            }
+            throw APIError.unconfirmed
         }
-        throw APIError.requestFailed
     }
 
     func fetchDashboard() async throws -> DashboardSnapshot {
@@ -98,12 +119,14 @@ final class APIRepository: LedgerRepository {
 
     @discardableResult
     func createLoad(_ load: NewLoad) async throws -> String {
-        try await post("api/mobile/loads", body: NewLoadDTO(load))
+        try await post("api/mobile/loads", body: NewLoadDTO(load),
+                       summary: "Load \(load.originCity) → \(load.destinationCity)", amount: load.grossRate)
     }
 
     @discardableResult
     func createExpense(_ expense: NewExpense) async throws -> String {
-        try await post("api/mobile/expenses", body: NewExpenseDTO(expense))
+        try await post("api/mobile/expenses", body: NewExpenseDTO(expense),
+                       summary: "Gasto \(expense.detail)", amount: expense.amount)
     }
 
     func fetchFuel() async throws -> FuelLedger {
@@ -112,7 +135,8 @@ final class APIRepository: LedgerRepository {
 
     @discardableResult
     func createFuelStop(_ stop: NewFuelStop) async throws -> String {
-        try await post("api/mobile/fuel", body: NewFuelDTO(stop))
+        try await post("api/mobile/fuel", body: NewFuelDTO(stop),
+                       summary: "Combustible \(stop.location.isEmpty ? "sin lugar" : stop.location)", amount: stop.totalCost)
     }
 
     func fetchInvoices() async throws -> InvoiceLedger {
@@ -121,12 +145,14 @@ final class APIRepository: LedgerRepository {
 
     @discardableResult
     func issueInvoice(loadId: String, _ invoice: NewInvoice) async throws -> String {
-        try await post("api/mobile/invoices/\(loadId)", body: IssueInvoiceDTO(invoice))
+        try await post("api/mobile/invoices/\(loadId)", body: IssueInvoiceDTO(invoice),
+                       summary: "Factura \(invoice.invoiceNumber) a \(invoice.customer)")
     }
 
     @discardableResult
     func markInvoicePaid(loadId: String, on date: Date) async throws -> String {
-        try await post("api/mobile/invoices/\(loadId)", body: MarkPaidDTO(paidOn: ISODate.day(date)))
+        try await post("api/mobile/invoices/\(loadId)", body: MarkPaidDTO(paidOn: ISODate.day(date)),
+                       summary: "Marcar factura cobrada")
     }
 
     func fetchSettlements() async throws -> [SettlementPeriod] {
@@ -351,13 +377,6 @@ private struct IssueInvoiceDTO: Encodable {
 private struct MarkPaidDTO: Encodable {
     let intent = "paid"
     let paidOn: String
-}
-
-private struct CreatedDTO: Decodable { let id: String }
-
-private struct RefusalDTO: Decodable {
-    let error: String
-    let fieldErrors: [String: String]?
 }
 
 /// Exactly the fields `loadSchema` requires. The trip-cost fields the phone

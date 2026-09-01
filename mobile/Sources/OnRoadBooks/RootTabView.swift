@@ -8,13 +8,30 @@ import SwiftUI
 struct RootTabView: View {
     let repository: LedgerRepository
     let accountLabel: String
+    /// Both absent in demo mode, which has nothing to send and nowhere to send
+    /// it. Held as plain optionals rather than as @ObservedObject so demo mode
+    /// never builds a queue or starts a path monitor it will not use; the views
+    /// that observe them are children, and they take them non-optional.
+    let queue: WriteQueue?
+    let monitor: NetworkMonitor?
     /// nil only if neither a real session nor demo mode is active (shouldn't
     /// happen — AppRootView always passes one).
     var onSignOut: (() -> Void)?
 
-    init(repository: LedgerRepository, accountLabel: String, onSignOut: (() -> Void)? = nil) {
+    @State private var showingPending = false
+    @Environment(\.scenePhase) private var scenePhase
+
+    init(
+        repository: LedgerRepository,
+        accountLabel: String,
+        queue: WriteQueue? = nil,
+        monitor: NetworkMonitor? = nil,
+        onSignOut: (() -> Void)? = nil
+    ) {
         self.repository = repository
         self.accountLabel = accountLabel
+        self.queue = queue
+        self.monitor = monitor
         self.onSignOut = onSignOut
 
         let appearance = UITabBarAppearance()
@@ -51,5 +68,29 @@ struct RootTabView: View {
         }
         .tint(OBColor.primary)
         .preferredColorScheme(.dark)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if let queue, let monitor {
+                PendingBanner(queue: queue, monitor: monitor) { showingPending = true }
+            }
+        }
+        .sheet(isPresented: $showingPending) {
+            if let queue, let monitor {
+                NavigationStack {
+                    PendingWritesView(queue: queue, monitor: monitor)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Listo") { showingPending = false }
+                            }
+                        }
+                }
+                .preferredColorScheme(.dark)
+            }
+        }
+        .onChange(of: scenePhase) { phase in
+            // Coming back from a pocket is the most common moment for signal to
+            // have returned without the path monitor having fired while the app
+            // was suspended.
+            if phase == .active, let queue { Task { await queue.flush() } }
+        }
     }
 }

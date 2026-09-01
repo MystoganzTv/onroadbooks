@@ -61,6 +61,7 @@ The format is in [0000-template.md](0000-template.md); the practice itself is
 | [0019](0019-colour-carries-financial-meaning.md) | Green and red mean money; the landing page has its own palette | Accepted |
 | [0020](0020-tests-on-node-test-and-ci.md) | `node:test` with no framework, four CI gates | Accepted |
 | [0021](0021-exercise-the-postgres-store-in-ci.md) | Exercise the Postgres store in CI against a real database | Accepted |
+| [0024](0024-queue-writes-offline-never-retry-blind.md) | Hold writes when there is no signal, and never retry a blind one | Accepted |
 
 ## Writing a new one
 
