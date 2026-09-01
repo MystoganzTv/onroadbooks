@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
+    let repository: LedgerRepository
     let accountLabel: String
     var onSignOut: (() -> Void)?
 
@@ -16,7 +17,7 @@ struct SettingsView: View {
                     .padding(.vertical, 4)
                     .listRowBackground(OBColor.card)
                 NavigationLink {
-                    ComingSoonView(title: "Access & Roles", systemImage: "person.3.fill")
+                    TeamView(repository: repository)
                 } label: {
                     Label("Access & Roles", systemImage: "person.3.fill")
                         .foregroundStyle(OBColor.foreground)

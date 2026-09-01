@@ -22,6 +22,24 @@ enum ISODate {
 
     /// The day a picked date falls on, as the API expects to receive it.
     static func day(_ date: Date) -> String { formatter.string(from: date) }
+
+    private static let dateTimeFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    private static let dateTimeFormatterNoFraction: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+
+    /// A full `new Date().toISOString()` timestamp, like `joinedAt`/`invitedAt` --
+    /// different from `parse`, which only ever sees a bare `yyyy-MM-dd`.
+    static func parseDateTime(_ string: String?) -> Date? {
+        guard let string else { return nil }
+        return dateTimeFormatter.date(from: string) ?? dateTimeFormatterNoFraction.date(from: string)
+    }
 }
 
 // Domain models mirror the JSON shapes `/api/mobile/*` returns (which
@@ -488,4 +506,84 @@ struct DashboardSnapshot {
     let expenseBreakdown: [CategoryTotal]
     let recentLoads: [Load]
     let reserves: [ReserveAccount]
+}
+
+
+// MARK: - Access & Roles
+
+/// Mirrors `MemberRole` in `lib/types.ts`. VIEWER stays here only so a legacy
+/// row decodes without crashing -- it can no longer be assigned (see
+/// `AssignableRole`).
+enum MemberRole: String, Decodable {
+    case owner = "OWNER"
+    case admin = "ADMIN"
+    case bookkeeper = "BOOKKEEPER"
+    case dispatcher = "DISPATCHER"
+    case viewer = "VIEWER"
+
+    var label: String {
+        switch self {
+        case .owner: return "Dueño"
+        case .admin: return "Administrador"
+        case .bookkeeper: return "Contable"
+        case .dispatcher: return "Despachador"
+        case .viewer: return "Solo lectura (heredado)"
+        }
+    }
+
+    /// Same wording as `ROLE_DEFINITIONS` in `lib/roles.ts`, translated.
+    var roleDescription: String {
+        switch self {
+        case .owner: return "Todo, incluyendo facturación, miembros y la cuenta."
+        case .admin: return "Operación y configuración del negocio, sin facturación, accesos, reservas ni pago del dueño."
+        case .bookkeeper: return "Gastos, combustible, facturas, cobros, reportes y exportaciones."
+        case .dispatcher: return "Loads, conductores, combustible y mantenimiento del camión."
+        case .viewer: return "Acceso de solo lectura heredado. Ya no se puede asignar."
+        }
+    }
+}
+
+/// Mirrors `ASSIGNABLE_ROLES` in `lib/roles.ts` -- the only roles a new
+/// invite or an existing member's role change can pick.
+enum AssignableRole: String, CaseIterable, Identifiable {
+    case admin = "ADMIN"
+    case bookkeeper = "BOOKKEEPER"
+    case dispatcher = "DISPATCHER"
+
+    var id: String { rawValue }
+    var role: MemberRole {
+        switch self {
+        case .admin: return .admin
+        case .bookkeeper: return .bookkeeper
+        case .dispatcher: return .dispatcher
+        }
+    }
+    var label: String { role.label }
+    var roleDescription: String { role.roleDescription }
+}
+
+struct TeamMember: Identifiable, Hashable {
+    let id: String
+    let email: String
+    let name: String?
+    let role: MemberRole
+    let joinedAt: Date?
+    let invitedAt: Date?
+
+    static func == (lhs: TeamMember, rhs: TeamMember) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+
+    var displayName: String {
+        if let name, !name.trimmingCharacters(in: .whitespaces).isEmpty { return name }
+        return String(email.split(separator: "@").first ?? "Miembro")
+    }
+}
+
+/// What `/api/mobile/team` answers with: the roster, plus whether THIS
+/// account may change it. Access & Roles is a Fleet-plan capability on the
+/// web (`hasFleetAccess`) -- everyone on the plan can see who has access,
+/// only the owner can change it.
+struct TeamRoster {
+    let canManage: Bool
+    let members: [TeamMember]
 }

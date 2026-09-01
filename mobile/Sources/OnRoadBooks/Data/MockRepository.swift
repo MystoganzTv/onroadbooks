@@ -245,6 +245,46 @@ final class MockRepository: LedgerRepository {
         )
     }
 
+    /// Two members: the demo "owner" and a Bookkeeper, the exact shape of the
+    /// workflow this screen exists for -- inviting an outside accountant
+    /// without giving them the keys to billing or the account itself.
+    private var teamMembers: [TeamMember] = [
+        TeamMember(id: "owner", email: "propietario@ejemplo.com", name: nil,
+                   role: .owner, joinedAt: mockDate(2026, 1, 6), invitedAt: nil),
+        TeamMember(id: "member-1", email: "contadora@ejemplo.com", name: "Ana Ruiz",
+                   role: .bookkeeper, joinedAt: mockDate(2026, 7, 2), invitedAt: mockDate(2026, 7, 1)),
+    ]
+
+    func fetchTeam() async throws -> TeamRoster {
+        TeamRoster(canManage: true, members: teamMembers)
+    }
+
+    @discardableResult
+    func inviteTeamMember(email: String, name: String?, role: AssignableRole) async throws -> String {
+        if teamMembers.contains(where: { $0.email.caseInsensitiveCompare(email) == .orderedSame }) {
+            throw APIError.refused("Ese correo ya está en el equipo.")
+        }
+        let member = TeamMember(id: "member-\(teamMembers.count + 1)", email: email, name: name,
+                                 role: role.role, joinedAt: nil, invitedAt: Date())
+        teamMembers.append(member)
+        return member.id
+    }
+
+    @discardableResult
+    func updateTeamMemberRole(userId: String, role: AssignableRole) async throws -> String {
+        guard let index = teamMembers.firstIndex(where: { $0.id == userId }) else {
+            throw APIError.refused("Ese miembro ya no existe.")
+        }
+        let existing = teamMembers[index]
+        teamMembers[index] = TeamMember(id: existing.id, email: existing.email, name: existing.name,
+                                         role: role.role, joinedAt: existing.joinedAt, invitedAt: existing.invitedAt)
+        return existing.id
+    }
+
+    func removeTeamMember(userId: String) async throws {
+        teamMembers.removeAll { $0.id == userId }
+    }
+
     func fetchInvoices() async throws -> InvoiceLedger {
         let outstanding = invoices.filter { $0.isIssued && $0.status == .invoiced }
         let overdue = outstanding.filter(\.isOverdue)

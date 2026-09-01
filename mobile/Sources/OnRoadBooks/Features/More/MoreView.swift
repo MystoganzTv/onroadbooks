@@ -113,7 +113,7 @@ struct MoreView: View {
                         .listRowSeparatorTint(OBColor.border)
 
                         NavigationLink {
-                            SettingsView(accountLabel: accountLabel, onSignOut: onSignOut)
+                            SettingsView(repository: repository, accountLabel: accountLabel, onSignOut: onSignOut)
                         } label: {
                             Label("Settings", systemImage: "gearshape.fill")
                                 .foregroundStyle(OBColor.foreground)

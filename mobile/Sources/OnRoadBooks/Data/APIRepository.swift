@@ -118,6 +118,18 @@ final class APIRepository: LedgerRepository {
         }
     }
 
+    /// A write with no queue behind it at all -- used only where holding it
+    /// for later signal would be the wrong default (see `Repository.swift`).
+    /// Same transport and same `APIClient.outcome` decoding as `post`, minus
+    /// the offline branch.
+    private func directWrite<Body: Encodable>(_ path: String, method: String, body: Body) async throws -> String {
+        var request = client.request(path, method: method)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(body)
+        let (data, http) = try await client.send(request)
+        return try APIClient.outcome(data, http)
+    }
+
     func fetchDashboard() async throws -> DashboardSnapshot {
         try await get("api/mobile/dashboard", as: DashboardDTO.self).toDomain()
     }
@@ -191,6 +203,31 @@ final class APIRepository: LedgerRepository {
 
     func fetchReserves() async throws -> ReserveLedger {
         try await get("api/mobile/reserves", as: ReservesResponseDTO.self).toDomain()
+    }
+
+    func fetchTeam() async throws -> TeamRoster {
+        try await get("api/mobile/team", as: TeamResponseDTO.self).toDomain()
+    }
+
+    @discardableResult
+    func inviteTeamMember(email: String, name: String?, role: AssignableRole) async throws -> String {
+        try await directWrite(
+            "api/mobile/team", method: "POST",
+            body: InviteMemberDTO(email: email, name: name, role: role.rawValue)
+        )
+    }
+
+    @discardableResult
+    func updateTeamMemberRole(userId: String, role: AssignableRole) async throws -> String {
+        try await directWrite(
+            "api/mobile/team/\(userId)", method: "PATCH",
+            body: UpdateMemberRoleDTO(role: role.rawValue)
+        )
+    }
+
+    func removeTeamMember(userId: String) async throws {
+        let (data, http) = try await client.send(client.request("api/mobile/team/\(userId)", method: "DELETE"))
+        _ = try APIClient.outcome(data, http)
     }
 
     func fetchTruck() async throws -> TruckSummary {
@@ -703,6 +740,43 @@ private struct ReportTableResponseDTO: Decodable {
     }
     let periodLabel: String
     let table: Table
+}
+
+private struct TeamMemberDTO: Decodable {
+    let id: String
+    let email: String
+    let name: String?
+    let role: String
+    let joinedAt: String?
+    let invitedAt: String?
+
+    func toDomain() -> TeamMember {
+        TeamMember(
+            id: id, email: email, name: name,
+            role: MemberRole(rawValue: role) ?? .viewer,
+            joinedAt: ISODate.parseDateTime(joinedAt),
+            invitedAt: ISODate.parseDateTime(invitedAt)
+        )
+    }
+}
+
+private struct TeamResponseDTO: Decodable {
+    let canManage: Bool
+    let members: [TeamMemberDTO]
+
+    func toDomain() -> TeamRoster {
+        TeamRoster(canManage: canManage, members: members.map { $0.toDomain() })
+    }
+}
+
+private struct InviteMemberDTO: Encodable {
+    let email: String
+    let name: String?
+    let role: String
+}
+
+private struct UpdateMemberRoleDTO: Encodable {
+    let role: String
 }
 
 private struct ReservesResponseDTO: Decodable {

@@ -2,7 +2,7 @@ import "server-only";
 
 import { getAuthStore, getRepository } from "@/lib/db";
 import type { Repository } from "@/lib/db/repository";
-import { canWrite, trialState } from "@/lib/plans";
+import { canWrite, hasFleetAccess, trialState } from "@/lib/plans";
 import { permissionRefusal, roleCan, type Permission } from "@/lib/roles";
 import { todayISO } from "@/lib/periods";
 import { decodeSession, type SessionPayload } from "./session";
@@ -84,6 +84,38 @@ export async function requireMobileWrite(
   const role = session.role ?? "VIEWER";
   if (!roleCan(role, permission)) {
     return { ok: false, status: 403, error: permissionRefusal(role, permission) };
+  }
+
+  return { ok: true, session, repository };
+}
+
+export type MobileTeamGate =
+  | { ok: true; session: SessionPayload; repository: Repository }
+  | { ok: false; status: 401 | 403; error: string };
+
+/**
+ * Bearer-token analogue of `ownerWithFleet()` in `lib/actions/team.ts`, in
+ * the same order: a valid session, then the `manage_team` permission (owner
+ * only), then an active Fleet plan. Access & Roles rides the same Fleet gate
+ * on the phone as it does on the web -- a phone is not a second product.
+ */
+export async function requireMobileTeamManage(request: Request): Promise<MobileTeamGate> {
+  const session = await getMobileSession(request);
+  if (!session) return { ok: false, status: 401, error: "Unauthorized" };
+
+  const role = session.role ?? "VIEWER";
+  if (!roleCan(role, "manage_team")) {
+    return { ok: false, status: 403, error: permissionRefusal(role, "manage_team") };
+  }
+
+  const repository = getRepository(session.businessId);
+  const { subscription } = await repository.getDataset();
+  if (!hasFleetAccess(subscription)) {
+    return {
+      ok: false,
+      status: 403,
+      error: "Access & Roles is included with an active OnRoad Fleet plan.",
+    };
   }
 
   return { ok: true, session, repository };

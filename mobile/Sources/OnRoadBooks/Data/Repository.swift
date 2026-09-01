@@ -39,4 +39,15 @@ protocol LedgerRepository {
     /// receipt has nothing to attach itself to until the expense has an id from
     /// the ledger, so this needs signal by definition.
     @discardableResult func attachReceipt(expenseId: String, jpeg: Data) async throws -> String
+
+    /// Access & Roles: who has an app sign-in and what they can do with it.
+    /// A Fleet-plan capability on the web (`hasFleetAccess`), so it throws
+    /// `APIError.refused` on a Solo/Pro business exactly like Reserves does.
+    func fetchTeam() async throws -> TeamRoster
+    /// Never queued, unlike a load or a fill-up: an invite sends an email and
+    /// a removal revokes a sign-in immediately, and doing either later without
+    /// the owner watching is the wrong default. It fails now instead.
+    @discardableResult func inviteTeamMember(email: String, name: String?, role: AssignableRole) async throws -> String
+    @discardableResult func updateTeamMemberRole(userId: String, role: AssignableRole) async throws -> String
+    func removeTeamMember(userId: String) async throws
 }

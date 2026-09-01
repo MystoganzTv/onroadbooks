@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { roleCan } from "../roles";
-import { expenseSchema, fuelSchema, invoiceSchema, loadSchema } from "../schemas";
+import { expenseSchema, fuelSchema, invoiceSchema, loadSchema, memberInviteSchema, memberRoleSchema } from "../schemas";
 
 /**
  * The iOS app posts JSON straight at `/api/mobile/loads` and
@@ -120,6 +120,37 @@ describe("what the iOS app posts", () => {
     assert.equal(expenseSchema.safeParse({ ...expenseFromPhone, amount: 0 }).success, false);
     assert.equal(expenseSchema.safeParse({ ...expenseFromPhone, description: "" }).success, false);
     assert.equal(expenseSchema.safeParse({ ...expenseFromPhone, category: "NOT_A_CATEGORY" }).success, false);
+  });
+});
+
+describe("what the iOS app posts to /api/mobile/team", () => {
+  /** From `InviteMemberDTO` / `UpdateMemberRoleDTO` in `APIRepository.swift`. */
+  const inviteFromPhone = { email: "contadora@example.com", name: "Ana Ruiz", role: "BOOKKEEPER" };
+
+  it("is accepted by the same schema the web invite form uses", () => {
+    assert.equal(memberInviteSchema.safeParse(inviteFromPhone).success, true);
+    assert.equal(memberInviteSchema.safeParse({ ...inviteFromPhone, name: undefined }).success, true);
+    assert.equal(
+      memberRoleSchema.safeParse({ userId: "user_1", role: "DISPATCHER" }).success,
+      true,
+    );
+  });
+
+  it("refuses OWNER and the legacy VIEWER as an assignable role -- ASSIGNABLE_ROLES has neither", () => {
+    assert.equal(memberInviteSchema.safeParse({ ...inviteFromPhone, role: "OWNER" }).success, false);
+    assert.equal(memberInviteSchema.safeParse({ ...inviteFromPhone, role: "VIEWER" }).success, false);
+    assert.equal(memberRoleSchema.safeParse({ userId: "user_1", role: "OWNER" }).success, false);
+  });
+
+  it("refuses a bad email the same way the web form would", () => {
+    assert.equal(memberInviteSchema.safeParse({ ...inviteFromPhone, email: "not-an-email" }).success, false);
+  });
+
+  it("keeps everyone but the owner out of Access & Roles", () => {
+    assert.equal(roleCan("OWNER", "manage_team"), true);
+    assert.equal(roleCan("ADMIN", "manage_team"), false);
+    assert.equal(roleCan("BOOKKEEPER", "manage_team"), false);
+    assert.equal(roleCan("DISPATCHER", "manage_team"), false);
   });
 });
 
