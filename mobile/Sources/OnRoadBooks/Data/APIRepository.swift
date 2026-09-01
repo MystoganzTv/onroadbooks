@@ -200,6 +200,16 @@ final class APIRepository: LedgerRepository {
         )
     }
 
+    func downloadYearEndPacket(year: Int) async throws -> URL {
+        var request = client.request("api/mobile/year-end", method: "GET")
+        if let url = request.url,
+           var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            components.queryItems = [URLQueryItem(name: "year", value: String(year))]
+            request.url = components.url
+        }
+        return try await download(request, fallbackName: "onroad-books-\(year).xlsx")
+    }
+
     func downloadReport(_ reportId: String, format: String) async throws -> URL {
         var request = client.request("api/mobile/reports/\(reportId)", method: "GET")
         if let url = request.url,
@@ -208,20 +218,28 @@ final class APIRepository: LedgerRepository {
             request.url = components.url
         }
 
+        return try await download(request, fallbackName: "\(reportId).\(format)")
+    }
+
+    /// Saves a response body to a temporary file for the share sheet, keeping
+    /// the name the server chose — it already spells out the business, the
+    /// period and the truck, which is what the accountant will see.
+    private func download(_ request: URLRequest, fallbackName: String) async throws -> URL {
         let (data, http) = try await client.send(request)
         if http.statusCode == 401 { throw APIError.unauthorized }
+        if http.statusCode == 403,
+           let refusal = try? JSONDecoder().decode(RefusalResponse.self, from: data) {
+            throw APIError.refused(refusal.error)
+        }
         guard http.statusCode == 200 else { throw APIError.requestFailed }
 
-        // The server already named the file for the accountant, period and
-        // truck included. Keep that name rather than inventing a worse one.
-        let fallback = "\(reportId).\(format)"
         let name = http.value(forHTTPHeaderField: "Content-Disposition")
             .flatMap { header -> String? in
                 guard let range = header.range(of: "filename=\"") else { return nil }
                 let rest = header[range.upperBound...]
                 guard let end = rest.firstIndex(of: "\"") else { return nil }
                 return String(rest[..<end])
-            } ?? fallback
+            } ?? fallbackName
 
         let destination = FileManager.default.temporaryDirectory.appendingPathComponent(name)
         try? FileManager.default.removeItem(at: destination)

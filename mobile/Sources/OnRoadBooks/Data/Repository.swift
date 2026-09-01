@@ -18,6 +18,8 @@ protocol LedgerRepository {
     /// Renders the report as a file and returns a local URL to hand to the
     /// share sheet. A report on a phone is usually not read — it is sent.
     func downloadReport(_ reportId: String, format: String) async throws -> URL
+    /// The whole year in one workbook, for the accountant.
+    func downloadYearEndPacket(year: Int) async throws -> URL
 
     /// Both return the new record's id. They throw `APIError.refused` carrying
     /// the server's own sentence when the ledger says no -- an expired trial, a

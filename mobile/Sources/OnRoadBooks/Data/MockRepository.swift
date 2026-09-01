@@ -141,6 +141,10 @@ final class MockRepository: LedgerRepository {
         throw APIError.refused("Los exports necesitan una cuenta real. Entra con tu cuenta para descargarlos.")
     }
 
+    func downloadYearEndPacket(year: Int) async throws -> URL {
+        throw APIError.refused("El paquete de fin de año necesita una cuenta real.")
+    }
+
     func fetchReserves() async throws -> ReserveLedger {
         // The same three buckets and the same arithmetic as fetchDashboard:
         // tax 20% of profit, maintenance 5% of revenue, emergency 2% of revenue.

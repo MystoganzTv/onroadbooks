@@ -59,6 +59,23 @@ delivery has a three-second timeout and cannot replace the original error.
 Invalid signatures are logged as warnings but are not alerted to avoid turning
 internet noise into an alert storm.
 
+## The year-end packet
+
+`GET /api/export/year-end?year=2026` (browser session) and
+`GET /api/mobile/year-end?year=2026` (bearer token) return one XLSX: a Summary
+sheet plus every report for the calendar year, built by `buildYearEndPacket`.
+
+It is one file on purpose — "send this to my accountant" should be one
+attachment — and it is assembled from the six report tables that already exist,
+so it is a new arrangement of the same numbers rather than a second opinion
+about the year. `year-end.test.ts` asserts the Summary agrees with
+`summarizePeriod` to the cent; if that ever breaks, the accountant is reading
+figures the app does not show.
+
+The packet computes no tax liability and says so on the cover. That line is
+ADR-0022's, and it is permanent: tax varies by state and by entity, and it is
+advice. The accountant files; we hand them the file.
+
 ## Database backups
 
 Supabase's free plan includes no daily backup and no point-in-time recovery, so

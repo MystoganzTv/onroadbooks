@@ -22,14 +22,42 @@ function numberFormat(column: string): string {
   return '#,##0.00';
 }
 
-/** Native Excel export with frozen headers, filters, print setup, and typed numeric cells. */
-export async function toXlsx(table: ReportTable): Promise<Uint8Array> {
+function newWorkbook(): ExcelJS.Workbook {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Onroad Books";
   workbook.created = new Date();
   workbook.modified = new Date();
   workbook.calcProperties.fullCalcOnLoad = true;
-  const sheet = workbook.addWorksheet("Report", {
+  return workbook;
+}
+
+/** Native Excel export with frozen headers, filters, print setup, and typed numeric cells. */
+export async function toXlsx(table: ReportTable): Promise<Uint8Array> {
+  const workbook = newWorkbook();
+  writeSheet(workbook, table, "Report");
+  const buffer = await workbook.xlsx.writeBuffer();
+  return new Uint8Array(buffer);
+}
+
+/**
+ * Several reports in one file — the year-end packet an accountant receives as
+ * a single attachment. Each sheet is written by exactly the same code a single
+ * export uses, so nothing about the formatting drifts between the two.
+ */
+export async function toXlsxWorkbook(
+  tables: ReportTable[],
+  sheetNames: string[],
+): Promise<Uint8Array> {
+  const workbook = newWorkbook();
+  tables.forEach((table, index) => {
+    writeSheet(workbook, table, sheetNames[index] ?? `Sheet ${index + 1}`);
+  });
+  const buffer = await workbook.xlsx.writeBuffer();
+  return new Uint8Array(buffer);
+}
+
+function writeSheet(workbook: ExcelJS.Workbook, table: ReportTable, name: string): void {
+  const sheet = workbook.addWorksheet(name, {
     views: [{ state: "frozen", ySplit: 3 }],
     pageSetup: { orientation: table.columns.length > 7 ? "landscape" : "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.25, right: 0.25, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 } },
   });
@@ -73,6 +101,4 @@ export async function toXlsx(table: ReportTable): Promise<Uint8Array> {
     });
   }
   sheet.headerFooter.oddFooter = "Onroad Books  |  &P of &N";
-  const buffer = await workbook.xlsx.writeBuffer();
-  return new Uint8Array(buffer);
 }

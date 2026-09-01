@@ -8,6 +8,11 @@ struct ReportsView: View {
 
     @State private var reports: [ReportSummary] = []
     @State private var isLoading = true
+    @State private var isBuildingPacket = false
+    @State private var packetFailure: String?
+    @State private var share: SharePayload?
+
+    private var year: Int { Calendar.current.component(.year, from: Date()) }
 
     var body: some View {
         Group {
@@ -16,6 +21,38 @@ struct ReportsView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
+                    Section {
+                        Button {
+                            buildPacket()
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Paquete de fin de año · \(String(year))")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(OBColor.foreground)
+                                    Text("Todo el año en un archivo, para el contador.")
+                                        .font(.caption)
+                                        .foregroundStyle(OBColor.mutedForeground)
+                                }
+                                Spacer()
+                                if isBuildingPacket {
+                                    ProgressView().tint(OBColor.primary)
+                                } else {
+                                    Image(systemName: "square.and.arrow.up")
+                                        .foregroundStyle(OBColor.primary)
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isBuildingPacket)
+                        .listRowBackground(OBColor.card)
+                    } footer: {
+                        Text(packetFailure ?? "Resumen del año más los seis reportes, en una sola hoja de cálculo. No calcula impuestos: tu contador declara, nosotros entregamos el archivo.")
+                            .font(.caption)
+                            .foregroundStyle(packetFailure == nil ? OBColor.mutedForeground : OBColor.neg)
+                    }
+
                     ForEach(reports) { report in
                         NavigationLink {
                             ReportTableView(repository: repository, report: report)
@@ -41,9 +78,26 @@ struct ReportsView: View {
         .background(OBColor.background)
         .navigationTitle("Reports")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $share) { payload in
+            ShareSheet(url: payload.url)
+        }
         .task {
             reports = (try? await repository.fetchReports()) ?? []
             isLoading = false
+        }
+    }
+
+    private func buildPacket() {
+        isBuildingPacket = true
+        packetFailure = nil
+        Task {
+            do {
+                share = SharePayload(url: try await repository.downloadYearEndPacket(year: year))
+            } catch {
+                packetFailure = (error as? LocalizedError)?.errorDescription
+                    ?? "No se pudo generar el paquete."
+            }
+            isBuildingPacket = false
         }
     }
 }
@@ -63,11 +117,6 @@ struct ReportTableView: View {
     @State private var isExporting = false
     @State private var failure: String?
     @State private var share: SharePayload?
-
-    struct SharePayload: Identifiable {
-        let id = UUID()
-        let url: URL
-    }
 
     var body: some View {
         Group {
@@ -193,9 +242,14 @@ struct ReportTableView: View {
     }
 }
 
+struct SharePayload: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
 /// The system share sheet, so a report can go straight to the accountant from
 /// wherever the truck is parked.
-private struct ShareSheet: UIViewControllerRepresentable {
+struct ShareSheet: UIViewControllerRepresentable {
     let url: URL
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
