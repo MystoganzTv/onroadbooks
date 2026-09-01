@@ -19,6 +19,8 @@ export type ExpenseCategoryId =
   | "TOLLS"
   | "INSURANCE"
   | "TRUCK_PAYMENT"
+  | "INTEREST_EXPENSE"
+  | "PRINCIPAL_PAYMENT"
   | "MAINTENANCE"
   | "REPAIRS"
   | "PARKING"
@@ -66,7 +68,7 @@ export interface FinancialSettings {
   businessId: string;
   /** Percent of operating profit reserved for taxes, e.g. 20 = 20%. */
   taxReservePct: number;
-  /** Percent of gross revenue reserved for maintenance, e.g. 5 = 5%. */
+  /** Percent of Booked Revenue reserved for maintenance, e.g. 5 = 5%. */
   maintenanceReservePct: number;
   /** Per-category fixed/variable classification overrides. */
   categoryBehavior: Record<string, ExpenseBehavior>;
@@ -383,8 +385,26 @@ export interface LoadMetrics {
 export type LoadWithMetrics = Load & { metrics: LoadMetrics };
 
 export interface PeriodSummary {
+  calculationVersion: number;
+  /** Performance-basis revenue, independent of payment status. */
+  bookedRevenue: number;
+  /** Cash-basis revenue, assigned by the recorded payment date. */
+  collectedRevenue: number;
+  /** Booked revenue in this period that remains unpaid. */
+  accountsReceivable: number;
+  /** Paid loads that have no payment date and therefore are not guessed into cash. */
+  unallocatedCollectedRevenue: number;
+  interestExpense: number;
+  principalPayment: number;
+  /** Historical truck-payment rows whose interest/principal split is unknown. */
+  unallocatedDebtService: number;
+  debtService: number;
+  operatingProfit: number;
+  cashAfterDebtService: number;
+  /** @deprecated Use bookedRevenue. */
   grossRevenue: number;
   operatingExpenses: number;
+  /** @deprecated Use operatingProfit. Kept as a read-compatible alias. */
   netProfit: number;
   netMargin: number;
   totalMiles: number;
@@ -395,7 +415,9 @@ export interface PeriodSummary {
   costPerMile: number;
   profitPerMile: number;
   loadCount: number;
+  /** @deprecated Use collectedRevenue. */
   paidRevenue: number;
+  /** @deprecated Use accountsReceivable. */
   outstandingRevenue: number;
   fixedExpenses: number;
   variableExpenses: number;
@@ -542,6 +564,17 @@ export type SettlementStatus = "OPEN" | "CLOSED";
  * changing a reserve percentage next month must not rewrite it.
  */
 export interface SettlementSnapshot {
+  /** Missing on historical snapshots, which are read as calculation version 1. */
+  calculationVersion?: number;
+  bookedRevenue?: number;
+  collectedRevenue?: number;
+  accountsReceivable?: number;
+  unallocatedCollectedRevenue?: number;
+  interestExpense?: number;
+  principalPayment?: number;
+  unallocatedDebtService?: number;
+  debtService?: number;
+  cashAfterDebtService?: number;
   grossRevenue: number;
   operatingExpenses: number;
   operatingProfit: number;

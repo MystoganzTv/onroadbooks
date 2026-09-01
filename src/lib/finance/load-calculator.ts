@@ -15,14 +15,16 @@
  *   Dispatch         = percent of gross, or a flat amount
  *   Factoring        = percent of gross, or a flat amount
  *   Other            = entered
- *   Overhead         = total miles x overhead cost per mile
+ *   Allocated ops    = total miles x normalized operating cost per mile
+ *   Debt burden      = total miles x debt-service cost per mile (cash only)
  *
  * `overheadCostPerMile` is the truck's own historical cost per mile with
  * fuel, tolls, dispatch and factoring removed -- those four are entered
  * explicitly above, and charging them twice is the classic way a load
- * calculator lies to you. What is left is the truck note, insurance,
- * parking, permits, maintenance, repairs and the rest of the overhead every
- * mile has to carry.
+ * calculator lies to you. What is left is insurance, parking, permits,
+ * maintenance, repairs and the rest of the operating overhead every mile has
+ * to carry. Truck-note Debt Service is excluded from operating overhead and
+ * displayed in its own cash-burden layer.
  *
  * Deadhead is never optional. A rate is only as good as the miles it took to
  * earn it, and the empty ones are miles.
@@ -47,6 +49,8 @@ export interface LoadEstimateInput {
   otherCost: number;
   /** Historical overhead per mile. See `overheadCostPerMile`. */
   overheadPerMile: number;
+  /** Historical debt-service cash burden; never used by the load rating. */
+  debtServicePerMile?: number;
 }
 
 export interface CostLineItem {
@@ -68,8 +72,18 @@ export interface LoadEstimate {
   factoring: number;
   otherCost: number;
   overhead: number;
+  debtService: number;
   /** Fuel + tolls + dispatch + factoring + other. What the trip itself costs. */
   tripCost: number;
+  directTripCosts: number;
+  contributionProfit: number;
+  contributionProfitPerMile: number;
+  contributionMargin: number;
+  allocatedOperatingCosts: number;
+  fullyLoadedOperatingProfit: number;
+  fullyLoadedOperatingProfitPerMile: number;
+  fullyLoadedOperatingMargin: number;
+  cashAfterDebtService: number;
   /** Trip cost plus the overhead those miles have to carry. */
   totalCost: number;
   profit: number;
@@ -77,6 +91,8 @@ export interface LoadEstimate {
   profitMargin: number;
   costPerMile: number;
   breakEvenRate: number;
+  operatingBreakEven: number;
+  cashBreakEven: number;
   lines: CostLineItem[];
   score: LoadScore;
   /** False when miles or MPG are missing: nothing below can be trusted yet. */
@@ -105,12 +121,17 @@ export function calculateLoadEstimate(
   const factoring = feeAmount(input.factoringMode, input.factoringValue, grossRate);
   const otherCost = roundMoney(Math.max(0, input.otherCost));
   const overhead = roundMoney(totalMiles * Math.max(0, input.overheadPerMile));
+  const debtService = roundMoney(totalMiles * Math.max(0, input.debtServicePerMile ?? 0));
 
   const tripCost = roundMoney(fuelCost + tolls + dispatch + factoring + otherCost);
   const totalCost = roundMoney(tripCost + overhead);
-  const profit = roundMoney(grossRate - totalCost);
-  const profitPerMile = div(profit, totalMiles);
-  const profitMargin = div(profit, grossRate) * 100;
+  const contributionProfit = roundMoney(grossRate - tripCost);
+  const contributionProfitPerMile = div(contributionProfit, totalMiles);
+  const contributionMargin = div(contributionProfit, grossRate) * 100;
+  const fullyLoadedOperatingProfit = roundMoney(contributionProfit - overhead);
+  const fullyLoadedOperatingProfitPerMile = div(fullyLoadedOperatingProfit, totalMiles);
+  const fullyLoadedOperatingMargin = div(fullyLoadedOperatingProfit, grossRate) * 100;
+  const cashAfterDebtService = roundMoney(fullyLoadedOperatingProfit - debtService);
   const deadheadPct = div(deadheadMiles, totalMiles) * 100;
 
   const lines: CostLineItem[] = [
@@ -137,13 +158,7 @@ export function calculateLoadEstimate(
       note: input.factoringMode === "PCT" ? `${input.factoringValue}% of gross` : "Flat fee",
     },
     { key: "other", label: "Other costs", amount: otherCost },
-    {
-      key: "overhead",
-      label: "Truck operating cost",
-      amount: overhead,
-      note: `${totalMiles.toLocaleString()} mi at $${input.overheadPerMile.toFixed(2)}/mi overhead`,
-    },
-  ].filter((line) => line.amount > 0 || line.key === "fuel" || line.key === "overhead");
+  ].filter((line) => line.amount > 0 || line.key === "fuel");
 
   return {
     totalMiles,
@@ -157,16 +172,32 @@ export function calculateLoadEstimate(
     factoring,
     otherCost,
     overhead,
+    debtService,
     tripCost,
+    directTripCosts: tripCost,
+    contributionProfit,
+    contributionProfitPerMile,
+    contributionMargin,
+    allocatedOperatingCosts: overhead,
+    fullyLoadedOperatingProfit,
+    fullyLoadedOperatingProfitPerMile,
+    fullyLoadedOperatingMargin,
+    cashAfterDebtService,
     totalCost,
-    profit,
-    profitPerMile,
-    profitMargin,
+    profit: fullyLoadedOperatingProfit,
+    profitPerMile: fullyLoadedOperatingProfitPerMile,
+    profitMargin: fullyLoadedOperatingMargin,
     costPerMile: div(totalCost, totalMiles),
     breakEvenRate: totalCost,
+    operatingBreakEven: totalCost,
+    cashBreakEven: roundMoney(totalCost + debtService),
     lines,
     score: calculateLoadScore(
-      { profitPerMile, profitMargin, deadheadPct },
+      {
+        profitPerMile: contributionProfitPerMile,
+        profitMargin: contributionMargin,
+        deadheadPct,
+      },
       thresholds,
       deadheadWarnPct,
     ),
@@ -188,12 +219,13 @@ export interface TargetRateInput {
   factoringValue: number;
   otherCost: number;
   overheadPerMile: number;
+  debtServicePerMile?: number;
   /** What the owner wants to clear, per total mile. */
   targetProfitPerMile: number;
 }
 
 export interface RateTier {
-  key: "breakeven" | "minimum" | "good" | "great" | "target";
+  key: "operatingBreakeven" | "cashBreakeven" | "minimum" | "good" | "great" | "target";
   label: string;
   profitPerMile: number;
   rate: number;
@@ -208,6 +240,7 @@ export interface TargetRate {
   tolls: number;
   otherCost: number;
   overhead: number;
+  debtService: number;
   /** Costs that do not move with the rate. Dispatch and factoring do. */
   fixedTripCost: number;
   costPerMile: number;
@@ -248,6 +281,7 @@ export function calculateTargetRate(
   const tolls = roundMoney(Math.max(0, input.tolls));
   const otherCost = roundMoney(Math.max(0, input.otherCost));
   const overhead = roundMoney(totalMiles * Math.max(0, input.overheadPerMile));
+  const debtService = roundMoney(totalMiles * Math.max(0, input.debtServicePerMile ?? 0));
 
   const flatFees = roundMoney(
     (input.dispatchMode === "AMOUNT" ? Math.max(0, input.dispatchValue) : 0) +
@@ -257,43 +291,62 @@ export function calculateTargetRate(
     (input.dispatchMode === "PCT" ? Math.max(0, input.dispatchValue) : 0) / 100 +
     (input.factoringMode === "PCT" ? Math.max(0, input.factoringValue) : 0) / 100;
 
-  const fixedTripCost = roundMoney(fuelCost + tolls + otherCost + overhead + flatFees);
+  const directFixedCost = roundMoney(fuelCost + tolls + otherCost + flatFees);
+  const fixedTripCost = roundMoney(directFixedCost + overhead);
   const impossible = grossFeeRate >= 1;
 
-  const rateFor = (profitPerMile: number): number => {
+  const rateFor = (costAndProfit: number): number => {
     if (impossible || totalMiles <= 0) return 0;
-    return roundMoney((fixedTripCost + profitPerMile * totalMiles) / (1 - grossFeeRate));
+    return roundMoney(costAndProfit / (1 - grossFeeRate));
   };
 
-  const tierDefs: { key: RateTier["key"]; label: string; ppm: number; description: string }[] = [
+  const tierDefs: {
+    key: RateTier["key"];
+    label: string;
+    ppm: number;
+    numerator: number;
+    description: string;
+  }[] = [
     {
-      key: "breakeven",
-      label: "Break even",
+      key: "operatingBreakeven",
+      label: "Operating break-even",
       ppm: 0,
-      description: "Covers fuel, tolls, fees and the truck's overhead. Pays you nothing.",
+      numerator: directFixedCost + overhead,
+      description: "Covers direct trip costs and allocated operating costs. Excludes debt service.",
+    },
+    {
+      key: "cashBreakeven",
+      label: "Cash break-even",
+      ppm: 0,
+      numerator: directFixedCost + overhead + debtService,
+      description: "Covers operating break-even plus the separately allocated debt-service burden.",
     },
     {
       key: "minimum",
       label: "Minimum acceptable",
       ppm: thresholds.marginal,
-      description: `Clears $${thresholds.marginal.toFixed(2)}/mi -- your MARGINAL floor. Take it if the reload is worth it.`,
+      numerator: directFixedCost + thresholds.marginal * totalMiles,
+      description: `Contributes $${thresholds.marginal.toFixed(2)}/mi after direct trip costs -- your MARGINAL floor.`,
     },
     {
       key: "good",
       label: "Good rate",
       ppm: thresholds.good,
-      description: `Clears $${thresholds.good.toFixed(2)}/mi -- rates as a GOOD load.`,
+      numerator: directFixedCost + thresholds.good * totalMiles,
+      description: `Contributes $${thresholds.good.toFixed(2)}/mi after direct trip costs -- rates as GOOD.`,
     },
     {
       key: "great",
       label: "Great rate",
       ppm: thresholds.great,
-      description: `Clears $${thresholds.great.toFixed(2)}/mi -- rates as a GREAT load.`,
+      numerator: directFixedCost + thresholds.great * totalMiles,
+      description: `Contributes $${thresholds.great.toFixed(2)}/mi after direct trip costs -- rates as GREAT.`,
     },
     {
       key: "target",
       label: "Your target",
       ppm: input.targetProfitPerMile,
+      numerator: directFixedCost + overhead + input.targetProfitPerMile * totalMiles,
       description: `Clears the $${input.targetProfitPerMile.toFixed(2)}/mi you asked for.`,
     },
   ];
@@ -305,12 +358,13 @@ export function calculateTargetRate(
     tolls,
     otherCost,
     overhead,
+    debtService,
     fixedTripCost,
     costPerMile: div(fixedTripCost, totalMiles),
     grossFeeRate,
     flatFees,
     tiers: tierDefs.map((tier) => {
-      const rate = rateFor(tier.ppm);
+      const rate = rateFor(tier.numerator);
       return {
         key: tier.key,
         label: tier.label,

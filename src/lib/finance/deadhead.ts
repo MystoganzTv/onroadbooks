@@ -5,7 +5,7 @@
  * Empty miles are a first-class business metric, not a footnote. They cost
  * money in two different ways and the app reports both:
  *
- *   COST         deadhead miles x true cost per mile
+ *   COST         deadhead miles x Actual Cost Per Mile
  *                What running those miles actually took out of the business.
  *   OPPORTUNITY  deadhead miles x revenue per loaded mile
  *                What those miles would have earned if they had been loaded.

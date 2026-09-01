@@ -10,7 +10,7 @@ export interface DayBucket {
 }
 
 /**
- * Revenue/expense buckets across the selected period.
+ * Booked-revenue/operating-expense buckets across the selected period.
  *
  * Granularity follows the span rather than the period name: up to about two
  * months renders one bar per day, anything longer switches to months so a
@@ -26,9 +26,9 @@ export function periodBuckets(loads: Load[], expenses: Expense[], period: Period
       const summary = summarizePeriod(loads, expenses, clamped);
       return {
         label: month.shortLabel,
-        revenue: summary.grossRevenue,
+        revenue: summary.bookedRevenue,
         expenses: summary.operatingExpenses,
-        profit: summary.netProfit,
+        profit: summary.operatingProfit,
       };
     });
   }
@@ -41,9 +41,9 @@ export function periodBuckets(loads: Load[], expenses: Expense[], period: Period
     const summary = summarizePeriod(loads, expenses, range);
     return {
       label: multiMonth || days.length <= 10 ? shortDay(day) : day.slice(-2),
-      revenue: summary.grossRevenue,
+      revenue: summary.bookedRevenue,
       expenses: summary.operatingExpenses,
-      profit: summary.netProfit,
+      profit: summary.operatingProfit,
     };
   });
 }

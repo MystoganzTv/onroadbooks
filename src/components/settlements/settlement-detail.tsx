@@ -14,6 +14,7 @@ import {
   formatRateValue,
 } from "@/lib/formatters";
 import type { SettlementView } from "@/lib/finance/settlement";
+import { financialModelVersionOf } from "@/lib/finance/terminology";
 import { cn } from "@/lib/utils";
 
 /**
@@ -27,6 +28,8 @@ import { cn } from "@/lib/utils";
 export function SettlementDetail({ view }: { view: SettlementView }) {
   const figures = view.figures;
   const closed = view.status === "CLOSED";
+  const calculationVersion = financialModelVersionOf(figures);
+  const currentModel = calculationVersion >= 2;
 
   return (
     <Card>
@@ -52,6 +55,9 @@ export function SettlementDetail({ view }: { view: SettlementView }) {
             {closed ? <CircleCheck className="size-3" /> : <LockOpen className="size-3" />}
             {closed ? "Closed" : "Open"}
           </span>
+          <span className="rounded border border-border px-1.5 py-1 text-2xs text-muted-foreground">
+            Model v{calculationVersion}
+          </span>
           {closed ? (
             <ReopenSettlementButton id={view.id} />
           ) : (
@@ -67,24 +73,71 @@ export function SettlementDetail({ view }: { view: SettlementView }) {
 
       <CardContent className="p-0">
         <dl className="divide-y divide-border/70">
-          <Row label="Revenue" value={formatMoney(figures.grossRevenue)} />
           <Row
-            label="Operating expenses"
+            label={currentModel ? "Booked Revenue" : "Gross Revenue (legacy)"}
+            value={formatMoney(figures.bookedRevenue ?? figures.grossRevenue)}
+          />
+          {currentModel ? (
+            <>
+              <Row label="Collected Revenue" value={formatMoney(figures.collectedRevenue ?? 0)} />
+              {(figures.unallocatedCollectedRevenue ?? 0) > 0 ? (
+                <Row
+                  label="Paid Revenue without Payment Date"
+                  hint="preserved; not assigned to a cash period"
+                  value={formatMoney(figures.unallocatedCollectedRevenue ?? 0)}
+                  tone="warn"
+                />
+              ) : null}
+              <Row
+                label="Accounts Receivable"
+                hint="not available cash"
+                value={formatMoney(figures.accountsReceivable ?? 0)}
+                tone={(figures.accountsReceivable ?? 0) > 0 ? "warn" : undefined}
+              />
+            </>
+          ) : null}
+          <Row
+            label="Operating Expenses"
             value={`-${formatMoney(figures.operatingExpenses)}`}
             tone="neg"
           />
           <Row
-            label="Operating profit"
+            label="Operating Profit"
             value={formatMoney(figures.operatingProfit)}
             strong
             className="bg-surface-sunken/60"
           />
+          {currentModel ? (
+            <>
+              <Row label="Interest Expense" value={formatMoney(figures.interestExpense ?? 0)} />
+              <Row label="Principal Payment" value={formatMoney(figures.principalPayment ?? 0)} />
+              <Row
+                label="Unallocated Debt Service"
+                value={formatMoney(figures.unallocatedDebtService ?? 0)}
+              />
+              <Row
+                label="Debt Service"
+                value={`-${formatMoney(figures.debtService ?? 0)}`}
+                tone="neg"
+              />
+              <Row
+                label="Cash After Debt Service"
+                value={formatMoney(figures.cashAfterDebtService ?? 0)}
+                strong
+                className="bg-surface-sunken/60"
+              />
+            </>
+          ) : null}
           {figures.reserves.map((reserve) => (
             <Row
               key={reserve.accountId}
               label={reserve.name}
               hint={`${reserve.pct}% of ${
-                reserve.basis === "OPERATING_PROFIT" ? "operating profit" : "gross revenue"
+                reserve.basis === "OPERATING_PROFIT"
+                  ? "Operating Profit"
+                  : currentModel
+                    ? "Booked Revenue"
+                    : "Gross Revenue"
               }`}
               value={`-${formatMoney(reserve.amount)}`}
               tone="warn"
@@ -101,7 +154,7 @@ export function SettlementDetail({ view }: { view: SettlementView }) {
           )}
         >
           <span className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            Safe to pay yourself
+            Safe to Pay Yourself
           </span>
           <span
             className={cn(
@@ -118,12 +171,12 @@ export function SettlementDetail({ view }: { view: SettlementView }) {
           <Figure label="Total miles" value={formatNumber(figures.totalMiles)} />
           <Figure label="Deadhead" value={formatPercent(figures.deadheadPct)} />
           <Figure
-            label="True cost / mile"
+            label={currentModel ? "Actual cost / mile" : "True cost / mile (legacy)"}
             value={figures.totalMiles > 0 ? formatRateValue(figures.trueCostPerMile) : "—"}
           />
-          <Figure label="Revenue / mile" value={formatRateValue(figures.revenuePerMile)} />
+          <Figure label="Booked Revenue / mile" value={formatRateValue(figures.revenuePerMile)} />
           <Figure
-            label="Profit / mile"
+            label={currentModel ? "Operating Profit / mile" : "Profit / mile (legacy)"}
             value={formatRateValue(figures.profitPerMile)}
             tone={figures.profitPerMile >= 0 ? "text-pos" : "text-neg"}
           />
@@ -133,8 +186,9 @@ export function SettlementDetail({ view }: { view: SettlementView }) {
 
         {closed ? (
           <p className="border-t border-border px-4 py-2.5 text-2xs leading-relaxed text-muted-foreground">
-            These figures were frozen when the settlement closed. Changing a reserve percentage or
-            editing a load afterwards does not rewrite them.
+            These model v{calculationVersion} figures were frozen when the settlement closed.
+            Changing a reserve percentage, editing a load, or shipping a newer calculation model
+            does not rewrite them.
           </p>
         ) : (
           <p className="border-t border-border px-4 py-2.5 text-2xs leading-relaxed text-muted-foreground">

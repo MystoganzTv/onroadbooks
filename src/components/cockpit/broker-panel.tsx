@@ -72,7 +72,7 @@ export function BrokerPanel({
                   <span className="truncate text-2xs text-muted-foreground tnum">
                     {broker.loadCount} {broker.loadCount === 1 ? "load" : "loads"} ·{" "}
                     {formatMoneyCompact(broker.revenue)} revenue ·{" "}
-                    {formatMoneyCompact(broker.tripProfit)} profit ·{" "}
+                    {formatMoneyCompact(broker.tripProfit)} contribution profit ·{" "}
                     {formatPercent(broker.deadheadPct, 0)} deadhead
                   </span>
                   {broker.qualified ? null : (

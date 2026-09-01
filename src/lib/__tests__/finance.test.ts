@@ -203,16 +203,20 @@ describe("calculateTrueCostPerMile", () => {
     expense({ id: "f2", date: "2026-08-20", category: "FUEL", amount: 300 }),
   ];
 
-  it("divides actual expenses by actual miles", () => {
+  it("divides actual operating expenses by actual miles and reports debt separately", () => {
     const cost = calculateTrueCostPerMile(loads, expenses, august, settings, "August");
     assert.equal(cost.totalMiles, 1000);
-    assert.equal(cost.totalCost, 1800);
-    assert.equal(cost.trueCostPerMile, 1.8);
+    assert.equal(cost.totalCost, 600);
+    assert.equal(cost.debtServiceTotal, 1200);
+    assert.equal(cost.cashCostTotal, 1800);
+    assert.equal(cost.actualCostPerMile, 0.6);
+    assert.equal(cost.debtServicePerMile, 1.2);
+    assert.equal(cost.cashCostPerMile, 1.8);
   });
 
   it("splits fixed and variable, and the two add up to the whole", () => {
     const cost = calculateTrueCostPerMile(loads, expenses, august, settings, "August");
-    assert.equal(cost.fixedTotal, 1200);
+    assert.equal(cost.fixedTotal, 0);
     assert.equal(cost.variableTotal, 600);
     assert.equal(
       Math.round((cost.fixedCostPerMile + cost.variableCostPerMile) * 1000) / 1000,
@@ -223,12 +227,14 @@ describe("calculateTrueCostPerMile", () => {
   it("does NOT prorate a monthly cost across the halves", () => {
     const a = calculateTrueCostPerMile(loads, expenses, firstHalf, settings, "1-15");
     const b = calculateTrueCostPerMile(loads, expenses, secondHalf, settings, "16-end");
-    // The half that actually carried the truck note is genuinely dearer.
-    assert.equal(a.totalCost, 1500);
+    // Operating cost is comparable; the debt cash burden stays on the day paid.
+    assert.equal(a.totalCost, 300);
     assert.equal(b.totalCost, 300);
-    assert.equal(a.trueCostPerMile, 3);
+    assert.equal(a.trueCostPerMile, 0.6);
     assert.equal(b.trueCostPerMile, 0.6);
-    assert.ok(a.trueCostPerMile > b.trueCostPerMile);
+    assert.equal(a.debtServiceTotal, 1200);
+    assert.equal(b.debtServiceTotal, 0);
+    assert.ok(a.cashCostPerMile > b.cashCostPerMile);
   });
 
   it("the halves' costs and miles still sum to the whole month", () => {
@@ -274,14 +280,16 @@ describe("overheadCostPerMile", () => {
         expense({ id: "2", category: "TOLLS", amount: 100 }),
         expense({ id: "3", category: "DISPATCH", amount: 100 }),
         expense({ id: "4", category: "FACTORING", amount: 100 }),
-        expense({ id: "5", category: "TRUCK_PAYMENT", amount: 1200 }),
+        expense({ id: "5", category: "INSURANCE", amount: 1200 }),
+        expense({ id: "6", category: "TRUCK_PAYMENT", amount: 900 }),
       ],
       august,
       settings,
       "x",
     );
     assert.equal(cost.trueCostPerMile, 2);
-    // Only the truck note survives: 1200 / 1000 miles.
+    assert.equal(cost.debtServicePerMile, 0.9);
+    // Only operating insurance survives the direct-trip exclusions.
     assert.equal(overheadCostPerMile(cost), 1.2);
   });
 
@@ -299,10 +307,11 @@ describe("overheadCostPerMile", () => {
       settings,
       "x",
     );
-    // The calculator asks for trip Other costs explicitly, so the posted row
-    // must not also ride inside the overhead rate: (800 + 80) / 1000 miles.
+    // The calculator asks for trip Other costs explicitly, and financing is
+    // separate: only the manual $80 remains in allocated operating cost.
     assert.equal(cost.directTripTotal, 120);
-    assert.equal(overheadCostPerMile(cost), 0.88);
+    assert.equal(cost.debtServiceTotal, 800);
+    assert.equal(overheadCostPerMile(cost), 0.08);
   });
 
   it("is zero, not negative, when there is no basis", () => {
@@ -352,21 +361,54 @@ describe("resolveReserveRules", () => {
 });
 
 describe("calculateSafeOwnerPay", () => {
+  const ownerPayInput = ({
+    bookedRevenue,
+    collectedRevenue = bookedRevenue,
+    operatingExpenses,
+    interestExpense = 0,
+    principalPayment = 0,
+    unallocatedDebtService = 0,
+  }: {
+    bookedRevenue: number;
+    collectedRevenue?: number;
+    operatingExpenses: number;
+    interestExpense?: number;
+    principalPayment?: number;
+    unallocatedDebtService?: number;
+  }) => {
+    const operatingProfit = bookedRevenue - operatingExpenses;
+    const debtService = interestExpense + principalPayment + unallocatedDebtService;
+    return {
+      calculationVersion: 2,
+      bookedRevenue,
+      collectedRevenue,
+      accountsReceivable: Math.max(bookedRevenue - collectedRevenue, 0),
+      unallocatedCollectedRevenue: 0,
+      operatingExpenses,
+      operatingProfit,
+      interestExpense,
+      principalPayment,
+      unallocatedDebtService,
+      debtService,
+      cashAfterDebtService: collectedRevenue - operatingExpenses - debtService,
+    };
+  };
+
   it("walks revenue down to what is free to take", () => {
     const pay = calculateSafeOwnerPay(
-      { grossRevenue: 8420, operatingExpenses: 1578 },
+      ownerPayInput({ bookedRevenue: 8420, operatingExpenses: 1578 }),
       resolveReserveRules(settings, accounts.slice(0, 2)),
     );
     assert.equal(pay.operatingProfit, 6842);
     assert.equal(pay.reserves[0].amount, 1368.4); // 20% of operating profit
-    assert.equal(pay.reserves[1].amount, 421); // 5% of gross revenue
+    assert.equal(pay.reserves[1].amount, 421); // 5% of Booked Revenue
     assert.equal(pay.reserveTotal, 1789.4);
     assert.equal(pay.safeToPay, 5052.6);
   });
 
   it("charges no tax reserve on a loss, but still reserves against revenue", () => {
     const pay = calculateSafeOwnerPay(
-      { grossRevenue: 1000, operatingExpenses: 3000 },
+      ownerPayInput({ bookedRevenue: 1000, operatingExpenses: 3000 }),
       resolveReserveRules(settings, accounts),
     );
     assert.equal(pay.operatingProfit, -2000);
@@ -375,18 +417,24 @@ describe("calculateSafeOwnerPay", () => {
     assert.equal(pay.safeToPay, -2070);
   });
 
-  it("reserves and safe-to-pay always reconstruct operating profit", () => {
+  it("reserves and safe-to-pay always reconstruct cash after debt service", () => {
     const pay = calculateSafeOwnerPay(
-      { grossRevenue: 12345.67, operatingExpenses: 4321.09 },
+      ownerPayInput({
+        bookedRevenue: 12345.67,
+        collectedRevenue: 11345.67,
+        operatingExpenses: 4321.09,
+        interestExpense: 200,
+        principalPayment: 600,
+      }),
       resolveReserveRules(settings, accounts),
     );
     const sum = pay.reserves.reduce((total, r) => total + r.amount, 0) + pay.safeToPay;
-    assert.ok(Math.abs(sum - pay.operatingProfit) < 0.02);
+    assert.ok(Math.abs(sum - pay.cashAfterDebtService) < 0.02);
   });
 
   it("reconciles the reviewed two-load example after trip costs reach the ledger", () => {
     const pay = calculateSafeOwnerPay(
-      { grossRevenue: 4800, operatingExpenses: 2734 },
+      ownerPayInput({ bookedRevenue: 4800, operatingExpenses: 2734 }),
       resolveReserveRules(
         { ...settings, taxReservePct: 20, maintenanceReservePct: 10 },
         accounts.slice(0, 2),
@@ -397,6 +445,18 @@ describe("calculateSafeOwnerPay", () => {
     assert.equal(pay.reserves.find((reserve) => reserve.kind === "TAX")?.amount, 413.2);
     assert.equal(pay.reserves.find((reserve) => reserve.kind === "MAINTENANCE")?.amount, 480);
     assert.equal(pay.safeToPay, 1172.8);
+  });
+
+  it("never treats an unpaid invoice as cash available to the owner", () => {
+    const pay = calculateSafeOwnerPay(
+      ownerPayInput({ bookedRevenue: 2500, collectedRevenue: 0, operatingExpenses: 0 }),
+      resolveReserveRules(settings, accounts.slice(0, 2)),
+    );
+
+    assert.equal(pay.operatingProfit, 2500);
+    assert.equal(pay.accountsReceivable, 2500);
+    assert.equal(pay.cashAfterDebtService, 0);
+    assert.equal(pay.safeToPay, -625);
   });
 });
 
@@ -504,6 +564,7 @@ describe("calculateLoadEstimate", () => {
     factoringValue: 0,
     otherCost: 0,
     overheadPerMile: 0.25,
+    debtServicePerMile: 1.75,
   };
 
   it("always includes deadhead in the miles it prices", () => {
@@ -533,6 +594,26 @@ describe("calculateLoadEstimate", () => {
       estimate.overhead;
     assert.ok(Math.abs(costs - estimate.totalCost) < 0.01);
     assert.ok(Math.abs(700 - estimate.totalCost - estimate.profit) < 0.01);
+    assert.ok(
+      Math.abs(estimate.profit - estimate.debtService - estimate.cashAfterDebtService) < 0.01,
+    );
+  });
+
+  it("classifies on contribution profit, never allocated costs or debt service", () => {
+    const lowDebt = calculateLoadEstimate({ ...base, debtServicePerMile: 0 }, thresholds, 20);
+    const highDebt = calculateLoadEstimate({ ...base, debtServicePerMile: 10 }, thresholds, 20);
+    const highOperatingCost = calculateLoadEstimate(
+      { ...base, overheadPerMile: 10, debtServicePerMile: 0 },
+      thresholds,
+      20,
+    );
+
+    assert.equal(lowDebt.score.rating, highDebt.score.rating);
+    assert.equal(lowDebt.score.rating, highOperatingCost.score.rating);
+    assert.equal(lowDebt.score.score, highDebt.score.score);
+    assert.equal(lowDebt.score.score, highOperatingCost.score.score);
+    assert.ok(highDebt.cashAfterDebtService < lowDebt.cashAfterDebtService);
+    assert.ok(highOperatingCost.fullyLoadedOperatingProfit < lowDebt.fullyLoadedOperatingProfit);
   });
 
   it("treats a percentage fee and the same money as a flat fee identically", () => {
@@ -578,6 +659,7 @@ describe("calculateTargetRate", () => {
     factoringValue: 2.5,
     otherCost: 0,
     overheadPerMile: 0.5,
+    debtServicePerMile: 0.3,
     targetProfitPerMile: 1.5,
   };
 
@@ -591,7 +673,7 @@ describe("calculateTargetRate", () => {
 
   it("break even really is zero profit", () => {
     const target = calculateTargetRate(base, thresholds);
-    const tier = target.tiers.find((t) => t.key === "breakeven")!;
+    const tier = target.tiers.find((t) => t.key === "operatingBreakeven")!;
     const profit = tier.rate - tier.rate * 0.075 - target.fixedTripCost;
     assert.ok(Math.abs(profit) < 0.02);
   });
@@ -599,7 +681,8 @@ describe("calculateTargetRate", () => {
   it("ranks the tiers in the order a driver would expect", () => {
     const rates = calculateTargetRate(base, thresholds).tiers;
     const by = (key: string) => rates.find((t) => t.key === key)!.rate;
-    assert.ok(by("breakeven") < by("minimum"));
+    assert.ok(by("operatingBreakeven") < by("cashBreakeven"));
+    assert.ok(by("cashBreakeven") < by("minimum"));
     assert.ok(by("minimum") < by("good"));
     assert.ok(by("good") < by("great"));
   });
@@ -899,7 +982,7 @@ describe("calculateDaySnapshot", () => {
     assert.equal(day.revenue, 1420);
     assert.equal(day.profit, 1034);
     assert.equal(day.verdict, "GOOD");
-    assert.match(day.statement, /above your daily profit target/);
+    assert.match(day.statement, /above your daily Operating Profit target/);
   });
 
   it("says nothing happened rather than reporting a bad day", () => {
@@ -1028,6 +1111,10 @@ describe("settlements", () => {
       settings,
       accounts,
     );
+    assert.equal(snapshot.calculationVersion, 2);
+    assert.equal(snapshot.bookedRevenue, snapshot.grossRevenue);
+    assert.equal(snapshot.collectedRevenue, 0);
+    assert.equal(snapshot.debtService, 1200);
     assert.equal(snapshot.reserves.length, 3);
     assert.equal(snapshot.reserves[0].pct, 20);
     assert.equal(snapshot.reserves[0].kind, "TAX");

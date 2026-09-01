@@ -85,9 +85,9 @@ export default async function FleetPage({
 
       <PeriodControls period={period} />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         <MiniStat
-          label="Revenue"
+          label="Booked Revenue"
           value={formatMoneyCompact(fleet.revenue)}
           sub={`${loadCount} ${loadCount === 1 ? "load" : "loads"}`}
           tone="info"
@@ -103,10 +103,22 @@ export default async function FleetPage({
           sub="belongs to no single truck"
         />
         <MiniStat
-          label="Operating profit"
+          label="Operating Profit"
           value={formatMoneyCompact(fleet.operatingProfit)}
           sub={period.shortLabel}
           tone={fleet.operatingProfit >= 0 ? "positive" : "negative"}
+        />
+        <MiniStat
+          label="Debt Service"
+          value={formatMoneyCompact(fleet.debtService)}
+          sub="separate cash burden"
+          tone={fleet.debtService > 0 ? "negative" : "neutral"}
+        />
+        <MiniStat
+          label="Cash After Debt Service"
+          value={formatMoneyCompact(fleet.cashAfterDebtService)}
+          sub={`${formatMoneyCompact(fleet.collectedRevenue)} collected`}
+          tone={fleet.cashAfterDebtService >= 0 ? "positive" : "negative"}
         />
       </div>
 
@@ -128,7 +140,7 @@ export default async function FleetPage({
                     <TableHead className="text-right">Loads</TableHead>
                     <TableHead className="text-right">Miles</TableHead>
                     <TableHead className="text-right">Deadhead</TableHead>
-                    <TableHead className="text-right">Revenue</TableHead>
+                    <TableHead className="text-right">Booked Revenue</TableHead>
                     <TableHead className="text-right">Its own costs</TableHead>
                     <TableHead className="text-right">Contribution</TableHead>
                     <TableHead className="text-right">$/mi</TableHead>
@@ -204,15 +216,28 @@ export default async function FleetPage({
             <Line label="Every truck's contribution" value={fleet.contribution} />
             <Line label="Less business overhead" value={-fleet.overhead} />
             <div className="flex items-center justify-between border-t border-border pt-2 font-semibold">
-              <span>Operating profit</span>
+              <span>Operating Profit</span>
               <span className={cn("tnum", fleet.operatingProfit >= 0 ? "text-pos" : "text-neg")}>
                 {formatMoney(fleet.operatingProfit)}
+              </span>
+            </div>
+            <Line label="Less Debt Service (cash burden)" value={-fleet.debtService} />
+            {fleet.unallocatedCollectedRevenue > 0 ? (
+              <Line
+                label="Paid Revenue without payment date (not assigned to cash)"
+                value={fleet.unallocatedCollectedRevenue}
+              />
+            ) : null}
+            <div className="flex items-center justify-between border-t border-border pt-2 font-semibold">
+              <span>Cash After Debt Service</span>
+              <span className={cn("tnum", fleet.cashAfterDebtService >= 0 ? "text-pos" : "text-neg")}>
+                {formatMoney(fleet.cashAfterDebtService)}
               </span>
             </div>
             {/* Printed, not assumed. If these two ever disagree, the fleet
                 view is the thing that is wrong. */}
             <p className="pt-1 text-2xs text-muted-foreground">
-              The same {formatMoney(summary.netProfit)} the dashboard reports for {period.label}.
+              The same {formatMoney(summary.operatingProfit)} Operating Profit the dashboard reports for {period.label}.
               Overhead is subtracted once, here, and never charged to a truck.
             </p>
           </CardContent>

@@ -65,7 +65,7 @@ export function TripWaterfall({
           <div className="my-2 border-t border-dashed border-border" />
 
           <Row
-            label="Total Load Expenses"
+            label="Direct Trip Costs"
             value={-metrics.tripExpenses}
             width={scale(metrics.tripExpenses)}
             barClass="bg-neg"
@@ -74,7 +74,7 @@ export function TripWaterfall({
           <div className="my-2 border-t border-border" />
 
           <Row
-            label="Trip Profit"
+            label="Contribution Profit"
             value={metrics.tripProfit}
             width={scale(metrics.tripProfit)}
             barClass={metrics.tripProfit >= 0 ? "bg-pos" : "bg-neg"}
@@ -85,11 +85,11 @@ export function TripWaterfall({
         <div className="grid grid-cols-3 gap-3 rounded-md border border-border bg-surface-sunken px-3 py-2.5">
           <Summary label="Total miles" value={formatMiles(metrics.totalMiles)} />
           <Summary
-            label="Profit / mile"
+            label="Contribution Profit / mile"
             value={`${formatRateValue(metrics.profitPerMile)}`}
             tone={metrics.profitPerMile >= 0 ? "pos" : "neg"}
           />
-          <Summary label="Profit margin" value={formatPercent(metrics.profitMargin)} />
+          <Summary label="Contribution margin" value={formatPercent(metrics.profitMargin)} />
         </div>
 
         <RatingVerdict rating={metrics.rating} profitPerMile={metrics.profitPerMile} />

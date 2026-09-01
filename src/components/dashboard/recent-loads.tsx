@@ -53,7 +53,7 @@ export function RecentLoads({ loads }: { loads: LoadWithMetrics[] }) {
                 <TableHead className="hidden sm:table-cell">Broker</TableHead>
                 <TableHead className="text-right">Miles</TableHead>
                 <TableHead className="text-right">Rate</TableHead>
-                <TableHead className="text-right">Profit/mi</TableHead>
+                <TableHead className="text-right">Contribution/mi</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>

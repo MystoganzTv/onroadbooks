@@ -193,7 +193,7 @@ export function SettingsForm({
               htmlFor="tax-pct"
               required
               error={errors.taxReservePct}
-              hint="Applied to operating profit. 20% is a common starting point."
+              hint="Applied to Operating Profit. 20% is a common starting point."
             >
               <Input
                 id="tax-pct"
@@ -212,7 +212,7 @@ export function SettingsForm({
               htmlFor="maintenance-pct"
               required
               error={errors.maintenanceReservePct}
-              hint="Applied to gross revenue, so it accrues even in a thin month."
+              hint="Applied to Booked Revenue, so unpaid invoices create a reserve requirement but never available cash."
             >
               <Input
                 id="maintenance-pct"
@@ -231,7 +231,7 @@ export function SettingsForm({
           <div className="rounded-md border border-border bg-surface-sunken p-3">
             <p className="label-xs">Live preview</p>
             <ul className="mt-2 space-y-1 text-sm">
-              <PreviewRow label="Operating profit" value={formatMoney(livePreview.operatingProfit)} />
+              <PreviewRow label="Operating Profit" value={formatMoney(livePreview.operatingProfit)} />
               {livePreview.reserves.map((reserve) => (
                 <PreviewRow
                   key={reserve.accountId}
@@ -243,7 +243,7 @@ export function SettingsForm({
             </ul>
             <div className="mt-2 border-t border-border pt-2">
               <PreviewRow
-                label="Safe to pay yourself"
+                label="Safe to Pay Yourself"
                 value={formatMoney(livePreview.safeToPay)}
                 tone={livePreview.safeToPay >= 0 ? "pos" : "neg"}
                 strong
@@ -256,7 +256,7 @@ export function SettingsForm({
       <section className="rounded-lg border border-border bg-card">
         <CardHeader>
           <CardTitle>Load Profitability Thresholds</CardTitle>
-          <span className="text-2xs text-muted-foreground">Profit per total mile</span>
+          <span className="text-2xs text-muted-foreground">Contribution Profit per total mile</span>
         </CardHeader>
         <CardContent className="space-y-3 p-4">
           <div className="grid gap-3 sm:grid-cols-3">

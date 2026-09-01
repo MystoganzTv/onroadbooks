@@ -66,7 +66,7 @@ export function MoneyBreakdownCard({ breakdown, periodLabel }: MoneyBreakdownCar
       <CardContent className="p-4 pt-3">
         <div className="divide-y divide-border/70">
           <div>
-            <Row label="Gross Revenue" value={breakdown.grossRevenue} />
+            <Row label="Booked Revenue" value={breakdown.grossRevenue} />
             <Row label="Operating Expenses" value={breakdown.operatingExpenses} negative />
           </div>
 
@@ -97,7 +97,7 @@ export function MoneyBreakdownCard({ breakdown, periodLabel }: MoneyBreakdownCar
           )}
         >
           <p className={cn("label-xs", positive ? "text-pos/80" : "text-neg/80")}>
-            Available Cash
+            After Reserves (legacy performance view)
           </p>
           <p
             className={cn(

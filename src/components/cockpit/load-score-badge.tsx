@@ -30,10 +30,9 @@ export function LoadScoreBadge({
  * The score with its three components spelled out, so the answer to "why did
  * this load score 87?" is always on the screen.
  *
- * `showBasis` adds the one line that stops this score from contradicting the
- * Load Calculator. This one rates the trip on its own costs -- what the load
- * contributed. The calculator also charges the truck's overhead per mile, so
- * the same trip scores lower there. Both are right; only the question differs.
+ * `showBasis` names the contribution basis explicitly. The same methodology
+ * is used on a saved load and in the calculator: financing and allocated
+ * operating costs are context, never inputs to the classification.
  */
 export function LoadScoreBreakdown({
   score,
@@ -42,9 +41,8 @@ export function LoadScoreBreakdown({
 }: {
   score: LoadScore;
   /**
-   * "trip" for a booked load, scored on its own costs; "loaded" for the
-   * calculator, which also charges overhead. Naming the basis is what keeps
-   * the two screens from looking like they disagree.
+   * "trip" for a booked load and "loaded" for a calculator estimate. Both use
+   * contribution profit; the distinction only changes the explanatory copy.
    */
   showBasis?: "trip" | "loaded";
   className?: string;
@@ -89,13 +87,12 @@ export function LoadScoreBreakdown({
       {showBasis === "trip" ? (
         <p className="mt-3 border-t border-current/20 pt-3 text-2xs opacity-70">
           Scored on this trip&apos;s own costs — what the load contributed. The Load Calculator
-          also charges the truck&apos;s overhead per mile, so the same trip scores lower there.
+          uses the same basis. Allocated operating costs and debt service are shown separately.
         </p>
       ) : showBasis === "loaded" ? (
         <p className="mt-3 border-t border-current/20 pt-3 text-2xs opacity-70">
-          Scored after the truck&apos;s overhead per mile, not just this trip&apos;s costs. A
-          booked load&apos;s own page scores it on trip costs alone, so the same numbers rate
-          higher there.
+          Classified from Contribution Profit per total mile after direct trip costs. Allocated
+          operating costs and debt service are excluded from GREAT / GOOD / MARGINAL / BAD.
         </p>
       ) : null}
     </div>

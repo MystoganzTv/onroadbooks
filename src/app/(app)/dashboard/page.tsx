@@ -316,8 +316,8 @@ export default async function DashboardPage({
               ownerPay={cockpit ? ownerPay : undefined}
               previousLabel={prior.shortLabel}
               deltas={{
-                revenue: pctChange(summary.grossRevenue, priorSummary.grossRevenue),
-                profit: pctChange(summary.netProfit, priorSummary.netProfit),
+                revenue: pctChange(summary.bookedRevenue, priorSummary.bookedRevenue),
+                profit: pctChange(summary.operatingProfit, priorSummary.operatingProfit),
                 profitPerMile: pctChange(summary.profitPerMile, priorSummary.profitPerMile),
               }}
             />
@@ -353,7 +353,7 @@ export default async function DashboardPage({
             tone={deadhead.elevated ? "warning" : "neutral"}
           />
           <MiniStat
-            label="True Cost / Mile"
+            label="Actual Cost / Mile"
             value={costBasis.sufficient ? formatRateValue(costBasis.trueCostPerMile) : "—"}
             sub="actual, not prorated"
             tone="negative"
@@ -367,7 +367,7 @@ export default async function DashboardPage({
           <MiniStat
             label="Loads Completed"
             value={formatNumber(summary.loadCount)}
-            sub={`${formatMoneyCompact(summary.paidRevenue)} collected`}
+            sub={`${formatMoneyCompact(summary.collectedRevenue)} collected`}
             tone="neutral"
           />
         </div>
@@ -404,7 +404,7 @@ export default async function DashboardPage({
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Route className="size-3.5 text-muted-foreground" />
-                <CardTitle>Revenue vs Expenses</CardTitle>
+                <CardTitle>Booked Revenue vs Operating Expenses</CardTitle>
               </div>
               <span className="text-2xs text-muted-foreground">
                 {period.days > 62 ? "By month" : "By day"}

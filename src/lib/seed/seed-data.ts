@@ -734,7 +734,7 @@ export function buildSeedDataset(): Dataset {
         date: bounds.end,
         type: "CONTRIBUTION",
         amount: reserve.amount,
-        description: `${reserve.pct}% ${reserve.basis === "OPERATING_PROFIT" ? "of operating profit" : "of gross revenue"} - settlement closed`,
+        description: `${reserve.pct}% ${reserve.basis === "OPERATING_PROFIT" ? "of Operating Profit" : "of Booked Revenue"} - settlement closed`,
         settlementId: id,
         createdAt: `${bounds.end}T21:00:00.000Z`,
       });

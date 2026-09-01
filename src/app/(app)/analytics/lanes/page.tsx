@@ -192,7 +192,7 @@ export default async function LanesPage({
       <Card>
         <CardHeader>
           <CardTitle>All lanes</CardTitle>
-          <span className="text-2xs text-muted-foreground">Best profit per mile first</span>
+          <span className="text-2xs text-muted-foreground">Best contribution profit per mile first</span>
         </CardHeader>
         <CardContent className="p-0">
           {lanes.length === 0 ? (
@@ -206,11 +206,11 @@ export default async function LanesPage({
                   <TableRow>
                     <TableHead>Lane</TableHead>
                     <TableHead className="text-right">Loads</TableHead>
-                    <TableHead className="text-right">Revenue</TableHead>
+                    <TableHead className="text-right">Booked Revenue</TableHead>
                     <TableHead className="text-right">Miles</TableHead>
                     <TableHead className="text-right">Rate $/loaded mi</TableHead>
-                    <TableHead className="text-right">Profit $/mi</TableHead>
-                    <TableHead className="text-right">Margin</TableHead>
+                    <TableHead className="text-right">Contribution $/mi</TableHead>
+                    <TableHead className="text-right">Contribution Margin</TableHead>
                     <TableHead className="text-right">Deadhead</TableHead>
                     <TableHead className="w-28">Relative</TableHead>
                   </TableRow>

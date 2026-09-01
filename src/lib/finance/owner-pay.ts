@@ -2,10 +2,11 @@
  * SAFE TO PAY YOURSELF
  * ====================
  *
- *     Gross revenue
+ *     Collected revenue
  *   - Operating expenses
+ *   - Debt service
  *   -------------------------
- *   = Operating profit
+ *   = Cash after debt service
  *   - Tax reserve
  *   - Maintenance reserve
  *   - Any other configured reserve
@@ -46,13 +47,24 @@ export interface ReserveLine extends ReserveRule {
 }
 
 export interface OwnerPay {
+  calculationVersion: number;
+  bookedRevenue: number;
+  collectedRevenue: number;
+  accountsReceivable: number;
+  unallocatedCollectedRevenue: number;
+  interestExpense: number;
+  principalPayment: number;
+  unallocatedDebtService: number;
+  debtService: number;
+  cashAfterDebtService: number;
+  /** @deprecated Use bookedRevenue. */
   grossRevenue: number;
   operatingExpenses: number;
   operatingProfit: number;
   reserves: ReserveLine[];
   reserveTotal: number;
   safeToPay: number;
-  /** Safe-to-pay as a share of gross revenue, 0-100. */
+  /** Safe-to-pay as a share of booked revenue, 0-100. */
   takeHomeRate: number;
 }
 
@@ -79,37 +91,66 @@ export function resolveReserveRules(
 }
 
 /**
- * A reserve is charged against operating profit or against gross revenue,
+ * A reserve is charged against operating profit or against booked revenue,
  * whichever the bucket is configured for.
  *
  * Tax defaults to operating profit because tax follows profit, and a loss
  * reserves nothing (the base is floored at zero rather than going negative).
- * Maintenance defaults to gross revenue because the truck wears out whether
+ * Maintenance defaults to booked revenue because the truck wears out whether
  * or not the month was profitable.
  */
 export function calculateSafeOwnerPay(
-  summary: Pick<PeriodSummary, "grossRevenue" | "operatingExpenses">,
+  summary: Pick<
+    PeriodSummary,
+    | "calculationVersion"
+    | "bookedRevenue"
+    | "collectedRevenue"
+    | "accountsReceivable"
+    | "unallocatedCollectedRevenue"
+    | "operatingExpenses"
+    | "operatingProfit"
+    | "interestExpense"
+    | "principalPayment"
+    | "unallocatedDebtService"
+    | "debtService"
+    | "cashAfterDebtService"
+  >,
   rules: ReserveRule[],
 ): OwnerPay {
-  const grossRevenue = roundMoney(summary.grossRevenue);
+  const bookedRevenue = roundMoney(summary.bookedRevenue);
+  const collectedRevenue = roundMoney(summary.collectedRevenue);
   const operatingExpenses = roundMoney(summary.operatingExpenses);
-  const operatingProfit = roundMoney(grossRevenue - operatingExpenses);
+  const operatingProfit = roundMoney(summary.operatingProfit);
+  const cashAfterDebtService = roundMoney(summary.cashAfterDebtService);
 
   const reserves: ReserveLine[] = rules.map((rule) => {
-    const base = rule.basis === "OPERATING_PROFIT" ? Math.max(operatingProfit, 0) : grossRevenue;
+    const base =
+      rule.basis === "OPERATING_PROFIT" ? Math.max(operatingProfit, 0) : bookedRevenue;
     return { ...rule, amount: roundMoney(base * (rule.pct / 100)) };
   });
 
   const reserveTotal = roundMoney(reserves.reduce((total, r) => total + r.amount, 0));
-  const safeToPay = roundMoney(operatingProfit - reserveTotal);
+  // Cash is the hard ceiling. Booked but unpaid revenue can increase business
+  // performance and reserve requirements, never the amount free to withdraw.
+  const safeToPay = roundMoney(cashAfterDebtService - reserveTotal);
 
   return {
-    grossRevenue,
+    calculationVersion: summary.calculationVersion,
+    bookedRevenue,
+    collectedRevenue,
+    accountsReceivable: roundMoney(summary.accountsReceivable),
+    unallocatedCollectedRevenue: roundMoney(summary.unallocatedCollectedRevenue),
+    interestExpense: roundMoney(summary.interestExpense),
+    principalPayment: roundMoney(summary.principalPayment),
+    unallocatedDebtService: roundMoney(summary.unallocatedDebtService),
+    debtService: roundMoney(summary.debtService),
+    cashAfterDebtService,
+    grossRevenue: bookedRevenue,
     operatingExpenses,
     operatingProfit,
     reserves,
     reserveTotal,
     safeToPay,
-    takeHomeRate: div(safeToPay, grossRevenue) * 100,
+    takeHomeRate: div(safeToPay, collectedRevenue) * 100,
   };
 }

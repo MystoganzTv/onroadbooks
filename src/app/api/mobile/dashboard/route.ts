@@ -20,6 +20,10 @@ import {
   resolveReserveRules,
   scoreLoads,
 } from "@/lib/finance";
+import {
+  FINANCIAL_MODEL_VERSION,
+  isOperatingExpenseCategory,
+} from "@/lib/finance/terminology";
 import { periodFromSearchParams } from "@/lib/period-params";
 import { previousPeriod, todayISO } from "@/lib/periods";
 
@@ -30,7 +34,7 @@ export const dynamic = "force-dynamic";
  * The cockpit, condensed for a phone screen. Reuses exactly the functions
  * `src/app/(app)/dashboard/page.tsx` calls (see its header comment for the
  * reading order this mirrors) so every rule — costsPosted, reserve math,
- * true cost per mile — is enforced in that ONE place, not reimplemented
+ * Actual Cost Per Mile — is enforced in that ONE place, not reimplemented
  * here. This route only selects which of those already-correct numbers a
  * phone needs and shapes them as JSON.
  *
@@ -61,7 +65,12 @@ export async function GET(request: NextRequest) {
     thresholds,
     settings.deadheadWarnPct,
   );
-  const categories = categoryTotals(expensesInPeriod(expenses, period), settings);
+  const categories = categoryTotals(
+    expensesInPeriod(expenses, period).filter((expense) =>
+      isOperatingExpenseCategory(expense.category),
+    ),
+    settings,
+  );
   const day = calculateDaySnapshot(loads, expenses, today, goals);
 
   const recentLoads = [...periodLoads]
@@ -78,6 +87,7 @@ export async function GET(request: NextRequest) {
       grossRate: load.grossRate,
       loadedMiles: load.loadedMiles,
       deadheadMiles: load.deadheadMiles,
+      contributionProfitPerMile: load.metrics.profitPerMile,
       profitPerMile: load.metrics.profitPerMile,
       rating: load.metrics.rating,
     }));
@@ -85,17 +95,42 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(
     {
       periodLabel: period.label,
+      calculationVersion: FINANCIAL_MODEL_VERSION,
       month: period.month,
-      revenue: summary.grossRevenue,
+      bookedRevenue: summary.bookedRevenue,
+      collectedRevenue: summary.collectedRevenue,
+      accountsReceivable: summary.accountsReceivable,
+      unallocatedCollectedRevenue: summary.unallocatedCollectedRevenue,
+      operatingExpenses: summary.operatingExpenses,
+      operatingProfit: summary.operatingProfit,
+      interestExpense: summary.interestExpense,
+      principalPayment: summary.principalPayment,
+      unallocatedDebtService: summary.unallocatedDebtService,
+      debtService: summary.debtService,
+      cashAfterDebtService: summary.cashAfterDebtService,
+      bookedRevenueDeltaPct: pctChange(summary.bookedRevenue, priorSummary.bookedRevenue),
+      operatingProfitDeltaPct: pctChange(summary.operatingProfit, priorSummary.operatingProfit),
+      actualCostPerMile: costBasis.actualCostPerMile,
+      debtServicePerMile: costBasis.debtServicePerMile,
+      // Read-compatible aliases for older mobile builds.
+      revenue: summary.bookedRevenue,
       expenses: summary.operatingExpenses,
-      netProfit: summary.netProfit,
-      revenueDeltaPct: pctChange(summary.grossRevenue, priorSummary.grossRevenue),
-      netProfitDeltaPct: pctChange(summary.netProfit, priorSummary.netProfit),
-      trueCostPerMile: costBasis.trueCostPerMile,
+      netProfit: summary.operatingProfit,
+      revenueDeltaPct: pctChange(summary.bookedRevenue, priorSummary.bookedRevenue),
+      netProfitDeltaPct: pctChange(summary.operatingProfit, priorSummary.operatingProfit),
+      trueCostPerMile: costBasis.actualCostPerMile,
       safeToPay: ownerPay.safeToPay,
       totalMiles: summary.totalMiles,
       deadheadPct: summary.deadheadPct,
-      today: { revenue: day.revenue, loadCount: day.loadCount },
+      today: {
+        bookedRevenue: day.revenue,
+        operatingExpenses: day.expenses,
+        operatingProfit: day.profit,
+        operatingProfitPerMile: day.profitPerMile,
+        // Compatibility alias.
+        revenue: day.revenue,
+        loadCount: day.loadCount,
+      },
       expenseBreakdown: categories.map((c) => ({
         category: c.category,
         label: c.label,

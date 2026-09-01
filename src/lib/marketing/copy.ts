@@ -24,24 +24,26 @@ export type Lang = "en" | "es";
  * The figures in the marketing mock-ups. These are the reference month
  * (`?month=2026-08&period=full`) and they tie to the cent:
  *
- *   revenue 9,795.00 - expenses 6,143.90            = net 3,651.10
- *   tax 20% of profit 730.22, maintenance 5% of
- *   revenue 489.75, emergency 2% of revenue 195.90  = reserves 1,415.87
- *   3,651.10 - 1,415.87                             = safe to pay 2,235.23
+ *   booked revenue 9,795.00 - operating expenses 4,858.90 = operating profit 4,936.10
+ *   collected revenue 6,275.00 - cash operating expenses 4,858.90
+ *   - debt service 1,285.00                         = cash after debt 131.10
+ *   tax 20% of operating profit 987.22, maintenance 5% of
+ *   revenue 489.75, emergency 2% of revenue 195.90  = reserves 1,672.87
+ *   131.10 - 1,672.87                               = safe to pay -1,541.77
  *
  * If a change to the seed or to the maths moves these, the landing page is
  * wrong and has to move with them.
  */
 export const PREVIEW_FIGURES = {
   revenue: "$9,795",
-  expenses: "$6,144",
-  netProfit: "$3,651",
-  margin: "37.3%",
-  available: "$2,235",
-  costPerMile: "$1.84",
+  expenses: "$4,859",
+  netProfit: "$4,936",
+  margin: "50.4%",
+  available: "-$1,542",
+  costPerMile: "$1.46",
   revenuePerMile: "$2.94",
-  profitPerMile: "$1.10",
-  taxReserve: "-$730",
+  profitPerMile: "$1.48",
+  taxReserve: "-$987",
   maintenanceReserve: "-$490",
   emergencyReserve: "-$196",
   loadRate: "$2,450",
@@ -50,14 +52,13 @@ export const PREVIEW_FIGURES = {
   loadProfit: "$881",
   loadPerMile: "$1.26",
   loadScore: "82",
-  /** August expenses by group. Percentages are of $6,143.90 and sum to 100. */
+  /** August operating expenses by group. Percentages are of $4,858.90 and sum to 100. */
   expenseSlices: [
-    { key: "fuel", amount: "$1,322", pct: 21.5 },
-    { key: "note", amount: "$1,285", pct: 20.9 },
-    { key: "fees", amount: "$954", pct: 15.5 },
-    { key: "service", amount: "$897", pct: 14.6 },
-    { key: "insurance", amount: "$685", pct: 11.1 },
-    { key: "other", amount: "$1,000", pct: 16.4 },
+    { key: "fuel", amount: "$1,322", pct: 27.2 },
+    { key: "fees", amount: "$954", pct: 19.6 },
+    { key: "service", amount: "$897", pct: 18.5 },
+    { key: "insurance", amount: "$685", pct: 14.1 },
+    { key: "other", amount: "$1,000", pct: 20.6 },
   ],
 } as const;
 
@@ -65,7 +66,7 @@ const en = {
   meta: {
     title: "OnRoad Books - Know what your truck really makes.",
     description:
-      "Bookkeeping and profit tracking for owner-operators. True cost per mile, load screening before you book, owner pay after reserves, and broker and lane scoring - all from your own ledger.",
+      "Bookkeeping and profit tracking for owner-operators. Actual and normalized cost per mile, load screening before you book, cash-safe owner pay, and broker and lane scoring - all from your own ledger.",
   },
   banner: {
     text: `Half-month settlements and reserve buckets are live. Free for ${TRIAL_DAYS} days, no card.`,
@@ -124,17 +125,17 @@ const en = {
     title: "Dashboard",
     period: "Aug 1 - Aug 31, 2026",
     tiles: {
-      revenue: "Gross Revenue",
-      netProfit: "Net Profit",
-      profitPerMile: "Profit / Mile",
+      revenue: "Booked Revenue",
+      netProfit: "Operating Profit",
+      profitPerMile: "Operating Profit / Mile",
       marginNote: "margin",
-      cpmNote: "true cost / mile $1.84",
-      expensesNote: "expenses",
+      cpmNote: "actual cost / mile $1.46",
+      expensesNote: "operating expenses",
     },
     chart: {
-      title: "Revenue vs Expenses",
-      revenue: "Revenue",
-      expenses: "Expenses",
+      title: "Booked Revenue vs Operating Expenses",
+      revenue: "Booked Revenue",
+      expenses: "Operating Expenses",
       ticks: ["Aug 1", "Aug 8", "Aug 15", "Aug 22", "Aug 29"],
     },
     breakdown: {
@@ -151,7 +152,7 @@ const en = {
       routeTo: "Newark, NJ",
       milesNote: "612 loaded - 88 deadhead",
       rate: "Rate",
-      profit: "Trip profit",
+      profit: "Contribution profit",
       perMile: "Per total mile",
       verdict: "GREAT LOAD",
       score: "Score 82 / 100",
@@ -175,7 +176,7 @@ const en = {
     items: [
       { title: "Track Loads", body: "Know which loads actually made money, and which only looked like it." },
       { title: "Manage Expenses", body: "Fuel, tolls, repairs, insurance, permits - with the receipt attached." },
-      { title: "Real Profit Tracking", body: "Net profit and margin for any window, never prorated." },
+      { title: "Real Profit Tracking", body: "Booked performance, collected cash and receivables shown separately." },
       { title: "Reserve With Confidence", body: "Tax and maintenance funded every time you close a settlement." },
       { title: "Reports That Help", body: "Print-ready monthly reports and a clean CSV export of everything." },
       { title: "Cab Or Kitchen Table", body: "The same books on the phone in the truck and the laptop at home." },
@@ -209,7 +210,7 @@ const en = {
     title: "Gross is the one number the industry hands you for free.",
     body: "Every number that decides whether the truck is worth running you have to build yourself, and most owner-operators never get the time. That is the whole job of this app.",
     points: [
-      "True cost per mile from your own ledger - never a national average",
+      "Actual and normalized cost per mile from your own ledger - never a national average",
       "A load priced before you book it, not explained after you unload",
       "Owner pay that already has the tax and the next set of tires taken out",
     ],
@@ -249,8 +250,8 @@ const en = {
         features: [
           "One truck, unlimited loads",
           "Loads, expenses, fuel, receipts and documents",
-          "Profit per load and profit per mile",
-          "True cost per mile, never prorated",
+          "Contribution profit per load and per mile",
+          "Actual and normalized cost per mile",
           "Print-ready reports and CSV export",
         ],
         note: null,
@@ -314,7 +315,7 @@ const en = {
       },
       {
         q: "Is the safe-to-pay number tax advice?",
-        a: "No. It is a planning figure: your operating profit minus the reserve percentages you chose yourself. It is not a bank balance, and it is not tax or accounting advice.",
+        a: "No. It is a cash planning figure: collected revenue minus cash operating expenses, debt service, and the reserve amounts you chose. Unpaid invoices never increase it. It is not a bank balance, and it is not tax or accounting advice.",
       },
     ],
   },
@@ -340,7 +341,7 @@ const es: LandingCopy = {
   meta: {
     title: "OnRoad Books - Sabe lo que de verdad deja tu camión.",
     description:
-      "Contabilidad y control de ganancia para owner-operators. Costo real por milla, la carga evaluada antes de aceptarla, cuánto puedes pagarte después de reservas, y qué brokers y rutas rinden - todo desde tu propio libro.",
+      "Contabilidad y control de ganancia para owner-operators. Costo real y normalizado por milla, la carga evaluada antes de aceptarla, cuánto efectivo puedes pagarte después de reservas, y qué brokers y rutas rinden - todo desde tu propio libro.",
   },
   banner: {
     text: `Ya están los cortes de quincena y las reservas. Gratis ${TRIAL_DAYS} días, sin tarjeta.`,
@@ -398,17 +399,17 @@ const es: LandingCopy = {
     title: "Panel",
     period: "1 - 31 ago 2026",
     tiles: {
-      revenue: "Ingreso bruto",
-      netProfit: "Ganancia neta",
-      profitPerMile: "Ganancia / milla",
+      revenue: "Ingresos registrados",
+      netProfit: "Ganancia operativa",
+      profitPerMile: "Ganancia operativa / milla",
       marginNote: "margen",
-      cpmNote: "costo real / milla $1.84",
-      expensesNote: "gastos",
+      cpmNote: "costo real / milla $1.46",
+      expensesNote: "gastos operativos",
     },
     chart: {
-      title: "Ingresos vs gastos",
-      revenue: "Ingresos",
-      expenses: "Gastos",
+      title: "Ingresos registrados vs gastos operativos",
+      revenue: "Ingresos registrados",
+      expenses: "Gastos operativos",
       ticks: ["1 ago", "8 ago", "15 ago", "22 ago", "29 ago"],
     },
     breakdown: {
@@ -425,7 +426,7 @@ const es: LandingCopy = {
       routeTo: "Newark, NJ",
       milesNote: "612 cargadas - 88 en vacío",
       rate: "Tarifa",
-      profit: "Ganancia del viaje",
+      profit: "Ganancia de contribución",
       perMile: "Por milla total",
       verdict: "BUENA CARGA",
       score: "Puntaje 82 / 100",
@@ -449,7 +450,7 @@ const es: LandingCopy = {
     items: [
       { title: "Cargas", body: "Cuáles dejaron dinero de verdad y cuáles sólo lo parecían." },
       { title: "Gastos", body: "Diésel, peajes, reparaciones, seguro, permisos - con el recibo adjunto." },
-      { title: "Ganancia real", body: "Ganancia neta y margen en cualquier ventana, nunca prorrateada." },
+      { title: "Ganancia real", body: "Rendimiento registrado, efectivo cobrado y cuentas por cobrar por separado." },
       { title: "Reservas al día", body: "Impuestos y mantenimiento apartados en cada corte que cierras." },
       { title: "Reportes útiles", body: "Reporte mensual listo para imprimir y exportación CSV de todo." },
       { title: "Cabina o cocina", body: "El mismo libro en el teléfono del camión y en la laptop de la casa." },
@@ -523,8 +524,8 @@ const es: LandingCopy = {
         features: [
           "Un camión, cargas ilimitadas",
           "Cargas, gastos, diésel, recibos y documentos",
-          "Ganancia por carga y por milla",
-          "Costo real por milla, nunca prorrateado",
+          "Ganancia de contribución por carga y por milla",
+          "Costo real y normalizado por milla",
           "Reportes para imprimir y exportación CSV",
         ],
         note: null,

@@ -1,19 +1,18 @@
 /**
- * TRUE COST PER MILE -- methodology
- * =================================
+ * ACTUAL AND NORMALIZED COST PER MILE -- methodology
+ * ==================================================
  *
  * One rule, applied everywhere:
  *
- *     true cost per mile = every operating expense dated inside the window
- *                          -------------------------------------------------
- *                          every mile driven inside the window (loaded + deadhead)
+ *     Actual Cost Per Mile = Operating Expenses dated inside the window
+ *                            ---------------------------------------------
+ *                            loaded + deadhead miles inside the window
  *
  * Consequences that are deliberate, not accidental:
  *
  *  1. Nothing is prorated. A 1-15 settlement is NOT "half the month's costs".
- *     If the truck note posts on the 1st, the first half of the month really
- *     did carry it, and the second half really did not. Splitting a monthly
- *     total in half would invent a number that never happened.
+ *     If insurance posts on the 1st, the first half of the month really did
+ *     carry it, and the second half did not. Debt Service is shown separately.
  *  2. Expenses come from the expense ledger only. Trip-level costs that the
  *     owner posts are mirrored into linked ledger rows. Detailed Fuel entries
  *     replace the load's generated fuel row, so one purchase is counted once.
@@ -39,6 +38,10 @@ import type {
   FinancialSettings,
   Load,
 } from "../types";
+import {
+  isDebtServiceCategory,
+  isOperatingExpenseCategory,
+} from "./terminology";
 
 export interface CostLine {
   category: ExpenseCategoryId;
@@ -46,7 +49,7 @@ export interface CostLine {
   behavior: ExpenseBehavior;
   amount: number;
   perMile: number;
-  /** Share of the true cost per mile, 0-100. */
+  /** Share of Actual Cost Per Mile, 0-100. */
   share: number;
 }
 
@@ -57,6 +60,10 @@ export interface CostPerMile {
   fixedTotal: number;
   variableTotal: number;
   totalCost: number;
+  /** Financing cash burden, excluded from Actual Cost Per Mile. */
+  debtServiceTotal: number;
+  /** Operating costs plus debt service paid in the same window. */
+  cashCostTotal: number;
   /**
    * Dollars the trip itself caused: everything in the four direct categories
    * PLUS every ledger row posted automatically from a load (which includes
@@ -68,6 +75,10 @@ export interface CostPerMile {
   fixedCostPerMile: number;
   variableCostPerMile: number;
   trueCostPerMile: number;
+  /** Canonical name for trueCostPerMile under model version 2. */
+  actualCostPerMile: number;
+  debtServicePerMile: number;
+  cashCostPerMile: number;
   fixed: CostLine[];
   variable: CostLine[];
   /** Every line, biggest first, for the "where does a dollar go" breakdown. */
@@ -98,10 +109,15 @@ function emptyCostPerMile(basisLabel: string, days: number): CostPerMile {
     fixedTotal: 0,
     variableTotal: 0,
     totalCost: 0,
+    debtServiceTotal: 0,
+    cashCostTotal: 0,
     directTripTotal: 0,
     fixedCostPerMile: 0,
     variableCostPerMile: 0,
     trueCostPerMile: 0,
+    actualCostPerMile: 0,
+    debtServicePerMile: 0,
+    cashCostPerMile: 0,
     fixed: [],
     variable: [],
     lines: [],
@@ -124,6 +140,12 @@ export function calculateTrueCostPerMile(
 ): CostPerMile {
   const periodLoads = loads.filter((l) => inRange(l.date, range));
   const periodExpenses = expenses.filter((e) => inRange(e.date, range));
+  const operatingExpenses = periodExpenses.filter((expense) =>
+    isOperatingExpenseCategory(expense.category),
+  );
+  const debtExpenses = periodExpenses.filter((expense) =>
+    isDebtServiceCategory(expense.category),
+  );
 
   const loadedMiles = sum(periodLoads, (l) => l.loadedMiles);
   const deadheadMiles = sum(periodLoads, (l) => l.deadheadMiles);
@@ -134,16 +156,18 @@ export function calculateTrueCostPerMile(
 
   const overrides = settings?.categoryBehavior;
   const buckets = new Map<ExpenseCategoryId, number>();
-  for (const expense of periodExpenses) {
+  for (const expense of operatingExpenses) {
     buckets.set(expense.category, (buckets.get(expense.category) ?? 0) + expense.amount);
   }
 
-  const totalCost = roundMoney(sum(periodExpenses, (e) => e.amount));
+  const totalCost = roundMoney(sum(operatingExpenses, (e) => e.amount));
+  const debtServiceTotal = roundMoney(sum(debtExpenses, (expense) => expense.amount));
+  const cashCostTotal = roundMoney(totalCost + debtServiceTotal);
   // One filter, so a load-posted FUEL row (both a direct category AND a
   // derived id) is never subtracted twice.
   const directTripTotal = roundMoney(
     sum(
-      periodExpenses.filter(
+      operatingExpenses.filter(
         (e) => DIRECT_TRIP_CATEGORIES.includes(e.category) || isLoadExpenseId(e.id),
       ),
       (e) => e.amount,
@@ -176,10 +200,15 @@ export function calculateTrueCostPerMile(
     fixedTotal,
     variableTotal,
     totalCost,
+    debtServiceTotal,
+    cashCostTotal,
     directTripTotal,
     fixedCostPerMile: div(fixedTotal, totalMiles),
     variableCostPerMile: div(variableTotal, totalMiles),
     trueCostPerMile: div(totalCost, totalMiles),
+    actualCostPerMile: div(totalCost, totalMiles),
+    debtServicePerMile: div(debtServiceTotal, totalMiles),
+    cashCostPerMile: div(cashCostTotal, totalMiles),
     fixed,
     variable,
     lines,
@@ -230,13 +259,13 @@ export function trailingCostBasis(
 }
 
 /**
- * Cost per mile with fuel, tolls, dispatch and factoring taken out.
+ * Normalized operating cost per mile with direct trip costs taken out.
  *
  * The load calculator asks for those four explicitly (they change load by
- * load), so charging the full true cost per mile on top would count them
- * twice. What is left -- the truck note, insurance, parking, permits,
- * maintenance, repairs, phone, accounting -- is the overhead every mile has
- * to carry whatever the load pays.
+ * load), so charging the full Actual Cost Per Mile on top would count them
+ * twice. What is left -- insurance, parking, permits, maintenance, repairs,
+ * phone and accounting -- is operating overhead. Debt Service is never part
+ * of this allocation.
  */
 export function overheadCostPerMile(basis: CostPerMile): number {
   if (!basis.sufficient || basis.totalMiles <= 0) return 0;

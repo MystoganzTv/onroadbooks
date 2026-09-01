@@ -160,6 +160,53 @@ describe("summarizePeriod", () => {
     assert.equal(s.loadCount, 2);
   });
 
+  it("separates earned revenue, dated collections, receivables and debt service", () => {
+    const s = summarizePeriod(
+      [
+        load({
+          id: "earned-unpaid",
+          date: "2026-08-03",
+          grossRate: 2500,
+          status: "INVOICED",
+        }),
+        load({
+          id: "prior-paid-now",
+          date: "2026-07-20",
+          grossRate: 1800,
+          status: "PAID",
+          invoicePaidDate: "2026-08-10",
+        }),
+        load({
+          id: "legacy-paid",
+          date: "2026-08-08",
+          grossRate: 900,
+          status: "PAID",
+          invoicePaidDate: null,
+        }),
+      ],
+      [
+        expense({ id: "ops", amount: 400, category: "INSURANCE" }),
+        expense({ id: "interest", amount: 100, category: "INTEREST_EXPENSE" }),
+        expense({ id: "principal", amount: 600, category: "PRINCIPAL_PAYMENT" }),
+        expense({ id: "legacy-debt", amount: 200, category: "TRUCK_PAYMENT" }),
+      ],
+      resolvePeriod("2026-08", "full"),
+      settings,
+    );
+
+    assert.equal(s.bookedRevenue, 3400);
+    assert.equal(s.collectedRevenue, 1800);
+    assert.equal(s.accountsReceivable, 2500);
+    assert.equal(s.unallocatedCollectedRevenue, 900);
+    assert.equal(s.operatingExpenses, 400);
+    assert.equal(s.operatingProfit, 3000);
+    assert.equal(s.interestExpense, 100);
+    assert.equal(s.principalPayment, 600);
+    assert.equal(s.unallocatedDebtService, 200);
+    assert.equal(s.debtService, 900);
+    assert.equal(s.cashAfterDebtService, 500);
+  });
+
   it("halves sum exactly to the full month", () => {
     const first = summarizePeriod(loads, expenses, resolvePeriod("2026-08", "first"), settings);
     const second = summarizePeriod(loads, expenses, resolvePeriod("2026-08", "second"), settings);
@@ -190,7 +237,7 @@ describe("moneyBreakdown", () => {
     const b = moneyBreakdown(s, settings);
     assert.equal(b.operatingProfit, 6000);
     assert.equal(b.taxReserve, 1200); // 20% of operating profit
-    assert.equal(b.maintenanceReserve, 500); // 5% of gross revenue
+    assert.equal(b.maintenanceReserve, 500); // 5% of Booked Revenue
     assert.equal(b.availableCash, 4300);
   });
 

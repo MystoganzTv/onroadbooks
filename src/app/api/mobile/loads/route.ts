@@ -13,6 +13,7 @@ import {
 } from "@/lib/calculations";
 import { scoreLoads } from "@/lib/finance";
 import { periodFromSearchParams } from "@/lib/period-params";
+import { FINANCIAL_MODEL_VERSION } from "@/lib/finance/terminology";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,6 +47,11 @@ export async function GET(request: NextRequest) {
       grossRate: load.grossRate,
       loadedMiles: load.loadedMiles,
       deadheadMiles: load.deadheadMiles,
+      directTripCosts: load.metrics.tripExpenses,
+      contributionProfit: load.metrics.tripProfit,
+      contributionProfitPerMile: load.metrics.profitPerMile,
+      contributionMargin: load.metrics.profitMargin,
+      // Read-compatible aliases for older mobile builds.
       profitPerMile: load.metrics.profitPerMile,
       profitMargin: load.metrics.profitMargin,
       deadheadPct: load.metrics.deadheadPct,
@@ -53,7 +59,7 @@ export async function GET(request: NextRequest) {
     }));
 
   return NextResponse.json(
-    { periodLabel: period.label, loads: results },
+    { calculationVersion: FINANCIAL_MODEL_VERSION, periodLabel: period.label, loads: results },
     { headers: { "Cache-Control": "no-store, max-age=0" } },
   );
 }

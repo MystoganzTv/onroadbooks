@@ -6,7 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const TABS = [
-  { href: "/analytics/cost-per-mile", label: "Cost / Mile" },
+  { href: "/analytics/cost-per-mile", label: "Actual Cost / Mile" },
   { href: "/analytics/brokers", label: "Brokers" },
   { href: "/analytics/lanes", label: "Lanes" },
 ];

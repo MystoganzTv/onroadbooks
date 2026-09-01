@@ -78,7 +78,7 @@ export default async function BrokersPage({
         />
         <PlanGate
           capability="cockpit"
-          what="Rank the brokers you actually haul for on profit per mile driven, not on the rate they quote."
+          what="Rank the brokers you actually haul for on contribution profit per mile driven, not on the rate they quote."
         />
       </div>
     );
@@ -168,12 +168,12 @@ export default async function BrokersPage({
                   <TableRow>
                     <TableHead>Broker</TableHead>
                     <TableHead className="text-right">Loads</TableHead>
-                    <TableHead className="text-right">Revenue</TableHead>
+                    <TableHead className="text-right">Booked Revenue</TableHead>
                     <TableHead className="text-right">Miles</TableHead>
                     <TableHead className="text-right">Gross $/mi</TableHead>
-                    <TableHead className="text-right">Profit</TableHead>
-                    <TableHead className="text-right">Profit $/mi</TableHead>
-                    <TableHead className="text-right">Margin</TableHead>
+                    <TableHead className="text-right">Contribution Profit</TableHead>
+                    <TableHead className="text-right">Contribution $/mi</TableHead>
+                    <TableHead className="text-right">Contribution Margin</TableHead>
                     <TableHead className="text-right">Deadhead</TableHead>
                     <TableHead className="text-right">Rating</TableHead>
                   </TableRow>
@@ -238,7 +238,7 @@ export default async function BrokersPage({
       </Card>
 
       <p className="text-2xs leading-relaxed text-muted-foreground">
-        Profit here is trip profit: gross rate less the fuel, tolls, dispatch, factoring and other
+        Profit here is Contribution Profit: gross rate less the fuel, tolls, dispatch, factoring and other
         costs recorded on each load, over every mile including deadhead. The ranking default is
         total profit — who produced the most money — while the rating is per mile, which is what
         decides whether their next load is worth taking.

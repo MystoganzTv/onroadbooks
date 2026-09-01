@@ -10,7 +10,7 @@
  * The tiers are split by DEPTH, not by how much of the same thing you get:
  *
  *   SOLO    the book      what happened. Loads, expenses, fuel, documents,
- *                         profit per load and per mile, true cost per mile.
+ *                         contribution profit per load, actual cost per mile.
  *   OWNER   the cockpit   what to do next. The load calculator and target
  *                         rate, brokers and lanes, deadhead, settlements,
  *                         reserves and Safe to Pay Yourself, goals and pace.
@@ -69,8 +69,8 @@ export const PLANS: Record<PlanId, Plan> = {
     features: [
       "One truck, unlimited loads",
       "Loads, expenses, fuel, receipts and documents",
-      "Profit per load and profit per mile",
-      "True cost per mile, never prorated",
+      "Contribution profit per load and per mile",
+      "Actual and normalized cost per mile",
       "Print-ready reports and CSV export",
     ],
     note: null,

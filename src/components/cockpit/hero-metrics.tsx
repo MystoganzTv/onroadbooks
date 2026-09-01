@@ -23,7 +23,7 @@ interface HeroMetricsProps {
 /**
  * The four numbers that answer "am I making money" in five seconds.
  *
- * Revenue, net profit, what is actually free to take, and what a mile
+ * Booked revenue, operating profit, what is actually free to take, and what a mile
  * returned. Everything else on the page is context for these.
  */
 export function HeroMetrics({
@@ -32,21 +32,21 @@ export function HeroMetrics({
   previousLabel,
   deltas,
 }: HeroMetricsProps) {
-  const profitable = summary.netProfit >= 0;
+  const profitable = summary.operatingProfit >= 0;
 
   return (
     <div className="grid h-full grid-cols-2 gap-3">
       <HeroTile
-        label="Revenue"
-        value={formatMoneyCompact(summary.grossRevenue)}
+        label="Booked Revenue"
+        value={formatMoneyCompact(summary.bookedRevenue)}
         icon={Banknote}
         tone="info"
         delta={deltas.revenue}
         sub={`vs ${previousLabel}`}
       />
       <HeroTile
-        label="Net Profit"
-        value={formatMoneyCompact(summary.netProfit)}
+        label="Operating Profit"
+        value={formatMoneyCompact(summary.operatingProfit)}
         icon={profitable ? TrendingUp : TrendingDown}
         tone={profitable ? "positive" : "negative"}
         delta={deltas.profit}
@@ -54,7 +54,7 @@ export function HeroMetrics({
       />
       {ownerPay ? (
         <HeroTile
-          label="Available Cash"
+          label="Safe to Pay Yourself"
           value={formatMoneyCompact(ownerPay.safeToPay)}
           icon={Wallet}
           tone={ownerPay.safeToPay >= 0 ? "positive" : "negative"}
@@ -62,7 +62,7 @@ export function HeroMetrics({
         />
       ) : (
         <HeroTile
-          label="Cost / Mile"
+          label="Actual Cost / Mile"
           value={formatRate(summary.costPerMile)}
           icon={Wallet}
           tone="negative"
@@ -70,7 +70,7 @@ export function HeroMetrics({
         />
       )}
       <HeroTile
-        label="Profit / Mile"
+        label="Operating Profit / Mile"
         value={formatRate(summary.profitPerMile)}
         icon={Gauge}
         tone={summary.profitPerMile >= 0 ? "positive" : "negative"}

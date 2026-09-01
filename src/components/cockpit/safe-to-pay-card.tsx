@@ -47,9 +47,9 @@ export function SafeToPayCard({ ownerPay, periodLabel, href, className }: SafeTo
               <Info className="size-3.5" />
             </TooltipTrigger>
             <TooltipContent className="max-w-[17rem] text-2xs leading-relaxed">
-              Operating profit for {periodLabel} minus the reserve percentages you set. It is a
-              planning figure showing what is not already spoken for -- not your bank balance,
-              and not tax or accounting advice.
+              Collected Revenue for {periodLabel}, less cash operating expenses, Debt Service and
+              planned Reserve Contributions. Accounts Receivable never increases this figure. It
+              is a planning ceiling, not a bank balance or tax advice.
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -57,9 +57,24 @@ export function SafeToPayCard({ ownerPay, periodLabel, href, className }: SafeTo
 
       <CardContent className="space-y-0 p-0">
         <dl className="divide-y divide-border/70">
-          <Row label="Gross revenue" value={formatMoney(ownerPay.grossRevenue)} />
+          <Row label="Booked Revenue" value={formatMoney(ownerPay.bookedRevenue)} />
           <Row
-            label="Operating expenses"
+            label="Accounts Receivable"
+            hint="performance, not available cash"
+            value={formatMoney(ownerPay.accountsReceivable)}
+            tone={ownerPay.accountsReceivable > 0 ? "warn" : undefined}
+          />
+          <Row label="Collected Revenue" value={formatMoney(ownerPay.collectedRevenue)} strong />
+          {ownerPay.unallocatedCollectedRevenue > 0 ? (
+            <Row
+              label="Paid Revenue without Payment Date"
+              hint="preserved; not assigned to a cash period"
+              value={formatMoney(ownerPay.unallocatedCollectedRevenue)}
+              tone="warn"
+            />
+          ) : null}
+          <Row
+            label="Cash Operating Expenses"
             value={
               ownerPay.operatingExpenses > 0
                 ? `-${formatMoney(ownerPay.operatingExpenses)}`
@@ -68,8 +83,14 @@ export function SafeToPayCard({ ownerPay, periodLabel, href, className }: SafeTo
             tone={ownerPay.operatingExpenses > 0 ? "neg" : undefined}
           />
           <Row
-            label="Operating profit"
-            value={formatMoney(ownerPay.operatingProfit)}
+            label="Debt Service"
+            hint="interest + principal + unsplit payments"
+            value={ownerPay.debtService > 0 ? `-${formatMoney(ownerPay.debtService)}` : formatMoney(0)}
+            tone={ownerPay.debtService > 0 ? "neg" : undefined}
+          />
+          <Row
+            label="Cash After Debt Service"
+            value={formatMoney(ownerPay.cashAfterDebtService)}
             strong
             className="bg-surface-sunken/60"
           />
@@ -78,7 +99,7 @@ export function SafeToPayCard({ ownerPay, periodLabel, href, className }: SafeTo
               key={reserve.accountId}
               label={reserve.name}
               hint={`${reserve.pct}% of ${
-                reserve.basis === "OPERATING_PROFIT" ? "operating profit" : "gross revenue"
+                reserve.basis === "OPERATING_PROFIT" ? "Operating Profit" : "Booked Revenue"
               }`}
               value={reserve.amount > 0 ? `-${formatMoney(reserve.amount)}` : formatMoney(0)}
               tone={reserve.amount > 0 ? "warn" : undefined}
@@ -94,7 +115,7 @@ export function SafeToPayCard({ ownerPay, periodLabel, href, className }: SafeTo
         >
           <div className="min-w-0">
             <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              Safe to pay yourself
+              Safe to Pay Yourself
             </p>
             <p className="mt-0.5 text-2xs text-muted-foreground">{periodLabel}</p>
           </div>

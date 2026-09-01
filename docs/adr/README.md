@@ -43,6 +43,7 @@ The format is in [0000-template.md](0000-template.md); the practice itself is
 | [0011](0011-settlement-snapshots.md) | Freeze a settlement into a server-built snapshot | Accepted |
 | [0012](0012-reserves-as-signed-ledger.md) | Reserves as a signed ledger, each rate stored once | Accepted |
 | [0016](0016-fleet-contribution-model.md) | Contribution per truck, overhead subtracted once | Accepted |
+| [0025](0025-canonical-financial-terminology.md) | One vocabulary and separate performance, cash and load-profitability lenses | Accepted |
 
 ### What the product claims
 

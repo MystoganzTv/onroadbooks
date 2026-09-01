@@ -155,7 +155,7 @@ export function ReserveAccountDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="GROSS_REVENUE">Gross revenue</SelectItem>
-                  <SelectItem value="OPERATING_PROFIT">Operating profit</SelectItem>
+                  <SelectItem value="OPERATING_PROFIT">Operating Profit</SelectItem>
                 </SelectContent>
               </Select>
             </Field>

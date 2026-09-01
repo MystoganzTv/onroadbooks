@@ -136,7 +136,7 @@ export default async function ReservesPage({
                       ? `${formatPercent(rule.pct, rule.pct % 1 === 0 ? 0 : 1)} of ${
                           balance.account.basis === "OPERATING_PROFIT"
                             ? "operating profit"
-                            : "gross revenue"
+                            : "Booked Revenue"
                         } each settlement`
                       : "No automatic contribution set"}
                   </p>

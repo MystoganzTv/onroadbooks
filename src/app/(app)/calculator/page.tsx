@@ -19,9 +19,11 @@ export const metadata: Metadata = { title: "Load Calculator" };
  *                this truck loaded the way this owner loads it.
  *   Fuel price   the most recent price actually paid.
  *   Fees         the dispatch and factoring rates this truck has been paying,
- *                inferred from the ledger against gross revenue.
- *   Overhead     trailing-90-day true cost per mile with fuel, tolls, dispatch
+ *                inferred from the ledger against Booked Revenue.
+ *   Operating    trailing-90-day actual cost per mile with fuel, tolls, dispatch
  *                and factoring removed, because those are entered per load.
+ *   Debt burden  trailing debt service per mile, shown separately and never
+ *                used to classify the load.
  */
 export default async function CalculatorPage() {
   const session = await requireSession();
@@ -59,6 +61,7 @@ export default async function CalculatorPage() {
     dispatchPct: Math.round(div(dispatchPaid, grossRevenue) * 1000) / 10,
     factoringPct: Math.round(div(factoringPaid, grossRevenue) * 1000) / 10,
     overheadPerMile: overheadCostPerMile(basis),
+    debtServicePerMile: basis.debtServicePerMile,
     trueCostPerMile: basis.trueCostPerMile,
     basisLabel: basis.basisLabel,
     basisMiles: basis.totalMiles,

@@ -9,6 +9,14 @@
  */
 
 import { behaviorOf, EXPENSE_CATEGORIES, getCategory } from "./categories";
+import {
+  FINANCIAL_MODEL_VERSION,
+  isDebtServiceCategory,
+  isInterestExpenseCategory,
+  isOperatingExpenseCategory,
+  isPrincipalPaymentCategory,
+  isUnallocatedDebtServiceCategory,
+} from "./finance/terminology";
 import { inRange, type DateRange, type Period } from "./periods";
 import type {
   CategoryTotal,
@@ -248,9 +256,59 @@ export function summarizePeriod(
   const periodLoads = loadsInPeriod(loads, range);
   const periodExpenses = expensesInPeriod(expenses, range);
 
-  const grossRevenue = roundMoney(sum(periodLoads, (l) => l.grossRate));
-  const operatingExpenses = roundMoney(sum(periodExpenses, (e) => e.amount));
-  const netProfit = roundMoney(grossRevenue - operatingExpenses);
+  const bookedRevenue = roundMoney(sum(periodLoads, (l) => l.grossRate));
+  // Collections belong to the day cash arrived, not to the operational date
+  // of the load. A legacy PAID row with no date stays paid but is not guessed
+  // into this or any other cash period.
+  const collectedRevenue = roundMoney(
+    sum(
+      loads.filter(
+        (load) =>
+          load.status === "PAID" &&
+          Boolean(load.invoicePaidDate) &&
+          inRange(load.invoicePaidDate!, range),
+      ),
+      (load) => load.grossRate,
+    ),
+  );
+  const accountsReceivable = roundMoney(
+    sum(
+      periodLoads.filter((load) => load.status !== "PAID"),
+      (load) => load.grossRate,
+    ),
+  );
+  const unallocatedCollectedRevenue = roundMoney(
+    sum(
+      periodLoads.filter((load) => load.status === "PAID" && !load.invoicePaidDate),
+      (load) => load.grossRate,
+    ),
+  );
+
+  const operatingExpenseRows = periodExpenses.filter((expense) =>
+    isOperatingExpenseCategory(expense.category),
+  );
+  const operatingExpenses = roundMoney(sum(operatingExpenseRows, (expense) => expense.amount));
+  const interestExpense = roundMoney(
+    sum(
+      periodExpenses.filter((expense) => isInterestExpenseCategory(expense.category)),
+      (expense) => expense.amount,
+    ),
+  );
+  const principalPayment = roundMoney(
+    sum(
+      periodExpenses.filter((expense) => isPrincipalPaymentCategory(expense.category)),
+      (expense) => expense.amount,
+    ),
+  );
+  const unallocatedDebtService = roundMoney(
+    sum(
+      periodExpenses.filter((expense) => isUnallocatedDebtServiceCategory(expense.category)),
+      (expense) => expense.amount,
+    ),
+  );
+  const debtService = roundMoney(interestExpense + principalPayment + unallocatedDebtService);
+  const operatingProfit = roundMoney(bookedRevenue - operatingExpenses);
+  const cashAfterDebtService = roundMoney(collectedRevenue - operatingExpenses - debtService);
 
   const loadedMiles = sum(periodLoads, (l) => l.loadedMiles);
   const deadheadMiles = sum(periodLoads, (l) => l.deadheadMiles);
@@ -259,51 +317,54 @@ export function summarizePeriod(
   const overrides = settings?.categoryBehavior;
   const fixedExpenses = roundMoney(
     sum(
-      periodExpenses.filter((e) => behaviorOf(e.category, overrides) === "FIXED"),
+      operatingExpenseRows.filter((e) => behaviorOf(e.category, overrides) === "FIXED"),
       (e) => e.amount,
     ),
   );
 
   return {
-    grossRevenue,
+    calculationVersion: FINANCIAL_MODEL_VERSION,
+    bookedRevenue,
+    collectedRevenue,
+    accountsReceivable,
+    unallocatedCollectedRevenue,
+    interestExpense,
+    principalPayment,
+    unallocatedDebtService,
+    debtService,
+    operatingProfit,
+    cashAfterDebtService,
+    grossRevenue: bookedRevenue,
     operatingExpenses,
-    netProfit,
-    netMargin: div(netProfit, grossRevenue) * 100,
+    netProfit: operatingProfit,
+    netMargin: div(operatingProfit, bookedRevenue) * 100,
     totalMiles,
     loadedMiles,
     deadheadMiles,
     deadheadPct: div(deadheadMiles, totalMiles) * 100,
-    revenuePerMile: div(grossRevenue, totalMiles),
+    revenuePerMile: div(bookedRevenue, totalMiles),
     costPerMile: div(operatingExpenses, totalMiles),
-    profitPerMile: div(netProfit, totalMiles),
+    profitPerMile: div(operatingProfit, totalMiles),
     loadCount: periodLoads.length,
-    paidRevenue: roundMoney(
-      sum(
-        periodLoads.filter((l) => l.status === "PAID"),
-        (l) => l.grossRate,
-      ),
-    ),
-    outstandingRevenue: roundMoney(
-      sum(
-        periodLoads.filter((l) => l.status !== "PAID"),
-        (l) => l.grossRate,
-      ),
-    ),
+    paidRevenue: collectedRevenue,
+    outstandingRevenue: accountsReceivable,
     fixedExpenses,
     variableExpenses: roundMoney(operatingExpenses - fixedExpenses),
     fuelExpense: roundMoney(
       sum(
-        periodExpenses.filter((e) => e.category === "FUEL"),
+        operatingExpenseRows.filter((e) => e.category === "FUEL"),
         (e) => e.amount,
       ),
     ),
     maintenanceExpense: roundMoney(
       sum(
-        periodExpenses.filter((e) => e.category === "MAINTENANCE" || e.category === "REPAIRS"),
+        operatingExpenseRows.filter(
+          (e) => e.category === "MAINTENANCE" || e.category === "REPAIRS",
+        ),
         (e) => e.amount,
       ),
     ),
-    revenuePerLoadedMile: div(grossRevenue, loadedMiles),
+    revenuePerLoadedMile: div(bookedRevenue, loadedMiles),
     variableCostPerMile: div(roundMoney(operatingExpenses - fixedExpenses), totalMiles),
   };
 }
@@ -453,9 +514,9 @@ export function emptySummary(): PeriodSummary {
 /* ---- Money breakdown ------------------------------------------------- */
 
 /**
- * Gross revenue - operating expenses = operating profit.
- * Reserves come off operating profit / gross revenue, and what is left is
- * the number the owner can actually spend.
+ * Booked revenue - operating expenses = operating profit.
+ * This legacy helper does not model collected cash or debt service and must
+ * not be used to present Safe to Pay Yourself.
  *
  * LEGACY: only knows the two built-in buckets at their default bases. The
  * app, the exports and the Settings preview all use finance/owner-pay.ts
@@ -599,8 +660,22 @@ export function summarizeFuel(entries: FuelEntry[], totalMiles: number): FuelSum
 /* ---- Truck lifetime -------------------------------------------------- */
 
 export interface TruckLifetime {
+  calculationVersion: number;
+  bookedRevenue: number;
+  collectedRevenue: number;
+  accountsReceivable: number;
+  unallocatedCollectedRevenue: number;
+  operatingExpenses: number;
+  operatingProfit: number;
+  debtService: number;
+  cashAfterDebtService: number;
+  actualCostPerMile: number;
+  operatingProfitPerMile: number;
+  /** @deprecated Use bookedRevenue. */
   totalRevenue: number;
+  /** @deprecated Use operatingExpenses. */
   totalExpenses: number;
+  /** @deprecated Use operatingProfit. */
   lifetimeProfit: number;
   totalMiles: number;
   costPerMile: number;
@@ -620,11 +695,37 @@ export function truckLifetime(dataset: Dataset, truck: Truck): TruckLifetime {
   );
 
   const totalRevenue = roundMoney(sum(loads, (l) => l.grossRate));
-  const totalExpenses = roundMoney(sum(expenses, (e) => e.amount));
+  const collectedRevenue = roundMoney(
+    sum(loads.filter((load) => load.status === "PAID" && Boolean(load.invoicePaidDate)), (load) => load.grossRate),
+  );
+  const accountsReceivable = roundMoney(
+    sum(loads.filter((load) => load.status !== "PAID"), (load) => load.grossRate),
+  );
+  const unallocatedCollectedRevenue = roundMoney(
+    sum(loads.filter((load) => load.status === "PAID" && !load.invoicePaidDate), (load) => load.grossRate),
+  );
+  const totalExpenses = roundMoney(
+    sum(expenses.filter((expense) => isOperatingExpenseCategory(expense.category)), (e) => e.amount),
+  );
+  const debtService = roundMoney(
+    sum(expenses.filter((expense) => isDebtServiceCategory(expense.category)), (e) => e.amount),
+  );
   const totalMiles = sum(loads, (l) => l.loadedMiles + l.deadheadMiles);
   const lifetimeProfit = roundMoney(totalRevenue - totalExpenses);
+  const cashAfterDebtService = roundMoney(collectedRevenue - totalExpenses - debtService);
 
   return {
+    calculationVersion: FINANCIAL_MODEL_VERSION,
+    bookedRevenue: totalRevenue,
+    collectedRevenue,
+    accountsReceivable,
+    unallocatedCollectedRevenue,
+    operatingExpenses: totalExpenses,
+    operatingProfit: lifetimeProfit,
+    debtService,
+    cashAfterDebtService,
+    actualCostPerMile: div(totalExpenses, totalMiles),
+    operatingProfitPerMile: div(lifetimeProfit, totalMiles),
     totalRevenue,
     totalExpenses,
     lifetimeProfit,
@@ -674,7 +775,7 @@ export function buildInsights(
       insights.push({
         id: "ppm-trend",
         tone: delta >= 0 ? "positive" : "negative",
-        text: `Your profit per mile ${delta >= 0 ? "improved" : "declined"} ${Math.abs(delta).toFixed(1)}% compared with the previous period.`,
+        text: `Your operating profit per mile ${delta >= 0 ? "improved" : "declined"} ${Math.abs(delta).toFixed(1)}% compared with the previous period.`,
       });
     }
   }
@@ -778,9 +879,9 @@ export function buildTrend(
     const s = summarizePeriod(loads, expenses, period);
     return {
       label: period.shortLabel,
-      revenue: s.grossRevenue,
+      revenue: s.bookedRevenue,
       expenses: s.operatingExpenses,
-      profit: s.netProfit,
+      profit: s.operatingProfit,
       revenuePerMile: roundMoney(s.revenuePerMile),
       costPerMile: roundMoney(s.costPerMile),
       profitPerMile: roundMoney(s.profitPerMile),

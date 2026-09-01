@@ -29,6 +29,7 @@ import {
 } from "@/lib/calculations";
 import { getRepository } from "@/lib/db";
 import { calculateFleetSummary } from "@/lib/finance/fleet";
+import { isOperatingExpenseCategory } from "@/lib/finance/terminology";
 import { expensesForTruck, loadsForTruck, orderedTrucks, truckById } from "@/lib/fleet";
 import {
   formatMiles,
@@ -82,7 +83,9 @@ export default async function FleetUnitPage({
   if (!contribution) notFound();
 
   const categories = categoryTotals(
-    expensesInPeriod(unitExpenses, period),
+    expensesInPeriod(unitExpenses, period).filter((expense) =>
+      isOperatingExpenseCategory(expense.category),
+    ),
     dataset.settings,
   );
   const thresholds = thresholdsFromSettings(dataset.settings);
@@ -118,7 +121,7 @@ export default async function FleetUnitPage({
 
       <div className="hidden border-b-2 border-foreground pb-3 print:block">
         <p className="text-2xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          OnRoad Books · Unit P&amp;L
+          OnRoad Books · Unit Contribution Statement
         </p>
         <div className="mt-1 flex items-end justify-between gap-4">
           <div>
@@ -131,8 +134,8 @@ export default async function FleetUnitPage({
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 print:grid-cols-4">
         <MiniStat
-          label="Gross revenue"
-          value={formatMoneyCompact(summary.grossRevenue)}
+          label="Booked Revenue"
+          value={formatMoneyCompact(summary.bookedRevenue)}
           sub={`${summary.loadCount} ${summary.loadCount === 1 ? "load" : "loads"}`}
           tone="info"
         />
@@ -144,9 +147,9 @@ export default async function FleetUnitPage({
         />
         <MiniStat
           label="Contribution"
-          value={formatMoneyCompact(summary.netProfit)}
+          value={formatMoneyCompact(summary.operatingProfit)}
           sub={`${formatPercent(summary.netMargin)} margin`}
-          tone={summary.netProfit >= 0 ? "positive" : "negative"}
+          tone={summary.operatingProfit >= 0 ? "positive" : "negative"}
         />
         <MiniStat
           label="Contribution / mile"
@@ -160,15 +163,15 @@ export default async function FleetUnitPage({
         <Card className="print-keep xl:col-span-2">
           <CardHeader>
             <div>
-              <CardTitle>Unit profit &amp; loss</CardTitle>
+              <CardTitle>Unit Contribution Statement</CardTitle>
               <p className="mt-1 text-2xs text-muted-foreground">
-                Only revenue and ledger costs assigned to {truck.name}.
+                Booked Revenue less operating costs assigned to {truck.name}; Debt Service is separate.
               </p>
             </div>
             <span className="text-2xs text-muted-foreground">{period.shortLabel}</span>
           </CardHeader>
           <CardContent className="p-0">
-            <StatementLine label="Gross revenue" value={summary.grossRevenue} emphasis />
+            <StatementLine label="Booked Revenue" value={summary.bookedRevenue} emphasis />
             <div className="border-y border-border bg-surface-sunken/35 px-4 py-2">
               <p className="label-xs">Operating expenses</p>
             </div>
@@ -195,16 +198,16 @@ export default async function FleetUnitPage({
               <div>
                 <p className="font-semibold">Unit contribution</p>
                 <p className="mt-0.5 text-2xs text-muted-foreground">
-                  Revenue minus costs caused by this truck
+                  Booked Revenue minus operating costs caused by this truck
                 </p>
               </div>
               <p
                 className={cn(
                   "text-xl font-semibold tnum",
-                  summary.netProfit >= 0 ? "text-pos" : "text-neg",
+                  summary.operatingProfit >= 0 ? "text-pos" : "text-neg",
                 )}
               >
-                {formatMoney(summary.netProfit)}
+                {formatMoney(summary.operatingProfit)}
               </p>
             </div>
           </CardContent>
@@ -219,11 +222,12 @@ export default async function FleetUnitPage({
             <ContextLine label="All units' contribution" value={fleet.contribution} />
             <ContextLine label="Business overhead" value={-fleet.overhead} />
             <div className="flex items-center justify-between border-t border-border pt-3 font-semibold">
-              <span>Company operating profit</span>
+              <span>Company Operating Profit</span>
               <span className={cn("tnum", fleet.operatingProfit >= 0 ? "text-pos" : "text-neg")}>
                 {formatMoney(fleet.operatingProfit)}
               </span>
             </div>
+            <ContextLine label="Debt Service (cash burden)" value={-contribution.debtService} />
             <p className="border-t border-border pt-3 text-2xs leading-relaxed text-muted-foreground">
               Company overhead is shown here for reconciliation, but it is not assigned to this
               truck. That keeps the unit result factual instead of inventing an allocation rule.
@@ -264,8 +268,8 @@ export default async function FleetUnitPage({
                     <TableHead>Route</TableHead>
                     <TableHead>Broker</TableHead>
                     <TableHead className="text-right">Miles</TableHead>
-                    <TableHead className="text-right">Gross</TableHead>
-                    <TableHead className="text-right">Trip profit</TableHead>
+                    <TableHead className="text-right">Gross Rate</TableHead>
+                    <TableHead className="text-right">Contribution Profit</TableHead>
                     <TableHead className="text-right print:hidden">Open</TableHead>
                   </TableRow>
                 </TableHeader>

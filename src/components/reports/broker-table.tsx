@@ -23,7 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * Which brokers actually make money -- ranked on trip profit, with profit
+ * Which brokers actually make money -- ranked on Contribution Profit, with profit
  * per total mile alongside so a high-volume broker paying thin rates cannot
  * hide behind its revenue.
  *
@@ -47,7 +47,7 @@ export function BrokerTable({
           <Building2 className="size-3.5 text-muted-foreground" />
           <CardTitle>Broker Performance</CardTitle>
         </div>
-        <span className="text-2xs text-muted-foreground">Ranked by trip profit</span>
+        <span className="text-2xs text-muted-foreground">Ranked by Contribution Profit</span>
       </CardHeader>
 
       {brokers.length === 0 ? (
@@ -65,12 +65,12 @@ export function BrokerTable({
                 <TableRow className="hover:bg-transparent">
                   <TableHead>Broker</TableHead>
                   <TableHead className="text-right">Loads</TableHead>
-                  <TableHead className="text-right">Revenue</TableHead>
+                  <TableHead className="text-right">Booked Revenue</TableHead>
                   <TableHead className="text-right print:hidden">Miles</TableHead>
                   <TableHead className="text-right">DH %</TableHead>
                   <TableHead className="text-right print:hidden">$/Loaded</TableHead>
-                  <TableHead className="text-right">Trip Profit</TableHead>
-                  <TableHead className="text-right">Profit/mi</TableHead>
+                  <TableHead className="text-right">Contribution Profit</TableHead>
+                  <TableHead className="text-right">Contribution/mi</TableHead>
                   <TableHead>Rating</TableHead>
                   <TableHead className="text-right">Outstanding</TableHead>
                 </TableRow>
@@ -142,7 +142,7 @@ export function BrokerTable({
                 <p className="label-xs text-pos/80">Best relationship</p>
                 <p className="mt-1 truncate text-sm font-semibold text-pos">{best.broker}</p>
                 <p className="mt-0.5 text-2xs text-pos/90 tnum">
-                  {formatMoney(best.tripProfit)} trip profit across {best.loadCount}{" "}
+                  {formatMoney(best.tripProfit)} Contribution Profit across {best.loadCount}{" "}
                   {best.loadCount === 1 ? "load" : "loads"} at{" "}
                   {formatRateValue(best.profitPerMile)}/mi
                 </p>
@@ -154,7 +154,7 @@ export function BrokerTable({
                 </p>
                 <p className="mt-1 truncate text-sm font-semibold">{worst.broker}</p>
                 <p className="mt-0.5 text-2xs text-muted-foreground tnum">
-                  {formatMoney(worst.tripProfit)} trip profit at{" "}
+                  {formatMoney(worst.tripProfit)} Contribution Profit at{" "}
                   {formatRateValue(worst.profitPerMile)}/mi with{" "}
                   {formatPercent(worst.deadheadPct)} deadhead
                 </p>

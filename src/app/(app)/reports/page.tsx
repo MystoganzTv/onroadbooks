@@ -44,6 +44,7 @@ import {
   truckById,
 } from "@/lib/fleet";
 import { formatDateMedium } from "@/lib/formatters";
+import { isOperatingExpenseCategory } from "@/lib/finance/terminology";
 import {
   periodFromSearchParams,
   scopeQuery,
@@ -85,7 +86,12 @@ export default async function ReportsPage({
 
   const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings);
   const priorSummary = summarizePeriod(scopedLoads, scopedExpenses, prior, settings);
-  const categories = categoryTotals(expensesInPeriod(scopedExpenses, period), settings);
+  const categories = categoryTotals(
+    expensesInPeriod(scopedExpenses, period).filter((expense) =>
+      isOperatingExpenseCategory(expense.category),
+    ),
+    settings,
+  );
   const halves = halfMonthComparison(scopedLoads, scopedExpenses, period.month);
   const thresholds = thresholdsFromSettings(settings);
   const brokers = brokerPerformance(
@@ -152,7 +158,7 @@ export default async function ReportsPage({
       <div className="grid gap-4 xl:grid-cols-2 print:gap-3">
         <Card className="print-keep">
           <CardHeader>
-            <CardTitle>Revenue vs Expenses</CardTitle>
+            <CardTitle>Booked Revenue vs Operating Expenses</CardTitle>
             <span className="text-2xs text-muted-foreground">Last 8 half-months</span>
           </CardHeader>
           <CardContent className="px-2 py-3">
@@ -163,8 +169,8 @@ export default async function ReportsPage({
               <PrintBarChart
                 data={halfTrend}
                 series={[
-                  { dataKey: "revenue", name: "Revenue", color: PRINT_INK.revenue },
-                  { dataKey: "expenses", name: "Expenses", color: PRINT_INK.expense },
+                  { dataKey: "revenue", name: "Booked Revenue", color: PRINT_INK.revenue },
+                  { dataKey: "expenses", name: "Operating Expenses", color: PRINT_INK.expense },
                 ]}
               />
             </div>
@@ -173,7 +179,7 @@ export default async function ReportsPage({
 
         <Card className="print-keep">
           <CardHeader>
-            <CardTitle>Net Profit Trend</CardTitle>
+            <CardTitle>Operating Profit Trend</CardTitle>
             <span className="text-2xs text-muted-foreground">Last 6 months</span>
           </CardHeader>
           <CardContent className="px-2 py-3">
@@ -182,8 +188,8 @@ export default async function ReportsPage({
                 data={monthTrend}
                 height={240}
                 series={[
-                  { dataKey: "profit", name: "Net Profit", color: "hsl(var(--pos))" },
-                  { dataKey: "revenue", name: "Revenue", color: "hsl(var(--info))" },
+                  { dataKey: "profit", name: "Operating Profit", color: "hsl(var(--pos))" },
+                  { dataKey: "revenue", name: "Booked Revenue", color: "hsl(var(--info))" },
                 ]}
               />
             </div>
@@ -191,8 +197,8 @@ export default async function ReportsPage({
               <PrintLineChart
                 data={monthTrend}
                 series={[
-                  { dataKey: "profit", name: "Net Profit", color: PRINT_INK.revenue },
-                  { dataKey: "revenue", name: "Revenue", color: PRINT_INK.info },
+                  { dataKey: "profit", name: "Operating Profit", color: PRINT_INK.revenue },
+                  { dataKey: "revenue", name: "Booked Revenue", color: PRINT_INK.info },
                 ]}
               />
             </div>
@@ -211,7 +217,7 @@ export default async function ReportsPage({
                 formatter="rate"
                 series={[
                   { dataKey: "revenuePerMile", name: "Revenue / mi", color: "hsl(var(--info))" },
-                  { dataKey: "profitPerMile", name: "Profit / mi", color: "hsl(var(--pos))" },
+                  { dataKey: "profitPerMile", name: "Operating Profit / mi", color: "hsl(var(--pos))" },
                 ]}
               />
             </div>
@@ -221,7 +227,7 @@ export default async function ReportsPage({
                 kind="rate"
                 series={[
                   { dataKey: "revenuePerMile", name: "Revenue / mi", color: PRINT_INK.info },
-                  { dataKey: "profitPerMile", name: "Profit / mi", color: PRINT_INK.revenue },
+                  { dataKey: "profitPerMile", name: "Operating Profit / mi", color: PRINT_INK.revenue },
                 ]}
               />
             </div>

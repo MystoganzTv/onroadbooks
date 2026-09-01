@@ -84,8 +84,8 @@ export default async function LoadsPage({
       >
         <MiniStat label="Loads" value={formatNumber(summary.loadCount)} sub="in period" />
         <MiniStat
-          label="Gross Revenue"
-          value={formatMoneyCompact(summary.grossRevenue)}
+          label="Booked Revenue"
+          value={formatMoneyCompact(summary.bookedRevenue)}
           tone="info"
         />
         <MiniStat label="Total Miles" value={formatNumber(summary.totalMiles)} sub="mi" />
@@ -95,7 +95,7 @@ export default async function LoadsPage({
           tone={isDeadheadElevated(summary.deadheadPct, settings.deadheadWarnPct) ? "warning" : "positive"}
         />
         <MiniStat
-          label="Trip Expenses"
+          label="Direct Trip Costs"
           value={formatMoneyCompact(tripExpenses)}
           tone="negative"
           sub="trip costs + paid driver"
@@ -104,7 +104,7 @@ export default async function LoadsPage({
           label="Revenue / Mile"
           value={formatRate(summary.revenuePerMile)}
           tone="info"
-          sub={`trip profit ${formatMoneyCompact(tripProfit)}`}
+          sub={`Contribution Profit ${formatMoneyCompact(tripProfit)}`}
         />
       </section>
 

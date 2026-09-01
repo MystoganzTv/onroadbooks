@@ -158,7 +158,10 @@ enum ExpenseCategory {
   FUEL
   TOLLS
   INSURANCE
+  /// Legacy or intentionally unsplit debt payment. Never auto-reclassified.
   TRUCK_PAYMENT
+  INTEREST_EXPENSE
+  PRINCIPAL_PAYMENT
   MAINTENANCE
   REPAIRS
   PARKING

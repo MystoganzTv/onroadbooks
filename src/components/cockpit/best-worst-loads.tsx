@@ -107,12 +107,12 @@ function LoadCard({
         <dl className="grid grid-cols-4 gap-2">
           <Figure label="Gross" value={formatMoneyCompact(load.grossRate)} />
           <Figure
-            label="Profit"
+            label="Contribution"
             value={formatMoneyCompact(load.metrics.tripProfit)}
             tone={load.metrics.tripProfit >= 0 ? "text-pos" : "text-neg"}
           />
           <Figure
-            label="Profit / mi"
+            label="Contribution / mi"
             value={formatRateValue(load.metrics.profitPerMile)}
             tone={load.metrics.profitPerMile >= 0 ? "text-pos" : "text-neg"}
           />

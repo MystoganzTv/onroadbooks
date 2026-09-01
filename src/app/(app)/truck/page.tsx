@@ -213,34 +213,41 @@ export default async function TruckPage({
 
       <section
         aria-label="Lifetime economics"
-        className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
+        className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8"
       >
         <MiniStat
-          label="Total Revenue"
-          value={formatMoneyCompact(lifetime.totalRevenue)}
+          label="Booked Revenue"
+          value={formatMoneyCompact(lifetime.bookedRevenue)}
           tone="info"
           sub={`${lifetime.loadCount} loads`}
         />
         <MiniStat
-          label="Total Expenses"
-          value={formatMoneyCompact(lifetime.totalExpenses)}
+          label="Operating Expenses"
+          value={formatMoneyCompact(lifetime.operatingExpenses)}
           tone="negative"
         />
         <MiniStat
-          label="Lifetime Profit"
-          value={formatMoneyCompact(lifetime.lifetimeProfit)}
-          tone={lifetime.lifetimeProfit >= 0 ? "positive" : "negative"}
+          label="Operating Profit"
+          value={formatMoneyCompact(lifetime.operatingProfit)}
+          tone={lifetime.operatingProfit >= 0 ? "positive" : "negative"}
         />
         <MiniStat label="Total Miles" value={formatNumber(lifetime.totalMiles)} sub="from loads" />
         <MiniStat
-          label="Cost / Mile"
-          value={formatRate(lifetime.costPerMile)}
+          label="Actual Cost / Mile"
+          value={formatRate(lifetime.actualCostPerMile)}
           tone="negative"
         />
         <MiniStat
-          label="Profit / Mile"
-          value={formatRate(lifetime.profitPerMile)}
-          tone={lifetime.profitPerMile >= 0 ? "positive" : "negative"}
+          label="Operating Profit / Mile"
+          value={formatRate(lifetime.operatingProfitPerMile)}
+          tone={lifetime.operatingProfitPerMile >= 0 ? "positive" : "negative"}
+        />
+        <MiniStat label="Debt Service" value={formatMoneyCompact(lifetime.debtService)} tone="negative" />
+        <MiniStat
+          label="Cash After Debt Service"
+          value={formatMoneyCompact(lifetime.cashAfterDebtService)}
+          sub={`${formatMoneyCompact(lifetime.collectedRevenue)} collected`}
+          tone={lifetime.cashAfterDebtService >= 0 ? "positive" : "negative"}
         />
       </section>
 

@@ -6,6 +6,7 @@ import { getRepository } from "@/lib/db";
 import { overheadCostPerMile, trailingCostBasis } from "@/lib/finance/cost-per-mile";
 import { capabilityRefusal, planAllows } from "@/lib/plans";
 import { todayISO } from "@/lib/periods";
+import { FINANCIAL_MODEL_VERSION } from "@/lib/finance/terminology";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ export const dynamic = "force-dynamic";
  * guesses — 6.5 MPG, $3.85 diesel, $0.85/mi overhead — which produced a
  * confident verdict about somebody else's truck.
  *
- * `overheadCostPerMile` is deliberately NOT true cost per mile: fuel, tolls,
+ * `overheadCostPerMile` is deliberately NOT Actual Cost Per Mile: fuel, tolls,
  * dispatch and factoring are entered explicitly in the calculator, so a rate
  * that still contained them would charge them twice. That is the classic way a
  * load calculator lies.
@@ -49,6 +50,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(
     {
+      calculationVersion: FINANCIAL_MODEL_VERSION,
       // Null rather than a number nobody proved: the app leaves the field
       // empty and refuses to estimate instead of assuming a fleet average.
       fuelPrice: latestFuel?.pricePerGallon ?? fuel.averagePricePerGallon ?? null,
@@ -56,6 +58,7 @@ export async function GET(request: NextRequest) {
       dispatchPct: Math.round(div(dispatchPaid, grossRevenue) * 1000) / 10,
       factoringPct: Math.round(div(factoringPaid, grossRevenue) * 1000) / 10,
       overheadPerMile: overheadCostPerMile(basis),
+      debtServicePerMile: basis.debtServicePerMile,
       trueCostPerMile: basis.trueCostPerMile,
       basisLabel: basis.basisLabel,
       basisMiles: basis.totalMiles,

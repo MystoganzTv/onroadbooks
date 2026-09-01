@@ -20,6 +20,7 @@ import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { formatMoneyCompact, formatPercent, formatRate } from "@/lib/formatters";
 import { expensesForTruck, loadsForTruck, orderedTrucks } from "@/lib/fleet";
+import { isOperatingExpenseCategory } from "@/lib/finance/terminology";
 import { defaultEntryDate } from "@/lib/periods";
 import {
   periodFromSearchParams,
@@ -55,7 +56,10 @@ export default async function ExpensesPage({
     linkedFuelByLoad(fuelEntries),
   );
   const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings);
-  const categories = categoryTotals(periodExpenses, settings);
+  const operatingPeriodExpenses = periodExpenses.filter((expense) =>
+    isOperatingExpenseCategory(expense.category),
+  );
+  const categories = categoryTotals(operatingPeriodExpenses, settings);
 
   const fixedShare =
     summary.operatingExpenses > 0 ? (summary.fixedExpenses / summary.operatingExpenses) * 100 : 0;
@@ -83,12 +87,18 @@ export default async function ExpensesPage({
 
       <section
         aria-label="Expense summary"
-        className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
+        className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
       >
         <MiniStat
-          label="Total Expenses"
+          label="Operating Expenses"
           value={formatMoneyCompact(summary.operatingExpenses)}
           tone="negative"
+        />
+        <MiniStat
+          label="Debt Service"
+          value={formatMoneyCompact(summary.debtService)}
+          tone={summary.debtService > 0 ? "negative" : "neutral"}
+          sub="interest + principal + unsplit"
         />
         <MiniStat
           label="Fixed"
@@ -104,10 +114,10 @@ export default async function ExpensesPage({
         />
         <MiniStat label="Fuel" value={formatMoneyCompact(summary.fuelExpense)} />
         <MiniStat
-          label="Cost / Mile"
+          label="Actual Cost / Mile"
           value={formatRate(summary.costPerMile)}
           tone="negative"
-          sub="all expenses"
+          sub="Operating Expenses only"
         />
       </section>
 

@@ -81,9 +81,9 @@ const COLUMNS: Column[] = [
   { key: "grossRate", label: "Rate", numeric: true },
   { key: "ratePerLoaded", label: "$/Loaded", numeric: true },
   { key: "ratePerTotal", label: "$/Total", numeric: true },
-  { key: "expenses", label: "Expenses", numeric: true },
-  { key: "profit", label: "Profit", numeric: true },
-  { key: "profitPerMile", label: "Profit/mi", numeric: true },
+  { key: "expenses", label: "Direct Trip Costs", numeric: true },
+  { key: "profit", label: "Contribution Profit", numeric: true },
+  { key: "profitPerMile", label: "Contribution/mi", numeric: true },
   { key: "rating", label: "Rating" },
   { key: "status", label: "Status" },
 ];
@@ -333,7 +333,7 @@ export function LoadsTable({
             hasFilters
               ? "Try widening the date range or clearing the broker and status filters."
               : (emptyDescription ??
-                "Add your first load to start tracking revenue and profit per mile.")
+                "Add your first load to start tracking Booked Revenue and Contribution Profit per mile.")
           }
           action={
             hasFilters ? (

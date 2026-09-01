@@ -31,11 +31,12 @@
  * tie back to the single number on the dashboard would be worse than none.
  */
 
-import { div, roundMoney, sum } from "../calculations";
+import { div, roundMoney, sum, summarizePeriod } from "../calculations";
 import { expensesForTruck, loadsForTruck, overheadExpenses } from "../fleet";
 import { inRange, type DateRange } from "../periods";
 import type { Expense, FinancialSettings, Load, Truck } from "../types";
 import { calculateTrueCostPerMile, type CostPerMile } from "./cost-per-mile";
+import { isDebtServiceCategory, isOperatingExpenseCategory } from "./terminology";
 
 export interface TruckContribution {
   truck: Truck;
@@ -43,6 +44,7 @@ export interface TruckContribution {
   revenue: number;
   /** Only what this unit caused. Never a share of overhead. */
   directCosts: number;
+  debtService: number;
   contribution: number;
   totalMiles: number;
   loadedMiles: number;
@@ -59,11 +61,16 @@ export interface TruckContribution {
 export interface FleetSummary {
   units: TruckContribution[];
   revenue: number;
+  collectedRevenue: number;
+  accountsReceivable: number;
+  unallocatedCollectedRevenue: number;
   directCosts: number;
   contribution: number;
   /** Business overhead: real spend that belongs to no single unit. */
   overhead: number;
   operatingProfit: number;
+  debtService: number;
+  cashAfterDebtService: number;
   totalMiles: number;
   /**
    * Overhead spread across every mile the fleet drove. An ALLOCATION, and
@@ -88,7 +95,18 @@ function contributionFor(
   const unitExpenses = expensesForTruck(expenses, truck.id).filter((e) => inRange(e.date, range));
 
   const revenue = roundMoney(sum(unitLoads, (l) => l.grossRate));
-  const directCosts = roundMoney(sum(unitExpenses, (e) => e.amount));
+  const directCosts = roundMoney(
+    sum(
+      unitExpenses.filter((expense) => isOperatingExpenseCategory(expense.category)),
+      (expense) => expense.amount,
+    ),
+  );
+  const debtService = roundMoney(
+    sum(
+      unitExpenses.filter((expense) => isDebtServiceCategory(expense.category)),
+      (expense) => expense.amount,
+    ),
+  );
   const loadedMiles = sum(unitLoads, (l) => l.loadedMiles);
   const deadheadMiles = sum(unitLoads, (l) => l.deadheadMiles);
   const totalMiles = loadedMiles + deadheadMiles;
@@ -98,6 +116,7 @@ function contributionFor(
     loadCount: unitLoads.length,
     revenue,
     directCosts,
+    debtService,
     contribution: roundMoney(revenue - directCosts),
     totalMiles,
     loadedMiles,
@@ -124,10 +143,14 @@ export function calculateFleetSummary(
   const contribution = roundMoney(revenue - directCosts);
   const overhead = roundMoney(
     sum(
-      overheadExpenses(expenses).filter((e) => inRange(e.date, range)),
+      overheadExpenses(expenses).filter(
+        (e) => inRange(e.date, range) && isOperatingExpenseCategory(e.category),
+      ),
       (e) => e.amount,
     ),
   );
+  const financial = summarizePeriod(loads, expenses, range, settings);
+  const debtService = financial.debtService;
   const totalMiles = sum(units, (u) => u.totalMiles);
   const overheadPerMile = div(overhead, totalMiles);
 
@@ -139,10 +162,15 @@ export function calculateFleetSummary(
       }))
       .sort((a, b) => b.contribution - a.contribution),
     revenue,
+    collectedRevenue: financial.collectedRevenue,
+    accountsReceivable: financial.accountsReceivable,
+    unallocatedCollectedRevenue: financial.unallocatedCollectedRevenue,
     directCosts,
     contribution,
     overhead,
     operatingProfit: roundMoney(contribution - overhead),
+    debtService,
+    cashAfterDebtService: financial.cashAfterDebtService,
     totalMiles,
     overheadPerMile,
     fullyLoadedProfitPerMile: div(contribution, totalMiles) - overheadPerMile,

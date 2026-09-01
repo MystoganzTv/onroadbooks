@@ -22,7 +22,7 @@ export function HalfMonthSplit({ halves, monthLabel }: HalfMonthSplitProps) {
       </CardHeader>
       <CardContent className="grid gap-3 p-4 sm:grid-cols-2">
         {halves.map(({ period, summary }) => {
-          const positive = summary.netProfit >= 0;
+          const positive = summary.operatingProfit >= 0;
           return (
             <div key={period.key} className="rounded-md border border-border bg-surface-sunken p-3">
               <div className="flex items-baseline justify-between">
@@ -39,19 +39,21 @@ export function HalfMonthSplit({ halves, monthLabel }: HalfMonthSplitProps) {
                   positive ? "text-pos" : "text-neg",
                 )}
               >
-                {formatMoney(summary.netProfit)}
+                {formatMoney(summary.operatingProfit)}
               </p>
-              <p className="text-2xs text-muted-foreground">net profit</p>
+              <p className="text-2xs text-muted-foreground">Operating Profit</p>
 
               <dl className="mt-3 space-y-1 text-xs">
-                <Line label="Revenue" value={formatMoney(summary.grossRevenue)} />
+                <Line label="Booked Revenue" value={formatMoney(summary.bookedRevenue)} />
+                <Line label="Collected Revenue" value={formatMoney(summary.collectedRevenue)} />
+                <Line label="Accounts Receivable" value={formatMoney(summary.accountsReceivable)} />
                 <Line
-                  label="Expenses"
+                  label="Operating Expenses"
                   value={`-${formatMoney(summary.operatingExpenses)}`}
                   tone="neg"
                 />
                 <Line label="Margin" value={formatPercent(summary.netMargin)} />
-                <Line label="Profit / mi" value={formatRate(summary.profitPerMile)} />
+                <Line label="Operating Profit / mi" value={formatRate(summary.profitPerMile)} />
               </dl>
             </div>
           );

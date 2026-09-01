@@ -96,7 +96,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
     ];
   }
 
-  /* -- Profit per mile against the previous window ------------------------ */
+  /* -- Operating Profit per mile against the previous window -------------- */
   if (comparable && previous.profitPerMile !== 0) {
     const delta = pctChange(summary.profitPerMile, previous.profitPerMile);
     if (Math.abs(delta) >= 1) {
@@ -104,7 +104,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
         id: "ppm-trend",
         tone: delta >= 0 ? "positive" : "negative",
         priority: 90,
-        text: `Profit per mile ${delta >= 0 ? "improved" : "declined"} ${Math.abs(delta).toFixed(1)}% versus ${previousLabel}, ${rate(previous.profitPerMile)} to ${rate(summary.profitPerMile)}.`,
+        text: `Operating Profit per mile ${delta >= 0 ? "improved" : "declined"} ${Math.abs(delta).toFixed(1)}% versus ${previousLabel}, ${rate(previous.profitPerMile)} to ${rate(summary.profitPerMile)}.`,
       });
     }
   }
@@ -127,7 +127,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
       id: "deadhead-cost",
       tone: "warning",
       priority: 80,
-      text: `${Math.round(deadhead.deadheadMiles).toLocaleString()} empty miles at ${rate(deadhead.costPerMile)} true cost per mile is about ${usd(deadhead.cost)} of running cost with no load revenue behind it.`,
+      text: `${Math.round(deadhead.deadheadMiles).toLocaleString()} empty miles at ${rate(deadhead.costPerMile)} actual operating cost per mile is about ${usd(deadhead.cost)} of running cost with no load revenue behind it.`,
     });
   }
 
@@ -147,7 +147,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
       id: "cost-split",
       tone: "neutral",
       priority: 55,
-      text: `Every mile costs ${rate(costBasis.trueCostPerMile)} to run: ${rate(costBasis.fixedCostPerMile)} fixed and ${rate(costBasis.variableCostPerMile)} variable.`,
+      text: `Actual operating cost is ${rate(costBasis.trueCostPerMile)} per mile: ${rate(costBasis.fixedCostPerMile)} fixed and ${rate(costBasis.variableCostPerMile)} variable. Debt service is tracked separately.`,
     });
   }
 
@@ -233,24 +233,24 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
     });
   }
 
-  if (ownerPay.operatingProfit > 0) {
+  if (ownerPay.safeToPay > 0) {
     out.push({
       id: "take-home",
       tone: ownerPay.takeHomeRate >= 30 ? "positive" : "neutral",
       priority: 65,
-      text: `After ${usd(ownerPay.reserveTotal)} of reserves you can take ${usd(ownerPay.safeToPay)}, or ${ownerPay.takeHomeRate.toFixed(1)}c of every revenue dollar.`.replace(
+      text: `After Debt Service and ${usd(ownerPay.reserveTotal)} of Reserve Contributions, Safe to Pay Yourself is ${usd(ownerPay.safeToPay)}, or ${ownerPay.takeHomeRate.toFixed(1)}c of every Booked Revenue dollar.`.replace(
         "c of",
         " cents of",
       ),
     });
   }
 
-  if (summary.outstandingRevenue > 0) {
+  if (summary.accountsReceivable > 0) {
     out.push({
       id: "outstanding",
       tone: "warning",
       priority: 62,
-      text: `${usd(summary.outstandingRevenue)} of this period's revenue is still pending or invoiced and has not been collected.`,
+      text: `${usd(summary.accountsReceivable)} of this period's Booked Revenue is Accounts Receivable and cannot fund Safe to Pay Yourself until collected.`,
     });
   }
 

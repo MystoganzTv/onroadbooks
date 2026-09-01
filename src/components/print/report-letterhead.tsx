@@ -34,7 +34,7 @@ export function ReportLetterhead({
   generatedAt,
   summary,
 }: ReportLetterheadProps) {
-  const profitable = summary.netProfit >= 0;
+  const profitable = summary.operatingProfit >= 0;
 
   return (
     <header className="hidden print:block">
@@ -84,16 +84,16 @@ export function ReportLetterhead({
 
       {/* The four numbers, set as a band rather than as cards. */}
       <div className="mt-3 grid grid-cols-4 border-y-2 border-[#0F1E38]">
-        <Figure label="Gross Revenue" value={formatMoneyCompact(summary.grossRevenue)} />
+        <Figure label="Booked Revenue" value={formatMoneyCompact(summary.bookedRevenue)} />
         <Figure label="Operating Expenses" value={formatMoneyCompact(summary.operatingExpenses)} />
         <Figure
-          label="Net Profit"
-          value={formatMoneyCompact(summary.netProfit)}
+          label="Operating Profit"
+          value={formatMoneyCompact(summary.operatingProfit)}
           accent={profitable ? "positive" : "negative"}
           note={`${formatPercent(summary.netMargin)} margin`}
         />
         <Figure
-          label="Profit / Mile"
+          label="Operating Profit / Mile"
           value={`${formatRateValue(summary.profitPerMile)}/mi`}
           accent={summary.profitPerMile >= 0 ? "positive" : "negative"}
           note={`${Math.round(summary.totalMiles).toLocaleString()} mi driven`}
@@ -104,7 +104,8 @@ export function ReportLetterhead({
       <p className="mt-2.5 max-w-[62ch] text-[7.5pt] leading-relaxed text-neutral-500">
         Every figure is recomputed from the loads and expenses actually dated inside{" "}
         {periodLabel}. Nothing is prorated or split out of a monthly total, and the halves of a
-        month sum exactly to the month. Revenue is gross rate on completed loads; operating
+        month sum exactly to the month. Booked Revenue is gross rate on completed loads;
+        Collected Revenue uses recorded invoice payment dates. Operating
         expenses come from the expense ledger only, so trip costs recorded on a load are never
         counted twice. Prepared for internal review — not an audited financial statement.
       </p>

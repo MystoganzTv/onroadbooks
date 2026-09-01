@@ -41,15 +41,15 @@ export function TodayCard({ day, className }: { day: DaySnapshot; className?: st
       </div>
 
       <div className="grid grid-cols-3 gap-3 p-4 sm:grid-cols-5">
-        <Cell label="Revenue" value={formatMoneyCompact(day.revenue)} />
-        <Cell label="Expenses" value={formatMoneyCompact(day.expenses)} tone="text-neg" />
+        <Cell label="Booked Revenue" value={formatMoneyCompact(day.revenue)} />
+        <Cell label="Operating Expenses" value={formatMoneyCompact(day.expenses)} tone="text-neg" />
         <Cell
-          label="Profit"
+          label="Operating Profit"
           value={formatMoneyCompact(day.profit)}
           tone={day.profit >= 0 ? "text-pos" : "text-neg"}
         />
         <Cell label="Miles" value={formatMiles(day.miles)} />
-        <Cell label="Profit / mi" value={`${formatRateValue(day.profitPerMile)}`} />
+        <Cell label="Operating Profit / mi" value={`${formatRateValue(day.profitPerMile)}`} />
       </div>
 
       <p className="border-t border-border px-4 py-2.5 text-xs text-muted-foreground">

@@ -9,6 +9,10 @@ import { buildReport, REPORT_IDS, type ReportTable, type ReportId } from "./expo
 import { calculateReserveBalances } from "./finance/reserves";
 import { dayCount, type Period } from "./periods";
 import type { Dataset } from "./types";
+import {
+  FINANCIAL_MODEL_VERSION,
+  isOperatingExpenseCategory,
+} from "./finance/terminology";
 
 /**
  * The packet for the accountant.
@@ -46,7 +50,12 @@ function sheetName(label: string): string {
 function coverTable(dataset: Dataset, period: Period, businessName: string): ReportTable {
   const summary = summarizePeriod(dataset.loads, dataset.expenses, period, dataset.settings);
   const fuel = summarizeFuel(fuelInPeriod(dataset.fuelEntries, period), summary.totalMiles);
-  const categories = categoryTotals(expensesInPeriod(dataset.expenses, period), dataset.settings);
+  const categories = categoryTotals(
+    expensesInPeriod(dataset.expenses, period).filter((expense) =>
+      isOperatingExpenseCategory(expense.category),
+    ),
+    dataset.settings,
+  );
   const reserves = calculateReserveBalances(
     dataset.reserveAccounts,
     dataset.reserveTransactions,
@@ -57,22 +66,27 @@ function coverTable(dataset: Dataset, period: Period, businessName: string): Rep
     ["Business", businessName],
     ["Year", period.label],
     ["Period covered", `${period.start} to ${period.end}`],
+    ["Calculation model", `v${FINANCIAL_MODEL_VERSION}`],
     ["", ""],
-    ["Gross revenue", money(summary.grossRevenue)],
+    ["Booked Revenue", money(summary.bookedRevenue)],
+    ["Collected Revenue", money(summary.collectedRevenue)],
+    ["Accounts Receivable", money(summary.accountsReceivable)],
     ["Operating expenses", money(summary.operatingExpenses)],
-    ["Net profit", money(summary.netProfit)],
+    ["Operating Profit", money(summary.operatingProfit)],
+    ["Interest Expense", money(summary.interestExpense)],
+    ["Principal Payment", money(summary.principalPayment)],
+    ["Unallocated Debt Service", money(summary.unallocatedDebtService)],
+    ["Debt Service", money(summary.debtService)],
+    ["Cash After Debt Service", money(summary.cashAfterDebtService)],
     ["", ""],
     ["Loads recorded", summary.loadCount],
     ["Loaded miles", Math.round(summary.loadedMiles)],
     ["Deadhead miles", Math.round(summary.deadheadMiles)],
     ["Total miles", Math.round(summary.totalMiles)],
-    ["Cost per mile", money(summary.costPerMile)],
+    ["Actual Cost per Mile", money(summary.costPerMile)],
     ["", ""],
     ["Fuel purchased (gallons)", Number(fuel.totalGallons.toFixed(2))],
     ["Fuel cost", money(fuel.totalCost)],
-    ["Revenue collected", money(summary.paidRevenue)],
-    ["Revenue still outstanding", money(summary.outstandingRevenue)],
-    ["", ""],
     ["Fixed expenses", money(summary.fixedExpenses)],
     ["Variable expenses", money(summary.variableExpenses)],
   ];
@@ -96,6 +110,7 @@ function coverTable(dataset: Dataset, period: Period, businessName: string): Rep
 
   return {
     title: `${businessName} — ${period.label} year-end packet`,
+    calculationVersion: FINANCIAL_MODEL_VERSION,
     columns: ["Item", "Value"],
     rows,
   };

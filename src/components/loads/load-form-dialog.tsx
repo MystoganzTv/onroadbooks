@@ -934,14 +934,14 @@ export function LoadFormDialog({
               <Calc label="Total miles" value={formatMiles(totalMiles)} />
               <Calc label="$ / loaded mile" value={formatRateValue(div(grossRate, loadedMiles))} />
               <Calc label="$ / total mile" value={formatRateValue(div(grossRate, totalMiles))} />
-              <Calc label="Trip expenses" value={formatMoney(tripExpenses)} />
+              <Calc label="Direct Trip Costs" value={formatMoney(tripExpenses)} />
               <Calc
-                label="Trip profit"
+                label="Contribution Profit"
                 value={formatMoney(tripProfit)}
                 tone={tripProfit >= 0 ? "pos" : "neg"}
               />
               <Calc
-                label="Profit / mile"
+                label="Contribution Profit / mile"
                 value={formatRateValue(profitPerMile)}
                 tone={tripProfit >= 0 ? "pos" : "neg"}
               />

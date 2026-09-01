@@ -34,10 +34,10 @@ export interface BrokerScore extends BrokerPerformance {
 export type BrokerSort = "profit" | "revenue" | "profitPerMile" | "worstProfitPerMile";
 
 export const BROKER_SORTS: { key: BrokerSort; label: string }[] = [
-  { key: "profit", label: "Most profitable" },
-  { key: "revenue", label: "Highest revenue" },
-  { key: "profitPerMile", label: "Best profit / mile" },
-  { key: "worstProfitPerMile", label: "Worst profit / mile" },
+  { key: "profit", label: "Most contribution profit" },
+  { key: "revenue", label: "Highest Booked Revenue" },
+  { key: "profitPerMile", label: "Best contribution / mile" },
+  { key: "worstProfitPerMile", label: "Worst contribution / mile" },
 ];
 
 export function calculateBrokerPerformance(

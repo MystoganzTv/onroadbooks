@@ -19,6 +19,7 @@
 import { div, roundMoney, sum } from "../calculations";
 import { addDays, dayCount, inRange, parseMonth, daysInMonth, type DateRange, type Period } from "../periods";
 import type { Expense, FinancialGoal, Load, PeriodSummary } from "../types";
+import { isOperatingExpenseCategory } from "./terminology";
 
 /** Monday-start working week: 6 means Mon-Sat, 5 means Mon-Fri, 7 means every day. */
 export function isWorkingDay(iso: string, workingDaysPerWeek: number): boolean {
@@ -92,11 +93,11 @@ export function calculateGoalProgress(
 
   if (goals.monthlyRevenueTarget > 0) {
     const target = roundMoney(goals.monthlyRevenueTarget * share);
-    const pct = div(summary.grossRevenue, target) * 100;
+    const pct = div(summary.bookedRevenue, target) * 100;
     out.push({
       key: "revenue",
-      label: "Revenue",
-      current: summary.grossRevenue,
+      label: "Booked Revenue",
+      current: summary.bookedRevenue,
       target,
       pct,
       format: "money",
@@ -109,11 +110,11 @@ export function calculateGoalProgress(
 
   if (goals.monthlyProfitTarget > 0) {
     const target = roundMoney(goals.monthlyProfitTarget * share);
-    const pct = div(summary.netProfit, target) * 100;
+    const pct = div(summary.operatingProfit, target) * 100;
     out.push({
       key: "profit",
-      label: "Net profit",
-      current: summary.netProfit,
+      label: "Operating Profit",
+      current: summary.operatingProfit,
       target,
       pct,
       format: "money",
@@ -128,7 +129,7 @@ export function calculateGoalProgress(
     const pct = div(summary.profitPerMile, goals.targetProfitPerMile) * 100;
     out.push({
       key: "profitPerMile",
-      label: "Profit / mile",
+      label: "Operating Profit / mile",
       current: summary.profitPerMile,
       target: goals.targetProfitPerMile,
       pct,
@@ -214,11 +215,11 @@ export function calculateProjection(
     ? workingDaysIn({ start: addDays(today, 1), end: period.end }, goals.workingDaysPerWeek)
     : 0;
 
-  const revenuePerWorkingDay = div(summary.grossRevenue, workingDaysElapsed);
-  const profitPerWorkingDay = div(summary.netProfit, workingDaysElapsed);
+  const revenuePerWorkingDay = div(summary.bookedRevenue, workingDaysElapsed);
+  const profitPerWorkingDay = div(summary.operatingProfit, workingDaysElapsed);
   const revenueTarget = roundMoney(goals.monthlyRevenueTarget * monthlyTargetShare(period, goals));
   const projectedRevenue = roundMoney(
-    summary.grossRevenue + revenuePerWorkingDay * workingDaysRemaining,
+    summary.bookedRevenue + revenuePerWorkingDay * workingDaysRemaining,
   );
 
   return {
@@ -230,12 +231,12 @@ export function calculateProjection(
     revenuePerWorkingDay,
     profitPerWorkingDay,
     projectedRevenue,
-    projectedProfit: roundMoney(summary.netProfit + profitPerWorkingDay * workingDaysRemaining),
+    projectedProfit: roundMoney(summary.operatingProfit + profitPerWorkingDay * workingDaysRemaining),
     projectedLoads: Math.round(
       summary.loadCount + div(summary.loadCount, workingDaysElapsed) * workingDaysRemaining,
     ),
     revenueTarget,
-    revenueGap: roundMoney(revenueTarget - summary.grossRevenue),
+    revenueGap: roundMoney(revenueTarget - summary.bookedRevenue),
   };
 }
 
@@ -279,7 +280,9 @@ export function calculateDaySnapshot(
   const dayExpenses = expenses.filter((e) => inRange(e.date, range));
 
   const revenue = roundMoney(sum(dayLoads, (l) => l.grossRate));
-  const spend = roundMoney(sum(dayExpenses, (e) => e.amount));
+  const spend = roundMoney(
+    sum(dayExpenses.filter((expense) => isOperatingExpenseCategory(expense.category)), (e) => e.amount),
+  );
   const profit = roundMoney(revenue - spend);
   const miles = sum(dayLoads, (l) => l.loadedMiles + l.deadheadMiles);
   const target = dailyProfitTarget(date.slice(0, 7), goals);
@@ -308,10 +311,10 @@ export function calculateDaySnapshot(
   const statement = empty
     ? "Nothing recorded yet today."
     : target <= 0
-      ? `${money(profit)} of profit today across ${dayLoads.length} ${dayLoads.length === 1 ? "load" : "loads"}. Set a monthly profit target to see a daily pace.`
+      ? `${money(profit)} of Operating Profit today across ${dayLoads.length} ${dayLoads.length === 1 ? "load" : "loads"}. Set a monthly Operating Profit target to see a daily pace.`
       : delta >= 0
-        ? `You are ${money(delta)} above your daily profit target of ${money(target)}.`
-        : `You are ${money(delta)} below your daily profit target of ${money(target)}.`;
+        ? `You are ${money(delta)} above your daily Operating Profit target of ${money(target)}.`
+        : `You are ${money(delta)} below your daily Operating Profit target of ${money(target)}.`;
 
   return {
     date,

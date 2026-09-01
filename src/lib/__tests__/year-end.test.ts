@@ -54,17 +54,27 @@ describe("the year-end packet", () => {
       yearPeriod(2026),
       dataset.settings,
     );
-    assert.equal(value("Gross revenue"), Number(summary.grossRevenue.toFixed(2)));
+    assert.equal(value("Booked Revenue"), Number(summary.bookedRevenue.toFixed(2)));
+    assert.equal(value("Collected Revenue"), Number(summary.collectedRevenue.toFixed(2)));
+    assert.equal(value("Accounts Receivable"), Number(summary.accountsReceivable.toFixed(2)));
     assert.equal(value("Operating expenses"), Number(summary.operatingExpenses.toFixed(2)));
-    assert.equal(value("Net profit"), Number(summary.netProfit.toFixed(2)));
+    assert.equal(value("Operating Profit"), Number(summary.operatingProfit.toFixed(2)));
+    assert.equal(value("Debt Service"), Number(summary.debtService.toFixed(2)));
+    assert.equal(value("Cash After Debt Service"), Number(summary.cashAfterDebtService.toFixed(2)));
     assert.equal(value("Loads recorded"), summary.loadCount);
     assert.equal(value("Total miles"), Math.round(summary.totalMiles));
   });
 
   it("splits revenue into collected and still owed", () => {
-    const collected = Number(value("Revenue collected"));
-    const outstanding = Number(value("Revenue still outstanding"));
-    assert.equal(collected + outstanding, Number(value("Gross revenue")));
+    const summary = summarizePeriod(
+      dataset.loads,
+      dataset.expenses,
+      yearPeriod(2026),
+      dataset.settings,
+    );
+    assert.equal(Number(value("Collected Revenue")), summary.collectedRevenue);
+    assert.equal(Number(value("Accounts Receivable")), summary.accountsReceivable);
+    assert.equal(Number(value("Booked Revenue")), summary.bookedRevenue);
   });
 
   it("computes no tax liability, and says so", () => {
@@ -76,7 +86,7 @@ describe("the year-end packet", () => {
   });
 
   it("is empty rather than wrong for a year with no records", () => {
-    assert.equal(value("Gross revenue", 1999), 0);
+    assert.equal(value("Booked Revenue", 1999), 0);
     assert.equal(value("Loads recorded", 1999), 0);
   });
 });

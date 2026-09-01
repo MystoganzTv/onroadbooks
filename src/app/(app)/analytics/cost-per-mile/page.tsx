@@ -66,8 +66,8 @@ export default async function CostPerMilePage({
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <PageHeader
-        title="True Cost per Mile"
-        description="Actual expenses over actual miles. Nothing prorated, nothing split from a monthly total."
+        title="Actual Cost per Mile"
+        description="Actual operating expenses over actual miles, with Debt Service shown separately. Nothing prorated."
       />
       <AnalyticsTabs />
       <div className="flex flex-wrap items-center gap-2">
@@ -75,7 +75,7 @@ export default async function CostPerMilePage({
         <TruckSwitcher trucks={orderedTrucks(trucks)} selectedId={truckId} />
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <MiniStat
           label="Fixed / Mile"
           value={cost.sufficient ? formatRateValue(cost.fixedCostPerMile) : "—"}
@@ -89,10 +89,16 @@ export default async function CostPerMilePage({
           tone="warning"
         />
         <MiniStat
-          label="True Cost / Mile"
-          value={cost.sufficient ? formatRateValue(cost.trueCostPerMile) : "—"}
+          label="Actual Cost / Mile"
+          value={cost.sufficient ? formatRateValue(cost.actualCostPerMile) : "—"}
           sub={formatMoney(cost.totalCost)}
           tone="negative"
+        />
+        <MiniStat
+          label="Debt Service / Mile"
+          value={cost.sufficient ? formatRateValue(cost.debtServicePerMile) : "—"}
+          sub={formatMoney(cost.debtServiceTotal)}
+          tone="warning"
         />
         <MiniStat
           label="Revenue / Mile"
@@ -102,9 +108,9 @@ export default async function CostPerMilePage({
         />
         <MiniStat
           label="Kept / Mile"
-          value={formatRateValue(summary.revenuePerMile - cost.trueCostPerMile)}
+          value={formatRateValue(summary.revenuePerMile - cost.actualCostPerMile)}
           sub={`${formatNumber(cost.totalMiles)} mi`}
-          tone={summary.revenuePerMile - cost.trueCostPerMile >= 0 ? "positive" : "negative"}
+          tone={summary.revenuePerMile - cost.actualCostPerMile >= 0 ? "positive" : "negative"}
         />
       </div>
 
@@ -135,9 +141,13 @@ export default async function CostPerMilePage({
             <CardContent className="space-y-2 p-4 text-2xs leading-relaxed text-muted-foreground">
               <p>
                 <span className="font-medium text-foreground">Why two numbers.</span> The period
-                figure is what this window actually cost. The trailing basis is the stable number
+                figure is what this window actually cost to operate. Normalized Cost Per Mile is the stable number
                 the load calculator prices new work on, so one annual bill landing inside a
                 half-month does not make every quote wrong for two weeks.
+              </p>
+              <p>
+                Debt Service is a separate cash burden. It is excluded from Actual and Normalized
+                Cost Per Mile and never changes a load&apos;s profitability rating.
               </p>
               <p>
                 Fixed and variable follow your own classification. Change it under{" "}

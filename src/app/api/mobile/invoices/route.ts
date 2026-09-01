@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
     date: load.date,
     invoiceDate: load.invoiceDate ?? null,
     invoiceDueDate: load.invoiceDueDate ?? null,
+    invoicePaidDate: load.invoicePaidDate ?? null,
     // Positive means late by that many days; null when there is nothing to be
     // late for. The web page computes overdue from exactly this.
     overdueDays: invoiceAgeDays(load),

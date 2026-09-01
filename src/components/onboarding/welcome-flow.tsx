@@ -172,8 +172,8 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
             <h1 className="text-md font-semibold tracking-tight">Tell us about the truck</h1>
           </div>
           <p className="mt-1 text-2xs text-muted-foreground">
-            The note and the insurance are what make cost per mile real. You can change any of
-            this later on the Truck page.
+            Insurance contributes to operating cost per mile. The truck payment is tracked
+            separately as debt-service cash burden. You can change this later on the Truck page.
           </p>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -281,7 +281,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
             <Field
               label="Maintenance reserve"
               htmlFor="w-maint"
-              hint="Percent of gross revenue set aside"
+              hint="Percent of Booked Revenue set aside"
             >
               <Input
                 id="w-maint"

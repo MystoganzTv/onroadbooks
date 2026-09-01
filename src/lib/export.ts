@@ -28,6 +28,13 @@ import { equipmentTypeLabel, loadCapacityLabel } from "./load-details";
 import type { Period } from "./periods";
 import type { Dataset } from "./types";
 import { expensesForTruck, loadsForTruck, primaryTruck, truckById } from "./fleet";
+import {
+  FINANCIAL_MODEL_VERSION,
+  isInterestExpenseCategory,
+  isOperatingExpenseCategory,
+  isPrincipalPaymentCategory,
+  isUnallocatedDebtServiceCategory,
+} from "./finance/terminology";
 
 export type ReportId =
   | "loads"
@@ -47,7 +54,7 @@ export const REPORTS: ReportDefinition[] = [
   { id: "loads", label: "Loads Report", description: "Every load with its full profitability stack" },
   { id: "expenses", label: "Expense Report", description: "Ledger detail with fixed / variable split" },
   { id: "fuel", label: "Fuel Report", description: "Fill-ups, gallons, price and odometer" },
-  { id: "profit-loss", label: "Profit & Loss Summary", description: "Revenue, costs by category, reserves" },
+  { id: "profit-loss", label: "Financial Summary", description: "Performance, collections, debt service and reserves" },
   { id: "mileage", label: "Mileage Report", description: "Loaded, deadhead and total miles by load" },
   { id: "maintenance", label: "Maintenance Report", description: "Service history and next service due" },
 ];
@@ -58,6 +65,7 @@ export interface ReportTable {
   title: string;
   columns: string[];
   rows: (string | number)[][];
+  calculationVersion?: number;
 }
 
 const money = (value: number | null | undefined) =>
@@ -100,14 +108,15 @@ export function buildReport(
     case "loads":
       return {
         title: `Loads - ${scopeLabel} - ${period.label}`,
+        calculationVersion: FINANCIAL_MODEL_VERSION,
         columns: [
           "Truck", "Pickup Date", "Delivery Date", "Ending Odometer", "Load Number", "Broker", "Origin", "Destination",
           "Equipment", "Load Type", "Length (ft)", "Weight (lb)", "Commodity",
           "Loaded Miles", "Deadhead Miles", "Total Miles", "Deadhead %",
           "Gross Rate", "Rate/Loaded Mile", "Rate/Total Mile",
-          "Fuel", "Tolls", "Dispatch", "Factoring", "Other",
-          "Total Load Expenses", "Load Profit", "Profit/Total Mile",
-          "Profit Margin %", "Rating", "Payment Status", "Notes",
+          "Fuel", "Tolls", "Dispatch", "Factoring", "Other", "Driver Pay",
+          "Direct Trip Costs", "Contribution Profit", "Contribution/Total Mile",
+          "Contribution Margin %", "Rating", "Payment Status", "Notes",
         ],
         rows: periodLoads.map((load) => [
           truckName(load.truckId),
@@ -135,6 +144,7 @@ export function buildReport(
           money(load.dispatchFee),
           money(load.factoringFee),
           money(load.otherExpenses),
+          money(load.driverPay),
           money(load.metrics.tripExpenses),
           money(load.metrics.tripProfit),
           rate(load.metrics.profitPerMile),
@@ -148,8 +158,9 @@ export function buildReport(
     case "expenses":
       return {
         title: `Expenses - ${scopeLabel} - ${period.label}`,
+        calculationVersion: FINANCIAL_MODEL_VERSION,
         columns: [
-          "Charged To", "Date", "Category", "Fixed/Variable", "Description", "Vendor",
+          "Charged To", "Date", "Category", "Financial Treatment", "Fixed/Variable", "Description", "Vendor",
           "Amount", "Receipt Number", "Recurring", "Linked Load", "Notes",
         ],
         rows: periodExpenses.map((expense) => {
@@ -158,6 +169,13 @@ export function buildReport(
             truckName(expense.truckId),
             expense.date,
             categoryLabel(expense.category),
+            isInterestExpenseCategory(expense.category)
+              ? "Interest Expense"
+              : isPrincipalPaymentCategory(expense.category)
+                ? "Principal Payment"
+                : isUnallocatedDebtServiceCategory(expense.category)
+                  ? "Unallocated Debt Service"
+                  : "Operating Expense",
             behaviorOf(expense.category, settings.categoryBehavior) === "FIXED" ? "Fixed" : "Variable",
             expense.description,
             expense.vendor ?? "",
@@ -174,6 +192,7 @@ export function buildReport(
       const fuel = summarizeFuel(periodFuel, summary.totalMiles);
       return {
         title: `Fuel - ${scopeLabel} - ${period.label}`,
+        calculationVersion: FINANCIAL_MODEL_VERSION,
         columns: ["Truck", "Date", "Location", "Gallons", "Price/Gallon", "Total Cost", "Odometer", "Linked Load"],
         rows: [
           ...periodFuel.map((entry) => {
@@ -211,19 +230,22 @@ export function buildReport(
         summary,
         resolveReserveRules(settings, dataset.reserveAccounts),
       );
-      const behavior = behaviorTotals(periodExpenses, settings);
-      const categories = categoryTotals(periodExpenses, settings);
+      const operatingPeriodExpenses = periodExpenses.filter((expense) =>
+        isOperatingExpenseCategory(expense.category),
+      );
+      const behavior = behaviorTotals(operatingPeriodExpenses, settings);
+      const categories = categoryTotals(operatingPeriodExpenses, settings);
 
       return {
-        title: `Profit & Loss - ${scopeLabel} - ${period.label}`,
+        title: `Financial Summary - ${scopeLabel} - ${period.label}`,
+        calculationVersion: FINANCIAL_MODEL_VERSION,
         columns: ["Line", "Amount", "Per Total Mile", "Notes"],
         rows: [
           ["Period", period.label, "", `${period.start} to ${period.end}`],
+          ["Calculation model", `v${FINANCIAL_MODEL_VERSION}`, "", "Canonical financial terminology"],
           [],
-          ["REVENUE", "", "", ""],
-          ["Gross revenue", money(summary.grossRevenue), rate(summary.revenuePerMile), `${summary.loadCount} loads`],
-          ["Collected", money(summary.paidRevenue), "", "Paid loads"],
-          ["Outstanding", money(summary.outstandingRevenue), "", "Pending or invoiced"],
+          ["PERFORMANCE", "", "", ""],
+          ["Booked Revenue", money(summary.bookedRevenue), rate(summary.revenuePerMile), `${summary.loadCount} loads`],
           [],
           ["OPERATING EXPENSES", "", "", ""],
           ...categories.map((category) => [
@@ -238,11 +260,21 @@ export function buildReport(
           [],
           [selectedTruck ? "TRUCK RESULT" : "RESULT", "", "", ""],
           [
-            selectedTruck ? "Truck contribution" : "Net profit",
-            money(summary.netProfit),
+            selectedTruck ? "Truck Contribution" : "Operating Profit",
+            money(summary.operatingProfit),
             rate(summary.profitPerMile),
             `${summary.netMargin.toFixed(1)}% margin`,
           ],
+          [],
+          ["CASH AND FINANCING", "", "", ""],
+          ["Collected Revenue", money(summary.collectedRevenue), "", "Assigned by recorded payment date"],
+          ["Accounts Receivable", money(summary.accountsReceivable), "", "Booked but unpaid; not available cash"],
+          ["Paid revenue without payment date", money(summary.unallocatedCollectedRevenue), "", "Not guessed into a cash period"],
+          ["Interest Expense", money(summary.interestExpense), "", "Financing cost"],
+          ["Principal Payment", money(summary.principalPayment), "", "Cash use; not an operating expense"],
+          ["Unallocated Debt Service", money(summary.unallocatedDebtService), "", "Historical unsplit truck payments"],
+          ["Debt Service", money(summary.debtService), "", "Interest + principal + unallocated payments"],
+          ["Cash After Debt Service", money(summary.cashAfterDebtService), "", "Collected Revenue less cash operating costs and Debt Service"],
           ...(selectedTruck
             ? [
                 [],
@@ -260,10 +292,10 @@ export function buildReport(
                   reserve.name,
                   money(reserve.amount),
                   "",
-                  `${reserve.pct}% of ${reserve.basis === "OPERATING_PROFIT" ? "operating profit" : "gross revenue"}`,
+                  `${reserve.pct}% of ${reserve.basis === "OPERATING_PROFIT" ? "Operating Profit" : "Booked Revenue"}`,
                 ]),
                 ["Total reserves", money(pay.reserveTotal), "", "Every active bucket"],
-                ["Safe to pay yourself", money(pay.safeToPay), "", "After expenses and reserves"],
+                ["Safe to Pay Yourself", money(pay.safeToPay), "", "Cash After Debt Service less Reserve Contributions"],
               ]),
           [],
           ["BROKERS", "", "", ""],
@@ -271,7 +303,7 @@ export function buildReport(
             broker.broker,
             money(broker.revenue),
             rate(broker.profitPerMile),
-            `${broker.loadCount} loads, ${money(broker.tripProfit)} trip profit`,
+            `${broker.loadCount} loads, ${money(broker.tripProfit)} Contribution Profit`,
           ]),
         ],
       };
@@ -285,6 +317,7 @@ export function buildReport(
       const deadhead = calculateDeadheadCost(summary, basis, settings, null);
       return {
         title: `Mileage - ${scopeLabel} - ${period.label}`,
+        calculationVersion: FINANCIAL_MODEL_VERSION,
         columns: ["Truck", "Pickup Date", "Load Number", "Origin", "Destination", "Loaded Miles", "Deadhead Miles", "Total Miles", "Deadhead %"],
         rows: [
           ...periodLoads.map((load) => [
@@ -300,7 +333,7 @@ export function buildReport(
           ]),
           [],
           ["TOTALS", "", "", "", "", summary.loadedMiles, summary.deadheadMiles, summary.totalMiles, Number(summary.deadheadPct.toFixed(1))],
-          [`Deadhead cost (${rate(deadhead.costPerMile)}/mi true cost): ${money(deadhead.cost)}`, "", "", "", "", "", "", "", ""],
+          [`Deadhead cost (${rate(deadhead.costPerMile)}/mi Actual Cost): ${money(deadhead.cost)}`, "", "", "", "", "", "", "", ""],
           [
             `Deadhead cost per total mile: ${rate(deadhead.dragPerTotalMile)}`,
             "", "", "", "", "", "", "", "",
@@ -313,6 +346,7 @@ export function buildReport(
     default:
       return {
         title: `Maintenance - ${scopeLabel} - ${period.label}`,
+        calculationVersion: FINANCIAL_MODEL_VERSION,
         columns: [
           "Truck", "Service Date", "Type", "Tracked By", "Odometer", "Cost", "Vendor",
           "Next Service Date", "Next Service Odometer", "In Expense Ledger", "Notes",

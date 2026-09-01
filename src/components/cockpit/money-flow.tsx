@@ -5,6 +5,7 @@ import { formatMoney, formatMoneyCompact, formatPercent } from "@/lib/formatters
 import type { OwnerPay } from "@/lib/finance/owner-pay";
 import type { CategoryTotal } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { isOperatingExpenseCategory } from "@/lib/finance/terminology";
 
 interface MoneyFlowProps {
   ownerPay: OwnerPay;
@@ -34,12 +35,15 @@ export function MoneyFlow({
   maxRows = 7,
   className,
 }: MoneyFlowProps) {
-  const revenue = ownerPay.grossRevenue;
+  const revenue = ownerPay.bookedRevenue;
   const width = (value: number) =>
     revenue > 0 ? `${Math.max(1.5, Math.min(100, (Math.abs(value) / revenue) * 100))}%` : "1.5%";
 
-  const shown = categories.slice(0, maxRows);
-  const restTotal = categories.slice(maxRows).reduce((total, c) => total + c.amount, 0);
+  const operatingCategories = categories.filter((category) =>
+    isOperatingExpenseCategory(category.category),
+  );
+  const shown = operatingCategories.slice(0, maxRows);
+  const restTotal = operatingCategories.slice(maxRows).reduce((total, c) => total + c.amount, 0);
   const rows = restTotal > 0
     ? [...shown, { category: "OTHER" as const, label: "Everything else", amount: restTotal, share: 0, behavior: "VARIABLE" as const, count: 0 }]
     : shown;
@@ -60,7 +64,7 @@ export function MoneyFlow({
       <div className="border-b border-border bg-info-soft/50 px-4 py-3.5">
         <div className="flex items-baseline justify-between gap-3">
           <span className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            Revenue in
+            Booked Revenue · Performance
           </span>
           <span className="tnum text-2xl font-semibold tracking-tight text-info">
             {formatMoneyCompact(revenue)}
@@ -75,7 +79,7 @@ export function MoneyFlow({
       <div className="space-y-2 px-4 py-3">
         <div className="flex items-center gap-1.5 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
           <ArrowDown className="size-3" />
-          Operating expenses
+          Operating Expenses
         </div>
         {rows.length === 0 ? (
           <p className="py-2 text-xs text-muted-foreground">
@@ -106,15 +110,45 @@ export function MoneyFlow({
 
       {/* Operating profit */}
       <StepRow
-        label="Operating profit"
+        label="Operating Profit"
         value={ownerPay.operatingProfit}
         barWidth={width(ownerPay.operatingProfit)}
         tone="foreground"
         note={
           revenue > 0
-            ? `${formatPercent((ownerPay.operatingProfit / revenue) * 100)} of revenue`
+            ? `${formatPercent((ownerPay.operatingProfit / revenue) * 100)} of Booked Revenue`
             : undefined
         }
+      />
+
+      <StepRow
+        label="Collected Revenue · Cash"
+        value={ownerPay.collectedRevenue}
+        barWidth={width(ownerPay.collectedRevenue)}
+        tone="foreground"
+        note={
+          ownerPay.accountsReceivable > 0
+            ? `${formatMoney(ownerPay.accountsReceivable)} remains in Accounts Receivable`
+            : "No Accounts Receivable in this performance period"
+        }
+      />
+
+      {ownerPay.unallocatedCollectedRevenue > 0 ? (
+        <StepRow
+          label="Paid Revenue without Payment Date"
+          value={ownerPay.unallocatedCollectedRevenue}
+          barWidth={width(ownerPay.unallocatedCollectedRevenue)}
+          tone="foreground"
+          note="Preserved as paid; not silently assigned to a cash period"
+        />
+      ) : null}
+
+      <StepRow
+        label="Cash After Debt Service"
+        value={ownerPay.cashAfterDebtService}
+        barWidth={width(ownerPay.cashAfterDebtService)}
+        tone="foreground"
+        note={`${formatMoney(ownerPay.debtService)} of Debt Service paid`}
       />
 
       {/* Reserves out */}
@@ -153,7 +187,7 @@ export function MoneyFlow({
       >
         <div className="flex items-baseline justify-between gap-3">
           <span className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            Safe to pay yourself
+            Safe to Pay Yourself
           </span>
           <span
             className={cn(

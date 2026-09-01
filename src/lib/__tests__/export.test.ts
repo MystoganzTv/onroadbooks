@@ -106,8 +106,8 @@ describe("buildReport", () => {
 
     const profitLoss = buildReport("profit-loss", scoped, period, second.id);
     const labels = profitLoss.rows.map((row) => String(row[0] ?? ""));
-    assert.ok(labels.includes("Truck contribution"));
-    assert.equal(labels.includes("Safe to pay yourself"), false);
+    assert.ok(labels.includes("Truck Contribution"));
+    assert.equal(labels.includes("Safe to Pay Yourself"), false);
   });
 
   it("reconciles a unit P&L to that unit's on-screen contribution", () => {
@@ -135,9 +135,9 @@ describe("buildReport", () => {
     const report = buildReport("profit-loss", scoped, period, second.id);
     const row = (label: string) => report.rows.find((candidate) => candidate[0] === label);
 
-    assert.equal(Number(row("Gross revenue")?.[1]), summary.grossRevenue);
+    assert.equal(Number(row("Booked Revenue")?.[1]), summary.bookedRevenue);
     assert.equal(Number(row("Total operating expenses")?.[1]), summary.operatingExpenses);
-    assert.equal(Number(row("Truck contribution")?.[1]), summary.netProfit);
+    assert.equal(Number(row("Truck Contribution")?.[1]), summary.operatingProfit);
     assert.match(report.title, /Unit 202 \/ East/);
     assert.equal(
       reportFileName("profit-loss", period, second.name),
@@ -165,7 +165,7 @@ describe("export consistency with the app", () => {
         `${reserve.name} missing or wrong in the export`,
       );
     }
-    const safeRow = rows.find((r) => r[0] === "Safe to pay yourself");
+    const safeRow = rows.find((r) => r[0] === "Safe to Pay Yourself");
     assert.ok(safeRow, "Safe to pay row missing");
     assert.equal(Number(safeRow![1]), pay.safeToPay);
   });

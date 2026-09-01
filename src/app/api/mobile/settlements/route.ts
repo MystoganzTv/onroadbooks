@@ -4,6 +4,7 @@ import { getMobileSession } from "@/lib/auth/mobile";
 import { getRepository } from "@/lib/db";
 import { calculateSettlement, settlementId, settlementWindows } from "@/lib/finance/settlement";
 import { currentMonth, shiftMonth, todayISO } from "@/lib/periods";
+import { financialModelVersionOf } from "@/lib/finance/terminology";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,7 +39,17 @@ export async function GET(request: NextRequest) {
       id: view.id,
       label: view.shortLabel,
       status: view.status,
-      netProfit: view.figures.operatingProfit,
+      calculationVersion: financialModelVersionOf(view.figures),
+      bookedRevenue: view.figures.bookedRevenue ?? view.figures.grossRevenue,
+      collectedRevenue: view.figures.collectedRevenue ?? null,
+      accountsReceivable: view.figures.accountsReceivable ?? null,
+      unallocatedCollectedRevenue: view.figures.unallocatedCollectedRevenue ?? null,
+      operatingProfit: view.figures.operatingProfit,
+      interestExpense: view.figures.interestExpense ?? null,
+      principalPayment: view.figures.principalPayment ?? null,
+      unallocatedDebtService: view.figures.unallocatedDebtService ?? null,
+      debtService: view.figures.debtService ?? null,
+      cashAfterDebtService: view.figures.cashAfterDebtService ?? null,
       reserveTotal: view.figures.reserveTotal,
       safeToPay: view.figures.safeToPay,
       drifted: view.drifted,

@@ -124,7 +124,7 @@ export const loadSchema = z
         value.otherExpenses <=
       value.grossRate * 3,
     {
-      message: "Trip expenses look far higher than the rate -- check the numbers",
+      message: "Direct Trip Costs look far higher than the Gross Rate -- check the numbers",
       path: ["fuelCost"],
     },
   )

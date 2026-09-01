@@ -30,6 +30,7 @@ import type {
 } from "../types";
 import { calculateTrueCostPerMile } from "./cost-per-mile";
 import { calculateSafeOwnerPay, resolveReserveRules } from "./owner-pay";
+import { FINANCIAL_MODEL_VERSION } from "./terminology";
 
 export function settlementBounds(month: string, half: SettlementHalf): DateRange {
   const { year, monthIndex } = parseMonth(month);
@@ -96,6 +97,16 @@ export function buildSettlementSnapshot(
   const cost = calculateTrueCostPerMile(loads, expenses, range, settings, "Settlement window");
 
   return {
+    calculationVersion: FINANCIAL_MODEL_VERSION,
+    bookedRevenue: summary.bookedRevenue,
+    collectedRevenue: summary.collectedRevenue,
+    accountsReceivable: summary.accountsReceivable,
+    unallocatedCollectedRevenue: summary.unallocatedCollectedRevenue,
+    interestExpense: summary.interestExpense,
+    principalPayment: summary.principalPayment,
+    unallocatedDebtService: summary.unallocatedDebtService,
+    debtService: summary.debtService,
+    cashAfterDebtService: summary.cashAfterDebtService,
     grossRevenue: pay.grossRevenue,
     operatingExpenses: pay.operatingExpenses,
     operatingProfit: pay.operatingProfit,

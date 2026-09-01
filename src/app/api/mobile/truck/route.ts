@@ -7,6 +7,7 @@ import { orderedTrucks, primaryTruck, truckById } from "@/lib/fleet";
 import { thresholdsFrom, upcomingMaintenance } from "@/lib/maintenance";
 import { periodFromSearchParams } from "@/lib/period-params";
 import { todayISO } from "@/lib/periods";
+import { FINANCIAL_MODEL_VERSION } from "@/lib/finance/terminology";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,6 +58,18 @@ export async function GET(request: NextRequest) {
       },
       truckCount: trucks.length,
       lifetime: {
+        calculationVersion: FINANCIAL_MODEL_VERSION,
+        bookedRevenue: lifetime.bookedRevenue,
+        collectedRevenue: lifetime.collectedRevenue,
+        accountsReceivable: lifetime.accountsReceivable,
+        unallocatedCollectedRevenue: lifetime.unallocatedCollectedRevenue,
+        operatingExpenses: lifetime.operatingExpenses,
+        operatingProfit: lifetime.operatingProfit,
+        debtService: lifetime.debtService,
+        cashAfterDebtService: lifetime.cashAfterDebtService,
+        actualCostPerMile: lifetime.actualCostPerMile,
+        operatingProfitPerMile: lifetime.operatingProfitPerMile,
+        // Compatibility aliases for older mobile builds.
         revenue: lifetime.totalRevenue,
         expenses: lifetime.totalExpenses,
         profit: lifetime.lifetimeProfit,

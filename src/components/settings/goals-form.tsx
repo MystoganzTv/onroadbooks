@@ -24,9 +24,9 @@ import type { FinancialGoal } from "@/lib/types";
 import { toNumber, toRequiredNumber } from "@/lib/utils";
 
 const FIELD_LABELS: Record<string, string> = {
-  monthlyRevenueTarget: "Monthly revenue target",
-  monthlyProfitTarget: "Monthly profit target",
-  targetProfitPerMile: "Target profit per mile",
+  monthlyRevenueTarget: "Monthly booked revenue target",
+  monthlyProfitTarget: "Monthly operating profit target",
+  targetProfitPerMile: "Target operating profit per mile",
   maxDeadheadPct: "Maximum deadhead",
   targetLoads: "Target loads",
   workingDaysPerWeek: "Working days per week",

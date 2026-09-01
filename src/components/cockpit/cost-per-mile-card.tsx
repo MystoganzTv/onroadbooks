@@ -36,7 +36,7 @@ export function CostPerMileCard({
         <CardHeader>
           <div className="flex items-center gap-2">
             <Gauge className="size-3.5 text-muted-foreground" />
-            <CardTitle>True Cost / Mile</CardTitle>
+            <CardTitle>{compact ? "Normalized Cost / Mile" : "Actual Cost / Mile"}</CardTitle>
           </div>
           {/*
             The basis belongs in the header even when the card is empty: two of
@@ -58,14 +58,14 @@ export function CostPerMileCard({
     );
   }
 
-  const margin = revenuePerMile !== undefined ? revenuePerMile - cost.trueCostPerMile : undefined;
+  const margin = revenuePerMile !== undefined ? revenuePerMile - cost.actualCostPerMile : undefined;
 
   return (
     <Card className={className}>
       <CardHeader>
         <div className="flex items-center gap-2">
           <Gauge className="size-3.5 text-muted-foreground" />
-          <CardTitle>True Cost / Mile</CardTitle>
+          <CardTitle>{compact ? "Normalized Cost / Mile" : "Actual Cost / Mile"}</CardTitle>
         </div>
         <span className="text-2xs text-muted-foreground">{cost.basisLabel}</span>
       </CardHeader>
@@ -77,9 +77,9 @@ export function CostPerMileCard({
             <Split label="Variable / mile" value={cost.variableCostPerMile} tone="text-warn" />
           </div>
           <div className="shrink-0 text-right">
-            <p className="label-xs">True cost / mile</p>
+            <p className="label-xs">{compact ? "Normalized cost / mile" : "Actual cost / mile"}</p>
             <p className="mt-0.5 tnum text-3xl font-semibold leading-none tracking-tight text-foreground">
-              {formatRateValue(cost.trueCostPerMile)}
+              {formatRateValue(cost.actualCostPerMile)}
             </p>
           </div>
         </div>
@@ -128,6 +128,12 @@ export function CostPerMileCard({
             </span>
           ) : null}
         </div>
+
+        {cost.debtServiceTotal > 0 ? (
+          <p className="border-t border-border pt-3 text-2xs text-muted-foreground tnum">
+            Debt Service is separate: {formatMoney(cost.debtServiceTotal)} · {formatRateValue(cost.debtServicePerMile)}/mi cash burden.
+          </p>
+        ) : null}
 
         {href ? (
           <Link

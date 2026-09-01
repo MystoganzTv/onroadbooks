@@ -76,7 +76,7 @@ export async function closeSettlementAction(values: unknown): Promise<ActionResu
           accountId: reserve.accountId,
           amount: reserve.amount,
           description: `${reserve.pct}% ${
-            reserve.basis === "OPERATING_PROFIT" ? "of operating profit" : "of gross revenue"
+            reserve.basis === "OPERATING_PROFIT" ? "of Operating Profit" : "of Booked Revenue"
           } - ${settlementLabel(month, half)}`,
         })),
     });

@@ -68,26 +68,30 @@ function load(over: Partial<Load> = {}): Load {
 }
 
 /**
- * THE MIGRATION INVARIANT
+ * THE REFERENCE FINANCIAL MODEL
  * =======================
  *
- * The whole point of the fleet work is that it changes what the app CAN say,
- * not what it already said. These are the figures the app reported for August
- * 2026 before trucks became a collection and expenses gained a scope; if any
- * one of them moves, the migration is wrong -- not the arithmetic.
+ * The seed pins both lenses of the versioned model: earned performance and
+ * collected cash. The legacy truck payment remains intact as unallocated debt
+ * service; no test invents an interest/principal split for it.
  */
 describe("August 2026 after the fleet migration", () => {
   const dataset = buildSeedDataset();
   const august = resolvePeriod("2026-08", "full");
   const summary = summarizePeriod(dataset.loads, dataset.expenses, august, dataset.settings);
 
-  it("reports exactly the revenue, expenses and profit it always did", () => {
-    assert.equal(summary.grossRevenue, 9795);
-    assert.equal(summary.operatingExpenses, 6143.9);
-    assert.equal(summary.netProfit, 3651.1);
+  it("separates booked performance from collected cash", () => {
+    assert.equal(summary.bookedRevenue, 9795);
+    assert.equal(summary.collectedRevenue, 6275);
+    assert.equal(summary.accountsReceivable, 3520);
+    assert.equal(summary.operatingExpenses, 4858.9);
+    assert.equal(summary.operatingProfit, 4936.1);
+    assert.equal(summary.unallocatedDebtService, 1285);
+    assert.equal(summary.debtService, 1285);
+    assert.equal(summary.cashAfterDebtService, 131.1);
   });
 
-  it("still costs the same to run a mile", () => {
+  it("separates actual operating cost per mile from debt cash burden", () => {
     const cost = calculateTrueCostPerMile(
       dataset.loads,
       dataset.expenses,
@@ -95,16 +99,19 @@ describe("August 2026 after the fleet migration", () => {
       dataset.settings,
       "August",
     );
-    assert.equal(Math.round(cost.trueCostPerMile * 100) / 100, 1.84);
+    assert.equal(Math.round(cost.actualCostPerMile * 100) / 100, 1.46);
+    assert.equal(Math.round(cost.debtServicePerMile * 100) / 100, 0.39);
+    assert.equal(Math.round(cost.cashCostPerMile * 100) / 100, 1.84);
     assert.equal(summary.totalMiles, 3332);
   });
 
-  it("leaves the same amount safe to pay yourself", () => {
+  it("keeps unpaid invoices out of Safe to Pay Yourself", () => {
     const pay = calculateSafeOwnerPay(
       summary,
       resolveReserveRules(dataset.settings, dataset.reserveAccounts),
     );
-    assert.equal(pay.safeToPay, 2235.23);
+    assert.equal(pay.reserveTotal, 1672.87);
+    assert.equal(pay.safeToPay, -1541.77);
   });
 
   it("still splits a month into halves that sum back to it", () => {
@@ -350,6 +357,17 @@ describe("calculateFleetSummary", () => {
       Math.round((fleetSummary.directCosts + fleetSummary.overhead) * 100) / 100,
       overall.operatingExpenses,
     );
+  });
+
+  it("uses collected cash, never booked revenue, for Cash After Debt Service", () => {
+    const overall = summarizePeriod(loads, expenses, august, settings);
+    assert.equal(fleetSummary.collectedRevenue, 0);
+    // These fixtures are legacy PAID rows without payment dates: paid status
+    // is preserved, but no cash period is silently invented.
+    assert.equal(fleetSummary.accountsReceivable, 0);
+    assert.equal(fleetSummary.unallocatedCollectedRevenue, 18000);
+    assert.equal(fleetSummary.cashAfterDebtService, overall.cashAfterDebtService);
+    assert.equal(fleetSummary.cashAfterDebtService, -11500);
   });
 
   it("reports the overhead allocation separately from any unit's own cost", () => {

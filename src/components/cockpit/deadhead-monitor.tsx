@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
  * DEADHEAD MONITOR.
  *
  * Empty miles as a first-class metric: the split, the percentage against the
- * owner's own ceiling, what those miles cost at the truck's true cost per
+ * owner's own ceiling, what those miles cost at the truck's Actual Cost Per
  * mile, and what they would have earned loaded. The language is factual --
  * repositioning to a better market is a decision, not a failure.
  */

@@ -32,6 +32,7 @@ export interface CalculatorDefaults {
   dispatchPct: number;
   factoringPct: number;
   overheadPerMile: number;
+  debtServicePerMile: number;
   trueCostPerMile: number;
   basisLabel: string;
   basisMiles: number;
@@ -106,6 +107,7 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
     factoringValue: toNumber(values.factoringValue),
     otherCost: toNumber(values.otherCost),
     overheadPerMile: defaults.overheadPerMile,
+    debtServicePerMile: defaults.debtServicePerMile,
   };
 
   const estimate = calculateLoadEstimate(
@@ -161,9 +163,9 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
             </TabsContent>
             <TabsContent value="target" className="m-0">
               <Field
-                label="Profit per mile you want"
+                label="Fully Loaded Operating Profit / mile target"
                 htmlFor="calc-target-ppm"
-                hint="After fuel, tolls, fees and the truck's overhead"
+                hint="After Direct Trip Costs and allocated Operating Costs; before Debt Service"
               >
                 <Input
                   id="calc-target-ppm"
@@ -256,7 +258,7 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
               </p>
               <dl className="mt-2 space-y-1">
                 <BasisRow
-                  label="True cost / mile"
+                label="Normalized cost / mile"
                   value={
                     defaults.basisSufficient
                       ? formatRateValue(defaults.trueCostPerMile)
@@ -264,22 +266,26 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
                   }
                 />
                 <BasisRow
-                  label="Overhead / mile used here"
+                  label="Allocated operating cost / mile"
                   value={formatRateValue(defaults.overheadPerMile)}
+                />
+                <BasisRow
+                  label="Debt service / mile (separate)"
+                  value={formatRateValue(defaults.debtServicePerMile)}
                 />
               </dl>
               <p className="mt-2 text-2xs leading-relaxed text-muted-foreground">
                 {defaults.basisSufficient ? (
                   <>
                     From {defaults.basisLabel.toLowerCase()} (
-                    {formatMiles(defaults.basisMiles)}). Overhead excludes fuel, tolls, dispatch
-                    and factoring because you enter those above — counting them twice is how a
-                    calculator flatters a bad load.
+                    {formatMiles(defaults.basisMiles)}). Allocated operating cost excludes fuel,
+                    tolls, dispatch and factoring because you enter those above. Debt service is
+                    shown separately and never changes the load&apos;s rating.
                   </>
                 ) : (
                   <>
-                    Not enough recorded miles yet, so overhead is treated as $0.00 and the profit
-                    shown is a trip-cost profit only. Record loads and expenses and this fills in.
+                    Not enough recorded miles yet, so allocated operating cost is treated as $0.00.
+                    The rating still uses the load&apos;s direct trip costs only.
                   </>
                 )}
               </p>
@@ -350,41 +356,71 @@ function EvaluateResult({
                 tone="neg"
               />
             ))}
+            <Line
+              label="Contribution Profit"
+              hint="Gross rate minus direct trip costs — rating basis"
+              value={formatMoney(estimate.contributionProfit)}
+              tone={estimate.contributionProfit >= 0 ? undefined : "neg"}
+              strong
+            />
+            <Line
+              label="Allocated Operating Costs"
+              hint="Normalized history; excludes debt service"
+              value={`-${formatMoney(estimate.allocatedOperatingCosts)}`}
+              tone="neg"
+            />
+            <Line
+              label="Estimated Fully Loaded Operating Profit"
+              value={formatMoney(estimate.fullyLoadedOperatingProfit)}
+              tone={estimate.fullyLoadedOperatingProfit >= 0 ? undefined : "neg"}
+              strong
+            />
+            <Line
+              label="Debt Service"
+              hint="Cash burden only — never used by the rating"
+              value={`-${formatMoney(estimate.debtService)}`}
+              tone="neg"
+            />
+            <Line
+              label="Cash After Debt Service"
+              value={formatMoney(estimate.cashAfterDebtService)}
+              tone={estimate.cashAfterDebtService >= 0 ? undefined : "neg"}
+              strong
+            />
           </dl>
 
           <div
             className={cn(
               "flex items-end justify-between gap-4 border-t-2 px-4 py-4",
-              estimate.profit >= 0
+              estimate.contributionProfit >= 0
                 ? "border-pos/40 bg-pos-soft/40"
                 : "border-neg/40 bg-neg-soft/40",
             )}
           >
             <div>
               <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Estimated profit
+                Contribution Profit · Rating Basis
               </p>
               <p className="mt-1 text-2xs text-muted-foreground tnum">
-                {formatPercent(estimate.profitMargin)} margin ·{" "}
-                {formatRateValue(estimate.costPerMile)}/mi to run
+                {formatPercent(estimate.contributionMargin)} margin · direct trip costs only
               </p>
             </div>
             <div className="text-right">
               <p
                 className={cn(
                   "tnum text-3xl font-semibold leading-none tracking-tight",
-                  estimate.profit >= 0 ? "text-pos" : "text-neg",
+                  estimate.contributionProfit >= 0 ? "text-pos" : "text-neg",
                 )}
               >
-                {formatMoneyCompact(estimate.profit)}
+                {formatMoneyCompact(estimate.contributionProfit)}
               </p>
               <p
                 className={cn(
                   "mt-1 tnum text-sm font-medium",
-                  estimate.profitPerMile >= 0 ? "text-pos" : "text-neg",
+                  estimate.contributionProfitPerMile >= 0 ? "text-pos" : "text-neg",
                 )}
               >
-                {formatRateValue(estimate.profitPerMile)}/mi
+                {formatRateValue(estimate.contributionProfitPerMile)}/mi
               </p>
             </div>
           </div>
@@ -437,7 +473,8 @@ function EvaluateResult({
 /* ---- Target rate ------------------------------------------------------ */
 
 const TIER_TONE: Record<string, string> = {
-  breakeven: "border-border bg-surface-sunken",
+  operatingBreakeven: "border-border bg-surface-sunken",
+  cashBreakeven: "border-border bg-card",
   minimum: "border-warn/40 bg-warn-soft",
   good: "border-info/40 bg-info-soft",
   great: "border-pos/40 bg-pos-soft",
@@ -527,9 +564,14 @@ function TargetResult({
             <Line label="Tolls" value={formatMoney(target.tolls)} />
             <Line label="Other cost" value={formatMoney(target.otherCost)} />
             <Line
-              label="Truck overhead"
-              hint={`${formatMiles(target.totalMiles)} of overhead`}
+              label="Allocated operating costs"
+              hint={`${formatMiles(target.totalMiles)} at the normalized operating rate`}
               value={formatMoney(target.overhead)}
+            />
+            <Line
+              label="Debt service (cash burden only)"
+              hint="Excluded from GREAT / GOOD / MARGINAL / BAD"
+              value={formatMoney(target.debtService)}
             />
             {target.flatFees > 0 ? (
               <Line label="Flat dispatch / factoring" value={formatMoney(target.flatFees)} />

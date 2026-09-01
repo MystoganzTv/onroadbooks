@@ -5,15 +5,15 @@
  * A 0-100 number with three visible parts. Deterministic, no weighting
  * anyone has to take on faith:
  *
- *   Profit per mile   50 points   full marks at 1.25x the GREAT threshold
- *   Profit margin     30 points   full marks at 60% margin
+ *   Contribution / mi 50 points   full marks at 1.25x the GREAT threshold
+ *   Contribution %    30 points   full marks at 60% margin
  *   Deadhead          20 points   full marks at 0%, nothing at 2x the warn level
  *
  * Every component is reported with the number that produced it, so the answer
  * to "why did this load score 87?" is on the screen, not in the source.
  *
  * The CLASSIFICATION (GREAT / GOOD / MARGINAL / BAD) is NOT the score banded.
- * It stays `rateLoad()` -- profit per total mile against the owner's own
+ * It stays `rateLoad()` -- Contribution Profit per total mile against the owner's own
  * thresholds -- because that is the number that decides whether a load was
  * worth running. The score adds nuance; it does not overrule the threshold.
  */
@@ -65,7 +65,7 @@ export function calculateLoadScore(
   const components: ScoreComponent[] = [
     {
       key: "ppm",
-      label: "Profit / mile",
+      label: "Contribution Profit / mile",
       points: Math.round(ppmPoints),
       max: SCORE_WEIGHTS.profitPerMile,
       value: metrics.profitPerMile,
@@ -73,7 +73,7 @@ export function calculateLoadScore(
     },
     {
       key: "margin",
-      label: "Profit margin",
+      label: "Contribution margin",
       points: Math.round(marginPoints),
       max: SCORE_WEIGHTS.margin,
       value: metrics.profitMargin,
@@ -123,7 +123,7 @@ export function scoreLoads(
   }));
 }
 
-/** Best and worst by profit per mile, the number the rating is built on. */
+/** Best and worst by Contribution Profit per mile, the rating basis. */
 export function bestAndWorst(loads: ScoredLoad[]): {
   best: ScoredLoad | undefined;
   worst: ScoredLoad | undefined;
