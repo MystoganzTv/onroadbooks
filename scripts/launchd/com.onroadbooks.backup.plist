@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Nightly encrypted backup of the production ledger. See docs/operations.md.
+
+  The passphrase is read from the login keychain at run time rather than
+  written into this file, so a copy of the plist is not a copy of the key:
+
+      security add-generic-password -s onroadbooks-backup -a "$USER" -w
+
+  Install (edit the path below first if the repository lives elsewhere):
+
+      cp scripts/launchd/com.onroadbooks.backup.plist ~/Library/LaunchAgents/
+      launchctl load ~/Library/LaunchAgents/com.onroadbooks.backup.plist
+      launchctl start com.onroadbooks.backup     # prove it works now
+
+  A missed run (laptop closed at 03:15) fires once the machine wakes.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.onroadbooks.backup</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>cd "$HOME/Developer/OnroadBooks" &amp;&amp; BACKUP_PASSPHRASE="$(security find-generic-password -w -s onroadbooks-backup)" npm run backup</string>
+  </array>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>3</integer>
+    <key>Minute</key>
+    <integer>15</integer>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/onroadbooks-backup.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/onroadbooks-backup.log</string>
+</dict>
+</plist>

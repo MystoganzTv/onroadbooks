@@ -27,6 +27,46 @@ delivery has a three-second timeout and cannot replace the original error.
 Invalid signatures are logged as warnings but are not alerted to avoid turning
 internet noise into an alert storm.
 
+## Database backups
+
+Supabase's free plan includes no daily backup and no point-in-time recovery, so
+the ledger is backed up by us, on a schedule, or it is not backed up at all:
+
+```bash
+npm run backup
+```
+
+Each run dumps the production `public` schema, encrypts it with AES-256-GCM
+under a scrypt key derived from `BACKUP_PASSPHRASE`, writes
+`onroadbooks-<UTC timestamp>.dump.enc` into `BACKUP_DIR` (default
+`~/OnRoadBooksBackups`, and never inside this repository), then decrypts what
+it just wrote and reads its table of contents back with `pg_restore` to prove
+all 17 application tables are in it. A run that cannot prove that fails.
+
+Old files are pruned past `BACKUP_KEEP_DAYS` (default 30), except that the
+seven newest always survive -- a machine left off for two months must not
+prune itself down to nothing.
+
+Nightly on macOS: `scripts/launchd/com.onroadbooks.backup.plist`. It reads the
+passphrase from the login keychain rather than from a file; install
+instructions are in the comment at the top.
+
+To restore, decrypt first and then use ordinary PostgreSQL tooling:
+
+```bash
+npm run backup -- --decrypt ~/OnRoadBooksBackups/onroadbooks-<stamp>.dump.enc --out /tmp/ledger.dump
+pg_restore --dbname "$TARGET" --no-owner --no-privileges /tmp/ledger.dump
+rm /tmp/ledger.dump
+```
+
+`npm run backup -- --verify <file>` re-checks an existing backup without
+producing a new one; run it on the oldest file you keep, not just the newest.
+
+Two limits worth saying out loud. This recovers last night, not the last five
+minutes -- only Supabase Pro's PITR does that. And it covers the application
+database only: Supabase Auth identities and Storage objects have their own
+provider export procedures and are not in this file.
+
 ## Backup restoration drill
 
 Run:

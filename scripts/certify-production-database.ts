@@ -7,25 +7,8 @@ import path from "node:path";
 
 import { Prisma, PrismaClient } from "../src/generated/prisma";
 
-const APPLICATION_TABLES = [
-  "User",
-  "Business",
-  "FinancialGoal",
-  "Subscription",
-  "ReserveAccount",
-  "ReserveTransaction",
-  "Settlement",
-  "Driver",
-  "DriverSettlement",
-  "DriverSettlementLine",
-  "FinancialSettings",
-  "Truck",
-  "Load",
-  "Expense",
-  "FuelEntry",
-  "MaintenanceRecord",
-  "Document",
-] as const;
+import { APPLICATION_TABLES } from "./lib/postgres";
+
 
 interface SecurityRow {
   table_name: string;

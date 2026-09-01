@@ -30,6 +30,7 @@ The format is in [0000-template.md](0000-template.md); the practice itself is
 | [0005](0005-dependency-free-auth.md) | Hand-rolled auth on `node:crypto` with a signed cookie session | Accepted |
 | [0006](0006-business-scoped-repository.md) | `businessId` from the session, asserted on every access | Accepted |
 | [0018](0018-server-actions-validated-with-zod.md) | Server actions validated with zod, returning a typed result | Accepted |
+| [0023](0023-backups-are-ours-encrypted-and-verified.md) | Back the ledger up ourselves — encrypted, verified, off the platform | Accepted |
 
 ### The money
 
