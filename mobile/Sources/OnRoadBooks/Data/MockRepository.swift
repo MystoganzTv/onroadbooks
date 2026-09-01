@@ -120,6 +120,13 @@ final class MockRepository: LedgerRepository {
         return loadId
     }
 
+    /// Demo mode has nowhere to put a photo, and pretending otherwise would be
+    /// the app telling him a receipt was filed when it was not.
+    @discardableResult
+    func attachReceipt(expenseId: String, jpeg: Data) async throws -> String {
+        throw APIError.refused("Los recibos necesitan una cuenta real. Entra con tu cuenta para adjuntarlos.")
+    }
+
     @discardableResult
     func markInvoicePaid(loadId: String, on date: Date) async throws -> String {
         guard let index = invoices.firstIndex(where: { $0.loadId == loadId }) else { return loadId }

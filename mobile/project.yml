@@ -36,6 +36,9 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         UIUserInterfaceStyle: Dark
+        # The camera is only ever opened from "Adjuntar recibo"; the photo
+        # library uses PHPicker, which needs no permission string at all.
+        NSCameraUsageDescription: Para tomar la foto del recibo y adjuntarla al gasto.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.onroadbooks.mobile

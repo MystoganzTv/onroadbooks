@@ -84,7 +84,7 @@ final class AuthSession: ObservableObject {
     /// There is no Google SDK here and no second OAuth client: the app opens
     /// the real sign-in page and comes back with a code it alone can redeem.
     /// See `WebSignIn` and `src/lib/auth/mobile-handoff.ts`.
-    func continueWithGoogle() async {
+    func continueWithGoogle(freshSession: Bool = false) async {
         isAuthenticating = true
         lastError = nil
         defer { isAuthenticating = false }
@@ -94,7 +94,7 @@ final class AuthSession: ObservableObject {
         defer { webSignIn = nil }
 
         do {
-            let credentials = try await flow.start()
+            let credentials = try await flow.start(freshSession: freshSession)
             store(token: credentials.token, email: credentials.email, name: credentials.name)
         } catch WebSignIn.Failure.cancelled {
             // He closed the sheet. Not something to shout about.

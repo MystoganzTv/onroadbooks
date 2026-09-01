@@ -47,6 +47,15 @@ struct LoginView: View {
                     .foregroundStyle(OBColor.foreground)
                     .disabled(authSession.isAuthenticating)
 
+                    Button("Usar otra cuenta de Google") {
+                        focusedField = nil
+                        Task { await authSession.continueWithGoogle(freshSession: true) }
+                    }
+                    .font(.footnote)
+                    .foregroundStyle(OBColor.mutedForeground)
+                    .frame(maxWidth: .infinity)
+                    .disabled(authSession.isAuthenticating)
+
                     HStack(spacing: OBSpacing.sm) {
                         Rectangle().fill(OBColor.border).frame(height: 1)
                         Text("o con tu contraseña")

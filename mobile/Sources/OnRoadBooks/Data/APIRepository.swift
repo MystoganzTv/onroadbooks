@@ -139,6 +139,39 @@ final class APIRepository: LedgerRepository {
                        summary: "Combustible \(stop.location.isEmpty ? "sin lugar" : stop.location)", amount: stop.totalCost)
     }
 
+    /// Multipart, because that is what the web upload route already speaks and
+    /// what the storage adapter on the other side expects — the photo is not
+    /// re-encoded into JSON just to please the phone.
+    @discardableResult
+    func attachReceipt(expenseId: String, jpeg: Data) async throws -> String {
+        let boundary = "onroad-\(UUID().uuidString)"
+        var body = Data()
+
+        func field(_ name: String, _ value: String) {
+            body.append(Data("--\(boundary)\r\n".utf8))
+            body.append(Data("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".utf8))
+            body.append(Data("\(value)\r\n".utf8))
+        }
+
+        field("owner", "EXPENSE")
+        field("entityId", expenseId)
+        field("type", "RECEIPT")
+
+        let fileName = "recibo-\(ISODate.day(Date())).jpg"
+        body.append(Data("--\(boundary)\r\n".utf8))
+        body.append(Data("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n".utf8))
+        body.append(Data("Content-Type: image/jpeg\r\n\r\n".utf8))
+        body.append(jpeg)
+        body.append(Data("\r\n--\(boundary)--\r\n".utf8))
+
+        var request = client.request("api/mobile/documents", method: "POST")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+
+        let (data, http) = try await client.send(request)
+        return try APIClient.outcome(data, http)
+    }
+
     func fetchInvoices() async throws -> InvoiceLedger {
         try await get("api/mobile/invoices", as: InvoicesResponseDTO.self).toDomain()
     }

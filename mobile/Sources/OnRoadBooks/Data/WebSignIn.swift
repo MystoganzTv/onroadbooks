@@ -42,7 +42,11 @@ final class WebSignIn: NSObject, ASWebAuthenticationPresentationContextProviding
         }
     }
 
-    func start() async throws -> Credentials {
+    /// - Parameter freshSession: start with no cookies at all. Google then
+    ///   shows its account chooser instead of "Continue as …": with Safari's
+    ///   session shared, whoever is already signed in on the phone is the only
+    ///   account offered, and there is no way past it. This is that way past.
+    func start(freshSession: Bool = false) async throws -> Credentials {
         let verifier = Self.randomToken()
         let state = Self.randomToken()
         let challenge = Self.challenge(for: verifier)
@@ -57,7 +61,7 @@ final class WebSignIn: NSObject, ASWebAuthenticationPresentationContextProviding
         ]
         guard let url = components?.url else { throw Failure.failed("No se pudo abrir el inicio de sesión.") }
 
-        let callback = try await authenticate(url: url)
+        let callback = try await authenticate(url: url, freshSession: freshSession)
         let items = URLComponents(url: callback, resolvingAgainstBaseURL: false)?.queryItems ?? []
         guard items.first(where: { $0.name == "state" })?.value == state else { throw Failure.mismatched }
         guard let code = items.first(where: { $0.name == "code" })?.value else {
@@ -67,7 +71,7 @@ final class WebSignIn: NSObject, ASWebAuthenticationPresentationContextProviding
         return try await exchange(code: code, verifier: verifier)
     }
 
-    private func authenticate(url: URL) async throws -> URL {
+    private func authenticate(url: URL, freshSession: Bool) async throws -> URL {
         try await withCheckedThrowingContinuation { continuation in
             let session = ASWebAuthenticationSession(
                 url: url,
@@ -83,9 +87,11 @@ final class WebSignIn: NSObject, ASWebAuthenticationPresentationContextProviding
                 }
             }
             session.presentationContextProvider = self
-            // Use whatever Safari already knows: if he is signed in to
-            // onroadbooks.com on this phone, this is one tap.
-            session.prefersEphemeralWebBrowserSession = false
+            // By default use whatever Safari already knows: if he is signed in
+            // to onroadbooks.com on this phone, this is one tap. Ephemeral
+            // throws all of that away, which is the only way to reach Google's
+            // account chooser.
+            session.prefersEphemeralWebBrowserSession = freshSession
             self.session = session
             if !session.start() {
                 continuation.resume(throwing: Failure.failed("No se pudo abrir el inicio de sesión."))
