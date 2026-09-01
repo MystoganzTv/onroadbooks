@@ -66,6 +66,41 @@ delivery has a three-second timeout and cannot replace the original error.
 Invalid signatures are logged as warnings but are not alerted to avoid turning
 internet noise into an alert storm.
 
+## What CI costs, and why it runs the way it does
+
+The repository is private, so Actions minutes are metered (2,000/month on the
+free plan) instead of unlimited. `.github/workflows/ci.yml` is shaped by that:
+
+- **Every push to main gets the fast gates** — types, lint and the money maths.
+  About two minutes, and they are the ones that catch a real mistake.
+- **The browser suite and the real-Postgres suite run on pull requests and once
+  a night**, not on every push. They are the slow third of the bill and they do
+  not fail on a commit that already passed the fast gates.
+- **Nothing runs for a commit that only touches `mobile/`, `docs/` or
+  Markdown.** No job here tests Swift or an ADR.
+- **`npm run build` is not in CI.** Vercel builds every push already; a broken
+  build fails the deployment, which is where you would look for it. Paying
+  GitHub to compile the same commit twice buys nothing.
+- Chromium is cached against `package-lock.json`, so it downloads only when
+  Playwright's version changes.
+
+If minutes ever get tight again, the next thing to cut is the nightly
+Postgres job down to weekdays — not the fast gates.
+
+## Nightly backup in the cloud
+
+`.github/workflows/backup.yml` runs the same `scripts/backup-database.ts` the
+Mac runs, so there is one backup format and one implementation. It needs two
+repository secrets: `DATABASE_URL` and `BACKUP_PASSPHRASE` — the same
+passphrase as the local backups, so one secret opens either copy.
+
+The encrypted dump is kept as a workflow artifact for 90 days.
+
+**This is only safe because the repository is private.** Artifacts of a public
+repository are world-readable, and an encrypted ledger on the open internet is
+a countdown, not a backup. If this repository is ever made public again, delete
+that workflow in the same commit.
+
 ## The year-end packet
 
 `GET /api/export/year-end?year=2026` (browser session) and

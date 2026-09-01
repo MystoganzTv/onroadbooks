@@ -1,32 +1,58 @@
 name: CI
 
-# Every push and every pull request has to survive the same four gates the
-# app is developed against: it compiles, it type-checks, it lints clean, and
-# the money maths still holds.
+# A private repository meters Actions minutes, so this runs what tells us
+# something and stops paying for what does not.
+#
+#   - main and pull requests only. Pushing a work branch used to run the whole
+#     suite twice, once for the push and again for the PR.
+#   - nothing here tests Swift, Markdown or ADRs, so a commit touching only
+#     those starts no job at all.
+#   - every push gets the fast gates: types, lint, and the money maths. Those
+#     are the ones that catch a real mistake, and they finish in about two
+#     minutes.
+#   - the browser suite and the real-Postgres suite run on pull requests and
+#     once a night, not on every push. They are the slowest third of the bill
+#     and they almost never fail on a commit that already passed the fast gates.
+#   - `npm run build` is gone: Vercel builds every push already, and a broken
+#     build fails the deployment where you would look for it anyway. Paying
+#     GitHub to compile the same commit twice buys nothing.
 on:
   push:
-    branches: ["**"]
+    branches: [main]
+    paths-ignore:
+      - "mobile/**"
+      - "docs/**"
+      - "**/*.md"
   pull_request:
+    paths-ignore:
+      - "mobile/**"
+      - "docs/**"
+      - "**/*.md"
+  schedule:
+    - cron: "40 7 * * *"
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
 jobs:
   verify:
-    name: Build, types, lint and tests
+    name: Types, lint and the money maths
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     env:
-      # CI never talks to Postgres: the JSON store is the reference
+      # CI never talks to Postgres here: the JSON store is the reference
       # implementation and the one the behavioural tests exercise.
       DATA_SOURCE: json
       DOCUMENT_STORAGE: local
-      # A fixed key so the build does not write a session secret into the
+      # A fixed key so the run does not write a session secret into the
       # workspace. It signs nothing that outlives the job.
       AUTH_SECRET: ci-only-not-a-real-secret
-      NEXT_TELEMETRY_DISABLED: "1"
 
     steps:
       - uses: actions/checkout@v4
@@ -50,24 +76,62 @@ jobs:
       - name: Tests
         run: npm test
 
+  browser:
+    name: The app in a real browser
+    # Pull requests and the nightly run. A push that passed the fast gates has
+    # not broken the browser suite in practice, and this is the expensive third.
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      DATA_SOURCE: json
+      DOCUMENT_STORAGE: local
+      AUTH_SECRET: ci-only-not-a-real-secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Downloading Chromium every run is about a minute of billed time for a
+      # binary that changes only when the Playwright version does.
+      - name: Cache browser
+        id: browser-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      # The cache holds the browser binary, not the OS libraries it links
+      # against, so those are installed every run regardless of a cache hit.
+      - name: Browser system libraries
+        run: npx playwright install-deps chromium
+
       - name: Install browser
-        run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+        if: steps.browser-cache.outputs.cache-hit != 'true'
+        run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install chromium
 
       - name: Browser tests
         run: npm run test:e2e
 
-      - name: Build
-        run: npm run build
-
   postgres:
     name: The Postgres store, against a real database
+    # Same reasoning as the browser job. The suite in `verify` proves the
+    # arithmetic against the JSON store, and `store-contract` only compares the
+    # two stores' method NAMES. Everything the Prisma store does differently --
+    # foreign keys, transactions, generated ids, the snapshot JSON column -- is
+    # only ever exercised here, which is why it still runs every night.
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
-    # The suite above proves the arithmetic against the JSON store, and
-    # `store-contract` only compares the two stores' method NAMES. Everything
-    # the Prisma store does differently -- foreign keys, transactions,
-    # generated ids, the snapshot JSON column -- is only ever exercised here.
     services:
       postgres:
         image: postgres:16
@@ -88,7 +152,6 @@ jobs:
       DIRECT_URL: postgresql://postgres:postgres@localhost:5432/onroad_books?schema=public
       DOCUMENT_STORAGE: local
       AUTH_SECRET: ci-only-not-a-real-secret
-      NEXT_TELEMETRY_DISABLED: "1"
 
     steps:
       - uses: actions/checkout@v4
