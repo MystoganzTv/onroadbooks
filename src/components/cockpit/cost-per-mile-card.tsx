@@ -38,11 +38,20 @@ export function CostPerMileCard({
             <Gauge className="size-3.5 text-muted-foreground" />
             <CardTitle>True Cost / Mile</CardTitle>
           </div>
+          {/*
+            The basis belongs in the header even when the card is empty: two of
+            these sit side by side -- this period and the trailing basis -- and
+            without it they read as the same card twice. It is a label, not a
+            phrase, so it is shown as one instead of being spliced into the
+            sentence below ("Trailing 90 days" reads fine there, "No data yet"
+            does not).
+          */}
+          <span className="text-2xs text-muted-foreground">{cost.basisLabel}</span>
         </CardHeader>
         <CardContent className="p-4">
           <p className="text-xs leading-relaxed text-muted-foreground">
-            No miles recorded in {cost.basisLabel.toLowerCase()}, so there is nothing to divide
-            costs by yet. Add a load with miles and this fills in.
+            No miles recorded for this basis, so there is nothing to divide costs by yet. Add
+            a load with miles and this fills in.
           </p>
         </CardContent>
       </Card>
