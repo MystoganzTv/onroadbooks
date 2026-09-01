@@ -359,6 +359,80 @@ describe("load costs <-> expense mirror", () => {
     assert.equal(dataset.expenses.some((e) => e.id.startsWith(`expload_${load.id}_`)), false);
   });
 
+  it("edits a generated expense at its load source", async () => {
+    const load = await repo.createLoad({
+      date: "2026-08-30",
+      originCity: "Richmond",
+      originState: "VA",
+      destinationCity: "Atlanta",
+      destinationState: "GA",
+      loadedMiles: 530,
+      deadheadMiles: 20,
+      grossRate: 1800,
+      fuelCost: 0,
+      tolls: 40,
+      dispatchFee: 0,
+      factoringFee: 0,
+      otherExpenses: 0,
+      status: "PENDING",
+    });
+    const expenseId = loadExpenseId(load.id, "tolls");
+
+    await repo.updateLoadExpense(expenseId, 72.5);
+    let dataset = await repo.getDataset();
+    assert.equal(dataset.loads.find((row) => row.id === load.id)?.tolls, 72.5);
+    assert.equal(dataset.expenses.find((row) => row.id === expenseId)?.amount, 72.5);
+
+    await repo.updateLoadExpense(expenseId, 0);
+    dataset = await repo.getDataset();
+    assert.equal(dataset.loads.find((row) => row.id === load.id)?.tolls, 0);
+    assert.equal(dataset.expenses.some((row) => row.id === expenseId), false);
+  });
+
+  it("keeps a separate fuel estimate visible for every load", async () => {
+    const first = await repo.createLoad({
+      date: "2026-09-01",
+      originCity: "Austell",
+      originState: "GA",
+      destinationCity: "New Orleans",
+      destinationState: "LA",
+      loadedMiles: 430,
+      deadheadMiles: 20,
+      grossRate: 1500,
+      fuelCost: 80,
+      tolls: 0,
+      dispatchFee: 0,
+      factoringFee: 0,
+      otherExpenses: 0,
+      status: "PENDING",
+    });
+    const second = await repo.createLoad({
+      date: "2026-09-01",
+      originCity: "Richmond",
+      originState: "VA",
+      destinationCity: "Atlanta",
+      destinationState: "GA",
+      loadedMiles: 420,
+      deadheadMiles: 50,
+      grossRate: 1400,
+      fuelCost: 295.69,
+      tolls: 0,
+      dispatchFee: 0,
+      factoringFee: 0,
+      otherExpenses: 0,
+      status: "PENDING",
+    });
+
+    const dataset = await repo.getDataset();
+    const estimates = [first, second].map((load) =>
+      dataset.expenses.find((expense) => expense.id === loadExpenseId(load.id, "fuel")),
+    );
+    assert.deepEqual(
+      estimates.map((expense) => expense?.amount),
+      [80, 295.69],
+    );
+  });
+
   it("honours an explicit costsPosted:false so history is never posted retroactively", async () => {
     const load = await repo.createLoad({
       date: "2026-08-28",
@@ -417,6 +491,42 @@ describe("load costs <-> expense mirror", () => {
     dataset = await repo.getDataset();
     assert.equal(dataset.expenses.find((e) => e.id === loadExpenseId(load.id, "fuel"))?.amount, 180);
     await repo.deleteLoad(load.id);
+  });
+});
+
+describe("load IFTA mileage", () => {
+  it("updates only the jurisdiction allocation and rejects more than the trip total", async () => {
+    const load = await repo.createLoad(
+      loadInput({
+        originCity: "Austell",
+        originState: "GA",
+        destinationCity: "New Orleans",
+        destinationState: "LA",
+        loadedMiles: 477,
+        deadheadMiles: 17,
+        grossRate: 1500,
+      }),
+    );
+
+    const updated = await repo.updateLoadJurisdictionMiles(load.id, [
+      { jurisdiction: "GA", totalMiles: 90, nonTaxableMiles: 0 },
+      { jurisdiction: "AL", totalMiles: 210, nonTaxableMiles: 0 },
+      { jurisdiction: "MS", totalMiles: 170, nonTaxableMiles: 0 },
+      { jurisdiction: "LA", totalMiles: 24, nonTaxableMiles: 0 },
+    ]);
+    assert.equal(updated.grossRate, 1500);
+    assert.equal(
+      updated.jurisdictionMiles.reduce((total, row) => total + row.totalMiles, 0),
+      494,
+    );
+
+    await assert.rejects(
+      () =>
+        repo.updateLoadJurisdictionMiles(load.id, [
+          { jurisdiction: "GA", totalMiles: 495, nonTaxableMiles: 0 },
+        ]),
+      /cannot exceed total trip miles/i,
+    );
   });
 });
 

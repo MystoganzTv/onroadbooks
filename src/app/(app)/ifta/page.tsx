@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AlertTriangle, Download } from "lucide-react";
 
 import { IftaRateDialog } from "@/components/ifta/ifta-rate-dialog";
+import { LoadMileageDialog } from "@/components/ifta/load-mileage-dialog";
 import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import { MiniStat } from "@/components/dashboard/mini-stat";
 import { PageHeader } from "@/components/shared/page-header";
@@ -44,9 +45,31 @@ export default async function IftaPage({ searchParams }: { searchParams: Promise
     return Number.isFinite(rate) ? [[row.jurisdiction, rate]] : [];
   }));
   const relevantLoads = dataset.loads.filter((load) => load.date >= report.start && load.date <= report.end && (!truckId || load.truckId === truckId));
-  const missingLoads = relevantLoads.filter((load) => normalizeJurisdictionMiles(load.jurisdictionMiles).reduce((sum, row) => sum + row.totalMiles, 0) !== load.loadedMiles + load.deadheadMiles);
+  const missingLoads = relevantLoads.flatMap((load) => {
+    const totalMiles = load.loadedMiles + load.deadheadMiles;
+    const assignedMiles = normalizeJurisdictionMiles(load.jurisdictionMiles).reduce((sum, row) => sum + row.totalMiles, 0);
+    return assignedMiles === totalMiles
+      ? []
+      : [{
+          load: {
+            id: load.id,
+            originCity: load.originCity,
+            originState: load.originState,
+            destinationCity: load.destinationCity,
+            destinationState: load.destinationState,
+            loadedMiles: load.loadedMiles,
+            deadheadMiles: load.deadheadMiles,
+            jurisdictionMiles: load.jurisdictionMiles,
+          },
+          loadNumber: load.loadNumber,
+          totalMiles,
+          assignedMiles,
+          unassignedMiles: Math.max(0, totalMiles - assignedMiles),
+        }];
+  });
   const missingFuel = dataset.fuelEntries.filter((entry) => entry.date >= report.start && entry.date <= report.end && (!truckId || entry.truckId === truckId) && !entry.jurisdiction);
   const baseQuery = new URLSearchParams({ quarter }); if (truckId) baseQuery.set("truck", truckId);
+  const fuelQuery = new URLSearchParams({ month: report.start.slice(0, 7), period: "quarter" }); if (truckId) fuelQuery.set("truck", truckId);
 
   return <div className="space-y-4 p-4 lg:p-6">
     <PageHeader title="IFTA" description="Quarterly jurisdiction mileage, fuel allocation, and net tax due—with incomplete records called out before filing." />
@@ -71,11 +94,12 @@ export default async function IftaPage({ searchParams }: { searchParams: Promise
       <MiniStat label="Filing status" value={report.complete ? "Ready" : "Review"} tone={report.complete ? "positive" : "warning"} sub={`${report.start} to ${report.end}`} />
     </div>
     {!report.complete ? <Card className="border-warn/40"><CardHeader><CardTitle className="flex items-center gap-2"><AlertTriangle className="size-4 text-warn" /> Filing is incomplete</CardTitle></CardHeader><CardContent className="space-y-2 text-sm text-muted-foreground">
-      {report.unassignedMiles ? <p>{formatMiles(report.unassignedMiles)} are not assigned to a jurisdiction across {missingLoads.length} load(s).</p> : null}
+      {report.unassignedMiles ? <p>{formatMiles(report.unassignedMiles)} are not assigned to a jurisdiction across {missingLoads.length} load(s). The total is known, but the states or provinces actually crossed still need to be confirmed.</p> : null}
+      {report.totalFleetMiles > 0 && report.totalGallons === 0 ? <p>{formatMiles(report.totalFleetMiles)} are recorded, but there are no detailed fuel purchases in this quarter. <Link href={`/fuel?${fuelQuery.toString()}`} className="text-primary underline underline-offset-2">Add actual gallons on the Fuel page.</Link></p> : null}
       {report.unassignedGallons ? <p>{report.unassignedGallons.toFixed(2)} gallons are missing a jurisdiction across {missingFuel.length} fuel purchase(s).</p> : null}
       {report.missingRateJurisdictions.length ? <p>Missing {quarter} rates: {report.missingRateJurisdictions.join(", ")}.</p> : null}
-      {missingLoads.length ? <div className="flex flex-wrap gap-2">{missingLoads.map((load) => <Link key={load.id} href={`/loads/${load.id}`} className="text-primary underline underline-offset-2">{load.loadNumber ?? `${load.originCity}–${load.destinationCity}`}</Link>)}</div> : null}
     </CardContent></Card> : null}
+    {missingLoads.length ? <Card><CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle>Loads needing jurisdiction miles</CardTitle><p className="mt-1 text-xs text-muted-foreground">Trip totals arrive here automatically. Assign the actual route miles before filing.</p></div><Badge variant="warning">{formatMiles(report.unassignedMiles)} unassigned</Badge></div></CardHeader><CardContent className="p-0"><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Load</TableHead><TableHead>Route</TableHead><TableHead className="text-right">Trip miles</TableHead><TableHead className="text-right">Assigned</TableHead><TableHead className="text-right">Unassigned</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader><TableBody>{missingLoads.map(({ load, loadNumber, totalMiles, assignedMiles, unassignedMiles }) => <TableRow key={load.id}><TableCell><Link href={`/loads/${load.id}`} className="font-medium text-primary hover:underline">{loadNumber ? `#${loadNumber}` : `${load.originCity}–${load.destinationCity}`}</Link></TableCell><TableCell>{load.originState} → {load.destinationState}</TableCell><TableCell className="text-right tnum">{formatMiles(totalMiles)}</TableCell><TableCell className="text-right tnum">{formatMiles(assignedMiles)}</TableCell><TableCell className="text-right tnum text-warn">{formatMiles(unassignedMiles)}</TableCell><TableCell className="text-right">{canManage ? <LoadMileageDialog load={load} trigger={<Button size="sm" variant="outline">Assign miles</Button>} /> : <Button asChild size="sm" variant="outline"><Link href={`/loads/${load.id}`}>View load</Link></Button>}</TableCell></TableRow>)}</TableBody></Table></div></CardContent></Card> : null}
     <Card><CardHeader><div className="flex items-center justify-between"><CardTitle>Jurisdiction detail</CardTitle><Badge variant={report.complete ? "positive" : "warning"}>{report.complete ? "Ready to file" : "Draft"}</Badge></div></CardHeader><CardContent className="p-0">
       {report.jurisdictions.length === 0 ? <p className="p-6 text-center text-sm text-muted-foreground">No IFTA mileage or fuel entries in this quarter.</p> : <div className="overflow-x-auto"><Table><TableHeader><TableRow>
         <TableHead>Jurisdiction</TableHead><TableHead className="text-right">Total miles</TableHead><TableHead className="text-right">Taxable miles</TableHead><TableHead className="text-right">Tax-paid gal.</TableHead><TableHead className="text-right">Taxable gal.</TableHead><TableHead className="text-right">Net gal.</TableHead><TableHead className="text-right">Rate</TableHead><TableHead className="text-right">Tax due</TableHead>

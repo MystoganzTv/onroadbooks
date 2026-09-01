@@ -36,6 +36,7 @@ interface FuelTableProps {
   defaultTruckId?: string | null;
   defaultDate: string;
   lastOdometer: number | null;
+  hasLoadEstimates?: boolean;
 }
 
 export function FuelTable({
@@ -45,6 +46,7 @@ export function FuelTable({
   defaultTruckId,
   defaultDate,
   lastOdometer,
+  hasLoadEstimates = false,
 }: FuelTableProps) {
   const router = useRouter();
   const [deleting, setDeleting] = React.useState<string | null>(null);
@@ -95,8 +97,12 @@ export function FuelTable({
       <div className="rounded-lg border border-border bg-card">
         <EmptyState
           icon={Fuel}
-          title="No fuel purchases in this period"
-          description="Log each fill-up with its odometer reading and the app will calculate MPG and fuel cost per mile."
+          title="No detailed fill-ups in this period"
+          description={
+            hasLoadEstimates
+              ? "The load estimates above already count toward fuel spend. Add the actual gallons and odometer readings to calculate MPG and complete IFTA."
+              : "Log each fill-up with its odometer reading and the app will calculate MPG and fuel cost per mile."
+          }
           action={
             <FuelFormDialog
               loads={loads}

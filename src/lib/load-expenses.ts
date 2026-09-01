@@ -3,6 +3,13 @@ import type { Dataset, ExpenseCategoryId, Load } from "./types";
 
 export type LoadExpenseKey = "fuel" | "tolls" | "dispatch" | "factoring" | "other";
 
+export type LoadExpenseField =
+  | "fuelCost"
+  | "tolls"
+  | "dispatchFee"
+  | "factoringFee"
+  | "otherExpenses";
+
 export const LOAD_EXPENSE_KEYS: LoadExpenseKey[] = [
   "fuel",
   "tolls",
@@ -29,6 +36,31 @@ export function loadExpenseId(loadId: string, key: LoadExpenseKey): string {
 
 export function isLoadExpenseId(id: string): boolean {
   return id.startsWith("expload_");
+}
+
+/** The load field that owns each generated ledger row. */
+export function loadExpenseField(key: LoadExpenseKey): LoadExpenseField {
+  switch (key) {
+    case "fuel":
+      return "fuelCost";
+    case "tolls":
+      return "tolls";
+    case "dispatch":
+      return "dispatchFee";
+    case "factoring":
+      return "factoringFee";
+    case "other":
+      return "otherExpenses";
+  }
+}
+
+/**
+ * Resolves a generated expense id only in the context of its linked load.
+ * Comparing deterministic ids avoids parsing load ids, which may themselves
+ * contain underscores in imported datasets.
+ */
+export function loadExpenseKey(id: string, loadId: string): LoadExpenseKey | null {
+  return LOAD_EXPENSE_KEYS.find((key) => loadExpenseId(loadId, key) === id) ?? null;
 }
 
 export function loadExpenseSpecs(load: LoadCostSource): LoadExpenseSpec[] {

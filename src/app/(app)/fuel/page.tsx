@@ -6,10 +6,13 @@ import { MiniStat } from "@/components/dashboard/mini-stat";
 import { PeriodControls } from "@/components/dashboard/period-controls";
 import { FuelFormDialog } from "@/components/fuel/fuel-form-dialog";
 import { FuelTable } from "@/components/fuel/fuel-table";
+import { LoadFuelEstimates } from "@/components/fuel/load-fuel-estimates";
 import { PageHeader } from "@/components/shared/page-header";
 import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  div,
+  expensesInPeriod,
   linkedFuelByLoad,
   fuelInPeriod,
   loadsInPeriod,
@@ -63,6 +66,7 @@ export default async function FuelPage({
   const fuelEntries = truckId ? allFuel.filter((e) => e.truckId === truckId) : allFuel;
 
   const summary = summarizePeriod(loads, expenses, period, settings);
+  const periodExpenses = expensesInPeriod(expenses, period);
   const periodFuel = fuelInPeriod(fuelEntries, period);
   const fuel = summarizeFuel(periodFuel, summary.totalMiles);
   const periodLoads = withMetricsAll(
@@ -80,13 +84,16 @@ export default async function FuelPage({
       ) ?? null;
 
   const fuelShare =
-    summary.operatingExpenses > 0 ? (fuel.totalCost / summary.operatingExpenses) * 100 : 0;
+    summary.operatingExpenses > 0 ? (summary.fuelExpense / summary.operatingExpenses) * 100 : 0;
+  const loadFuelEstimates = periodExpenses.filter(
+    (expense) => expense.category === "FUEL" && expense.id.startsWith("expload_") && expense.loadId,
+  );
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <PageHeader
         title="Fuel"
-        description={`${period.label} - ${fuel.entryCount} ${fuel.entryCount === 1 ? "fill-up" : "fill-ups"}`}
+        description={`${period.label} - ${fuel.entryCount} detailed ${fuel.entryCount === 1 ? "fill-up" : "fill-ups"} - ${loadFuelEstimates.length} load ${loadFuelEstimates.length === 1 ? "estimate" : "estimates"}`}
         actions={
           <FuelFormDialog
             loads={periodLoads}
@@ -109,9 +116,9 @@ export default async function FuelPage({
       >
         <MiniStat
           label="Fuel Cost"
-          value={formatMoneyCompact(fuel.totalCost)}
+          value={formatMoneyCompact(summary.fuelExpense)}
           tone="negative"
-          sub={`${formatPercent(fuelShare)} of expenses`}
+          sub={`${formatPercent(fuelShare)} of expenses · ${formatMoneyCompact(fuel.totalCost)} detailed`}
         />
         <MiniStat label="Total Gallons" value={formatGallons(fuel.totalGallons)} />
         <MiniStat
@@ -120,9 +127,9 @@ export default async function FuelPage({
         />
         <MiniStat
           label="Fuel / Mile"
-          value={formatRate(fuel.fuelCostPerMile)}
+          value={formatRate(div(summary.fuelExpense, summary.totalMiles))}
           tone="warning"
-          sub={`${formatNumber(summary.totalMiles)} mi driven`}
+          sub={`${formatNumber(summary.totalMiles)} mi · all fuel costs`}
         />
         <MiniStat
           label="MPG"
@@ -136,6 +143,20 @@ export default async function FuelPage({
         />
       </section>
 
+      <LoadFuelEstimates
+        estimates={loadFuelEstimates}
+        loads={periodLoads}
+        trucks={trucks}
+        lastOdometer={lastOdometer}
+      />
+
+      <div>
+        <h2 className="text-sm font-semibold">Detailed fuel purchases</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Actual gallons and pump details used for MPG and IFTA.
+        </p>
+      </div>
+
       <FuelTable
         entries={periodFuel}
         loads={periodLoads}
@@ -143,6 +164,7 @@ export default async function FuelPage({
         defaultTruckId={truckId}
         defaultDate={defaultEntryDate(period)}
         lastOdometer={lastOdometer}
+        hasLoadEstimates={loadFuelEstimates.length > 0}
       />
 
       <Card className="border-dashed">

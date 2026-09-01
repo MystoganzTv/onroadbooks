@@ -47,6 +47,7 @@ import { formatDateShort, formatMoney } from "@/lib/formatters";
 import type { Expense, ExpenseBehavior, LoadWithMetrics, Truck } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ExpenseFormDialog } from "./expense-form-dialog";
+import { LoadExpenseFormDialog } from "./load-expense-form-dialog";
 
 type SortKey = "date" | "category" | "description" | "vendor" | "amount";
 
@@ -266,9 +267,9 @@ export function ExpensesTable({
             <TableBody>
               {filtered.map((expense) => {
                 const isFixed = behaviorOf(expense.category, categoryBehavior) === "FIXED";
-                // Rows the app writes for you. Editing them here would be
-                // overwritten by the record that owns them, so they are
-                // read-only and point at where they are actually maintained.
+                // Rows the app writes for you must be changed at their source.
+                // Load costs have a focused editor here that updates that
+                // source; the other mirrors point to their owning workflow.
                 const mirroredFuel = expense.id.startsWith("expfuel_");
                 const mirroredService = expense.id.startsWith("expmaint_");
                 const mirroredLoad = expense.id.startsWith("expload_");
@@ -338,7 +339,35 @@ export function ExpensesTable({
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-0.5">
-                        {mirrored ? (
+                        {mirroredLoad ? (
+                          <LoadExpenseFormDialog
+                            expense={expense}
+                            trigger={
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label="Edit load expense"
+                                title="Edit here and update the linked load"
+                              >
+                                <Pencil />
+                              </Button>
+                            }
+                          />
+                        ) : mirrored ? null : (
+                          <ExpenseFormDialog
+                            expense={expense}
+                            documents={documents.filter((d) => d.expenseId === expense.id)}
+                            loads={loads}
+                            categoryBehavior={categoryBehavior}
+                            trucks={trucks}
+                            trigger={
+                              <Button variant="ghost" size="icon-sm" aria-label="Edit expense">
+                                <Pencil />
+                              </Button>
+                            }
+                          />
+                        )}
+                        {mirrored && !mirroredLoad ? (
                           <Button asChild variant="ghost" size="icon-sm">
                             <Link
                               href={
@@ -346,8 +375,6 @@ export function ExpensesTable({
                                   ? "/fuel"
                                   : mirroredDriver
                                     ? "/driver-settlements"
-                                  : mirroredLoad && expense.loadId
-                                    ? `/loads/${expense.loadId}`
                                     : "/truck"
                               }
                               aria-label={
@@ -355,37 +382,20 @@ export function ExpensesTable({
                                   ? "Edit on the Fuel page"
                                   : mirroredDriver
                                     ? "Open the driver statement"
-                                  : mirroredLoad
-                                    ? "Edit on the Load page"
-                                  : "Edit on the Truck maintenance tab"
+                                    : "Edit on the Truck maintenance tab"
                               }
                               title={
                                 mirroredFuel
                                   ? "Written by a fuel entry - edit it on the Fuel page"
                                   : mirroredDriver
                                     ? "Written by a paid driver statement"
-                                  : mirroredLoad
-                                    ? "Written by a load - edit it on the Load page"
-                                  : "Written by a service record - edit it on the Truck page"
+                                    : "Written by a service record - edit it on the Truck page"
                               }
                             >
                               <ExternalLink />
                             </Link>
                           </Button>
-                        ) : (
-                        <ExpenseFormDialog
-                          expense={expense}
-                          documents={documents.filter((d) => d.expenseId === expense.id)}
-                          loads={loads}
-                          categoryBehavior={categoryBehavior}
-                          trucks={trucks}
-                          trigger={
-                            <Button variant="ghost" size="icon-sm" aria-label="Edit expense">
-                              <Pencil />
-                            </Button>
-                          }
-                        />
-                        )}
+                        ) : null}
                         {mirrored ? null : (
                         <ConfirmDelete
                           entity="expense"

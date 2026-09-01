@@ -244,6 +244,10 @@ export interface Repository {
 
   createLoad(input: LoadInput): Promise<Load>;
   updateLoad(id: string, input: LoadInput): Promise<Load>;
+  /** Updates only the IFTA mileage allocation, preserving the operational load. */
+  updateLoadJurisdictionMiles(id: string, mileage: Load["jurisdictionMiles"]): Promise<Load>;
+  /** Updates the load field that owns a generated trip-cost ledger row. */
+  updateLoadExpense(id: string, amount: number): Promise<Load>;
   deleteLoad(id: string): Promise<void>;
 
   createDriver(input: DriverInput): Promise<Driver>;

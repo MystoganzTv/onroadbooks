@@ -15,6 +15,9 @@ const money = z
   .min(0, "Cannot be negative")
   .max(1_000_000, "That looks too large");
 
+/** A generated load expense may be set to zero to remove it from the ledger. */
+export const loadExpenseAmountSchema = money;
+
 const miles = z
   .number({ invalid_type_error: "Enter a number" })
   .min(0, "Cannot be negative")
@@ -26,11 +29,13 @@ const iftaJurisdiction = z
   .transform((value) => value.toUpperCase())
   .refine(isIftaJurisdiction, "Choose an IFTA jurisdiction");
 
-const jurisdictionMileageSchema = z.object({
+export const jurisdictionMileageSchema = z.object({
   jurisdiction: iftaJurisdiction,
   totalMiles: miles,
   nonTaxableMiles: miles,
 });
+
+export const jurisdictionMilesSchema = z.array(jurisdictionMileageSchema).max(60);
 
 export const memberInviteSchema = z.object({
   email: z.string().trim().email("Enter a valid email address").max(254),
@@ -103,7 +108,7 @@ export const loadSchema = z
     otherExpenses: money,
     costsPosted: z.boolean().optional(),
     status: z.enum(["PENDING", "INVOICED", "PAID"]),
-    jurisdictionMiles: z.array(jurisdictionMileageSchema).max(60).optional(),
+    jurisdictionMiles: jurisdictionMilesSchema.optional(),
     notes: z.string().trim().max(2000).optional().nullable(),
   })
   .refine((value) => !value.deliveryDate || value.deliveryDate >= value.date, {

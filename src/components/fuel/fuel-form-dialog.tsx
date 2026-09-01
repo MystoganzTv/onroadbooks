@@ -64,6 +64,7 @@ interface FuelFormDialogProps {
   loads?: LoadWithMetrics[];
   trucks?: Truck[];
   defaultTruckId?: string | null;
+  defaultLoadId?: string | null;
   defaultDate?: string;
   lastOdometer?: number | null;
   trigger?: React.ReactNode;
@@ -78,6 +79,7 @@ export function FuelFormDialog({
   loads = [],
   trucks = [],
   defaultTruckId,
+  defaultLoadId,
   defaultDate,
   lastOdometer,
   trigger,
@@ -116,10 +118,10 @@ export function FuelFormDialog({
             odometer: "",
             location: "",
             jurisdiction: "UNASSIGNED",
-            loadId: "none",
+            loadId: defaultLoadId ?? "none",
             notes: "",
           },
-    [entry, defaultDate],
+    [entry, defaultDate, defaultLoadId],
   );
 
   const [open, setOpen] = React.useState(false);
@@ -152,11 +154,11 @@ export function FuelFormDialog({
   const linkOptions = React.useMemo(() => {
     const matching = loads.filter((load) => load.truckId === truckId);
     const visible = matching.slice(0, 40);
-    const linkedId = entry?.loadId;
+    const linkedId = entry?.loadId ?? defaultLoadId;
     if (!linkedId || visible.some((l) => l.id === linkedId)) return visible;
     const linked = matching.find((l) => l.id === linkedId);
     return linked ? [linked, ...visible] : visible;
-  }, [loads, entry?.loadId, truckId]);
+  }, [loads, entry?.loadId, defaultLoadId, truckId]);
 
   function changeTruck(nextTruckId: string) {
     setTruckId(nextTruckId);
