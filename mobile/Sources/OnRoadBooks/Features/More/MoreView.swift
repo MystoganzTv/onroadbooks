@@ -40,6 +40,7 @@ private let moreGroups: [MoreGroup] = [
 struct MoreView: View {
     let repository: LedgerRepository
     let accountLabel: String
+    let appLock: AppLock
     var onSignOut: (() -> Void)?
 
     @ViewBuilder
@@ -113,7 +114,7 @@ struct MoreView: View {
                         .listRowSeparatorTint(OBColor.border)
 
                         NavigationLink {
-                            SettingsView(repository: repository, accountLabel: accountLabel, onSignOut: onSignOut)
+                            SettingsView(repository: repository, accountLabel: accountLabel, appLock: appLock, onSignOut: onSignOut)
                         } label: {
                             Label("Settings", systemImage: "gearshape.fill")
                                 .foregroundStyle(OBColor.foreground)

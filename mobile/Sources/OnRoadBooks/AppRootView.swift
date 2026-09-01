@@ -9,34 +9,53 @@ import SwiftUI
 struct AppRootView: View {
     @StateObject private var authSession = AuthSession()
     @StateObject private var monitor = NetworkMonitor()
+    @StateObject private var appLock = AppLock()
     @StateObject private var queue = WriteQueue(
         client: APIClient(baseURL: APIConfig.baseURL, tokenProvider: { AuthSession.storedToken() })
     )
     @State private var useDemo = false
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        Group {
-            if authSession.isAuthenticated {
-                RootTabView(
-                    repository: APIRepository(
-                        tokenProvider: { authSession.token },
+        ZStack {
+            Group {
+                if authSession.isAuthenticated {
+                    RootTabView(
+                        repository: APIRepository(
+                            tokenProvider: { authSession.token },
+                            queue: queue,
+                            isOnline: { [flag = monitor.flag] in flag.current }
+                        ),
+                        accountLabel: authSession.email ?? "Signed in",
+                        greetingName: authSession.firstName,
                         queue: queue,
-                        isOnline: { [flag = monitor.flag] in flag.current }
-                    ),
-                    accountLabel: authSession.email ?? "Signed in",
-                    greetingName: authSession.firstName,
-                    queue: queue,
-                    monitor: monitor,
-                    onSignOut: { authSession.logout() }
-                )
-            } else if useDemo {
-                RootTabView(
-                    repository: MockRepository(),
-                    accountLabel: "Datos de muestra",
-                    onSignOut: { useDemo = false }
-                )
-            } else {
-                LoginView(authSession: authSession, onUseDemo: { useDemo = true })
+                        monitor: monitor,
+                        appLock: appLock,
+                        onSignOut: { authSession.logout() }
+                    )
+                } else if useDemo {
+                    RootTabView(
+                        repository: MockRepository(),
+                        accountLabel: "Datos de muestra",
+                        appLock: appLock,
+                        onSignOut: { useDemo = false }
+                    )
+                } else {
+                    LoginView(authSession: authSession, onUseDemo: { useDemo = true })
+                }
+            }
+
+            // Covers a real session or demo mode -- never the login screen,
+            // which has nothing yet worth locking behind a second gate.
+            if (authSession.isAuthenticated || useDemo), appLock.isEnabled, !appLock.isUnlocked {
+                AppLockView(lock: appLock, onSignOut: {
+                    if authSession.isAuthenticated {
+                        authSession.logout()
+                    } else {
+                        useDemo = false
+                    }
+                })
+                .transition(.opacity)
             }
         }
         .preferredColorScheme(.dark)
@@ -44,6 +63,12 @@ struct AppRootView: View {
             guard let online = note.object as? Bool else { return }
             monitor.apply(online: online)
             if online { Task { await queue.flush() } }
+        }
+        .onChange(of: scenePhase) { phase in
+            // Lock on the way OUT of the foreground, not on the way back in --
+            // that way there is never a frame where a backgrounded app shows
+            // real numbers in the app switcher.
+            if phase == .background { appLock.lockOnBackground() }
         }
     }
 }

@@ -16,6 +16,10 @@ struct RootTabView: View {
     /// that observe them are children, and they take them non-optional.
     let queue: WriteQueue?
     let monitor: NetworkMonitor?
+    /// Always real, in both the authenticated and demo branches -- see
+    /// `AppRootView`. Threaded down rather than read from the environment so
+    /// Settings can bind a Toggle directly to it, same as `repository`.
+    let appLock: AppLock
     /// nil only if neither a real session nor demo mode is active (shouldn't
     /// happen — AppRootView always passes one).
     var onSignOut: (() -> Void)?
@@ -29,6 +33,7 @@ struct RootTabView: View {
         greetingName: String? = nil,
         queue: WriteQueue? = nil,
         monitor: NetworkMonitor? = nil,
+        appLock: AppLock,
         onSignOut: (() -> Void)? = nil
     ) {
         self.repository = repository
@@ -36,6 +41,7 @@ struct RootTabView: View {
         self.greetingName = greetingName
         self.queue = queue
         self.monitor = monitor
+        self.appLock = appLock
         self.onSignOut = onSignOut
 
         let appearance = UITabBarAppearance()
@@ -67,7 +73,7 @@ struct RootTabView: View {
             SettlementsView(repository: repository)
                 .tabItem { Label("Settlements", systemImage: "wallet.pass.fill") }
 
-            MoreView(repository: repository, accountLabel: accountLabel, onSignOut: onSignOut)
+            MoreView(repository: repository, accountLabel: accountLabel, appLock: appLock, onSignOut: onSignOut)
                 .tabItem { Label("More", systemImage: "ellipsis.circle.fill") }
         }
         .tint(OBColor.primary)

@@ -3,7 +3,10 @@ import SwiftUI
 struct SettingsView: View {
     let repository: LedgerRepository
     let accountLabel: String
+    @ObservedObject var appLock: AppLock
     var onSignOut: (() -> Void)?
+
+    @State private var lockSetupFailed = false
 
     var body: some View {
         List {
@@ -35,6 +38,36 @@ struct SettingsView: View {
                 Text("Preferences").foregroundStyle(OBColor.mutedForeground)
             }
 
+            // A phone leaves a pocket more than a laptop leaves a desk. Off by
+            // default -- see AppLock.enable(), which proves this actually
+            // works on his phone before the switch takes hold.
+            if appLock.isAvailable {
+                Section {
+                    Toggle(isOn: Binding(
+                        get: { appLock.isEnabled },
+                        set: { wantsOn in
+                            if wantsOn {
+                                Task {
+                                    let ok = await appLock.enable()
+                                    lockSetupFailed = !ok
+                                }
+                            } else {
+                                appLock.disable()
+                            }
+                        }
+                    )) {
+                        Text("Bloqueo de la app").foregroundStyle(OBColor.foreground)
+                    }
+                    .tint(OBColor.primary)
+                    .listRowBackground(OBColor.card)
+                } header: {
+                    Text("Security").foregroundStyle(OBColor.mutedForeground)
+                } footer: {
+                    Text("Pide Face ID, Touch ID o tu código al volver a abrir la app.")
+                        .foregroundStyle(OBColor.mutedForeground)
+                }
+            }
+
             Section {
                 LabeledRow(title: "Version", value: "1.0 (1)")
                 if let onSignOut {
@@ -59,6 +92,11 @@ struct SettingsView: View {
         .background(OBColor.background)
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
+        .alert("No se pudo activar", isPresented: $lockSetupFailed) {
+            Button("Entendido") {}
+        } message: {
+            Text("No se pudo verificar tu identidad. Inténtalo de nuevo.")
+        }
     }
 }
 

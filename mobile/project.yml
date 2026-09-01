@@ -47,6 +47,9 @@ targets:
         # The camera is only ever opened from "Adjuntar recibo"; the photo
         # library uses PHPicker, which needs no permission string at all.
         NSCameraUsageDescription: Para tomar la foto del recibo y adjuntarla al gasto.
+        # App Lock (Settings > Seguridad) is off by default; this string only
+        # ever shows if he turns it on.
+        NSFaceIDUsageDescription: Para bloquear la app y proteger tus datos financieros.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.mystodev.onroadbooks
