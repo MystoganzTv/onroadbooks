@@ -1,6 +1,10 @@
 import "server-only";
 
-import { getAuthStore } from "@/lib/db";
+import { getAuthStore, getRepository } from "@/lib/db";
+import type { Repository } from "@/lib/db/repository";
+import { canWrite, trialState } from "@/lib/plans";
+import { permissionRefusal, roleCan, type Permission } from "@/lib/roles";
+import { todayISO } from "@/lib/periods";
 import { decodeSession, type SessionPayload } from "./session";
 
 /**
@@ -40,4 +44,47 @@ export async function getMobileSession(request: Request): Promise<SessionPayload
   } catch {
     return null;
   }
+}
+
+export type MobileWriteGate =
+  | { ok: true; session: SessionPayload; repository: Repository }
+  | { ok: false; status: 401 | 403; error: string };
+
+/**
+ * Bearer-token analogue of `requireWritableSession()`, in the same order and
+ * with the same refusals: a valid session, then a subscription that may still
+ * be written to, then the role's permission.
+ *
+ * A route handler must answer rather than redirect or throw, so this returns
+ * the refusal instead of raising it -- but the checks themselves are the web
+ * app's, not a second, looser set. A phone is just another client; it does not
+ * get to write something the browser would have refused.
+ */
+export async function requireMobileWrite(
+  request: Request,
+  permission: Permission,
+): Promise<MobileWriteGate> {
+  const session = await getMobileSession(request);
+  if (!session) return { ok: false, status: 401, error: "Unauthorized" };
+
+  const repository = getRepository(session.businessId);
+  const { subscription } = await repository.getDataset();
+  const today = todayISO();
+  if (!canWrite(subscription, today)) {
+    const trial = trialState(subscription, today);
+    return {
+      ok: false,
+      status: 403,
+      error: trial?.expired
+        ? "Your free trial has ended. Choose a plan to keep adding or changing records. Your existing books remain available to read and export."
+        : "Your subscription needs attention before you can add or change records. Your existing books remain available to read and export.",
+    };
+  }
+
+  const role = session.role ?? "VIEWER";
+  if (!roleCan(role, permission)) {
+    return { ok: false, status: 403, error: permissionRefusal(role, permission) };
+  }
+
+  return { ok: true, session, repository };
 }

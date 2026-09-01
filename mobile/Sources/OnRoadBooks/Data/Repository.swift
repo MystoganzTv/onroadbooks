@@ -7,6 +7,13 @@ import Foundation
 protocol LedgerRepository {
     func fetchDashboard() async throws -> DashboardSnapshot
     func fetchLoads() async throws -> [Load]
-    func fetchExpenses() async throws -> [ExpenseEntry]
+    func fetchExpenses() async throws -> ExpenseLedger
     func fetchSettlements() async throws -> [SettlementPeriod]
+
+    /// Both return the new record's id. They throw `APIError.refused` carrying
+    /// the server's own sentence when the ledger says no -- an expired trial, a
+    /// role without permission, a rate the numbers do not support. That text is
+    /// written for the owner, so show it rather than replacing it.
+    @discardableResult func createLoad(_ load: NewLoad) async throws -> String
+    @discardableResult func createExpense(_ expense: NewExpense) async throws -> String
 }

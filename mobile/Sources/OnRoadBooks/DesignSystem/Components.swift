@@ -233,23 +233,88 @@ struct StatusPill: View {
 struct OBScreenHeader: View {
     let title: String
     var subtitle: String? = nil
+    /// One optional action, on the right. A screen that lets you add something
+    /// puts it here rather than in a floating button, so the thing you press
+    /// most on a phone is where the thumb already is.
+    var actionIcon: String? = nil
+    var actionLabel: String = "Añadir"
+    var action: (() -> Void)? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(OBColor.foreground)
-            if let subtitle {
-                Text(subtitle)
-                    .font(.footnote)
-                    .foregroundStyle(OBColor.mutedForeground)
+        HStack(alignment: .center, spacing: OBSpacing.sm) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(OBColor.foreground)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.footnote)
+                        .foregroundStyle(OBColor.mutedForeground)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let actionIcon, let action {
+                Button(action: action) {
+                    Image(systemName: actionIcon)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(OBColor.primary)
+                        .frame(width: 38, height: 38)
+                        .background(OBColor.surfaceRaised, in: Circle())
+                }
+                .accessibilityLabel(Text(actionLabel))
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, OBSpacing.md)
         .padding(.top, OBSpacing.xs)
         .padding(.bottom, OBSpacing.sm)
         .background(OBColor.background)
+    }
+}
+
+// MARK: - Number entry
+
+enum OBNumber {
+    /// Parses what a thumb actually types at a fuel island: "412.60", "412,60",
+    /// "1,240.75". When both separators appear the last one is the decimal
+    /// mark, which is true in every locale that uses them.
+    static func parse(_ text: String) -> Double? {
+        var value = text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "$", with: "")
+        if value.isEmpty { return nil }
+        let comma = value.lastIndex(of: ",")
+        let dot = value.lastIndex(of: ".")
+        if let comma, dot == nil || comma > dot! {
+            value = value.replacingOccurrences(of: ".", with: "")
+            value = value.replacingOccurrences(of: ",", with: ".")
+        } else {
+            value = value.replacingOccurrences(of: ",", with: "")
+        }
+        return Double(value)
+    }
+}
+
+/// A labelled numeric row for the entry forms: label on the left, the number
+/// right-aligned and monospaced so a column of them reads like a receipt.
+struct OBNumberRow: View {
+    let label: String
+    var prefix: String? = nil
+    var placeholder: String = "0"
+    @Binding var text: String
+
+    var body: some View {
+        HStack {
+            Text(label).foregroundStyle(OBColor.foreground)
+            Spacer(minLength: OBSpacing.sm)
+            if let prefix {
+                Text(prefix).foregroundStyle(OBColor.mutedForeground)
+            }
+            TextField(placeholder, text: $text)
+                .keyboardType(.decimalPad)
+                .multilineTextAlignment(.trailing)
+                .monospacedDigit()
+                .foregroundStyle(OBColor.foreground)
+                .frame(maxWidth: 140)
+        }
     }
 }
 

@@ -12,45 +12,106 @@ import Foundation
 /// Every figure below ties back to that same arithmetic — if you change
 /// one, check the others still add up, exactly like the web app's
 /// `PREVIEW_FIGURES` comment insists.
-final class MockRepository: LedgerRepository {
-    private func date(_ y: Int, _ m: Int, _ d: Int) -> Date {
-        Calendar(identifier: .gregorian).date(from: DateComponents(year: y, month: m, day: d))!
-    }
+private func mockDate(_ y: Int, _ m: Int, _ d: Int) -> Date {
+    Calendar(identifier: .gregorian).date(from: DateComponents(year: y, month: m, day: d))!
+}
 
-    func fetchLoads() async throws -> [Load] {
-        [
-            Load(id: "1", date: date(2026, 8, 28), broker: "Werner Logistics",
+final class MockRepository: LedgerRepository {
+    /// Mutable so demo mode can actually add a load or an expense and see it
+    /// appear. Nothing is persisted: it lives as long as the app runs, which is
+    /// the honest shape of a demo.
+    private var loads: [Load] = [
+            Load(id: "1", date: mockDate(2026, 8, 28), broker: "Werner Logistics",
                  origin: "Chicago, IL", destination: "Columbus, OH",
                  rate: 2850, miles: 356, deadheadMiles: 12,
                  rating: .great, profitPerMile: 1.98),
-            Load(id: "2", date: date(2026, 8, 25), broker: "TQL",
+            Load(id: "2", date: mockDate(2026, 8, 25), broker: "TQL",
                  origin: "Dallas, TX", destination: "Memphis, TN",
                  rate: 1640, miles: 452, deadheadMiles: 38,
                  rating: .good, profitPerMile: 1.42),
-            Load(id: "3", date: date(2026, 8, 22), broker: "Coyote",
+            Load(id: "3", date: mockDate(2026, 8, 22), broker: "Coyote",
                  origin: "Atlanta, GA", destination: "Charlotte, NC",
                  rate: 980, miles: 244, deadheadMiles: 20,
                  rating: .good, profitPerMile: 1.35),
-            Load(id: "4", date: date(2026, 8, 19), broker: "Landstar",
+            Load(id: "4", date: mockDate(2026, 8, 19), broker: "Landstar",
                  origin: "Louisville, KY", destination: "Indianapolis, IN",
                  rate: 640, miles: 114, deadheadMiles: 45,
                  rating: .marginal, profitPerMile: 0.98),
-            Load(id: "5", date: date(2026, 8, 14), broker: "Direct Shipper",
+            Load(id: "5", date: mockDate(2026, 8, 14), broker: "Direct Shipper",
                  origin: "Phoenix, AZ", destination: "Albuquerque, NM",
                  rate: 980, miles: 465, deadheadMiles: 210,
                  rating: .bad, profitPerMile: 0.31),
-        ]
+    ]
+
+    private var expenses: [ExpenseEntry] = [
+            ExpenseEntry(id: "e1", date: mockDate(2026, 8, 27), category: "Fuel", note: "Pilot #442 — Joplin, MO", amount: 412.60),
+            ExpenseEntry(id: "e2", date: mockDate(2026, 8, 20), category: "Fuel", note: "Loves — Amarillo, TX", amount: 388.10),
+            ExpenseEntry(id: "e3", date: mockDate(2026, 8, 15), category: "Truck Payment", note: "Freightliner Cascadia — monthly note", amount: 1284.08),
+            ExpenseEntry(id: "e4", date: mockDate(2026, 8, 12), category: "Maintenance & Repairs", note: "Oil change + DOT inspection", amount: 340.00),
+            ExpenseEntry(id: "e5", date: mockDate(2026, 8, 9), category: "Insurance", note: "Progressive Commercial — monthly premium", amount: 681.97),
+            ExpenseEntry(id: "e6", date: mockDate(2026, 8, 5), category: "Other", note: "ELD subscription + phone plan", amount: 214.50),
+    ]
+
+    func fetchLoads() async throws -> [Load] { loads }
+
+    func fetchExpenses() async throws -> ExpenseLedger {
+        // A short, obviously partial list: the real one is served by
+        // /api/mobile/expenses and this file is not the source of truth for it.
+        ExpenseLedger(
+            entries: expenses,
+            categories: [
+                .init(id: "FUEL", label: "Fuel"),
+                .init(id: "TOLLS", label: "Tolls"),
+                .init(id: "MAINTENANCE", label: "Maintenance"),
+                .init(id: "REPAIRS", label: "Repairs"),
+                .init(id: "PARKING", label: "Parking"),
+                .init(id: "INSURANCE", label: "Insurance"),
+                .init(id: "TRUCK_PAYMENT", label: "Truck Payment"),
+                .init(id: "OTHER", label: "Other"),
+            ]
+        )
     }
 
-    func fetchExpenses() async throws -> [ExpenseEntry] {
-        [
-            ExpenseEntry(id: "e1", date: date(2026, 8, 27), category: "Fuel", note: "Pilot #442 — Joplin, MO", amount: 412.60),
-            ExpenseEntry(id: "e2", date: date(2026, 8, 20), category: "Fuel", note: "Loves — Amarillo, TX", amount: 388.10),
-            ExpenseEntry(id: "e3", date: date(2026, 8, 15), category: "Truck Payment", note: "Freightliner Cascadia — monthly note", amount: 1284.08),
-            ExpenseEntry(id: "e4", date: date(2026, 8, 12), category: "Maintenance & Repairs", note: "Oil change + DOT inspection", amount: 340.00),
-            ExpenseEntry(id: "e5", date: date(2026, 8, 9), category: "Insurance", note: "Progressive Commercial — monthly premium", amount: 681.97),
-            ExpenseEntry(id: "e6", date: date(2026, 8, 5), category: "Other", note: "ELD subscription + phone plan", amount: 214.50),
-        ]
+    @discardableResult
+    func createLoad(_ load: NewLoad) async throws -> String {
+        let id = "demo-\(UUID().uuidString.prefix(8))"
+        let miles = load.loadedMiles + load.deadheadMiles
+        let profit = load.grossRate - (load.fuelCost + load.tolls + load.otherExpenses)
+        let perMile = miles > 0 ? profit / miles : 0
+        loads.insert(
+            Load(id: id, date: load.date,
+                 broker: load.broker.isEmpty ? "Direct" : load.broker,
+                 origin: "\(load.originCity), \(load.originState.uppercased())",
+                 destination: "\(load.destinationCity), \(load.destinationState.uppercased())",
+                 rate: load.grossRate, miles: load.loadedMiles, deadheadMiles: load.deadheadMiles,
+                 rating: demoRating(profitPerMile: perMile), profitPerMile: perMile),
+            at: 0
+        )
+        return id
+    }
+
+    @discardableResult
+    func createExpense(_ expense: NewExpense) async throws -> String {
+        let id = "demo-\(UUID().uuidString.prefix(8))"
+        let note = [expense.detail, expense.vendor].filter { !$0.isEmpty }.joined(separator: " — ")
+        expenses.insert(
+            ExpenseEntry(id: id, date: expense.date, category: expense.categoryId,
+                         note: note.isEmpty ? expense.categoryId : note, amount: expense.amount),
+            at: 0
+        )
+        return id
+    }
+
+    /// Demo only. A real rating comes from the server, which scores against
+    /// this business's own thresholds; these bands exist so an entry made in
+    /// demo mode is not left blank, and they are not the product's judgement.
+    private func demoRating(profitPerMile: Double) -> LoadRating {
+        switch profitPerMile {
+        case 1.50...: return .great
+        case 1.00..<1.50: return .good
+        case 0.50..<1.00: return .marginal
+        default: return .bad
+        }
     }
 
     func fetchSettlements() async throws -> [SettlementPeriod] {
@@ -96,7 +157,7 @@ final class MockRepository: LedgerRepository {
             todayRevenue: 420,
             todayLoads: 1,
             expenseBreakdown: breakdown,
-            recentLoads: try await fetchLoads(),
+            recentLoads: loads,
             reserves: reserves
         )
     }

@@ -4,11 +4,18 @@ struct LoadsView: View {
     let repository: LedgerRepository
     @State private var loads: [Load] = []
     @State private var isLoading = true
+    @State private var isAdding = false
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                OBScreenHeader(title: "Loads", subtitle: isLoading ? nil : "\(loads.count) loads")
+                OBScreenHeader(
+                    title: "Loads",
+                    subtitle: isLoading ? nil : "\(loads.count) loads",
+                    actionIcon: "plus",
+                    actionLabel: "Nuevo load",
+                    action: { isAdding = true }
+                )
 
                 if isLoading {
                     ProgressView().tint(OBColor.primary)
@@ -27,11 +34,17 @@ struct LoadsView: View {
             }
             .background(OBColor.background)
             .toolbar(.hidden, for: .navigationBar)
-            .task {
-                loads = (try? await repository.fetchLoads()) ?? []
-                isLoading = false
+            .task { await reload() }
+            .refreshable { await reload() }
+            .sheet(isPresented: $isAdding) {
+                AddLoadView(repository: repository, onSaved: { Task { await reload() } })
             }
         }
+    }
+
+    private func reload() async {
+        loads = (try? await repository.fetchLoads()) ?? []
+        isLoading = false
     }
 }
 

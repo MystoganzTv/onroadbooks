@@ -3,14 +3,21 @@ import SwiftUI
 struct ExpensesView: View {
     let repository: LedgerRepository
     @State private var expenses: [ExpenseEntry] = []
+    @State private var categories: [ExpenseCategory] = []
     @State private var isLoading = true
+    @State private var isAdding = false
 
     private var total: Double { expenses.reduce(0) { $0 + $1.amount } }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                OBScreenHeader(title: "Expenses")
+                OBScreenHeader(
+                    title: "Expenses",
+                    actionIcon: "plus",
+                    actionLabel: "Nuevo gasto",
+                    action: { isAdding = true }
+                )
 
                 if isLoading {
                     ProgressView().tint(OBColor.primary)
@@ -40,11 +47,25 @@ struct ExpensesView: View {
             }
             .background(OBColor.background)
             .toolbar(.hidden, for: .navigationBar)
-            .task {
-                expenses = (try? await repository.fetchExpenses())?.sorted(by: { $0.date > $1.date }) ?? []
-                isLoading = false
+            .task { await reload() }
+            .refreshable { await reload() }
+            .sheet(isPresented: $isAdding) {
+                AddExpenseView(
+                    repository: repository,
+                    categories: categories,
+                    onSaved: { Task { await reload() } }
+                )
             }
         }
+    }
+
+    private func reload() async {
+        let ledger = try? await repository.fetchExpenses()
+        expenses = (ledger?.entries ?? []).sorted(by: { $0.date > $1.date })
+        // Keep the last known picker list rather than emptying it on a failed
+        // refresh -- a dropped connection should not make the add form unusable.
+        if let categories = ledger?.categories, !categories.isEmpty { self.categories = categories }
+        isLoading = false
     }
 }
 
