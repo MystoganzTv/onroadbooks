@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { requireSession } from "@/lib/auth";
-import { getRepository } from "@/lib/db";
+import { getDataset } from "@/lib/db";
 import { driverScheduleFromLoads } from "@/lib/driver-availability";
 import { hasFleetAccess } from "@/lib/plans";
 import {
@@ -57,7 +57,7 @@ export default async function LoadDetailPage({
 }) {
   const [{ id }, session, locale] = await Promise.all([params, requireSession(), getAppLocale()]);
   const copy = getWebDictionary(locale).loads;
-  const dataset = await getRepository(session.businessId).getDataset();
+  const dataset = await getDataset(session.businessId);
   const load = dataset.loads.find((item) => item.id === id);
   if (!load) notFound();
 

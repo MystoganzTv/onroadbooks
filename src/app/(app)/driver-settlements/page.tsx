@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { requireSession } from "@/lib/auth";
-import { getRepository } from "@/lib/db";
+import { getDataset } from "@/lib/db";
 import { calculateDriverPay, driverSettlementTotals, unsettledLoadsForDriver } from "@/lib/driver-pay";
 import { formatMoney, formatRateValue } from "@/lib/formatters";
 import { hasFleetAccess } from "@/lib/plans";
@@ -37,7 +37,7 @@ export default async function DriverSettlementsPage({
   const [params, session, locale] = await Promise.all([searchParams, requireSession(), getAppLocale()]);
   const copy = getWebDictionary(locale).driverPay;
   if (!roleCan(session.role ?? "VIEWER", "manage_driver_settlements")) redirect("/dashboard");
-  const dataset = await getRepository(session.businessId).getDataset();
+  const dataset = await getDataset(session.businessId);
   if (!hasFleetAccess(dataset.subscription)) redirect("/settlements");
 
   const period = periodFromSearchParams(params);

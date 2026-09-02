@@ -35,6 +35,36 @@ protocol LedgerRepository {
     @discardableResult func markInvoicePaid(loadId: String, on date: Date) async throws -> String
     @discardableResult func recordInvoicePayment(loadId: String, amount: Double, on date: Date) async throws -> String
 
+    /// Correcting what is already in the books.
+    ///
+    /// The app was append-only until now: a mistyped rate could be added from
+    /// the cab but only fixed at a laptop, while it moved the load's score,
+    /// the cost per mile and Safe to Pay in the meantime.
+    ///
+    /// These are never queued. An edit and a delete are deliberate acts on a
+    /// record that already exists, and replaying one later, unwatched, against
+    /// a row someone may have changed since is the wrong default — the same
+    /// reasoning that keeps team and settings writes out of the queue.
+    func fetchLoadDetail(id: String) async throws -> LoadDetail
+    @discardableResult func updateLoad(id: String, _ change: LoadEdit) async throws -> String
+    func deleteLoad(id: String) async throws
+    /// Deleting a load never deletes the money: its expenses and fuel are
+    /// unlinked, not removed. The confirmation says so.
+    func deleteExpense(id: String) async throws
+    func deleteFuelStop(id: String) async throws
+
+    /// Close or reopen a half-month.
+    ///
+    /// Closing freezes a snapshot built on the SERVER from the rows as they
+    /// stand, and posts the reserve contributions that snapshot implies —
+    /// nothing the phone sends is trusted as the figures. Reopening reverses
+    /// exactly what the close wrote and nothing else.
+    ///
+    /// Never queued: this is the most consequential write in the product and
+    /// replaying it later, unwatched, against rows that have since changed is
+    /// not something to do on the owner's behalf.
+    @discardableResult func setSettlementStatus(month: String, half: String, closed: Bool) async throws -> String
+
     /// Files a photo against a record that already exists. Never queued: a
     /// receipt has nothing to attach itself to until the expense has an id from
     /// the ledger, so this needs signal by definition.

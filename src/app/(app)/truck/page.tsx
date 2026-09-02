@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { summarizeFuel, truckLifetime } from "@/lib/calculations";
 import { requireSession } from "@/lib/auth";
-import { getRepository } from "@/lib/db";
+import { getDataset } from "@/lib/db";
 import { activeTrucks, orderedTrucks, primaryTruck, truckById } from "@/lib/fleet";
 import { hasFleetAccess, planOf, truckAllowance } from "@/lib/plans";
 import { iftaApplicability } from "@/lib/ifta-eligibility";
@@ -53,7 +53,7 @@ export default async function TruckPage({
   const [params, session, locale] = await Promise.all([searchParams, requireSession(), getAppLocale()]);
   const copy = getWebDictionary(locale).truck;
   const ownerPlanning = roleCan(session.role ?? "VIEWER", "manage_owner_finances");
-  const dataset = await getRepository(session.businessId).getDataset();
+  const dataset = await getDataset(session.businessId);
 
   // One unit at a time: miles remaining and reserve coverage are facts about a
   // specific odometer, not about a fleet.

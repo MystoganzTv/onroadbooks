@@ -12,6 +12,8 @@ struct FuelView: View {
     @State private var ledger: FuelLedger?
     @State private var isLoading = true
     @State private var isAdding = false
+    @State private var pendingDelete: FuelStop?
+    @State private var deleteFailure: String?
 
     var body: some View {
         Group {
@@ -25,6 +27,45 @@ struct FuelView: View {
             }
         }
         .background(OBColor.background)
+        // Deleting the fill-up takes its mirrored FUEL row out of the ledger
+        // with it -- which is exactly why the ledger row itself refuses to be
+        // deleted from the Expenses screen.
+        .confirmationDialog(
+            "¿Borrar esta carga de diésel?",
+            isPresented: Binding(
+                get: { pendingDelete != nil },
+                set: { if !$0 { pendingDelete = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Borrar", role: .destructive) {
+                guard let stop = pendingDelete else { return }
+                pendingDelete = nil
+                Task {
+                    do {
+                        try await repository.deleteFuelStop(id: stop.id)
+                        await reload()
+                    } catch {
+                        deleteFailure = (error as? LocalizedError)?.errorDescription
+                            ?? "No se pudo borrar la carga."
+                    }
+                }
+            }
+            Button("Cancelar", role: .cancel) { pendingDelete = nil }
+        } message: {
+            Text("También sale del libro de gastos, porque esa fila la escribió esta carga.")
+        }
+        .alert(
+            "No se borró",
+            isPresented: Binding(
+                get: { deleteFailure != nil },
+                set: { if !$0 { deleteFailure = nil } }
+            )
+        ) {
+            Button("Entendido", role: .cancel) { deleteFailure = nil }
+        } message: {
+            Text(deleteFailure ?? "")
+        }
         .navigationTitle("Fuel")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -87,6 +128,14 @@ struct FuelView: View {
                                 FuelStopRow(stop: stop)
                                     .padding(.horizontal, OBSpacing.md)
                                     .padding(.vertical, OBSpacing.sm)
+                                    .contentShape(Rectangle())
+                                    .contextMenu {
+                                        Button(role: .destructive) {
+                                            pendingDelete = stop
+                                        } label: {
+                                            Label("Borrar carga", systemImage: "trash")
+                                        }
+                                    }
                                 if index < ledger.entries.count - 1 {
                                     Rectangle().fill(OBColor.border).frame(height: 1)
                                         .padding(.leading, OBSpacing.md)

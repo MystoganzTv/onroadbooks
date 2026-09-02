@@ -36,7 +36,7 @@ import { halfMonthComparison } from "@/lib/chart-data";
 import { buildFinancialSummary } from "@/lib/finance/financial-summary";
 import { requireSession } from "@/lib/auth";
 import { planAllows } from "@/lib/plans";
-import { getRepository } from "@/lib/db";
+import { getDataset } from "@/lib/db";
 import {
   activeTrucks,
   expensesForTruck,
@@ -88,9 +88,9 @@ export default async function ReportsPage({
     getAppLocale(),
   ]);
   const copy = getWebDictionary(locale).reports;
-  const { business, trucks, loads, expenses, fuelEntries, settings, paymentEvents, reserveAccounts, subscription } = await getRepository(
+  const { business, trucks, loads, expenses, fuelEntries, settings, paymentEvents, reserveAccounts, subscription } = await getDataset(
     session.businessId,
-  ).getDataset();
+  );
   const period = periodFromSearchParams(params);
   const prior = previousPeriod(period);
   const truckId = truckFromSearchParams(params, trucks);

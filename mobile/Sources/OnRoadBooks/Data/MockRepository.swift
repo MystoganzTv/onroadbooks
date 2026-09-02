@@ -297,6 +297,76 @@ final class MockRepository: LedgerRepository {
         teamMembers.removeAll { $0.id == userId }
     }
 
+    // MARK: Correcting what is already there
+
+    func fetchLoadDetail(id: String) async throws -> LoadDetail {
+        guard let load = loads.first(where: { $0.id == id }) else { throw APIError.requestFailed }
+        let lane = load.origin.components(separatedBy: ", ")
+        let destination = load.destination.components(separatedBy: ", ")
+        return LoadDetail(
+            id: load.id,
+            date: load.date,
+            broker: load.broker,
+            originCity: lane.first ?? load.origin,
+            originState: lane.count > 1 ? lane[1] : "",
+            destinationCity: destination.first ?? load.destination,
+            destinationState: destination.count > 1 ? destination[1] : "",
+            grossRate: load.rate,
+            loadedMiles: load.miles,
+            deadheadMiles: load.deadheadMiles,
+            fuelCost: load.directTripCosts,
+            tolls: 0,
+            otherExpenses: 0,
+            status: "PENDING",
+            invoiceNumber: nil
+        )
+    }
+
+    @discardableResult
+    func updateLoad(id: String, _ change: LoadEdit) async throws -> String {
+        guard let index = loads.firstIndex(where: { $0.id == id }) else { throw APIError.requestFailed }
+        let existing = loads[index]
+        let totalMiles = change.loadedMiles + change.deadheadMiles
+        let direct = change.fuelCost + change.tolls + change.otherExpenses
+        let profit = change.grossRate - direct
+        loads[index] = Load(
+            id: existing.id,
+            date: change.date,
+            broker: change.broker.isEmpty ? "Direct" : change.broker,
+            origin: "\(change.originCity), \(change.originState.uppercased())",
+            destination: "\(change.destinationCity), \(change.destinationState.uppercased())",
+            rate: change.grossRate,
+            miles: change.loadedMiles,
+            deadheadMiles: change.deadheadMiles,
+            rating: existing.rating,
+            profitPerMile: totalMiles > 0 ? profit / totalMiles : 0,
+            directTripCosts: direct,
+            contributionProfit: profit,
+            allocatedOperatingCosts: existing.allocatedOperatingCosts,
+            estimatedFullyLoadedOperatingProfit: profit - existing.allocatedOperatingCosts,
+            debtCashBurden: existing.debtCashBurden,
+            allocationBasisLabel: existing.allocationBasisLabel
+        )
+        return id
+    }
+
+    func deleteLoad(id: String) async throws {
+        loads.removeAll { $0.id == id }
+    }
+
+    func deleteExpense(id: String) async throws {
+        expenses.removeAll { $0.id == id }
+    }
+
+    func deleteFuelStop(id: String) async throws {
+        fuel.removeAll { $0.id == id }
+    }
+
+    @discardableResult
+    func setSettlementStatus(month: String, half: String, closed: Bool) async throws -> String {
+        "\(month)-\(half)"
+    }
+
     @discardableResult
     func updateTruckIftaFilingScope(truckId: String, iftaReportingEnabled: Bool?) async throws -> String {
         mockTruckIftaReportingEnabled = iftaReportingEnabled
@@ -490,10 +560,10 @@ final class MockRepository: LedgerRepository {
 
     func fetchSettlements() async throws -> [SettlementPeriod] {
         [
-            SettlementPeriod(id: "s-aug-16", label: "Aug 16 – 31", status: .open, operatingProfit: 1802.40, reserveContributions: 0, ownerDraw: 0),
-            SettlementPeriod(id: "s-aug-01", label: "Aug 1 – 15", status: .closed, operatingProfit: 1848.70, reserveContributions: 703.10, ownerDraw: 1145.60),
-            SettlementPeriod(id: "s-jul-16", label: "Jul 16 – 31", status: .closed, operatingProfit: 1710.05, reserveContributions: 649.90, ownerDraw: 1060.15),
-            SettlementPeriod(id: "s-jul-01", label: "Jul 1 – 15", status: .closed, operatingProfit: 1594.30, reserveContributions: 606.20, ownerDraw: 988.10),
+            SettlementPeriod(id: "s-aug-16", label: "Aug 16 – 31", status: .open, operatingProfit: 1802.40, reserveContributions: 0, ownerDraw: 0, month: "2026-08", half: "SECOND", closable: true),
+            SettlementPeriod(id: "s-aug-01", label: "Aug 1 – 15", status: .closed, operatingProfit: 1848.70, reserveContributions: 703.10, ownerDraw: 1145.60, month: "2026-08", half: "FIRST", closable: false),
+            SettlementPeriod(id: "s-jul-16", label: "Jul 16 – 31", status: .closed, operatingProfit: 1710.05, reserveContributions: 649.90, ownerDraw: 1060.15, month: "2026-07", half: "SECOND", closable: false),
+            SettlementPeriod(id: "s-jul-01", label: "Jul 1 – 15", status: .closed, operatingProfit: 1594.30, reserveContributions: 606.20, ownerDraw: 988.10, month: "2026-07", half: "FIRST", closable: false),
         ]
     }
 

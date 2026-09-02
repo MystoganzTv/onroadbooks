@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth";
-import { getRepository } from "@/lib/db";
+import { getDataset } from "@/lib/db";
 import { formatMiles, formatMoney, formatRateValue } from "@/lib/formatters";
 import { calculateIftaReport, currentIftaQuarter, iftaRateKey, normalizeJurisdictionMiles } from "@/lib/ifta";
 import { activeTrucks, orderedTrucks, truckById } from "@/lib/fleet";
@@ -81,7 +81,7 @@ function IftaTruckScope({ trucks, copy, locale }: { trucks: Truck[]; copy: WebDi
 export default async function IftaPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const [params, session, locale] = await Promise.all([searchParams, requireSession(), getAppLocale()]);
   const copy = getWebDictionary(locale).ifta;
-  const dataset = await getRepository(session.businessId).getDataset();
+  const dataset = await getDataset(session.businessId);
   const requested = param(params, "quarter", currentIftaQuarter());
   const quarter = /^\d{4}-Q[1-4]$/.test(requested) ? requested : currentIftaQuarter();
   const truckId = truckFromSearchParams(params, dataset.trucks);

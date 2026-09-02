@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { fieldErrorsFrom } from "@/lib/actions/types";
 import { requireMobileWrite } from "@/lib/auth/mobile";
-import { duplicateInvoiceNumber, invoiceIssuePatch } from "@/lib/invoices";
+import { duplicateInvoiceNumber, invoiceIssuePatch, invoicePaymentSummary } from "@/lib/invoices";
 import { invoiceSchema, paymentEventSchema } from "@/lib/schemas";
 
 export const runtime = "nodejs";
@@ -57,14 +57,15 @@ export async function POST(
       return NextResponse.json({ error: "Use a valid payment date." }, { status: 422 });
     }
     try {
-      const recorded = dataset.paymentEvents
-        .filter((event) => event.loadId === loadId)
-        .reduce((total, event) => total + event.amount, 0);
-      const remaining = Math.round((load.grossRate - recorded) * 100) / 100;
-      if (remaining <= 0) {
+      // `invoicePaymentSummary` is the one reader of what is still owed --
+      // the same one the web action and the invoice screen use. Its arithmetic
+      // also knows about a load marked PAID before payment events existed,
+      // which is what stops this from posting the whole rate a second time.
+      const { balance } = invoicePaymentSummary(load, dataset.paymentEvents);
+      if (balance <= 0) {
         return NextResponse.json({ error: "That invoice is already fully paid." }, { status: 422 });
       }
-      await gate.repository.createPaymentEvent({ loadId, date: paidOn, amount: remaining });
+      await gate.repository.createPaymentEvent({ loadId, date: paidOn, amount: balance });
       return done();
     } catch (error) {
       return NextResponse.json(

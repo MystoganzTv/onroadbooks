@@ -8,7 +8,7 @@ import { PlanGate } from "@/components/shared/plan-gate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { requireSession } from "@/lib/auth";
-import { getRepository } from "@/lib/db";
+import { getDataset } from "@/lib/db";
 import { planAllows } from "@/lib/plans";
 import { roleCan } from "@/lib/roles";
 import {
@@ -65,7 +65,7 @@ export default async function SettlementsPage({
       </div>
     );
   }
-  const dataset = await getRepository(session.businessId).getDataset();
+  const dataset = await getDataset(session.businessId);
   const { loads, expenses, settings, reserveAccounts, settlements } = dataset;
 
   if (!planAllows(dataset.subscription, "cockpit")) {

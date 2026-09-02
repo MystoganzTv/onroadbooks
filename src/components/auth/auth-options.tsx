@@ -1,168 +1,64 @@
 "use client";
 
-import * as React from "react";
-import Script from "next/script";
-import { Loader2 } from "lucide-react";
 import type { AppLocale } from "@/lib/i18n";
 import { getWebDictionary } from "@/lib/i18n/dictionaries";
-import { localizeError } from "@/lib/i18n/errors";
 
-type CredentialResponse = { credential?: string };
-
-type GoogleIdentityApi = {
-  initialize(options: {
-    client_id: string;
-    callback(response: CredentialResponse): void;
-    nonce: string;
-    ux_mode: "popup";
-    use_fedcm_for_prompt: boolean;
-  }): void;
-  renderButton(
-    parent: HTMLElement,
-    options: {
-      type: "standard";
-      theme: "outline_dark";
-      size: "large";
-      text: "continue_with";
-      shape: "rectangular";
-      logo_alignment: "left";
-      width: number;
-    },
-  ): void;
-};
-
-declare global {
-  interface Window {
-    google?: { accounts: { id: GoogleIdentityApi } };
-  }
+function GoogleMark() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="absolute left-3 size-[18px]"
+      viewBox="0 0 18 18"
+    >
+      <path
+        fill="#4285F4"
+        d="M17.64 9.205c0-.638-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.797 2.716v2.258h2.909c1.703-1.568 2.684-3.878 2.684-6.614Z"
+      />
+      <path
+        fill="#34A853"
+        d="M9 18c2.43 0 4.467-.806 5.956-2.181l-2.909-2.258c-.806.54-1.835.859-3.047.859-2.344 0-4.328-1.585-5.037-3.714H.956v2.332A9 9 0 0 0 9 18Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M3.963 10.706A5.41 5.41 0 0 1 3.681 9c0-.592.102-1.168.282-1.706V4.962H.956A9 9 0 0 0 0 9c0 1.452.347 2.827.956 4.038l3.007-2.332Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M9 3.58c1.321 0 2.508.454 3.441 1.346l2.581-2.581C13.463.892 11.426 0 9 0A9 9 0 0 0 .956 4.962l3.007 2.332C4.672 5.165 6.656 3.58 9 3.58Z"
+      />
+    </svg>
+  );
 }
 
-async function hashNonce(nonce: string): Promise<string> {
-  const encoded = new TextEncoder().encode(nonce);
-  const digest = await crypto.subtle.digest("SHA-256", encoded);
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-export function AuthOptions({ next = null, locale }: { next?: string | null; locale: AppLocale }) {
-  const buttonRef = React.useRef<HTMLDivElement>(null);
-  const initializedRef = React.useRef(false);
-  const [pending, setPending] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+export function AuthOptions({
+  next = null,
+  locale,
+}: {
+  next?: string | null;
+  locale: AppLocale;
+}) {
   const copy = getWebDictionary(locale).auth;
-
-  const initializeGoogle = React.useCallback(async () => {
-    if (initializedRef.current || !buttonRef.current || !window.google || !clientId) return;
-    initializedRef.current = true;
-
-    try {
-      const nonceResponse = await fetch("/api/auth/google", {
-        cache: "no-store",
-        credentials: "same-origin",
-      });
-      const nonceData = (await nonceResponse.json().catch(() => null)) as { nonce?: string } | null;
-      if (!nonceResponse.ok || !nonceData?.nonce) {
-        throw new Error(copy.googleInitializing);
-      }
-
-      const hashedNonce = await hashNonce(nonceData.nonce);
-      window.google.accounts.id.initialize({
-        client_id: clientId,
-        nonce: hashedNonce,
-        ux_mode: "popup",
-        use_fedcm_for_prompt: true,
-        callback: async ({ credential }) => {
-          if (!credential) {
-            setError(copy.googleCredential);
-            return;
-          }
-
-          setPending(true);
-          setError(null);
-          try {
-            const response = await fetch("/api/auth/google", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              credentials: "same-origin",
-              body: JSON.stringify({ credential }),
-            });
-            const result = (await response.json().catch(() => null)) as {
-              error?: string;
-              redirectTo?: string;
-            } | null;
-            if (!response.ok || !result?.redirectTo) {
-              throw new Error(result?.error ? localizeError(result.error, locale) : copy.googleFailed);
-            }
-            window.location.assign(next ?? result.redirectTo);
-          } catch (callbackError) {
-            setError(
-              callbackError instanceof Error
-                ? callbackError.message
-                : copy.googleFailed,
-            );
-            setPending(false);
-          }
-        },
-      });
-
-      window.google.accounts.id.renderButton(buttonRef.current, {
-        type: "standard",
-        theme: "outline_dark",
-        size: "large",
-        text: "continue_with",
-        shape: "rectangular",
-        logo_alignment: "left",
-        // Google renders a fixed-width iframe and adds its own chrome on top
-        // of whatever number it is given, so it must be clamped to the range
-        // Google accepts AND contained by CSS -- see `.gis-button-host` in
-        // globals.css. Unclamped, the button came out ~20px wider than its slot
-        // and shoved the whole sign-in page sideways inside the iOS app's
-        // sign-in sheet, which is narrower than a browser tab.
-        width: Math.min(400, Math.max(200, Math.floor(buttonRef.current.clientWidth) || 280)),
-      });
-    } catch (initializationError) {
-      initializedRef.current = false;
-      setError(
-        initializationError instanceof Error
-          ? initializationError.message
-          : copy.googleInitializing,
-      );
-    }
-  }, [clientId, copy.googleCredential, copy.googleFailed, copy.googleInitializing, locale, next]);
+  const query = next ? `?next=${encodeURIComponent(next)}` : "";
+  const googleConfigured = Boolean(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);
+  const googleHref = `/api/auth/google/oauth${query}`;
 
   return (
-    <div className="space-y-3">
-      <Script
-        src="https://accounts.google.com/gsi/client"
-        strategy="afterInteractive"
-        onReady={() => void initializeGoogle()}
-        onError={() => setError(copy.googleLoading)}
-      />
-      <div className="relative min-h-9 w-full" aria-busy={pending}>
-        <div
-          ref={buttonRef}
-          className={`gis-button-host${pending ? " pointer-events-none opacity-60" : ""}`}
-        />
-        {pending ? (
-          <div
-            className="absolute inset-0 flex items-center justify-center"
-            aria-label={copy.googleSigningIn}
-          >
-            <Loader2 className="size-4 animate-spin" />
-          </div>
-        ) : null}
-      </div>
-      {!clientId ? (
+    <div className="space-y-4">
+      <a
+        href={googleConfigured ? googleHref : undefined}
+        aria-disabled={!googleConfigured}
+        tabIndex={googleConfigured ? undefined : -1}
+        className="relative flex h-10 w-full items-center justify-center rounded-md border border-[#747775] bg-white px-10 text-sm font-medium text-[#1f1f1f] shadow-sm transition-colors hover:bg-[#f8faff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card aria-disabled:pointer-events-none aria-disabled:opacity-50"
+      >
+        <GoogleMark />
+        <span>{copy.continueGoogle}</span>
+      </a>
+
+      {!googleConfigured ? (
         <p className="text-center text-2xs text-neg">{copy.googleNotConfigured}</p>
       ) : null}
-      {error ? (
-        <p className="text-center text-2xs text-neg" role="alert">
-          {error}
-        </p>
-      ) : null}
-      <div className="flex items-center gap-3 text-2xs uppercase tracking-[0.12em] text-muted-foreground">
+
+      <div className="flex items-center gap-3 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
         <span className="h-px flex-1 bg-border" />
         {copy.continueEmail}
         <span className="h-px flex-1 bg-border" />

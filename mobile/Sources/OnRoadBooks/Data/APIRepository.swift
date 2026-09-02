@@ -130,6 +130,13 @@ final class APIRepository: LedgerRepository {
         return try APIClient.outcome(data, http)
     }
 
+    /// A write with no body and no queue: DELETE.
+    private func directDelete(_ path: String) async throws {
+        let request = client.request(path, method: "DELETE")
+        let (data, http) = try await client.send(request)
+        _ = try APIClient.outcome(data, http)
+    }
+
     func fetchDashboard() async throws -> DashboardSnapshot {
         try await get("api/mobile/dashboard", as: DashboardDTO.self).toDomain()
     }
@@ -341,6 +348,36 @@ final class APIRepository: LedgerRepository {
             "api/mobile/invoices/\(loadId)",
             body: RecordPaymentDTO(date: ISODate.day(date), amount: amount),
             summary: "Registrar pago parcial"
+        )
+    }
+
+    func fetchLoadDetail(id: String) async throws -> LoadDetail {
+        try await get("api/mobile/loads/\(id)", as: LoadDetailResponseDTO.self).load.toDomain()
+    }
+
+    @discardableResult
+    func updateLoad(id: String, _ change: LoadEdit) async throws -> String {
+        try await directWrite("api/mobile/loads/\(id)", method: "PATCH", body: LoadEditDTO(change))
+    }
+
+    func deleteLoad(id: String) async throws {
+        try await directDelete("api/mobile/loads/\(id)")
+    }
+
+    func deleteExpense(id: String) async throws {
+        try await directDelete("api/mobile/expenses/\(id)")
+    }
+
+    func deleteFuelStop(id: String) async throws {
+        try await directDelete("api/mobile/fuel/\(id)")
+    }
+
+    @discardableResult
+    func setSettlementStatus(month: String, half: String, closed: Bool) async throws -> String {
+        try await directWrite(
+            "api/mobile/settlements",
+            method: "PATCH",
+            body: SettlementStatusDTO(month: month, half: half, status: closed ? "CLOSED" : "OPEN")
         )
     }
 
@@ -1038,6 +1075,9 @@ private struct SettlementDTO: Decodable {
     let reserveTotal: Double
     let safeToPay: Double
     let drifted: Bool
+    let month: String?
+    let half: String?
+    let closable: Bool?
 
     func toDomain() -> SettlementPeriod {
         SettlementPeriod(
@@ -1046,9 +1086,19 @@ private struct SettlementDTO: Decodable {
             status: status == "OPEN" ? .open : .closed,
             operatingProfit: operatingProfit,
             reserveContributions: reserveTotal,
-            ownerDraw: safeToPay
+            ownerDraw: safeToPay,
+            month: month,
+            half: half,
+            closable: closable ?? false
         )
     }
+}
+
+/// `month` and `half` identify the window; `status` says which way.
+private struct SettlementStatusDTO: Encodable {
+    let month: String
+    let half: String
+    let status: String
 }
 
 private struct SettlementsResponseDTO: Decodable {
@@ -1117,5 +1167,81 @@ private struct DashboardDTO: Decodable {
                 )
             }
         )
+    }
+}
+
+/// `GET /api/mobile/loads/{id}` — the raw record, not the derived figures.
+private struct LoadDetailResponseDTO: Decodable {
+    let load: LoadDetailDTO
+}
+
+private struct LoadDetailDTO: Decodable {
+    let id: String
+    let date: String
+    let broker: String?
+    let originCity: String
+    let originState: String
+    let destinationCity: String
+    let destinationState: String
+    let grossRate: Double
+    let loadedMiles: Double
+    let deadheadMiles: Double
+    let fuelCost: Double
+    let tolls: Double
+    let otherExpenses: Double
+    let status: String
+    let invoiceNumber: String?
+
+    func toDomain() -> LoadDetail {
+        LoadDetail(
+            id: id,
+            date: ISODate.parse(date),
+            broker: broker ?? "",
+            originCity: originCity,
+            originState: originState,
+            destinationCity: destinationCity,
+            destinationState: destinationState,
+            grossRate: grossRate,
+            loadedMiles: loadedMiles,
+            deadheadMiles: deadheadMiles,
+            fuelCost: fuelCost,
+            tolls: tolls,
+            otherExpenses: otherExpenses,
+            status: status,
+            invoiceNumber: invoiceNumber
+        )
+    }
+}
+
+/// Only the fields this screen shows. The server merges them onto the stored
+/// load, so dispatch, factoring, equipment and IFTA miles are never blanked
+/// by an edit made from a phone.
+private struct LoadEditDTO: Encodable {
+    let date: String
+    let broker: String?
+    let originCity: String
+    let originState: String
+    let destinationCity: String
+    let destinationState: String
+    let grossRate: Double
+    let loadedMiles: Double
+    let deadheadMiles: Double
+    let fuelCost: Double
+    let tolls: Double
+    let otherExpenses: Double
+
+    init(_ change: LoadEdit) {
+        date = ISODate.day(change.date)
+        broker = change.broker.isEmpty ? nil : change.broker
+        originCity = change.originCity
+        originState = change.originState.uppercased()
+        destinationCity = change.destinationCity
+        destinationState = change.destinationState.uppercased()
+        grossRate = change.grossRate
+        loadedMiles = change.loadedMiles
+        deadheadMiles = change.deadheadMiles
+        fuelCost = change.fuelCost
+        tolls = change.tolls
+        otherExpenses = change.otherExpenses
     }
 }

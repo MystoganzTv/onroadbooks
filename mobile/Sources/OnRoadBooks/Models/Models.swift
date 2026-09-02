@@ -160,6 +160,50 @@ struct NewLoad {
     var otherExpenses: Double
 }
 
+/// The raw record behind a load row, for correcting it.
+///
+/// The list endpoint returns DERIVED figures — contribution, score, allocated
+/// cost — which cannot be edited because they are conclusions. This is what
+/// the owner actually typed, from `GET /api/mobile/loads/{id}`.
+struct LoadDetail: Identifiable, Equatable {
+    let id: String
+    var date: Date
+    var broker: String
+    var originCity: String
+    var originState: String
+    var destinationCity: String
+    var destinationState: String
+    var grossRate: Double
+    var loadedMiles: Double
+    var deadheadMiles: Double
+    var fuelCost: Double
+    var tolls: Double
+    var otherExpenses: Double
+    var status: String
+    var invoiceNumber: String?
+
+    /// Dispatch and factoring are not on this screen; the server keeps them.
+    var lane: String { "\(originCity), \(originState) → \(destinationCity), \(destinationState)" }
+}
+
+/// What the phone changes about a load. Everything it does not show — the
+/// IFTA jurisdiction miles, the equipment, the commodity, dispatch and
+/// factoring — is merged in by the server and survives untouched.
+struct LoadEdit: Equatable {
+    var date: Date
+    var broker: String
+    var originCity: String
+    var originState: String
+    var destinationCity: String
+    var destinationState: String
+    var grossRate: Double
+    var loadedMiles: Double
+    var deadheadMiles: Double
+    var fuelCost: Double
+    var tolls: Double
+    var otherExpenses: Double
+}
+
 // MARK: - Load calculator
 
 /// The bands the account actually saved, not bands the app invented.
@@ -496,6 +540,12 @@ struct SettlementPeriod: Identifiable {
     let operatingProfit: Double
     let reserveContributions: Double
     let ownerDraw: Double
+    /// What closing this window needs. The id is opaque on purpose.
+    let month: String?
+    let half: String?
+    /// OPEN and the period has actually ended. A half-month cannot be closed
+    /// while it is still running — the server refuses it and says why.
+    let closable: Bool
 }
 
 struct DashboardSnapshot {

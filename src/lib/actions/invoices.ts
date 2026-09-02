@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireWritableSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
+import { invoicePaymentSummary } from "@/lib/invoices";
 import { duplicateInvoiceNumber, invoiceIssuePatch } from "@/lib/invoices";
 import { invoiceSchema, paymentEventSchema } from "@/lib/schemas";
 import { fieldErrorsFrom, type ActionResult } from "./types";
@@ -55,12 +56,13 @@ export async function markInvoicePaidAction(loadId: string, paidOn: string): Pro
     const load = dataset.loads.find((row) => row.id === loadId);
     if (!load?.invoiceNumber) return { ok: false, error: "Issue the invoice before marking it paid." };
     if (!/^\d{4}-\d{2}-\d{2}$/.test(paidOn)) return { ok: false, error: "Use a valid payment date." };
-    const alreadyRecorded = dataset.paymentEvents
-      .filter((event) => event.loadId === loadId)
-      .reduce((total, event) => total + event.amount, 0);
-    const remaining = Math.round((load.grossRate - alreadyRecorded) * 100) / 100;
-    if (remaining <= 0) return { ok: false, error: "That invoice is already fully paid." };
-    await repository.createPaymentEvent({ loadId, date: paidOn, amount: remaining });
+    // `invoicePaymentSummary` is the one reader of what is still owed. Its
+    // own arithmetic also knows about a load marked PAID before payment
+    // events existed -- counting that as a zero balance is what stops this
+    // from posting the whole rate a second time.
+    const { balance } = invoicePaymentSummary(load, dataset.paymentEvents);
+    if (balance <= 0) return { ok: false, error: "That invoice is already fully paid." };
+    await repository.createPaymentEvent({ loadId, date: paidOn, amount: balance });
     revalidateInvoicePaths(loadId);
     return { ok: true, id: loadId };
   } catch (error) {

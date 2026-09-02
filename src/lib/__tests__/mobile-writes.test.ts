@@ -2,7 +2,19 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { roleCan } from "../roles";
-import { expenseSchema, fuelSchema, invoiceSchema, loadSchema, memberInviteSchema, memberRoleSchema, truckSchema } from "../schemas";
+import {
+  driverSchema,
+  expenseSchema,
+  fuelSchema,
+  invoiceSchema,
+  loadSchema,
+  memberInviteSchema,
+  memberRoleSchema,
+  paymentEventSchema,
+  reserveTransactionSchema,
+  settlementRefSchema,
+  truckSchema,
+} from "../schemas";
 
 /**
  * The iOS app posts JSON straight at `/api/mobile/loads` and
@@ -223,5 +235,77 @@ describe("what the iOS app PATCHes to /api/mobile/truck for the IFTA filing deci
   it("gates on manage_fleet, same as createTruckAction/updateTruckByIdAction", () => {
     assert.equal(roleCan("OWNER", "manage_fleet"), true);
     assert.equal(roleCan("VIEWER", "manage_fleet"), false);
+  });
+});
+
+describe("what the iOS app now posts to edit, collect and close", () => {
+  /**
+   * The phone stopped being append-only. Every one of these goes through the
+   * SAME schema and the SAME repository call as the web, so a refusal a
+   * browser would give is a refusal a truck stop gets.
+   */
+
+  it("edits a load with the whole load, because updateLoad is a replace not a patch", () => {
+    // From `NewLoadDTO`, reused verbatim by the edit path in APIRepository.
+    assert.equal(loadSchema.safeParse(loadFromPhone).success, true);
+    // A partial body is refused: sending only the corrected rate would blank
+    // the route, the miles and the trip costs.
+    assert.equal(loadSchema.safeParse({ grossRate: 1900 }).success, false);
+  });
+
+  it("edits an expense and a fill-up with their own full schemas", () => {
+    assert.equal(expenseSchema.safeParse(expenseFromPhone).success, true);
+    assert.equal(fuelSchema.safeParse(fuelFromPhone).success, true);
+  });
+
+  /** From `RecordPaymentDTO`. `loadId` is supplied by the route, from the path. */
+  it("records a payment the same way the web invoice dialog does", () => {
+    const payment = { loadId: "load_1", date: "2026-09-02", amount: 1850 };
+    assert.equal(paymentEventSchema.safeParse(payment).success, true);
+    assert.equal(
+      paymentEventSchema.safeParse({ ...payment, method: "ACH", reference: "88213" }).success,
+      true,
+    );
+    // Zero is not a payment, and a mistyped date is not a date.
+    assert.equal(paymentEventSchema.safeParse({ ...payment, amount: 0 }).success, false);
+    assert.equal(paymentEventSchema.safeParse({ ...payment, date: "09/02/2026" }).success, false);
+  });
+
+  /** From `SettlementStatusDTO`. `status` is routing; the ref is the schema. */
+  it("closes and reopens a half-month by month and half", () => {
+    assert.equal(settlementRefSchema.safeParse({ month: "2026-08", half: "FIRST" }).success, true);
+    assert.equal(settlementRefSchema.safeParse({ month: "2026-08", half: "SECOND" }).success, true);
+    assert.equal(settlementRefSchema.safeParse({ month: "2026-8", half: "FIRST" }).success, false);
+    assert.equal(settlementRefSchema.safeParse({ month: "2026-08", half: "THIRD" }).success, false);
+  });
+
+  /** From `ReserveMovementDTO`. */
+  it("moves money in a reserve bucket only with a reason and an amount", () => {
+    const movement = {
+      accountId: "reserve_tax",
+      date: "2026-09-02",
+      type: "WITHDRAWAL",
+      amount: 500,
+      description: "Quarterly estimate",
+    };
+    assert.equal(reserveTransactionSchema.safeParse(movement).success, true);
+    assert.equal(reserveTransactionSchema.safeParse({ ...movement, amount: 0 }).success, false);
+    assert.equal(reserveTransactionSchema.safeParse({ ...movement, description: "" }).success, false);
+    assert.equal(reserveTransactionSchema.safeParse({ ...movement, type: "TRANSFER" }).success, false);
+  });
+
+  /** From `NewDriverDTO`. A driver is an operational record, never a sign-in. */
+  it("creates a driver with pay terms and nothing that could become a login", () => {
+    const driver = { name: "Luis Ramos", payType: "PER_LOADED_MILE", payRate: 0.62, active: true };
+    const parsed = driverSchema.safeParse(driver);
+    assert.equal(parsed.success, true);
+    if (parsed.success) {
+      assert.equal("email" in parsed.data, false, "a driver record has no email to invite");
+      assert.equal("password" in parsed.data, false);
+    }
+    assert.equal(driverSchema.safeParse({ ...driver, name: "" }).success, false);
+    // Only the four pay types the settlement maths knows how to allocate.
+    assert.equal(driverSchema.safeParse({ ...driver, payType: "SALARY" }).success, false);
+    assert.equal(driverSchema.safeParse({ ...driver, payRate: 0 }).success, false);
   });
 });

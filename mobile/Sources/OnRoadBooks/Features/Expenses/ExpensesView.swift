@@ -6,6 +6,8 @@ struct ExpensesView: View {
     @State private var categories: [ExpenseCategory] = []
     @State private var isLoading = true
     @State private var isAdding = false
+    @State private var pendingDelete: ExpenseEntry?
+    @State private var deleteFailure: String?
 
     private var total: Double { expenses.reduce(0) { $0 + $1.amount } }
 
@@ -38,6 +40,13 @@ struct ExpensesView: View {
                                 ExpenseRow(expense: expense)
                                     .listRowBackground(OBColor.card)
                                     .listRowSeparatorTint(OBColor.border)
+                                    .swipeActions(edge: .trailing) {
+                                        Button(role: .destructive) {
+                                            pendingDelete = expense
+                                        } label: {
+                                            Label("Borrar", systemImage: "trash")
+                                        }
+                                    }
                             }
                         }
                     }
@@ -55,6 +64,45 @@ struct ExpensesView: View {
                     categories: categories,
                     onSaved: { Task { await reload() } }
                 )
+            }
+            // A row the app wrote for you -- a fuel or service mirror, or a
+            // load's trip cost -- is refused by the server with the sentence
+            // that says where to change it instead. It is shown as it comes.
+            .confirmationDialog(
+                pendingDelete.map { "¿Borrar \($0.note)?" } ?? "¿Borrar este gasto?",
+                isPresented: Binding(
+                    get: { pendingDelete != nil },
+                    set: { if !$0 { pendingDelete = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Borrar", role: .destructive) {
+                    guard let expense = pendingDelete else { return }
+                    pendingDelete = nil
+                    Task {
+                        do {
+                            try await repository.deleteExpense(id: expense.id)
+                            await reload()
+                        } catch {
+                            deleteFailure = (error as? LocalizedError)?.errorDescription
+                                ?? "No se pudo borrar el gasto."
+                        }
+                    }
+                }
+                Button("Cancelar", role: .cancel) { pendingDelete = nil }
+            } message: {
+                Text("Sale del libro y deja de contar en el costo por milla.")
+            }
+            .alert(
+                "No se borró",
+                isPresented: Binding(
+                    get: { deleteFailure != nil },
+                    set: { if !$0 { deleteFailure = nil } }
+                )
+            ) {
+                Button("Entendido", role: .cancel) { deleteFailure = nil }
+            } message: {
+                Text(deleteFailure ?? "")
             }
         }
     }

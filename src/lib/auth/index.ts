@@ -2,15 +2,16 @@ import "server-only";
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 
-import { getAuthStore, getRepository } from "@/lib/db";
+import { getAuthStore, getDataset } from "@/lib/db";
 import { canWrite, trialState } from "@/lib/plans";
 import { permissionRefusal, roleCan, type Permission } from "@/lib/roles";
 import { todayISO } from "@/lib/periods";
 import { decodeSession, SESSION_COOKIE, type SessionPayload } from "./session";
 
 /** The signed-in user, or null. Never throws. */
-export async function getSession(): Promise<SessionPayload | null> {
+export const getSession = cache(async (): Promise<SessionPayload | null> => {
   try {
     const store = await cookies();
     const session = await decodeSession(store.get(SESSION_COOKIE)?.value);
@@ -33,7 +34,7 @@ export async function getSession(): Promise<SessionPayload | null> {
   } catch {
     return null;
   }
-}
+});
 
 /**
  * The session every page and action must go through.
@@ -52,7 +53,7 @@ export async function requireWritableSession(
   permission: Permission = "manage_business",
 ): Promise<SessionPayload> {
   const session = await requireSession();
-  const { subscription } = await getRepository(session.businessId).getDataset();
+  const { subscription } = await getDataset(session.businessId);
   const today = todayISO();
   if (!canWrite(subscription, today)) {
     const trial = trialState(subscription, today);

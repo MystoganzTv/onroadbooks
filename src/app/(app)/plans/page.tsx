@@ -4,7 +4,7 @@ import { PlanCard } from "@/components/settings/plan-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { requireSession } from "@/lib/auth";
-import { getRepository } from "@/lib/db";
+import { getDataset } from "@/lib/db";
 import { todayISO } from "@/lib/periods";
 import { stripeBillingConfigured } from "@/lib/stripe";
 import { planOf } from "@/lib/plans";
@@ -27,7 +27,7 @@ export default async function PlansPage({
     getAppLocale(),
   ]);
   const copy = getWebDictionary(locale).plans;
-  const { subscription } = await getRepository(session.businessId).getDataset();
+  const { subscription } = await getDataset(session.businessId);
 
   if ((session.role ?? "VIEWER") !== "OWNER") {
     return (

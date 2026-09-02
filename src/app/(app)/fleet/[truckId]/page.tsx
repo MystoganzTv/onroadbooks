@@ -29,7 +29,7 @@ import {
   thresholdsFromSettings,
   withMetricsAll,
 } from "@/lib/calculations";
-import { getRepository } from "@/lib/db";
+import { getDataset } from "@/lib/db";
 import { calculateFleetSummary } from "@/lib/finance/fleet";
 import { isOperatingExpenseCategory } from "@/lib/finance/terminology";
 import { expensesForTruck, loadsForTruck, orderedTrucks, truckById } from "@/lib/fleet";
@@ -71,7 +71,7 @@ export default async function FleetUnitPage({
     getAppLocale(),
   ]);
   const copy = getWebDictionary(locale).fleet;
-  const dataset = await getRepository(session.businessId).getDataset();
+  const dataset = await getDataset(session.businessId);
   if (!hasFleetAccess(dataset.subscription)) redirect("/truck");
 
   const truck = truckById(dataset.trucks, truckId);

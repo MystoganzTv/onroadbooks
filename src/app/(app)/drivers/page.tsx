@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth";
-import { getRepository } from "@/lib/db";
+import { getDataset } from "@/lib/db";
 import { calculateDriverPay, driverPayDescription, driverSettlementTotals, unsettledLoadsForDriver } from "@/lib/driver-pay";
 import { formatMoney, formatNumber } from "@/lib/formatters";
 import { hasFleetAccess } from "@/lib/plans";
@@ -29,7 +29,7 @@ export default async function DriversPage() {
   const [session, locale] = await Promise.all([requireSession(), getAppLocale()]);
   const copy = getWebDictionary(locale).drivers;
   const common = getWebDictionary(locale).common;
-  const dataset = await getRepository(session.businessId).getDataset();
+  const dataset = await getDataset(session.businessId);
   if (!hasFleetAccess(dataset.subscription)) redirect("/truck");
   const canManage = roleCan(session.role ?? "VIEWER", "manage_drivers");
   const active = dataset.drivers.filter((driver) => driver.active);

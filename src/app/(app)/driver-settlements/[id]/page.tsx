@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth";
-import { getRepository } from "@/lib/db";
+import { getDataset } from "@/lib/db";
 import { DRIVER_ADJUSTMENT_TYPES, DRIVER_PAY_TYPES, driverSettlementTotals } from "@/lib/driver-pay";
 import { formatMiles, formatMoney, formatRateValue } from "@/lib/formatters";
 import { hasFleetAccess } from "@/lib/plans";
@@ -34,7 +34,7 @@ export default async function DriverSettlementDetailPage({ params }: { params: P
   const dictionary = getWebDictionary(locale);
   const copy = dictionary.driverPay;
   if (!roleCan(session.role ?? "VIEWER", "manage_driver_settlements")) redirect("/dashboard");
-  const dataset = await getRepository(session.businessId).getDataset();
+  const dataset = await getDataset(session.businessId);
   if (!hasFleetAccess(dataset.subscription)) redirect("/settlements");
   const settlement = dataset.driverSettlements.find((row) => row.id === id);
   if (!settlement) notFound();

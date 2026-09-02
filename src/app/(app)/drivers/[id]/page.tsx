@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth";
-import { getRepository } from "@/lib/db";
+import { getDataset } from "@/lib/db";
 import { calculateDriverPay, driverPayDescription, driverSettlementTotals, unsettledLoadsForDriver } from "@/lib/driver-pay";
 import { formatMiles, formatMoney, formatRateValue } from "@/lib/formatters";
 import { hasFleetAccess } from "@/lib/plans";
@@ -39,7 +39,7 @@ export default async function DriverProfilePage({
   const dictionary = getWebDictionary(locale);
   const copy = dictionary.drivers;
   const common = dictionary.common;
-  const dataset = await getRepository(session.businessId).getDataset();
+  const dataset = await getDataset(session.businessId);
   if (!hasFleetAccess(dataset.subscription)) redirect("/truck");
   const driver = dataset.drivers.find((row) => row.id === id);
   if (!driver) notFound();

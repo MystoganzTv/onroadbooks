@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireSession } from "@/lib/auth";
 import { summarizePeriod } from "@/lib/calculations";
-import { getAuthStore, getRepository } from "@/lib/db";
+import { getAuthStore, getDataset } from "@/lib/db";
 import { getWebDictionary } from "@/lib/i18n/dictionaries";
 import { formatLocalePeriod } from "@/lib/i18n-format";
 import { getAppLocale } from "@/lib/i18n-server";
@@ -45,9 +45,8 @@ export default async function SettingsPage({
   const role = session.role ?? "VIEWER";
   const owner = role === "OWNER";
   const section = settingsSection(param(params, "section") || undefined);
-  const repository = getRepository(session.businessId);
   const [dataset, currentUser] = await Promise.all([
-    repository.getDataset(),
+    getDataset(session.businessId),
     getAuthStore().findUserById(session.userId),
   ]);
   const {

@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/shell/app-shell";
 import { LanguageProvider } from "@/components/shell/language-provider";
 import { requireSession } from "@/lib/auth";
-import { getRepository } from "@/lib/db";
+import { getDataset } from "@/lib/db";
 import { activeTrucks, primaryTruck } from "@/lib/fleet";
 import { isPlatformAdminEmail } from "@/lib/platform-admin";
 import { hasFleetAccess } from "@/lib/plans";
@@ -10,7 +10,7 @@ import { getAppLocale } from "@/lib/i18n-server";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [session, locale] = await Promise.all([requireSession(), getAppLocale()]);
-  const dataset = await getRepository(session.businessId).getDataset();
+  const dataset = await getDataset(session.businessId);
   const {
     business,
     trucks,

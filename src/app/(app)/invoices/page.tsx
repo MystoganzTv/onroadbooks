@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth";
-import { getRepository } from "@/lib/db";
+import { getDataset } from "@/lib/db";
 import { formatMoney } from "@/lib/formatters";
 import {
   invoiceAgeDays,
@@ -34,7 +34,7 @@ export default async function InvoicesPage() {
   const [session, locale] = await Promise.all([requireSession(), getAppLocale()]);
   const dictionary = getWebDictionary(locale);
   const copy = dictionary.invoices;
-  const dataset = await getRepository(session.businessId).getDataset();
+  const dataset = await getDataset(session.businessId);
   const today = todayISO();
   const canManage = roleCan(session.role ?? "VIEWER", "manage_finances");
   const loads = [...dataset.loads].sort((a, b) =>

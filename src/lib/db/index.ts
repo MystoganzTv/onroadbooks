@@ -1,5 +1,8 @@
 import "server-only";
 
+import { cache } from "react";
+
+import type { Dataset } from "../types";
 import { JsonAuthStore, JsonRepository } from "./json-store";
 import { PrismaAuthStore, PrismaRepository } from "./prisma-store";
 import type { AuthStore, Repository } from "./repository";
@@ -36,6 +39,18 @@ export function getRepository(businessId: string): Repository {
   if (!businessId) throw new Error("A businessId is required to read or write data.");
   return usingPostgres() ? new PrismaRepository(businessId) : new JsonRepository(businessId);
 }
+
+/**
+ * One authoritative ledger snapshot per business and Server Component render.
+ *
+ * App layouts and pages are separate components, so calling the repository in
+ * both used to execute the complete set of Postgres queries twice on a first
+ * page load. React cache is request/render scoped: it deduplicates that work
+ * without retaining one customer's books for a later request.
+ */
+export const getDataset = cache(async (businessId: string): Promise<Dataset> => {
+  return getRepository(businessId).getDataset();
+});
 
 /** Account lookups, which establish which business a request belongs to. */
 export function getAuthStore(): AuthStore {

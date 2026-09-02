@@ -46,7 +46,7 @@ import {
   withMetricsAll,
 } from "@/lib/calculations";
 import { periodBuckets } from "@/lib/chart-data";
-import { getRepository } from "@/lib/db";
+import { getDataset } from "@/lib/db";
 import { driverScheduleFromLoads } from "@/lib/driver-availability";
 import { hasFleetAccess, planAllows } from "@/lib/plans";
 import {
@@ -135,7 +135,7 @@ export default async function DashboardPage({
   const copy = getWebDictionary(locale).dashboard;
   const role = session.role ?? "VIEWER";
   const ownerPlanning = roleCan(role, "manage_owner_finances");
-  const dataset = await getRepository(session.businessId).getDataset();
+  const dataset = await getDataset(session.businessId);
   const period = periodFromSearchParams(params);
   const periodDisplayLabel = formatLocalePeriod(period, locale);
   const prior = previousPeriod(period);

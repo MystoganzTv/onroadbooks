@@ -1,3 +1,8 @@
+const locationDataIncludes = [
+  "./node_modules/@countrystatecity/countries/dist/data/United_States-US/**/*",
+  "./node_modules/@countrystatecity/countries/dist/data/Canada-CA/**/*",
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -10,12 +15,15 @@ const nextConfig = {
   outputFileTracingIncludes: {
     "/*": [
       "./src/generated/prisma/libquery_engine-*.node",
-      // The location package lazy-loads JSON with fs, which static tracing
-      // cannot discover. Only the two countries supported by the load form
-      // are copied into deployed server functions.
-      "./node_modules/@countrystatecity/countries/dist/data/United_States-US/**/*",
-      "./node_modules/@countrystatecity/countries/dist/data/Canada-CA/**/*",
     ],
+    // The location package lazy-loads JSON with fs, which static tracing
+    // cannot discover. Copy its 5 MB of country data only into the routes
+    // that search or validate load locations instead of every function.
+    "/api/locations": locationDataIncludes,
+    "/calculator": locationDataIncludes,
+    "/dashboard": locationDataIncludes,
+    "/loads": locationDataIncludes,
+    "/loads/*": locationDataIncludes,
   },
   experimental: {
     serverActions: { bodySizeLimit: "2mb" },

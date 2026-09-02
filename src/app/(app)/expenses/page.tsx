@@ -18,7 +18,7 @@ import {
   withMetricsAll,
 } from "@/lib/calculations";
 import { requireSession } from "@/lib/auth";
-import { getRepository } from "@/lib/db";
+import { getDataset } from "@/lib/db";
 import { expenseMirrorSources } from "@/lib/mirrored-expenses";
 import { formatMoneyCompact, formatPercent, formatRate } from "@/lib/formatters";
 import { expensesForTruck, loadsForTruck, orderedTrucks } from "@/lib/fleet";
@@ -44,9 +44,9 @@ export default async function ExpensesPage({
 }) {
   const [params, session, locale] = await Promise.all([searchParams, requireSession(), getAppLocale()]);
   const copy = getWebDictionary(locale).expenses;
-  const { trucks, loads, expenses, fuelEntries, maintenanceRecords, documents, settings, financialObligations, paymentEvents } = await getRepository(
+  const { trucks, loads, expenses, fuelEntries, maintenanceRecords, documents, settings, financialObligations, paymentEvents } = await getDataset(
     session.businessId,
-  ).getDataset();
+  );
   const period = periodFromSearchParams(params);
   const ratingThresholds = thresholdsFromSettings(settings);
 

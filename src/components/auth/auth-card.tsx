@@ -87,26 +87,32 @@ export function AuthCard({
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-background p-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-6">
-          <Link
-            href="/"
-            className="mb-5 inline-flex items-center gap-1.5 text-2xs text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <ArrowLeft className="size-3.5" aria-hidden />
-            {interpolate(copy.backTo, { app: APP_NAME })}
-          </Link>
-          <BrandLogo className="w-40" priority />
-          <p className="mt-2 text-2xs text-muted-foreground">
-            {isSetup ? copy.setupAccount : copy.signInBooks}
-          </p>
-        </div>
+    <div className="relative isolate flex min-h-dvh items-center justify-center overflow-hidden bg-background px-4 py-10">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-80 bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.12),transparent_68%)]"
+        aria-hidden
+      />
+      <div className="w-full max-w-md">
+        <Link
+          href="/"
+          className="mb-4 inline-flex items-center gap-1.5 text-2xs text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="size-3.5" aria-hidden />
+          {interpolate(copy.backTo, { app: APP_NAME })}
+        </Link>
+
+        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-2xl shadow-black/15">
+          <header className="border-b border-border px-6 py-5">
+            <BrandLogo className="w-44" priority />
+            <h1 className="mt-4 text-lg font-semibold tracking-tight text-foreground">
+              {isSetup ? copy.setupAccount : copy.signInBooks}
+            </h1>
+          </header>
 
         <form
           onSubmit={submit}
           noValidate
-          className="space-y-4 rounded-lg border border-border bg-card p-5"
+          className="space-y-4 px-6 py-5"
         >
           <AuthOptions next={next} locale={locale} />
 
@@ -199,6 +205,7 @@ export function AuthCard({
             .
           </p>
         </form>
+        </div>
 
         <p className="mt-4 text-center text-2xs leading-relaxed text-muted-foreground">
           {isSetup ? copy.alreadyAccount : copy.newToApp}{" "}

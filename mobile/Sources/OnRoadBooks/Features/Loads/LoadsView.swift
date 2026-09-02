@@ -23,9 +23,17 @@ struct LoadsView: View {
                 } else {
                     List {
                         ForEach(loads) { load in
-                            LoadDetailRow(load: load)
-                                .listRowBackground(OBColor.card)
-                                .listRowSeparatorTint(OBColor.border)
+                            NavigationLink {
+                                LoadDetailView(
+                                    repository: repository,
+                                    loadId: load.id,
+                                    onChanged: { Task { await reload() } }
+                                )
+                            } label: {
+                                LoadDetailRow(load: load)
+                            }
+                            .listRowBackground(OBColor.card)
+                            .listRowSeparatorTint(OBColor.border)
                         }
                     }
                     .listStyle(.plain)

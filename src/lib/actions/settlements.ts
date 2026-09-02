@@ -2,11 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import {
-  buildSettlementSnapshot,
-  settlementBounds,
-  settlementLabel,
-} from "@/lib/finance/settlement";
+import { planSettlementClose } from "@/lib/finance/settlement";
 import { settlementNotesSchema, settlementRefSchema } from "@/lib/schemas";
 import { todayISO } from "@/lib/periods";
 import type { SettlementHalf } from "@/lib/types";
@@ -46,23 +42,11 @@ export async function closeSettlementAction(values: unknown): Promise<ActionResu
   try {
     const repository = await repositoryWith("cockpit", "manage_owner_finances");
     const dataset = await repository.getDataset();
-    const range = settlementBounds(month, half);
 
-    if (todayISO() <= range.end) {
-      return {
-        ok: false,
-        error: "This settlement period has not finished yet. It can be closed once it ends.",
-      };
-    }
-
-    const snapshot = buildSettlementSnapshot(
-      dataset.loads,
-      dataset.expenses,
-      range,
-      dataset.settings,
-      dataset.reserveAccounts,
-      dataset.paymentEvents,
-    );
+    // What closing means lives in `planSettlementClose`, so the phone cannot
+    // close a settlement by a different rule than the browser does.
+    const plan = planSettlementClose(dataset, month, half, todayISO());
+    if (!plan.ok) return { ok: false, error: plan.error };
 
     const settlement = await repository.ensureSettlement(month, half);
     if (settlement.status === "CLOSED") {
@@ -70,16 +54,8 @@ export async function closeSettlementAction(values: unknown): Promise<ActionResu
     }
 
     await repository.closeSettlement(settlement.id, {
-      snapshot,
-      contributions: snapshot.reserves
-        .filter((reserve) => reserve.amount > 0)
-        .map((reserve) => ({
-          accountId: reserve.accountId,
-          amount: reserve.amount,
-          description: `${reserve.pct}% ${
-            reserve.basis === "OPERATING_PROFIT" ? "of Operating Profit" : "of Booked Revenue"
-          } - ${settlementLabel(month, half)}`,
-        })),
+      snapshot: plan.snapshot,
+      contributions: plan.contributions,
     });
 
     revalidate();

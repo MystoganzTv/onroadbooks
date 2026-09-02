@@ -16,7 +16,7 @@ import {
   withMetricsAll,
 } from "@/lib/calculations";
 import { requireSession } from "@/lib/auth";
-import { getRepository } from "@/lib/db";
+import { getDataset } from "@/lib/db";
 import { driverScheduleFromLoads } from "@/lib/driver-availability";
 import {
   formatMoneyCompact,
@@ -49,9 +49,9 @@ export default async function LoadsPage({
 }) {
   const [params, session, locale] = await Promise.all([searchParams, requireSession(), getAppLocale()]);
   const copy = getWebDictionary(locale).loads;
-  const { trucks, loads, expenses, fuelEntries, settings, drivers, subscription, paymentEvents } = await getRepository(
+  const { trucks, loads, expenses, fuelEntries, settings, drivers, subscription, paymentEvents } = await getDataset(
     session.businessId,
-  ).getDataset();
+  );
   const period = periodFromSearchParams(params);
   const periodLabel = formatLocalePeriod(period, locale);
   const ratingThresholds = thresholdsFromSettings(settings);

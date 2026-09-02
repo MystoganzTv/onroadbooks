@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth";
 import { summarizePeriod } from "@/lib/calculations";
-import { getRepository } from "@/lib/db";
+import { getDataset } from "@/lib/db";
 import { calculateFleetSummary, fleetExtremes } from "@/lib/finance/fleet";
 import { orderedTrucks } from "@/lib/fleet";
 import { hasFleetAccess } from "@/lib/plans";
@@ -69,9 +69,9 @@ export default async function FleetPage({
     getAppLocale(),
   ]);
   const copy = getWebDictionary(locale).fleet;
-  const { trucks, loads, expenses, settings, subscription, paymentEvents } = await getRepository(
+  const { trucks, loads, expenses, settings, subscription, paymentEvents } = await getDataset(
     session.businessId,
-  ).getDataset();
+  );
 
   // Fleet is a separate paid service. An individual account never sees a
   // preview of the operational Fleet workspace, even if an old truck row

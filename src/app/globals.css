@@ -411,31 +411,3 @@
     margin: 14mm 12mm;
   }
 }
-
-/*
- * Google Identity Services renders its button as a fixed-width iframe and
- * sizes it from a number we pass in, plus its own chrome. On a narrow screen
- * that came out wider than the card and pushed the whole sign-in page
- * sideways -- first visible inside the iOS app's sign-in sheet, which is
- * narrower than a browser tab, where the form ran off the right edge.
- *
- * Nothing Google renders may exceed its slot, whatever width it decides on.
- */
-.gis-button-host {
-  display: flex;
-  min-height: 2.25rem;
-  width: 100%;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  border-radius: calc(var(--radius) - 2px);
-}
-
-.gis-button-host > div {
-  width: 100% !important;
-  max-width: 100% !important;
-}
-
-.gis-button-host iframe {
-  max-width: 100% !important;
-}

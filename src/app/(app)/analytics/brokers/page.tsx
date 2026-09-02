@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth";
 import { linkedFuelByLoad, loadsInPeriod, thresholdsFromSettings, withMetricsAll } from "@/lib/calculations";
-import { getRepository } from "@/lib/db";
+import { getDataset } from "@/lib/db";
 import {
   bestBroker,
   BROKER_SORTS,
@@ -74,9 +74,9 @@ export default async function BrokersPage({
     getAppLocale(),
   ]);
   const copy = getWebDictionary(locale).analytics;
-  const { trucks, loads: allLoads, fuelEntries, settings, subscription } = await getRepository(
+  const { trucks, loads: allLoads, fuelEntries, settings, subscription } = await getDataset(
     session.businessId,
-  ).getDataset();
+  );
   const period = periodFromSearchParams(params);
 
   if (!planAllows(subscription, "cockpit")) {

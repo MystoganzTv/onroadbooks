@@ -2,7 +2,14 @@ import "server-only";
 
 import { getAuthStore, getRepository } from "@/lib/db";
 import type { Repository } from "@/lib/db/repository";
-import { canWrite, hasFleetAccess, trialState } from "@/lib/plans";
+import {
+  canWrite,
+  capabilityRefusal,
+  hasFleetAccess,
+  planAllows,
+  trialState,
+  type PlanCapability,
+} from "@/lib/plans";
 import { permissionRefusal, roleCan, type Permission } from "@/lib/roles";
 import { todayISO } from "@/lib/periods";
 import { decodeSession, type SessionPayload } from "./session";
@@ -63,6 +70,7 @@ export type MobileWriteGate =
 export async function requireMobileWrite(
   request: Request,
   permission: Permission,
+  capability?: PlanCapability,
 ): Promise<MobileWriteGate> {
   const session = await getMobileSession(request);
   if (!session) return { ok: false, status: 401, error: "Unauthorized" };
@@ -84,6 +92,13 @@ export async function requireMobileWrite(
   const role = session.role ?? "VIEWER";
   if (!roleCan(role, permission)) {
     return { ok: false, status: 403, error: permissionRefusal(role, permission) };
+  }
+
+  // The plan half of `repositoryWith(capability, permission)` on the web. A
+  // role check is NOT a plan check: on a single-user account the sole user is
+  // the owner, so role alone would hand a Solo plan the cockpit.
+  if (capability && !planAllows(subscription, capability)) {
+    return { ok: false, status: 403, error: capabilityRefusal(capability) };
   }
 
   return { ok: true, session, repository };

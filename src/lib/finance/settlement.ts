@@ -20,6 +20,7 @@
 import { div, summarizePeriod } from "../calculations";
 import { daysInMonth, monthLabel, parseMonth, type DateRange } from "../periods";
 import type {
+  Dataset,
   Expense,
   FinancialSettings,
   Load,
@@ -236,4 +237,67 @@ export function settlementDelta(current: SettlementView, previous?: SettlementVi
     current.figures.safeToPay - previous.figures.safeToPay,
     Math.abs(previous.figures.safeToPay),
   ) * 100;
+}
+
+/**
+ * WHAT CLOSING A SETTLEMENT MEANS — computed in one place.
+ *
+ * Both the web action and the phone's route go through here, because this is
+ * the single most consequential write in the product: it freezes a snapshot
+ * and posts real reserve contributions against it. Two implementations of
+ * that would drift, and the drift would be silent and financial.
+ *
+ * The snapshot is always built from the rows AS THEY STAND NOW, on the
+ * server. Nothing a client sends is ever trusted as the figures.
+ */
+export interface SettlementCloseRefusal {
+  ok: false;
+  error: string;
+}
+
+export interface SettlementClosePlan {
+  ok: true;
+  snapshot: SettlementSnapshot;
+  contributions: { accountId: string; amount: number; description: string }[];
+}
+
+export function planSettlementClose(
+  dataset: Pick<
+    Dataset,
+    "loads" | "expenses" | "settings" | "reserveAccounts" | "paymentEvents"
+  >,
+  month: string,
+  half: SettlementHalf,
+  today: string,
+): SettlementClosePlan | SettlementCloseRefusal {
+  const range = settlementBounds(month, half);
+  if (today <= range.end) {
+    return {
+      ok: false,
+      error: "This settlement period has not finished yet. It can be closed once it ends.",
+    };
+  }
+
+  const snapshot = buildSettlementSnapshot(
+    dataset.loads,
+    dataset.expenses,
+    range,
+    dataset.settings,
+    dataset.reserveAccounts,
+    dataset.paymentEvents,
+  );
+
+  return {
+    ok: true,
+    snapshot,
+    contributions: snapshot.reserves
+      .filter((reserve) => reserve.amount > 0)
+      .map((reserve) => ({
+        accountId: reserve.accountId,
+        amount: reserve.amount,
+        description: `${reserve.pct}% ${
+          reserve.basis === "OPERATING_PROFIT" ? "of Operating Profit" : "of Booked Revenue"
+        } - ${settlementLabel(month, half)}`,
+      })),
+  };
 }

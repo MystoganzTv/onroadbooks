@@ -14,7 +14,7 @@ import { PlanGate } from "@/components/shared/plan-gate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireSession } from "@/lib/auth";
 import { summarizePeriod } from "@/lib/calculations";
-import { getRepository } from "@/lib/db";
+import { getDataset } from "@/lib/db";
 import { orderedTrucks } from "@/lib/fleet";
 import {
   calculateReserveBalances,
@@ -75,7 +75,7 @@ export default async function ReservesPage({
     subscription,
     paymentEvents,
     trucks,
-  } = await getRepository(session.businessId).getDataset();
+  } = await getDataset(session.businessId);
 
   if (!planAllows(subscription, "cockpit")) {
     return (

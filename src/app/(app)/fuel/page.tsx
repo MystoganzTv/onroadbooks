@@ -22,7 +22,7 @@ import {
   withMetricsAll,
 } from "@/lib/calculations";
 import { requireSession } from "@/lib/auth";
-import { getRepository } from "@/lib/db";
+import { getDataset } from "@/lib/db";
 import {
   formatGallons,
   formatMoneyCompact,
@@ -60,7 +60,7 @@ export default async function FuelPage({
     fuelEntries: allFuel,
     settings,
     paymentEvents,
-  } = await getRepository(session.businessId).getDataset();
+  } = await getDataset(session.businessId);
   const period = periodFromSearchParams(params);
   const ratingThresholds = thresholdsFromSettings(settings);
 

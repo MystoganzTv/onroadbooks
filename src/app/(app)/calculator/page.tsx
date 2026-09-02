@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { PlanGate } from "@/components/shared/plan-gate";
 import { requireSession } from "@/lib/auth";
 import { div, summarizeFuel, thresholdsFromSettings } from "@/lib/calculations";
-import { getRepository } from "@/lib/db";
+import { getDataset } from "@/lib/db";
 import { overheadCostPerMile, trailingCostBasis } from "@/lib/finance/cost-per-mile";
 import { todayISO } from "@/lib/periods";
 import { planAllows } from "@/lib/plans";
@@ -33,7 +33,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function CalculatorPage() {
   const [session, locale] = await Promise.all([requireSession(), getAppLocale()]);
   const copy = getWebDictionary(locale).calculator;
-  const dataset = await getRepository(session.businessId).getDataset();
+  const dataset = await getDataset(session.businessId);
   const { trucks, loads, expenses, fuelEntries, settings, goals } = dataset;
 
   if (!planAllows(dataset.subscription, "cockpit")) {

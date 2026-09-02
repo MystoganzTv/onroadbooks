@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireSession } from "@/lib/auth";
 import { summarizePeriod } from "@/lib/calculations";
 import { categoryColor, categoryLabel } from "@/lib/categories";
-import { getRepository } from "@/lib/db";
+import { getDataset } from "@/lib/db";
 import { calculateTrueCostPerMile, trailingCostBasis } from "@/lib/finance/cost-per-mile";
 import {
   formatMoney,
@@ -62,7 +62,7 @@ export default async function CostPerMilePage({
     expenses: allExpenses,
     settings,
     paymentEvents,
-  } = await getRepository(session.businessId).getDataset();
+  } = await getDataset(session.businessId);
   const period = periodFromSearchParams(params);
 
   // Scoped to a unit, this is that truck's own cost per mile: its loads and
