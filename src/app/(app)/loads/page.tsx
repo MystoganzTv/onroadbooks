@@ -88,49 +88,66 @@ export default async function LoadsPage({
 
       <section
         aria-label="Load summary"
-        className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-9"
+        className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5"
       >
-        <MiniStat label="Loads" value={formatNumber(summary.loadCount)} sub="in period" />
+        <MiniStat
+          label="Loads"
+          value={formatNumber(summary.loadCount)}
+          sub="in period"
+          wrapText
+        />
         <MiniStat
           label="Booked Revenue"
           value={formatMoneyCompact(summary.bookedRevenue)}
           tone="info"
+          wrapText
         />
-        <MiniStat label="Total Miles" value={formatNumber(summary.totalMiles)} sub="mi" />
+        <MiniStat
+          label="Total Miles"
+          value={formatNumber(summary.totalMiles)}
+          sub="mi"
+          wrapText
+        />
         <MiniStat
           label="Deadhead %"
           value={formatPercent(summary.deadheadPct)}
           tone={isDeadheadElevated(summary.deadheadPct, settings.deadheadWarnPct) ? "warning" : "positive"}
+          wrapText
         />
         <MiniStat
           label="Direct Trip Costs"
           value={formatMoneyCompact(tripExpenses)}
           tone="negative"
           sub="trip costs + paid driver"
+          wrapText
         />
         <MiniStat
           label="Revenue / Mile"
           value={formatRate(summary.revenuePerMile)}
           tone="info"
           sub={`Contribution Profit ${formatMoneyCompact(tripProfit)}`}
+          wrapText
         />
         <MiniStat
           label="Allocated Operating Costs"
           value={formatMoneyCompact(allocatedOperatingCosts)}
           tone="negative"
           sub={`${costBasis.basisLabel} estimate`}
+          wrapText
         />
         <MiniStat
           label="Est. Fully Loaded Operating Profit"
           value={formatMoneyCompact(fullyLoadedOperatingProfit)}
           tone={fullyLoadedOperatingProfit >= 0 ? "positive" : "negative"}
           sub="does not change rating"
+          wrapText
         />
         <MiniStat
           label="Debt Cash Burden"
           value={formatMoneyCompact(debtCashBurden)}
           tone="warning"
           sub="separate from profitability"
+          wrapText
         />
       </section>
 

@@ -6,6 +6,8 @@ interface MiniStatProps {
   tone?: "neutral" | "positive" | "negative" | "warning" | "info";
   sub?: string;
   className?: string;
+  /** Let dense summary grids show their full labels instead of clipping them. */
+  wrapText?: boolean;
 }
 
 const TONE: Record<string, string> = {
@@ -17,14 +19,37 @@ const TONE: Record<string, string> = {
 };
 
 /** Second-row operational metric -- denser than a KPI card. */
-export function MiniStat({ label, value, tone = "neutral", sub, className }: MiniStatProps) {
+export function MiniStat({
+  label,
+  value,
+  tone = "neutral",
+  sub,
+  className,
+  wrapText = false,
+}: MiniStatProps) {
+  const fullText = sub ? `${label} — ${sub}` : label;
+
   return (
-    <div className={cn("rounded-lg border border-border bg-card px-3.5 py-3", className)}>
-      <p className="label-xs truncate">{label}</p>
+    <div
+      className={cn("rounded-lg border border-border bg-card px-3.5 py-3", className)}
+      title={fullText}
+    >
+      <p className={cn("label-xs", wrapText ? "min-h-8 whitespace-normal leading-4" : "truncate")}>
+        {label}
+      </p>
       <p className={cn("mt-1 text-xl font-semibold tnum tracking-tight", TONE[tone])}>
         {value}
       </p>
-      {sub ? <p className="mt-0.5 truncate text-2xs text-muted-foreground tnum">{sub}</p> : null}
+      {sub ? (
+        <p
+          className={cn(
+            "mt-0.5 text-2xs text-muted-foreground tnum",
+            wrapText ? "min-h-8 whitespace-normal leading-4" : "truncate",
+          )}
+        >
+          {sub}
+        </p>
+      ) : null}
     </div>
   );
 }
