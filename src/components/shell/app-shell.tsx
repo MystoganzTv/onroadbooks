@@ -83,7 +83,7 @@ export function AppShell({
         <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:hidden">
           <Button
             variant="ghost"
-            size="icon-sm"
+            size="icon-touch"
             onClick={() => setMobileOpen(true)}
             aria-label={copy.openNavigation}
           >

@@ -24,6 +24,9 @@ const buttonVariants = cva(
         lg: "h-10 px-4",
         icon: "h-9 w-9",
         "icon-sm": "h-8 w-8",
+        // 44px: the size a thumb in a glove actually hits. Use it for anything
+        // a driver taps on the road rather than at a desk.
+        "icon-touch": "h-11 w-11",
       },
     },
     defaultVariants: { variant: "default", size: "default" },

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import ExcelJS from "exceljs";
 
-import { calculateIftaReport, iftaRateKey, IFTA_JURISDICTIONS } from "../ifta";
+import { calculateIftaReport, iftaPendingScopeTruckIds, iftaRateKey, IFTA_JURISDICTIONS } from "../ifta";
 import {
   fleetIftaApplicability,
   iftaApplicability,
@@ -82,6 +82,49 @@ describe("IFTA reporting", () => {
     assert.equal(report.complete, true);
     assert.equal(iftaReportingLabel(null), "Decision needed");
     assert.equal(iftaReportingLabel(false), "Excluded");
+  });
+
+  it("counts an archived truck that ran this quarter as a pending decision", () => {
+    // A unit sold mid-quarter still drove the miles it drove. Counting
+    // pendings over ACTIVE trucks only dropped 12,000 of 13,000 miles and a
+    // whole jurisdiction out of the draft while it still said "Ready to file".
+    const dataset = buildSeedDataset();
+    const running = { ...dataset.trucks[0], id: "truck-running", iftaReportingEnabled: true };
+    const sold = {
+      ...dataset.trucks[0],
+      id: "truck-sold",
+      name: "Sold mid-quarter",
+      active: false,
+      iftaReportingEnabled: null,
+    };
+    dataset.trucks = [running, sold];
+    const load = {
+      ...dataset.loads[0],
+      truckId: running.id,
+      date: "2026-07-10",
+      loadedMiles: 1_000,
+      deadheadMiles: 0,
+      jurisdictionMiles: [{ jurisdiction: "TX", totalMiles: 1_000, nonTaxableMiles: 0 }],
+    };
+    dataset.loads = [
+      load,
+      {
+        ...load,
+        id: "sold-load",
+        truckId: sold.id,
+        loadedMiles: 12_000,
+        jurisdictionMiles: [{ jurisdiction: "NM", totalMiles: 12_000, nonTaxableMiles: 0 }],
+      },
+    ];
+    dataset.fuelEntries = [];
+
+    const pending = iftaPendingScopeTruckIds(dataset, "2026-Q3");
+    assert.deepEqual(pending, [sold.id], "an archived truck with miles is still undecided");
+
+    // And a truck that did not run in the window is nobody's decision to make.
+    dataset.loads = [load];
+    assert.deepEqual(iftaPendingScopeTruckIds(dataset, "2026-Q3"), []);
+    assert.deepEqual(iftaPendingScopeTruckIds(dataset, "2026-Q1"), []);
   });
 });
 

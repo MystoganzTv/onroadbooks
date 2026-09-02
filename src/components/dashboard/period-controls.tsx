@@ -118,7 +118,7 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
         <Button
           variant="ghost"
           size="icon-sm"
-          className="h-7 w-7 rounded-r-none"
+          className="h-9 w-9 rounded-r-none"
           onClick={() => push({ month: shiftMonth(period.month, -1), period: "full" })}
           aria-label={copy.previousMonth}
           title={copy.previousMonth}
@@ -130,7 +130,7 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
           onValueChange={(value) => push({ month: value, period: "full" })}
         >
           <SelectTrigger
-            className="h-7 w-[8.75rem] rounded-none border-x border-y-0 border-border/70 bg-transparent text-xs shadow-none focus:ring-0 focus:ring-offset-0"
+            className="h-9 w-[8.75rem] rounded-none border-x border-y-0 border-border/70 bg-transparent text-xs shadow-none focus:ring-0 focus:ring-offset-0"
             aria-label={copy.selectMonth}
           >
             <SelectValue />
@@ -146,7 +146,7 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
         <Button
           variant="ghost"
           size="icon-sm"
-          className="h-7 w-7 rounded-l-none"
+          className="h-9 w-9 rounded-l-none"
           onClick={() => push({ month: shiftMonth(period.month, 1), period: "full" })}
           aria-label={copy.nextMonth}
           title={copy.nextMonth}
@@ -169,7 +169,7 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
               aria-pressed={period.key === option.key}
               title={fullLabels[option.key]}
               className={cn(
-                "h-7 rounded-md px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "h-9 rounded-md px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 period.key === option.key
                   ? "bg-accent text-accent-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground",
@@ -187,7 +187,7 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
             variant="ghost"
             size="sm"
             className={cn(
-              "h-7 shrink-0 px-2.5",
+              "h-9 shrink-0 px-2.5",
               period.key === "custom" && "bg-accent text-accent-foreground shadow-sm",
             )}
             aria-pressed={period.key === "custom"}

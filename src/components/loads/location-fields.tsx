@@ -283,7 +283,7 @@ export function LocationFields({
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-6 px-2 text-2xs"
+                    className="h-9 px-2.5 text-2xs"
                     onClick={() => choose(location)}
                   >
                     {interpolate(copy.useState, { state: location.state })}
@@ -294,7 +294,7 @@ export function LocationFields({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-6 px-2 text-2xs"
+                    className="h-9 px-2.5 text-2xs"
                     onClick={() => onManualConfirmedChange(true)}
                   >
                     {copy.keepEntered}

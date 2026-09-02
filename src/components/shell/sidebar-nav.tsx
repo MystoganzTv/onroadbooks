@@ -215,7 +215,7 @@ export function SidebarNav({
               await fetch("/api/auth/logout", { method: "POST" });
               window.location.href = "/login";
             }}
-            className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-2xs text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="inline-flex min-h-11 items-center gap-1 rounded px-2.5 py-1 text-2xs text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <LogOut className="size-3" />
             {copy.signOut}
