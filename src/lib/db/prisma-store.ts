@@ -41,6 +41,7 @@ import type {
 } from "../types";
 import { defaultCategoryBehavior } from "../categories";
 import { financialTreatmentForCategory } from "../finance/terminology";
+import { requireExactDebtPaymentSplit } from "../finance/debt-payment";
 import { defaultGoals, defaultReserveAccounts, defaultSubscription } from "../defaults";
 import { DEFAULT_PLAN, getPlan, isComplimentaryAccess, trialEndsOn } from "../plans";
 import {
@@ -1817,11 +1818,11 @@ export class PrismaRepository implements Repository {
       if (obligation && obligation.kind !== "LOAN") {
         throw new Error("Choose a loan obligation before recording principal and interest.");
       }
-      const principal = roundMoney(input.principalAmount ?? 0);
-      const interest = roundMoney(input.interestAmount ?? 0);
-      if (principal < 0 || interest < 0 || roundMoney(principal + interest) !== num(expense.amount)) {
-        throw new Error("Principal plus interest must equal the original payment exactly.");
-      }
+      const { principal, interest } = requireExactDebtPaymentSplit(
+        num(expense.amount),
+        input.principalAmount ?? 0,
+        input.interestAmount ?? 0,
+      );
       const splitGroupId = newId("split");
       if (principal <= 0) {
         await tx.expense.update({

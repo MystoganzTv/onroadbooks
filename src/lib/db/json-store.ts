@@ -30,6 +30,7 @@ import {
   driverSettlementTotals,
 } from "../driver-pay";
 import { financialTreatmentForCategory } from "../finance/terminology";
+import { requireExactDebtPaymentSplit } from "../finance/debt-payment";
 import type {
   Business,
   Dataset,
@@ -1408,11 +1409,11 @@ export class JsonRepository implements Repository {
       if (obligation && obligation.kind !== "LOAN") {
         throw new Error("Choose a loan obligation before recording principal and interest.");
       }
-      const principal = roundMoney(input.principalAmount ?? 0);
-      const interest = roundMoney(input.interestAmount ?? 0);
-      if (principal < 0 || interest < 0 || roundMoney(principal + interest) !== expense.amount) {
-        throw new Error("Principal plus interest must equal the original payment exactly.");
-      }
+      const { principal, interest } = requireExactDebtPaymentSplit(
+        expense.amount,
+        input.principalAmount ?? 0,
+        input.interestAmount ?? 0,
+      );
       const splitGroupId = newId("split");
       if (principal <= 0) {
         expense.category = "INTEREST_EXPENSE";

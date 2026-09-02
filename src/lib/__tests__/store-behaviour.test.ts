@@ -1220,6 +1220,43 @@ describe("financial review and customer cash events", () => {
     assert.ok(rows.every((row) => row.obligationId && row.splitGroupId));
   });
 
+  it("rejects loan splits that are over or under the original payment", async () => {
+    const dataset = await repo.getDataset();
+    const over = await repo.createExpense(expense({
+      truckId: dataset.trucks[0].id,
+      category: "TRUCK_PAYMENT",
+      description: "Over split",
+      amount: 1_137.85,
+    }));
+    await assert.rejects(
+      repo.classifyDebtPayment(over.id, {
+        treatment: "LOAN_SPLIT",
+        principalAmount: 800,
+        interestAmount: 400,
+      }),
+      /\$62\.15 over the \$1137\.85 payment/,
+    );
+
+    const under = await repo.createExpense(expense({
+      truckId: dataset.trucks[0].id,
+      category: "TRUCK_PAYMENT",
+      description: "Under split",
+      amount: 1_137.85,
+    }));
+    await assert.rejects(
+      repo.classifyDebtPayment(under.id, {
+        treatment: "LOAN_SPLIT",
+        principalAmount: 800,
+        interestAmount: 200,
+      }),
+      /\$137\.85 short of the \$1137\.85 payment/,
+    );
+
+    const after = await repo.getDataset();
+    assert.equal(after.expenses.find((row) => row.id === over.id)?.category, "TRUCK_PAYMENT");
+    assert.equal(after.expenses.find((row) => row.id === under.id)?.category, "TRUCK_PAYMENT");
+  });
+
   it("treats an explicitly reviewed operating lease as operating cost", async () => {
     const dataset = await repo.getDataset();
     const original = await repo.createExpense(expense({

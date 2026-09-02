@@ -27,8 +27,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { classifyDebtPaymentAction } from "@/lib/actions/expenses";
+import { reconcileDebtPaymentSplit } from "@/lib/finance/debt-payment";
 import { formatDateShort, formatMoney } from "@/lib/formatters";
 import type { Expense, FinancialObligation, Truck } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 type Treatment = "LOAN_SPLIT" | "OPERATING_LEASE" | "DEBT_UNALLOCATED";
 
@@ -90,6 +92,21 @@ function DebtClassificationDialog({
   const [monthlyPayment, setMonthlyPayment] = React.useState(String(expense.amount));
   const [principal, setPrincipal] = React.useState(String(expense.amount));
   const [interest, setInterest] = React.useState("0");
+  const principalValue = Number(principal);
+  const interestValue = Number(interest);
+  const splitInputsValid = principal.trim() !== ""
+    && interest.trim() !== ""
+    && Number.isFinite(principalValue)
+    && Number.isFinite(interestValue)
+    && principalValue >= 0
+    && interestValue >= 0;
+  const reconciliation = reconcileDebtPaymentSplit(
+    expense.amount,
+    principalValue,
+    interestValue,
+  );
+  const splitBalanced = treatment !== "LOAN_SPLIT"
+    || (splitInputsValid && reconciliation.state === "BALANCED");
 
   const matching = obligations.filter((obligation) =>
     treatment === "LOAN_SPLIT"
@@ -101,6 +118,12 @@ function DebtClassificationDialog({
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (!splitBalanced) {
+      toast.error("Principal + interest must equal the payment exactly.", {
+        description: splitMessage(reconciliation, expense.amount),
+      });
+      return;
+    }
     const creating = obligationId === "new" && name.trim().length > 0;
     startTransition(async () => {
       const result = await classifyDebtPaymentAction(expense.id, {
@@ -180,22 +203,92 @@ function DebtClassificationDialog({
             ) : null}
 
             {treatment === "LOAN_SPLIT" ? (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Principal" htmlFor={`principal-${expense.id}`} required>
-                  <Input id={`principal-${expense.id}`} inputMode="decimal" value={principal} onChange={(event) => setPrincipal(event.target.value)} />
-                </Field>
-                <Field label="Interest" htmlFor={`interest-${expense.id}`} required hint={`Must total ${formatMoney(expense.amount)} with principal`}>
-                  <Input id={`interest-${expense.id}`} inputMode="decimal" value={interest} onChange={(event) => setInterest(event.target.value)} />
-                </Field>
+              <div className="space-y-3">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Principal" htmlFor={`principal-${expense.id}`} required>
+                    <Input
+                      id={`principal-${expense.id}`}
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      max={expense.amount}
+                      step="0.01"
+                      value={principal}
+                      aria-invalid={!splitInputsValid || reconciliation.state === "OVER"}
+                      onChange={(event) => setPrincipal(event.target.value)}
+                    />
+                  </Field>
+                  <Field label="Interest" htmlFor={`interest-${expense.id}`} required>
+                    <Input
+                      id={`interest-${expense.id}`}
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      max={expense.amount}
+                      step="0.01"
+                      value={interest}
+                      aria-invalid={!splitInputsValid || reconciliation.state === "OVER"}
+                      onChange={(event) => setInterest(event.target.value)}
+                    />
+                  </Field>
+                </div>
+                <div
+                  className={cn(
+                    "rounded-lg border px-3 py-3",
+                    reconciliation.state === "BALANCED"
+                      ? "border-pos/35 bg-pos-soft/45"
+                      : reconciliation.state === "OVER"
+                        ? "border-neg/35 bg-neg-soft/35"
+                        : "border-warn/35 bg-warn-soft/35",
+                  )}
+                  aria-live="polite"
+                >
+                  <div className="flex items-center justify-between gap-3 text-xs">
+                    <span className="text-muted-foreground">Payment to classify</span>
+                    <span className="font-semibold tnum">{formatMoney(expense.amount)}</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between gap-3 text-xs">
+                    <span className="text-muted-foreground">Principal + interest</span>
+                    <span className="font-semibold tnum">{splitInputsValid ? formatMoney(reconciliation.entered) : "—"}</span>
+                  </div>
+                  <p
+                    className={cn(
+                      "mt-2 border-t pt-2 text-xs font-medium",
+                      reconciliation.state === "BALANCED"
+                        ? "border-pos/20 text-pos"
+                        : reconciliation.state === "OVER"
+                          ? "border-neg/20 text-neg"
+                          : "border-warn/20 text-warn",
+                    )}
+                  >
+                    {splitInputsValid
+                      ? splitMessage(reconciliation, expense.amount)
+                      : "Enter valid non-negative amounts before continuing."}
+                  </p>
+                </div>
               </div>
             ) : null}
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={pending}>{pending ? <Loader2 className="animate-spin" /> : null} Confirm classification</Button>
+            <Button type="submit" disabled={pending || !splitBalanced}>{pending ? <Loader2 className="animate-spin" /> : null} Confirm classification</Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
   );
+}
+
+function splitMessage(
+  reconciliation: ReturnType<typeof reconcileDebtPaymentSplit>,
+  paymentAmount: number,
+): string {
+  if (reconciliation.state === "BALANCED") return "Balanced exactly. Ready to classify.";
+  if (reconciliation.state === "UNDER") {
+    return `${formatMoney(reconciliation.difference)} still needs to be assigned.`;
+  }
+  if (reconciliation.state === "OVER") {
+    return `${formatMoney(Math.abs(reconciliation.difference))} over the ${formatMoney(paymentAmount)} payment. Reduce principal or interest.`;
+  }
+  return "Enter valid non-negative amounts before continuing.";
 }
