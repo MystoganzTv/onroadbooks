@@ -574,6 +574,96 @@ struct DashboardSnapshot {
 }
 
 
+// MARK: - Fleet (Fleet plan only)
+
+/// A driver is an OPERATIONAL record and only that. Adding one never creates
+/// an app sign-in — that is Access & Roles, a different thing entirely — and
+/// this model has no field that could become one.
+struct DriverRecord: Identifiable, Hashable {
+    let id: String
+    let name: String
+    let active: Bool
+    /// PERCENT_GROSS | PER_LOADED_MILE | PER_TOTAL_MILE | FLAT_PER_LOAD
+    let payType: String
+    let payRate: Double
+    let reference: String?
+    let defaultTruckId: String?
+
+    var payDescription: String {
+        switch payType {
+        case "PERCENT_GROSS":
+            return "\(payRate.formatted(.number.precision(.fractionLength(0...1))))% del bruto"
+        case "PER_LOADED_MILE":
+            return "\(payRate.formatted(.currency(code: "USD").precision(.fractionLength(3)))) / milla cargada"
+        case "PER_TOTAL_MILE":
+            return "\(payRate.formatted(.currency(code: "USD").precision(.fractionLength(3)))) / milla total"
+        default:
+            return "\(payRate.formatted(.currency(code: "USD").precision(.fractionLength(2)))) por carga"
+        }
+    }
+}
+
+struct NewDriver {
+    var name: String
+    var payType: String
+    var payRate: Double
+    var reference: String?
+    var defaultTruckId: String?
+    var active: Bool = true
+}
+
+/// One truck's own economics. A unit is charged ONLY what it caused; business
+/// overhead is reported apart, and its per-mile figure is an allocation.
+struct FleetUnit: Identifiable, Hashable {
+    var id: String { truckId }
+    let truckId: String
+    let truckName: String
+    let active: Bool
+    let loadCount: Int
+    let revenue: Double
+    let directCosts: Double
+    let contribution: Double
+    let totalMiles: Double
+    let deadheadPct: Double
+    let revenuePerMile: Double
+    let contributionPerMile: Double
+    let actualCostPerMile: Double
+}
+
+struct FleetOverview {
+    let periodLabel: String
+    let revenue: Double
+    let directCosts: Double
+    let contribution: Double
+    /// Real spend that belongs to no single unit.
+    let overhead: Double
+    let operatingProfit: Double
+    let totalMiles: Double
+    /// An ALLOCATION, not a cost any one truck incurred.
+    let overheadPerMile: Double
+    let units: [FleetUnit]
+}
+
+/// A frozen driver pay statement. Read-only on the phone: a PAID one is a
+/// permanent accounting record.
+struct DriverStatement: Identifiable, Hashable {
+    let id: String
+    let driverName: String
+    let periodStart: String
+    let periodEnd: String
+    /// DRAFT | APPROVED | PAID
+    let status: String
+    let paidOn: String?
+    let loads: Int
+    let grossRevenue: Double
+    let totalMiles: Double
+    let basePay: Double
+    let additions: Double
+    let deductions: Double
+    let advances: Double
+    let netPay: Double
+}
+
 // MARK: - Access & Roles
 
 /// Mirrors `MemberRole` in `lib/types.ts`. VIEWER stays here only so a legacy

@@ -381,6 +381,29 @@ final class APIRepository: LedgerRepository {
         )
     }
 
+    func fetchDrivers() async throws -> [DriverRecord] {
+        try await get("api/mobile/drivers", as: DriversResponseDTO.self).drivers.map { $0.toDomain() }
+    }
+
+    @discardableResult
+    func createDriver(_ driver: NewDriver) async throws -> String {
+        try await directWrite("api/mobile/drivers", method: "POST", body: NewDriverDTO(driver))
+    }
+
+    @discardableResult
+    func setDriverActive(id: String, active: Bool) async throws -> String {
+        try await directWrite("api/mobile/drivers/\(id)", method: "PATCH", body: DriverActiveDTO(active: active))
+    }
+
+    func fetchFleet() async throws -> FleetOverview {
+        try await get("api/mobile/fleet", as: FleetResponseDTO.self).toDomain()
+    }
+
+    func fetchDriverStatements() async throws -> [DriverStatement] {
+        try await get("api/mobile/driver-settlements", as: DriverStatementsResponseDTO.self)
+            .statements.map { $0.toDomain() }
+    }
+
     func fetchSettlements() async throws -> [SettlementPeriod] {
         try await get("api/mobile/settlements", as: SettlementsResponseDTO.self).settlements.map { $0.toDomain() }
     }
@@ -1243,5 +1266,133 @@ private struct LoadEditDTO: Encodable {
         fuelCost = change.fuelCost
         tolls = change.tolls
         otherExpenses = change.otherExpenses
+    }
+}
+
+// MARK: - Fleet wire types
+
+private struct DriversResponseDTO: Decodable {
+    let drivers: [DriverDTO]
+}
+
+private struct DriverDTO: Decodable {
+    let id: String
+    let name: String
+    let active: Bool
+    let payType: String
+    let payRate: Double
+    let reference: String?
+    let defaultTruckId: String?
+
+    func toDomain() -> DriverRecord {
+        DriverRecord(
+            id: id, name: name, active: active, payType: payType,
+            payRate: payRate, reference: reference, defaultTruckId: defaultTruckId
+        )
+    }
+}
+
+/// Exactly what `driverSchema` wants. No email, no phone, nothing that could
+/// be mistaken for a sign-in.
+private struct NewDriverDTO: Encodable {
+    let name: String
+    let payType: String
+    let payRate: Double
+    let reference: String?
+    let defaultTruckId: String?
+    let active: Bool
+
+    init(_ driver: NewDriver) {
+        name = driver.name
+        payType = driver.payType
+        payRate = driver.payRate
+        reference = driver.reference
+        defaultTruckId = driver.defaultTruckId
+        active = driver.active
+    }
+}
+
+/// A retire/restore is its own small write, not a full driver replace.
+private struct DriverActiveDTO: Encodable {
+    let active: Bool
+}
+
+private struct FleetResponseDTO: Decodable {
+    struct Unit: Decodable {
+        let truckId: String
+        let truckName: String
+        let active: Bool
+        let loadCount: Int
+        let revenue: Double
+        let directCosts: Double
+        let contribution: Double
+        let totalMiles: Double
+        let deadheadPct: Double
+        let revenuePerMile: Double
+        let contributionPerMile: Double
+        let actualCostPerMile: Double
+    }
+
+    let periodLabel: String
+    let revenue: Double
+    let directCosts: Double
+    let contribution: Double
+    let overhead: Double
+    let operatingProfit: Double
+    let totalMiles: Double
+    let overheadPerMile: Double
+    let units: [Unit]
+
+    func toDomain() -> FleetOverview {
+        FleetOverview(
+            periodLabel: periodLabel,
+            revenue: revenue,
+            directCosts: directCosts,
+            contribution: contribution,
+            overhead: overhead,
+            operatingProfit: operatingProfit,
+            totalMiles: totalMiles,
+            overheadPerMile: overheadPerMile,
+            units: units.map {
+                FleetUnit(
+                    truckId: $0.truckId, truckName: $0.truckName, active: $0.active,
+                    loadCount: $0.loadCount, revenue: $0.revenue, directCosts: $0.directCosts,
+                    contribution: $0.contribution, totalMiles: $0.totalMiles,
+                    deadheadPct: $0.deadheadPct, revenuePerMile: $0.revenuePerMile,
+                    contributionPerMile: $0.contributionPerMile,
+                    actualCostPerMile: $0.actualCostPerMile
+                )
+            }
+        )
+    }
+}
+
+private struct DriverStatementsResponseDTO: Decodable {
+    let statements: [DriverStatementDTO]
+}
+
+private struct DriverStatementDTO: Decodable {
+    let id: String
+    let driverName: String
+    let periodStart: String
+    let periodEnd: String
+    let status: String
+    let paidOn: String?
+    let loads: Int
+    let grossRevenue: Double
+    let totalMiles: Double
+    let basePay: Double
+    let additions: Double
+    let deductions: Double
+    let advances: Double
+    let netPay: Double
+
+    func toDomain() -> DriverStatement {
+        DriverStatement(
+            id: id, driverName: driverName, periodStart: periodStart, periodEnd: periodEnd,
+            status: status, paidOn: paidOn, loads: loads, grossRevenue: grossRevenue,
+            totalMiles: totalMiles, basePay: basePay, additions: additions,
+            deductions: deductions, advances: advances, netPay: netPay
+        )
     }
 }

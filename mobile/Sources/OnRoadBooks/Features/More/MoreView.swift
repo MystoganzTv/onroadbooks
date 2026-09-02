@@ -1,9 +1,12 @@
 import SwiftUI
 
 /// Everything from the web app's `NAV_GROUPS` (`src/components/shell/nav-items.ts`)
-/// that isn't already a tab. Each row is a real destination, just not a
-/// built-out screen yet — `ComingSoonView` keeps the map of the whole app
-/// honest on mobile instead of hiding sections that exist on web.
+/// that isn't already a tab.
+///
+/// Every row here is now a real screen except Plans & Billing. The three
+/// `fleetOnly` ones are built and gated exactly as the web gates them: on a
+/// Solo or Pro business they open and explain, in the server's own sentence,
+/// that Fleet covers them — a lock with a reason rather than a dead end.
 private struct MoreItem: Identifiable {
     let id = UUID()
     let title: String
@@ -62,6 +65,12 @@ struct MoreView: View {
             AnalyticsView(repository: repository)
         case "IFTA":
             IftaView(repository: repository)
+        case "Drivers":
+            DriversView(repository: repository)
+        case "Fleet":
+            FleetView(repository: repository)
+        case "Driver Pay":
+            DriverPayView(repository: repository)
         default:
             ComingSoonView(title: item.title, systemImage: item.icon)
         }

@@ -20,6 +20,7 @@ final class MockRepository: LedgerRepository {
     /// Mutable so demo mode can actually add a load or an expense and see it
     /// appear. Nothing is persisted: it lives as long as the app runs, which is
     /// the honest shape of a demo.
+    private var mockDrivers: [DriverRecord] = []
     private var loads: [Load] = [
             Load(id: "1", date: mockDate(2026, 8, 28), broker: "Werner Logistics",
                  origin: "Chicago, IL", destination: "Columbus, OH",
@@ -365,6 +366,55 @@ final class MockRepository: LedgerRepository {
     @discardableResult
     func setSettlementStatus(month: String, half: String, closed: Bool) async throws -> String {
         "\(month)-\(half)"
+    }
+
+    // MARK: Fleet — the demo account runs one truck, so these stay small.
+
+    func fetchDrivers() async throws -> [DriverRecord] {
+        mockDrivers
+    }
+
+    @discardableResult
+    func createDriver(_ driver: NewDriver) async throws -> String {
+        let id = "driver-\(UUID().uuidString.prefix(8))"
+        mockDrivers.append(
+            DriverRecord(id: id, name: driver.name, active: true, payType: driver.payType,
+                         payRate: driver.payRate, reference: driver.reference,
+                         defaultTruckId: driver.defaultTruckId)
+        )
+        return id
+    }
+
+    @discardableResult
+    func setDriverActive(id: String, active: Bool) async throws -> String {
+        if let index = mockDrivers.firstIndex(where: { $0.id == id }) {
+            let existing = mockDrivers[index]
+            mockDrivers[index] = DriverRecord(
+                id: existing.id, name: existing.name, active: active, payType: existing.payType,
+                payRate: existing.payRate, reference: existing.reference,
+                defaultTruckId: existing.defaultTruckId
+            )
+        }
+        return id
+    }
+
+    func fetchFleet() async throws -> FleetOverview {
+        FleetOverview(
+            periodLabel: "Agosto 2026 · Mes completo",
+            revenue: 9795, directCosts: 3180.40, contribution: 6614.60,
+            overhead: 1678.50, operatingProfit: 4936.10, totalMiles: 5240,
+            overheadPerMile: 0.32,
+            units: [
+                FleetUnit(truckId: "truck-1", truckName: "Truck 1", active: true, loadCount: 9,
+                          revenue: 9795, directCosts: 3180.40, contribution: 6614.60,
+                          totalMiles: 5240, deadheadPct: 0.11, revenuePerMile: 1.87,
+                          contributionPerMile: 1.26, actualCostPerMile: 1.46)
+            ]
+        )
+    }
+
+    func fetchDriverStatements() async throws -> [DriverStatement] {
+        []
     }
 
     @discardableResult

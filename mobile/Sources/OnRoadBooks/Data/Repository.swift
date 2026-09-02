@@ -81,6 +81,15 @@ protocol LedgerRepository {
     @discardableResult func updateTeamMemberRole(userId: String, role: AssignableRole) async throws -> String
     func removeTeamMember(userId: String) async throws
 
+    /// Fleet, on the phone. All three ride the same `hasFleetAccess` gate the
+    /// web does, so on a Solo or Pro business they throw `APIError.refused`
+    /// with the server's own sentence — a lock with a reason, not an error.
+    func fetchDrivers() async throws -> [DriverRecord]
+    @discardableResult func createDriver(_ driver: NewDriver) async throws -> String
+    @discardableResult func setDriverActive(id: String, active: Bool) async throws -> String
+    func fetchFleet() async throws -> FleetOverview
+    func fetchDriverStatements() async throws -> [DriverStatement]
+
     /// The truck-level IFTA filing decision (`Truck.iftaReportingEnabled` on
     /// the web) -- Included / Excluded / no decision yet. Same full-replace
     /// `truckSchema` write the web's Truck form and fleet dialog make; see
