@@ -42,4 +42,20 @@ test("permanent account actions live in their proper settings sections", async (
   await page.getByRole("button", { name: "Borrar datos" }).click();
   await expect(page.getByRole("dialog")).toContainText("¿Borrar todos los datos del negocio?");
   await expect(page.getByRole("button", { name: "Borrar permanentemente" })).toBeDisabled();
+  await page.getByRole("button", { name: "Cancelar" }).click();
+
+  // Switching language from the live app must re-render server-owned page
+  // content too, not only the client sidebar and dialogs.
+  await page.getByRole("button", { name: "Preferencias de la aplicación" }).first().click();
+  await page.getByRole("menuitemradio", { name: /English/ }).click();
+  await expect(page.getByRole("heading", { name: "Business & finances" })).toBeVisible();
+  await page.goto("/loads");
+  await expect(page.getByRole("heading", { name: "Loads" })).toBeVisible();
+  await expect(page.getByText("Booked revenue", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Display settings" }).first().click();
+  await page.getByRole("menuitemradio", { name: /Español/ }).click();
+  await expect(page.getByRole("heading", { name: "Cargas" })).toBeVisible();
+  await expect(page.getByText("Ingresos registrados", { exact: true })).toBeVisible();
+  await expect(page.getByText("Booked revenue", { exact: true })).toHaveCount(0);
 });

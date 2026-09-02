@@ -1,10 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 
+import { setAppLocaleAction } from "@/lib/actions/locale";
 import {
-  APP_LOCALE_COOKIE,
   SHELL_COPY,
   type AppLocale,
 } from "@/lib/i18n";
@@ -26,22 +25,37 @@ export function LanguageProvider({
   initialLocale: AppLocale;
   children: React.ReactNode;
 }) {
-  const router = useRouter();
   const [locale, setLocaleState] = React.useState<AppLocale>(initialLocale);
+  const confirmedLocale = React.useRef<AppLocale>(initialLocale);
+  const [, startLocaleTransition] = React.useTransition();
 
   React.useEffect(() => {
+    confirmedLocale.current = initialLocale;
     setLocaleState(initialLocale);
     document.documentElement.lang = initialLocale;
   }, [initialLocale]);
 
   const setLocale = React.useCallback(
     (next: AppLocale) => {
+      if (next === locale) return;
+      const previous = confirmedLocale.current;
       setLocaleState(next);
       document.documentElement.lang = next;
-      document.cookie = `${APP_LOCALE_COOKIE}=${next}; Path=/; Max-Age=31536000; SameSite=Lax`;
-      router.refresh();
+      startLocaleTransition(async () => {
+        try {
+          const confirmed = await setAppLocaleAction(next);
+          confirmedLocale.current = confirmed;
+          setLocaleState(confirmed);
+          document.documentElement.lang = confirmed;
+        } catch {
+          // Never leave the client shell in a language the server did not
+          // accept. A later attempt can safely retry the preference change.
+          setLocaleState(previous);
+          document.documentElement.lang = previous;
+        }
+      });
     },
-    [router],
+    [locale],
   );
 
   const value = React.useMemo(
