@@ -145,7 +145,13 @@ final class MockRepository: LedgerRepository {
                                  taxPaidGallons: 92.4, netTaxableGallons: 48.0, taxRate: 0.47, taxDue: 22.56),
                 IftaJurisdiction(jurisdiction: "NM", totalMiles: 465, taxableMiles: 465,
                                  taxPaidGallons: 0, netTaxableGallons: 66.6, taxRate: nil, taxDue: nil),
-            ]
+            ],
+            // The demo truck already has its filing decision made -- unassigned
+            // miles and the missing NM rate are the incompleteness worth
+            // demoing here, not a second, unrelated reason.
+            filingScopeComplete: true,
+            includedTruckCount: 1,
+            pendingTruckCount: 0
         )
     }
 

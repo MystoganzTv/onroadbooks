@@ -246,8 +246,10 @@ struct IftaReport {
     let quarter: String
     let start: Date
     let end: Date
-    /// False while miles are unassigned or a jurisdiction has no rate. The
-    /// screen then shows what is missing instead of a number that looks filable.
+    /// False while miles are unassigned, a jurisdiction has no rate, OR a
+    /// truck's filing decision is still pending (see `pendingTruckCount`).
+    /// The screen then shows what is missing instead of a number that looks
+    /// filable.
     let complete: Bool
     let totalFleetMiles: Double
     let assignedMiles: Double
@@ -258,6 +260,14 @@ struct IftaReport {
     let missingRateJurisdictions: [String]
     let netTaxDue: Double?
     let jurisdictions: [IftaJurisdiction]
+
+    /// Same three fields the web's per-truck filing scope added
+    /// (`iftaReportingEnabled` on each truck, ADR-adjacent to ADR-0022): a
+    /// truck only enters the fleet report once its owner explicitly says so,
+    /// separate from unassigned miles or a missing rate.
+    let filingScopeComplete: Bool
+    let includedTruckCount: Int
+    let pendingTruckCount: Int
 }
 
 // MARK: - The truck

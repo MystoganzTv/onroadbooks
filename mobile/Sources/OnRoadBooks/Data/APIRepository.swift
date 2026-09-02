@@ -607,6 +607,11 @@ private struct IftaResponseDTO: Decodable {
     let missingRateJurisdictions: [String]
     let netTaxDue: Double?
     let jurisdictions: [Jurisdiction]
+    // Per-truck IFTA filing scope -- added on the web in the same shape,
+    // same route (`/api/mobile/ifta`), same day. See `IftaReport`.
+    let filingScopeComplete: Bool
+    let includedTruckCount: Int
+    let pendingTruckCount: Int
 
     func toDomain() -> IftaReport {
         IftaReport(
@@ -628,7 +633,10 @@ private struct IftaResponseDTO: Decodable {
                     taxableMiles: $0.taxableMiles, taxPaidGallons: $0.taxPaidGallons,
                     netTaxableGallons: $0.netTaxableGallons, taxRate: $0.taxRate, taxDue: $0.taxDue
                 )
-            }
+            },
+            filingScopeComplete: filingScopeComplete,
+            includedTruckCount: includedTruckCount,
+            pendingTruckCount: pendingTruckCount
         )
     }
 }

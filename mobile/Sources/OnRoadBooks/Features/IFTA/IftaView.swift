@@ -75,6 +75,16 @@ struct IftaView: View {
                         if !report.missingRateJurisdictions.isEmpty {
                             missing("Sin tarifa en: \(report.missingRateJurisdictions.joined(separator: ", "))")
                         }
+                        // A truck's own filing decision (Camión → Declaración
+                        // trimestral de IFTA) is a THIRD, separate reason the
+                        // total can be withheld -- unrelated to mileage or
+                        // rates, and one this screen cannot resolve itself:
+                        // there is no /api/mobile/truck write route yet.
+                        if !report.filingScopeComplete {
+                            missing(report.pendingTruckCount == 1
+                                ? "1 camión sin decisión de inclusión en IFTA — complétalo desde la web (Camión → Declaración trimestral de IFTA)."
+                                : "\(report.pendingTruckCount) camiones sin decisión de inclusión en IFTA — complétalo desde la web (Camión → Declaración trimestral de IFTA).")
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(OBSpacing.md)
