@@ -57,7 +57,7 @@ export function PlanGate({
 
         <div className="flex flex-wrap items-center gap-3">
           <Button asChild>
-            <Link href="/settings#plan">Change plan</Link>
+            <Link href="/settings?section=plan">Change plan</Link>
           </Button>
           <p className="text-xs text-muted-foreground">
             Your books stay exactly as they are, on any plan.

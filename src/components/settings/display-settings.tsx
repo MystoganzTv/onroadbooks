@@ -1,9 +1,11 @@
 "use client";
 
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Globe2, Monitor, Moon, Sun } from "lucide-react";
 
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UI_SCALES, useTheme, type UiScale } from "@/components/shell/theme-provider";
+import { useLanguage } from "@/components/shell/language-provider";
+import { APP_LOCALES } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
@@ -13,25 +15,28 @@ import { cn } from "@/lib/utils";
  */
 export function DisplaySettings() {
   const { theme, setTheme, scale, setScale } = useTheme();
+  const { locale, setLocale, copy } = useLanguage();
 
   return (
     <section className="rounded-lg border border-border bg-card">
       <CardHeader>
         <div className="flex items-center gap-2">
           <Monitor className="size-4 text-muted-foreground" />
-          <CardTitle>Display</CardTitle>
+          <CardTitle>{locale === "es" ? "Preferencias de la aplicación" : "App preferences"}</CardTitle>
         </div>
-        <span className="text-2xs text-muted-foreground">Saved on this device</span>
+        <span className="text-2xs text-muted-foreground">
+          {locale === "es" ? "Guardado en este dispositivo" : "Saved on this device"}
+        </span>
       </CardHeader>
 
       <CardContent className="space-y-4 p-4">
         <div>
-          <p className="label-xs">Theme</p>
+          <p className="label-xs">{copy.theme}</p>
           <div className="mt-2 grid grid-cols-2 gap-2 sm:max-w-sm">
             {(
               [
-                { id: "dark", label: "Dark", icon: Moon },
-                { id: "light", label: "Light", icon: Sun },
+                { id: "dark", label: copy.dark, icon: Moon },
+                { id: "light", label: copy.light, icon: Sun },
               ] as const
             ).map((option) => (
               <button
@@ -55,10 +60,11 @@ export function DisplaySettings() {
         </div>
 
         <div>
-          <p className="label-xs">Text size</p>
+          <p className="label-xs">{copy.textSize}</p>
           <p className="mt-1 text-2xs text-muted-foreground">
-            Scales the whole interface -- text, spacing, control heights and table rows -- not
-            just the font.
+            {locale === "es"
+              ? "Ajusta toda la interfaz: texto, espacios, controles y filas de tablas."
+              : "Scales the whole interface -- text, spacing, control heights and table rows -- not just the font."}
           </p>
           <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {UI_SCALES.map((option) => (
@@ -85,6 +91,38 @@ export function DisplaySettings() {
                   {option.label}
                 </span>
                 <span className="mt-0.5 block text-2xs text-muted-foreground">{option.hint}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-center gap-1.5">
+            <Globe2 className="size-3.5 text-muted-foreground" />
+            <p className="label-xs">{copy.language}</p>
+          </div>
+          <p className="mt-1 text-2xs text-muted-foreground">
+            {locale === "es"
+              ? "Cambia el idioma de navegación y de las pantallas principales."
+              : "Changes the language used in navigation and primary screens."}
+          </p>
+          <div className="mt-2 grid grid-cols-2 gap-2 sm:max-w-sm">
+            {APP_LOCALES.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                aria-pressed={locale === option.id}
+                onClick={() => setLocale(option.id)}
+                className={cn(
+                  "rounded-md border px-3 py-2 text-left text-sm font-medium transition-colors",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  locale === option.id
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "border-border text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <span className="mr-2 text-2xs font-semibold">{option.shortLabel}</span>
+                {option.label}
               </button>
             ))}
           </div>

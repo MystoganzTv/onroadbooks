@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Monitor, Moon, Sun, Type } from "lucide-react";
+import { Check, Globe2, Moon, Sun, Type } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +12,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { APP_LOCALES } from "@/lib/i18n";
+import { useLanguage } from "./language-provider";
 import { UI_SCALES, useTheme, type UiScale } from "./theme-provider";
 
 /**
@@ -23,30 +25,32 @@ import { UI_SCALES, useTheme, type UiScale } from "./theme-provider";
  */
 export function DisplayMenu({ className }: { className?: string }) {
   const { theme, setTheme, scale, setScale } = useTheme();
+  const { locale, setLocale, copy } = useLanguage();
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          size="icon-sm"
-          aria-label="Display settings"
-          title="Theme and text size"
+          size="sm"
+          aria-label={copy.displaySettings}
+          title={copy.displayTitle}
           className={cn(
-            "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-strong",
+            "h-8 gap-1.5 px-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-strong",
             className,
           )}
         >
-          <Monitor />
+          <Globe2 />
+          <span className="text-2xs font-semibold">{locale.toUpperCase()}</span>
         </Button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="start" side="bottom" className="w-[13rem]">
-        <DropdownMenuLabel>Theme</DropdownMenuLabel>
+        <DropdownMenuLabel>{copy.theme}</DropdownMenuLabel>
         {(
           [
-            { id: "dark", label: "Dark", icon: Moon },
-            { id: "light", label: "Light", icon: Sun },
+            { id: "dark", label: copy.dark, icon: Moon },
+            { id: "light", label: copy.light, icon: Sun },
           ] as const
         ).map((option) => (
           <DropdownMenuItem
@@ -68,7 +72,7 @@ export function DisplayMenu({ className }: { className?: string }) {
 
         <DropdownMenuLabel className="flex items-center gap-1.5">
           <Type className="size-3" />
-          Text size
+          {copy.textSize}
         </DropdownMenuLabel>
         {UI_SCALES.map((option) => (
           <DropdownMenuItem
@@ -83,6 +87,28 @@ export function DisplayMenu({ className }: { className?: string }) {
               <span className="block text-2xs text-muted-foreground">{option.hint}</span>
             </span>
             {scale === option.id ? <Check className="size-4 shrink-0" /> : null}
+          </DropdownMenuItem>
+        ))}
+
+        <DropdownMenuSeparator />
+
+        <DropdownMenuLabel className="flex items-center gap-1.5">
+          <Globe2 className="size-3" />
+          {copy.language}
+        </DropdownMenuLabel>
+        {APP_LOCALES.map((option) => (
+          <DropdownMenuItem
+            key={option.id}
+            role="menuitemradio"
+            aria-checked={locale === option.id}
+            onSelect={() => setLocale(option.id)}
+            className="cursor-pointer"
+          >
+            <span className="w-6 text-2xs font-semibold text-muted-foreground">
+              {option.shortLabel}
+            </span>
+            <span className="flex-1">{option.label}</span>
+            {locale === option.id ? <Check className="size-4 shrink-0" /> : null}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

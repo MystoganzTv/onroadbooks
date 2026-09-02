@@ -13,6 +13,7 @@ import type {
 } from "@/lib/finance/presentation";
 import type { FinancialSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { appText, type AppLocale } from "@/lib/i18n";
 
 interface HeroMetricsProps {
   summary: FinancialSummary;
@@ -20,6 +21,7 @@ interface HeroMetricsProps {
   previousLabel: string;
   deltas: { revenue: number; profit: number; profitPerMile: number };
   showOwnerPlanning?: boolean;
+  locale?: AppLocale;
 }
 
 /** Profit and cash are peers, never one blended accounting conclusion. */
@@ -29,7 +31,9 @@ export function HeroMetrics({
   previousLabel,
   deltas,
   showOwnerPlanning = true,
+  locale = "en",
 }: HeroMetricsProps) {
+  const tx = (english: string, spanish: string) => appText(locale, english, spanish);
   const answers = presentation.answers;
   const profitable = summary.operatingProfit >= 0;
   const fundingGap = presentation.cashFundingGap.state === "KNOWN"
@@ -50,7 +54,7 @@ export function HeroMetrics({
           <div className="flex items-center gap-2">
             <CircleDollarSign className={cn("size-4", profitable ? "text-pos" : "text-neg")} />
             <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground">
-              Financial performance
+              {tx("Financial performance", "Rendimiento financiero")}
             </h2>
           </div>
           <span
@@ -62,13 +66,13 @@ export function HeroMetrics({
             )}
           >
             {profitable ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
-            {profitable ? "Profitable" : "Loss"}
+            {profitable ? tx("Profitable", "Rentable") : tx("Loss", "Pérdida")}
           </span>
         </header>
 
         <div className="px-5 py-6">
           <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            Your business made
+            {tx("Your business made", "Tu negocio produjo")}
           </p>
           <p
             className={cn(
@@ -84,9 +88,9 @@ export function HeroMetrics({
         </div>
 
         <dl className="grid gap-px border-t border-border/70 bg-border/70 sm:grid-cols-3">
-          <PerformanceFact label="You earned" value={formatMoneyCompact(summary.bookedRevenue)} tone="info" />
-          <PerformanceFact label="Business expenses" value={`-${formatMoneyCompact(summary.operatingExpenses)}`} tone="negative" />
-          <PerformanceFact label="Profit / mile" value={formatRate(summary.profitPerMile)} tone={profitable ? "positive" : "negative"} />
+          <PerformanceFact label={tx("You earned", "Ganaste")} value={formatMoneyCompact(summary.bookedRevenue)} tone="info" />
+          <PerformanceFact label={tx("Business expenses", "Gastos del negocio")} value={`-${formatMoneyCompact(summary.operatingExpenses)}`} tone="negative" />
+          <PerformanceFact label={tx("Profit / mile", "Ganancia / milla")} value={formatRate(summary.profitPerMile)} tone={profitable ? "positive" : "negative"} />
         </dl>
       </section>
 
@@ -94,15 +98,15 @@ export function HeroMetrics({
         <header className="flex items-center gap-2 border-b border-border px-5 py-4">
           <WalletCards className="size-4 text-info" />
           <div>
-            <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground">Your cash</h2>
-            <p className="mt-0.5 text-2xs text-muted-foreground">What came in and what had to go out</p>
+            <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground">{tx("Your cash", "Tu efectivo")}</h2>
+            <p className="mt-0.5 text-2xs text-muted-foreground">{tx("What came in and what had to go out", "Lo que entró y lo que tuvo que salir")}</p>
           </div>
         </header>
 
         <dl className="divide-y divide-border/70 px-5">
-          <CashFact label="Collected" value={answers.collected.value} tone="info" />
-          <CashFact label="Business cash out" value={answers.spent.value} tone="negative" negative />
-          <CashFact label="Debt payments" value={answers.debtPayments.value} tone="negative" negative />
+          <CashFact label={tx("Collected", "Cobrado")} value={answers.collected.value} tone="info" locale={locale} />
+          <CashFact label={tx("Business cash out", "Efectivo que salió del negocio")} value={answers.spent.value} tone="negative" negative locale={locale} />
+          <CashFact label={tx("Debt payments", "Pagos de deuda")} value={answers.debtPayments.value} tone="negative" negative locale={locale} />
         </dl>
 
         {showOwnerPlanning ? (
@@ -110,18 +114,19 @@ export function HeroMetrics({
             <div className="flex items-end justify-between gap-4">
               <div>
                 <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  Available to you
+                  {tx("Available to you", "Disponible para ti")}
                 </p>
-                <p className="mt-1 text-2xs text-muted-foreground">How much can I take?</p>
+                <p className="mt-1 text-2xs text-muted-foreground">{tx("How much can I take?", "¿Cuánto puedo retirar?")}</p>
               </div>
               <MoneyValueText
                 value={presentation.availableToYou}
                 className="text-4xl font-semibold leading-none tracking-[-0.045em] text-info"
+                locale={locale}
               />
             </div>
             {fundingGap !== null && fundingGap > 0 ? (
               <p className="mt-3 border-t border-neg/20 pt-3 text-sm font-semibold text-neg tnum">
-                Funding gap: {formatMoneyCompact(fundingGap)}
+                {tx("Cash still needed", "Efectivo que aún falta")}: {formatMoneyCompact(fundingGap)}
               </p>
             ) : null}
           </div>
@@ -131,16 +136,16 @@ export function HeroMetrics({
           <div className="border-t border-border bg-surface-sunken/45 px-5 py-4">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                When cash is available
+                {tx("When cash is available", "Cuando haya efectivo disponible")}
               </p>
               <p className="text-xs font-semibold text-warn tnum">
-                Suggested set aside: {formatMoneyCompact(summary.reserveTotal)}
+                {tx("Suggested set aside", "Reserva sugerida")}: {formatMoneyCompact(summary.reserveTotal)}
               </p>
             </div>
             <dl className="mt-2 space-y-1.5">
               {summary.reserves.map((reserve) => (
                 <div key={reserve.accountId} className="flex items-baseline justify-between gap-3 text-2xs">
-                  <dt className="text-muted-foreground">{reserveLabel(reserve.kind, reserve.name)}</dt>
+                  <dt className="text-muted-foreground">{reserveLabel(reserve.kind, reserve.name, locale)}</dt>
                   <dd className="font-medium text-foreground tnum">{formatMoneyCompact(reserve.amount)}</dd>
                 </div>
               ))}
@@ -175,11 +180,13 @@ function CashFact({
   value,
   tone,
   negative = false,
+  locale = "en",
 }: {
   label: string;
   value: MoneyValue;
   tone: "info" | "negative";
   negative?: boolean;
+  locale?: AppLocale;
 }) {
   const display = value.state === "KNOWN"
     ? `${negative && value.amount > 0 ? "-" : ""}${formatMoneyCompact(value.amount)}`
@@ -188,25 +195,27 @@ function CashFact({
     <div className="flex items-baseline justify-between gap-4 py-3">
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className={cn("text-base font-semibold tnum", tone === "negative" ? "text-neg" : "text-info")}>
-        {display ?? <span className="text-xs text-muted-foreground">Not enough data</span>}
+        {display ?? <span className="text-xs text-muted-foreground">{appText(locale, "Not enough data", "Datos insuficientes")}</span>}
       </dd>
     </div>
   );
 }
 
-function MoneyValueText({ value, className }: { value: MoneyValue; className?: string }) {
+function MoneyValueText({ value, className, locale = "en" }: { value: MoneyValue; className?: string; locale?: AppLocale }) {
   if (value.state === "UNKNOWN") {
     return (
       <p className={cn("text-sm text-muted-foreground", className)} title={value.reason}>
-        Not enough data
+        {appText(locale, "Not enough data", "Datos insuficientes")}
       </p>
     );
   }
   return <p className={cn("tnum", className)}>{formatMoneyCompact(value.amount)}</p>;
 }
 
-function reserveLabel(kind: string, name: string): string {
-  if (kind === "TAX") return "Suggested tax set-aside";
-  if (kind === "MAINTENANCE") return "Suggested maintenance set-aside";
-  return `Suggested ${name.toLocaleLowerCase()} set-aside`;
+function reserveLabel(kind: string, name: string, locale: AppLocale): string {
+  if (kind === "TAX") return appText(locale, "Suggested tax set-aside", "Reserva sugerida para impuestos");
+  if (kind === "MAINTENANCE") return appText(locale, "Suggested maintenance set-aside", "Reserva sugerida para mantenimiento");
+  return locale === "es"
+    ? `Reserva sugerida para ${name.toLocaleLowerCase()}`
+    : `Suggested ${name.toLocaleLowerCase()} set-aside`;
 }

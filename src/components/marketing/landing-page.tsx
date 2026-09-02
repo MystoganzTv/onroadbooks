@@ -24,6 +24,7 @@ import { ExpensesPhone, LaptopMock, LoadPhone } from "@/components/marketing/pre
 import { LANDING_COPY, type Lang, type LandingCopy } from "@/lib/marketing/copy";
 import { getPlan } from "@/lib/plans";
 import { cn } from "@/lib/utils";
+import { APP_LOCALE_COOKIE } from "@/lib/i18n";
 
 /**
  * THE PUBLIC LANDING PAGE
@@ -44,8 +45,13 @@ const HERO_ICONS = [BarChart3, CircleDollarSign, PiggyBank];
 const FEATURE_ICONS = [Truck, Receipt, TrendingUp, PieChart, FileText, Smartphone];
 const TRUST_ICONS = [Lock, Link2Off, Download, Truck];
 
-export function LandingPage({ primaryHref }: { primaryHref: string }) {
-  const [lang, setLang] = useState<Lang>("en");
+export function LandingPage({ primaryHref, initialLang = "en" }: { primaryHref: string; initialLang?: Lang }) {
+  const [lang, setLangState] = useState<Lang>(initialLang);
+  const setLang = (next: Lang) => {
+    setLangState(next);
+    document.cookie = `${APP_LOCALE_COOKIE}=${next}; Path=/; Max-Age=31536000; SameSite=Lax`;
+    document.documentElement.lang = next;
+  };
   const c = LANDING_COPY[lang];
   const year = new Date().getFullYear();
   const isLogin = primaryHref === "/login";

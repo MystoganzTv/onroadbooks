@@ -60,7 +60,7 @@ export function GoalProgressCard({
         {goals.length === 0 ? (
           <p className="text-xs leading-relaxed text-muted-foreground">
             No targets set yet.{" "}
-            <Link href="/settings#goals" className="text-primary underline-offset-2 hover:underline">
+            <Link href="/settings?section=business#goals" className="text-primary underline-offset-2 hover:underline">
               Set a monthly revenue and profit target
             </Link>{" "}
             and this becomes a pace tracker.

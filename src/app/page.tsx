@@ -5,6 +5,7 @@ import { LandingPage } from "@/components/marketing/landing-page";
 import { getSession } from "@/lib/auth";
 import { LANDING_COPY } from "@/lib/marketing/copy";
 import { display, script } from "@/lib/marketing/fonts";
+import { getAppLocale } from "@/lib/i18n-server";
 
 // Reads the account state and the session cookie, so it must never be
 // prerendered -- a build-time render would bake in "no account exists yet",
@@ -21,12 +22,13 @@ export const metadata: Metadata = {
 export default async function Home() {
   // Signed in: there is nothing to sell, go to work.
   if (await getSession()) redirect("/dashboard");
+  const locale = await getAppLocale();
 
   // The two landing-only faces are attached here, so the app bundle never
   // pays for them.
   return (
     <div className={`${display.variable} ${script.variable}`}>
-      <LandingPage primaryHref="/setup" />
+      <LandingPage primaryHref="/setup" initialLang={locale} />
     </div>
   );
 }

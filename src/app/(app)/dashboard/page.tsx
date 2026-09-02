@@ -97,6 +97,8 @@ import { defaultEntryDate, monthLabel, previousPeriod, todayISO } from "@/lib/pe
 import { recurringExpenseSuggestions } from "@/lib/recurring-expenses";
 import { roleCan } from "@/lib/roles";
 import { cn } from "@/lib/utils";
+import { appText } from "@/lib/i18n";
+import { getAppLocale } from "@/lib/i18n-server";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -125,7 +127,8 @@ export default async function DashboardPage({
   searchParams: Promise<SearchParams>;
 }) {
   const params = await searchParams;
-  const session = await requireSession();
+  const [session, locale] = await Promise.all([requireSession(), getAppLocale()]);
+  const tx = (english: string, spanish: string) => appText(locale, english, spanish);
   const role = session.role ?? "VIEWER";
   const ownerPlanning = roleCan(role, "manage_owner_finances");
   const dataset = await getRepository(session.businessId).getDataset();
@@ -309,13 +312,16 @@ export default async function DashboardPage({
     return (
       <div className="space-y-5 p-4 lg:p-6">
         <PageHeader
-          title="Business Overview"
-          description="Revenue, costs, mileage, and cash available in one place."
+          title={tx("Business Overview", "Resumen del negocio")}
+          description={tx(
+            "Revenue, costs, mileage, and cash available in one place.",
+            "Ingresos, gastos, millas y efectivo disponible en un solo lugar.",
+          )}
           actions={
             <Button asChild variant="outline" size="sm">
               <Link href="/calculator">
                 <Calculator className="size-4" />
-                Load calculator
+                {tx("Load calculator", "Calculadora de cargas")}
               </Link>
             </Button>
           }
@@ -333,14 +339,17 @@ export default async function DashboardPage({
   return (
     <div className="space-y-5 p-4 lg:p-6">
       <PageHeader
-        title="Business Overview"
-        description="Revenue, costs, mileage, and cash available in one place."
+        title={tx("Business Overview", "Resumen del negocio")}
+        description={tx(
+          "Revenue, costs, mileage, and cash available in one place.",
+          "Ingresos, gastos, millas y efectivo disponible en un solo lugar.",
+        )}
         actions={
           <>
             <Button asChild variant="outline" size="sm">
               <Link href="/calculator">
                 <Calculator className="size-4" />
-                Load calculator
+                {tx("Load calculator", "Calculadora de cargas")}
               </Link>
             </Button>
             {expenseAction}
@@ -359,8 +368,8 @@ export default async function DashboardPage({
 
       {/* ---- The bottom line ------------------------------------------- */}
       <Section
-        title="The bottom line"
-        description={`${period.label} · ${summary.loadCount} ${summary.loadCount === 1 ? "load" : "loads"} · ${formatMiles(summary.totalMiles)}`}
+        title={tx("The bottom line", "El resultado")}
+        description={`${period.label} · ${summary.loadCount} ${summary.loadCount === 1 ? tx("load", "carga") : tx("loads", "cargas")} · ${formatMiles(summary.totalMiles)}`}
       >
         <HeroMetrics
           summary={summary}
@@ -372,6 +381,7 @@ export default async function DashboardPage({
             profitPerMile: pctChange(summary.profitPerMile, priorSummary.profitPerMile),
           }}
           showOwnerPlanning={ownerPlanning}
+          locale={locale}
         />
         {ownerPlanning && !cockpit ? (
           <PlanGate
@@ -399,32 +409,35 @@ export default async function DashboardPage({
       </div>
 
       {/* ---- Business health -------------------------------------------- */}
-      <Section title="Business health" description="What a mile costs, and whether the pace holds">
+      <Section
+        title={tx("Business health", "Salud del negocio")}
+        description={tx("What a mile costs, and whether the pace holds", "Cuánto cuesta cada milla y si el ritmo es sostenible")}
+      >
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <MiniStat label="Total Miles" value={formatNumber(summary.totalMiles)} sub="mi" />
-          <MiniStat label="Loaded Miles" value={formatNumber(summary.loadedMiles)} sub="mi" />
+          <MiniStat label={tx("Total Miles", "Millas totales")} value={formatNumber(summary.totalMiles)} sub="mi" />
+          <MiniStat label={tx("Loaded Miles", "Millas cargadas")} value={formatNumber(summary.loadedMiles)} sub="mi" />
           <MiniStat
-            label="Deadhead Miles"
+            label={tx("Deadhead Miles", "Millas vacías")}
             value={formatNumber(summary.deadheadMiles)}
             sub={formatPercent(summary.deadheadPct)}
             tone={deadhead.elevated ? "warning" : "neutral"}
           />
           <MiniStat
-            label="Actual Cost / Mile"
+            label={tx("Actual Cost / Mile", "Costo real / milla")}
             value={costBasis.sufficient ? formatRateValue(costBasis.trueCostPerMile) : "—"}
-            sub="actual, not prorated"
+            sub={tx("actual, not prorated", "real, no prorrateado")}
             tone="negative"
           />
           <MiniStat
-            label="Revenue / Mile"
+            label={tx("Revenue / Mile", "Ingreso / milla")}
             value={formatRateValue(summary.revenuePerMile)}
-            sub="all miles"
+            sub={tx("all miles", "todas las millas")}
             tone="info"
           />
           <MiniStat
-            label="Loads Completed"
+            label={tx("Loads Completed", "Cargas completadas")}
             value={formatNumber(summary.loadCount)}
-            sub={`${formatMoneyCompact(summary.collectedRevenue)} collected`}
+            sub={`${formatMoneyCompact(summary.collectedRevenue)} ${tx("collected", "cobrado")}`}
             tone="neutral"
           />
         </div>
@@ -450,23 +463,24 @@ export default async function DashboardPage({
       </Section>
 
       {/* ---- Money flow -------------------------------------------------- */}
-      <Section title="Where the money went" description={period.label}>
+      <Section title={tx("Where the money went", "A dónde se fue el dinero")} description={period.label}>
         <div className="grid gap-3 xl:grid-cols-3">
           <MoneyFlow
             ownerPay={ownerPay}
             categories={categories}
             periodLabel={period.label}
             showOwnerPlanning={ownerPlanning}
+            locale={locale}
             className="min-w-0 xl:col-span-2"
           />
           <Card className="min-w-0">
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Route className="size-3.5 text-muted-foreground" />
-                <CardTitle>You Earned vs Business Expenses</CardTitle>
+                <CardTitle>{tx("You Earned vs Business Expenses", "Lo que ganaste vs gastos del negocio")}</CardTitle>
               </div>
               <span className="text-2xs text-muted-foreground">
-                {period.days > 62 ? "By month" : "By day"}
+                {period.days > 62 ? tx("By month", "Por mes") : tx("By day", "Por día")}
               </span>
             </CardHeader>
             <CardContent className="px-2 py-3">
@@ -477,7 +491,10 @@ export default async function DashboardPage({
       </Section>
 
       {/* ---- Load performance ------------------------------------------- */}
-      <Section title="Load performance" description="The one to repeat, and the one to learn from">
+      <Section
+        title={tx("Load performance", "Rendimiento de cargas")}
+        description={tx("The one to repeat, and the one to learn from", "La que conviene repetir y la que deja una lección")}
+      >
         <BestWorstLoads
           best={best}
           worst={worst}
@@ -489,7 +506,7 @@ export default async function DashboardPage({
 
       {/* ---- Operations intelligence ------------------------------------ */}
       {cockpit ? (
-        <Section title="Operations intelligence" description="Who pays, and where">
+        <Section title={tx("Operations intelligence", "Análisis operativo")} description={tx("Who pays, and where", "Quién paga y dónde")}>
           <div className="grid gap-3 lg:grid-cols-2">
             <BrokerPanel
               brokers={brokers}
@@ -508,8 +525,8 @@ export default async function DashboardPage({
 
       {/* ---- Reserves and the truck ------------------------------------- */}
       <Section
-        title={ownerPlanning ? "Reserves and the truck" : "Truck condition"}
-        description={ownerPlanning ? "Am I setting enough aside" : "Maintenance due and upcoming cost"}
+        title={ownerPlanning ? tx("Reserves and the truck", "Reservas y camión") : tx("Truck condition", "Estado del camión")}
+        description={ownerPlanning ? tx("Am I setting enough aside", "¿Estoy reservando lo suficiente?") : tx("Maintenance due and upcoming cost", "Mantenimiento pendiente y próximos costos")}
       >
         <div className="grid gap-3 lg:grid-cols-2">
           {cockpit && ownerPlanning ? (
@@ -529,7 +546,10 @@ export default async function DashboardPage({
       </Section>
 
       {/* ---- Insights ---------------------------------------------------- */}
-      <Section title="Insights" description="Deterministic observations from this period's data">
+      <Section
+        title={tx("Insights", "Observaciones")}
+        description={tx("Deterministic observations from this period's data", "Conclusiones directas de los datos de este período")}
+      >
         <InsightsPanel insights={insights} />
       </Section>
     </div>

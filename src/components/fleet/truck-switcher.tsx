@@ -6,6 +6,7 @@ import { Check, Truck as TruckIcon } from "lucide-react";
 
 import type { Truck } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/components/shell/language-provider";
 
 /**
  * Which unit a page is scoped to.
@@ -18,7 +19,7 @@ import { cn } from "@/lib/utils";
 export function TruckSwitcher({
   trucks,
   selectedId,
-  allLabel = "Whole fleet",
+  allLabel,
   includeAll = true,
   variant = "compact",
   className,
@@ -38,6 +39,8 @@ export function TruckSwitcher({
 }) {
   const pathname = usePathname();
   const search = useSearchParams();
+  const { locale } = useLanguage();
+  const resolvedAllLabel = allLabel ?? (locale === "es" ? "Toda la flota" : "Whole fleet");
 
   if (trucks.length < 2) return null;
 
@@ -145,7 +148,7 @@ export function TruckSwitcher({
       <span className="px-1.5 text-muted-foreground" aria-hidden>
         <TruckIcon className="size-3.5" />
       </span>
-      {includeAll ? compactOption(null, allLabel) : null}
+      {includeAll ? compactOption(null, resolvedAllLabel) : null}
       {trucks.map((truck) => compactOption(truck.id, truck.name, !truck.active))}
     </div>
   );

@@ -28,6 +28,7 @@ import {
   type PeriodKey,
 } from "@/lib/periods";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/components/shell/language-provider";
 
 interface PeriodControlsProps {
   period: Period;
@@ -43,6 +44,7 @@ interface PeriodControlsProps {
  */
 export function PeriodControls({ period, className }: PeriodControlsProps) {
   const router = useRouter();
+  const { locale } = useLanguage();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
@@ -115,8 +117,8 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
           size="icon-sm"
           className="h-7 w-7 rounded-r-none"
           onClick={() => push({ month: shiftMonth(period.month, -1), period: "full" })}
-          aria-label="Previous month"
-          title="Previous month"
+          aria-label={locale === "es" ? "Mes anterior" : "Previous month"}
+          title={locale === "es" ? "Mes anterior" : "Previous month"}
         >
           <ChevronLeft />
         </Button>
@@ -126,14 +128,14 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
         >
           <SelectTrigger
             className="h-7 w-[8.75rem] rounded-none border-x border-y-0 border-border/70 bg-transparent text-xs shadow-none focus:ring-0 focus:ring-offset-0"
-            aria-label="Select month"
+            aria-label={locale === "es" ? "Seleccionar mes" : "Select month"}
           >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {monthOptions(period.month).map((option) => (
               <SelectItem key={option.value} value={option.value}>
-                {option.label}
+                {locale === "es" ? localizedMonth(option.value) : option.label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -143,8 +145,8 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
           size="icon-sm"
           className="h-7 w-7 rounded-l-none"
           onClick={() => push({ month: shiftMonth(period.month, 1), period: "full" })}
-          aria-label="Next month"
-          title="Next month"
+          aria-label={locale === "es" ? "Mes siguiente" : "Next month"}
+          title={locale === "es" ? "Mes siguiente" : "Next month"}
         >
           <ChevronRight />
         </Button>
@@ -152,7 +154,7 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
 
       <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden />
 
-      <div className="inline-flex shrink-0 items-center gap-0.5" role="group" aria-label="Period">
+      <div className="inline-flex shrink-0 items-center gap-0.5" role="group" aria-label={locale === "es" ? "Período" : "Period"}>
         {PERIOD_OPTIONS.filter((o) => o.key !== "custom").map((option, index, all) => (
           <span key={option.key} className="flex items-center">
             {index > 0 && all[index - 1].group !== option.group ? (
@@ -162,7 +164,7 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
               type="button"
               onClick={() => push({ period: option.key })}
               aria-pressed={period.key === option.key}
-              title={option.label}
+              title={locale === "es" ? periodLabelEs(option.key) : option.label}
               className={cn(
                 "h-7 rounded-md px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 period.key === option.key
@@ -170,7 +172,7 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              {option.short}
+              {locale === "es" ? periodShortEs(option.key) : option.short}
             </button>
           </span>
         ))}
@@ -188,14 +190,14 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
             aria-pressed={period.key === "custom"}
           >
             <CalendarRange />
-            {period.key === "custom" ? period.shortLabel : "Custom"}
+            {period.key === "custom" ? period.shortLabel : locale === "es" ? "Personalizado" : "Custom"}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[17.25rem]" align="end">
-          <p className="label-xs">Custom range</p>
+          <p className="label-xs">{locale === "es" ? "Rango personalizado" : "Custom range"}</p>
           <div className="mt-2 space-y-2">
             <label className="block">
-              <span className="mb-1 block text-2xs text-muted-foreground">From</span>
+              <span className="mb-1 block text-2xs text-muted-foreground">{locale === "es" ? "Desde" : "From"}</span>
               <Input
                 type="date"
                 value={from}
@@ -204,7 +206,7 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
               />
             </label>
             <label className="block">
-              <span className="mb-1 block text-2xs text-muted-foreground">To</span>
+              <span className="mb-1 block text-2xs text-muted-foreground">{locale === "es" ? "Hasta" : "To"}</span>
               <Input
                 type="date"
                 value={to}
@@ -221,11 +223,45 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
                 push({ period: "custom", from, to });
               }}
             >
-              Apply range
+              {locale === "es" ? "Aplicar rango" : "Apply range"}
             </Button>
           </div>
         </PopoverContent>
       </Popover>
     </div>
   );
+}
+
+function periodShortEs(key: PeriodKey): string {
+  return {
+    today: "Hoy",
+    week: "Semana",
+    first: "1-15",
+    second: "16-Fin",
+    full: "Mes",
+    quarter: "Trim",
+    ytd: "Año",
+    custom: "Personalizado",
+  }[key];
+}
+
+function periodLabelEs(key: PeriodKey): string {
+  return {
+    today: "Hoy",
+    week: "Esta semana",
+    first: "Primera mitad",
+    second: "Segunda mitad",
+    full: "Mes completo",
+    quarter: "Trimestre",
+    ytd: "Año hasta hoy",
+    custom: "Rango personalizado",
+  }[key];
+}
+
+function localizedMonth(value: string): string {
+  const [year, month] = value.split("-").map(Number);
+  if (!year || !month) return value;
+  return new Intl.DateTimeFormat("es-US", { month: "long", year: "numeric", timeZone: "UTC" })
+    .format(new Date(Date.UTC(year, month - 1, 1)))
+    .replace(/^./, (character) => character.toUpperCase());
 }

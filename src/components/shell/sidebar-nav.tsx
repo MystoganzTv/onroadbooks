@@ -23,6 +23,8 @@ import {
 } from "./sidebar-groups";
 import { ROLE_DEFINITIONS } from "@/lib/roles";
 import type { MemberRole } from "@/lib/types";
+import { useLanguage } from "./language-provider";
+import { localizedNavGroup, localizedNavItem } from "./nav-copy";
 
 interface SidebarNavProps {
   businessName: string;
@@ -45,6 +47,7 @@ export function SidebarNav({
   onNavigate,
 }: SidebarNavProps) {
   const pathname = usePathname();
+  const { locale, copy } = useLanguage();
   const navId = React.useId();
   const settingsActive =
     pathname === "/settings" || pathname.startsWith("/settings/");
@@ -103,7 +106,7 @@ export function SidebarNav({
                 )}
               >
                 <span className="flex min-w-0 items-center gap-1.5">
-                  <span className="truncate">{group.label}</span>
+                  <span className="truncate">{localizedNavGroup(group.label, copy)}</span>
                   {holdsCurrentPage && !expanded ? (
                     <span
                       aria-hidden="true"
@@ -131,7 +134,9 @@ export function SidebarNav({
                           active ? "text-primary" : "opacity-70",
                         )}
                       />
-                      <span className="truncate">{item.label}</span>
+                      <span className="truncate">
+                        {localizedNavItem(item.href, item.label, copy)}
+                      </span>
                       {!availability.enabled && availability.badge ? (
                         <span className="ml-auto shrink-0 rounded border border-sidebar-border px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide">
                           {availability.badge}
@@ -193,7 +198,11 @@ export function SidebarNav({
               {businessName}
             </p>
             <p className="truncate text-2xs text-sidebar-foreground">
-              {role === "OWNER" ? "Business Settings" : `${ROLE_DEFINITIONS[role].label} access`}
+              {role === "OWNER"
+                ? copy.businessSettings
+                : locale === "es"
+                  ? `Acceso ${ROLE_DEFINITIONS[role].label.toLowerCase()}`
+                  : `${ROLE_DEFINITIONS[role].label} access`}
             </p>
           </div>
           <ChevronRight className="size-4 shrink-0 text-sidebar-foreground transition-transform group-hover:translate-x-0.5" />
@@ -209,7 +218,7 @@ export function SidebarNav({
             className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-2xs text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <LogOut className="size-3" />
-            Sign out
+            {copy.signOut}
           </button>
         </div>
       </div>

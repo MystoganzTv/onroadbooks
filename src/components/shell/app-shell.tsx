@@ -12,6 +12,8 @@ import { SidebarNav } from "./sidebar-nav";
 import { DisplayMenu } from "./display-menu";
 import { isNavActive, PRIMARY_NAV, type NavigationReadiness } from "./nav-items";
 import type { MemberRole } from "@/lib/types";
+import { useLanguage } from "./language-provider";
+import { localizedNavItem } from "./nav-copy";
 
 interface AppShellProps {
   businessName: string;
@@ -34,8 +36,12 @@ export function AppShell({
 }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const pathname = usePathname();
+  const { copy } = useLanguage();
 
-  const current = PRIMARY_NAV.find((item) => isNavActive(item, pathname))?.label ?? APP_NAME;
+  const currentItem = PRIMARY_NAV.find((item) => isNavActive(item, pathname));
+  const current = currentItem
+    ? localizedNavItem(currentItem.href, currentItem.label, copy)
+    : APP_NAME;
 
   return (
     <div className="flex min-h-dvh bg-background print:block print:min-h-0">
@@ -70,8 +76,8 @@ export function AppShell({
       <div className="flex min-w-0 flex-1 flex-col lg:pl-60 print:block">
         {role === "VIEWER" ? (
           <div className="border-b border-info/25 bg-info-soft px-4 py-2 text-center text-xs text-info print:hidden">
-            <span className="font-semibold">Viewer access</span>
-            <span> — this workspace is read-only for your role.</span>
+            <span className="font-semibold">{copy.viewerAccess}</span>
+            <span> — {copy.readOnly}</span>
           </div>
         ) : null}
         <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:hidden">
