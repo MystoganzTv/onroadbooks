@@ -141,7 +141,10 @@ test.describe.serial("critical browser flows", () => {
     await page.getByRole("button", { name: "Skip for now" }).click();
     await expect(page.getByRole("heading", { name: "E2E Trucking LLC is set up" })).toBeVisible();
     await page.getByRole("button", { name: /Open the dashboard/ }).click();
-    await expect(page).toHaveURL(/\/dashboard$/);
+    // The E2E server runs in development mode, where the first dashboard
+    // request may include an on-demand compile. Keep that cost from turning a
+    // working redirect into a five-second flake.
+    await expect(page).toHaveURL(/\/dashboard$/, { timeout: 15_000 });
     await expect(page.getByRole("heading", { name: "Business Overview" })).toBeVisible();
 
     await page.goto("/truck");
@@ -320,10 +323,13 @@ test.describe.serial("critical browser flows", () => {
     await page.goto("/drivers");
     await expect(page.getByRole("button", { name: "Add driver", exact: true })).toHaveCount(0);
     await page.goto("/team");
-    await expect(page).toHaveURL(/\/settings#access-roles$/);
+    await expect(page).toHaveURL(/\/settings\?section=access$/);
     await expect(page.getByRole("heading", { name: "Access & Roles" })).toBeVisible();
     await expect(page.getByText("Only the workspace owner can invite people or change roles.")).toBeVisible();
-    await expect(page.getByText("Owner financial settings")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Role boundaries" })).toBeVisible();
+    await expect(page.getByText(/always remain with the Owner/)).toBeVisible();
+    await page.goto("/settings?section=business");
+    await expect(page.getByRole("heading", { name: "Owner financial settings", exact: true })).toBeVisible();
     await page.goto("/reserves");
     await expect(page.getByText("Reserve balances, rules and movements are available only to the workspace owner.")).toBeVisible();
     await page.goto("/settlements");
@@ -339,7 +345,7 @@ test.describe.serial("critical browser flows", () => {
     await page.context().clearCookies();
     await login(page, "admin.e2e@example.com");
     await page.goto("/team");
-    await expect(page).toHaveURL(/\/settings#access-roles$/);
+    await expect(page).toHaveURL(/\/settings\?section=access$/);
     await expect(page.getByText("Only the workspace owner can invite people or change roles.")).toBeVisible();
   });
 
@@ -362,7 +368,7 @@ test.describe.serial("critical browser flows", () => {
     await expect(page.getByText("You earned", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("Your business made", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("Collected", { exact: true }).first()).toBeVisible();
-    await expect(page.getByText("Business cash out", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Business expenses", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("Available to you", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("When cash is available", { exact: true }).first()).toBeVisible();
     await expect(page.getByRole("heading", { name: "Where is my money?" })).toBeVisible();
@@ -371,7 +377,7 @@ test.describe.serial("critical browser flows", () => {
     await page.goto("/settlements?month=2026-08&half=SECOND");
     await expect(page.getByRole("heading", { name: "Owner Settlements" })).toBeVisible();
     await expect(page.getByText("Half-month payday", { exact: true })).toBeVisible();
-    await expect(page.getByText("Available to pay yourself", { exact: true })).toBeVisible();
+    await expect(page.getByText("Available to you", { exact: true })).toBeVisible();
     await expect(page.getByText(/Financial details · model v/)).toBeVisible();
   });
 });

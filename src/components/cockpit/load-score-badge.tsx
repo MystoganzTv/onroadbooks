@@ -1,4 +1,4 @@
-import { RATING_STYLE } from "@/components/loads/rating-badge";
+import { RATING_STYLE } from "@/components/loads/rating-style";
 import { scoreBand, type LoadScore } from "@/lib/finance/load-score";
 import { cn } from "@/lib/utils";
 

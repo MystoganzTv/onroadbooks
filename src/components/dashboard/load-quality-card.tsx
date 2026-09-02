@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Target } from "lucide-react";
 
-import { RATING_STYLE } from "@/components/loads/rating-badge";
+import { RATING_STYLE } from "@/components/loads/rating-style";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/shared/empty-state";

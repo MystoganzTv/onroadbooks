@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Building2, Check, Loader2, Target, TruckIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -49,7 +48,6 @@ function initialBusinessName(name: string): string {
  * and Truck pages use, so onboarding cannot drift into a second data model.
  */
 export function WelcomeFlow({ business, truck, settings, goals, planName, locale }: WelcomeFlowProps) {
-  const router = useRouter();
   const dictionary = getWebDictionary(locale);
   const copy = dictionary.onboarding;
   const settingsCopy = dictionary.settings;
@@ -193,10 +191,6 @@ export function WelcomeFlow({ business, truck, settings, goals, planName, locale
       if (goalsResult.ok) setStep(3);
       else toast.error(localizedClientError(goalsResult.error));
     });
-  }
-
-  function finish() {
-    router.replace("/dashboard");
   }
 
   const workingDays = toNumber(runValues.workingDaysPerWeek, 6);
@@ -559,7 +553,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName, locale
             {interpolate(copy.trialReady, { plan: planName })}
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
-            <Button type="button" onClick={finish}>
+            <Button type="button" onClick={() => window.location.replace("/dashboard")}>
               {copy.openDashboard}
               <ArrowRight className="size-4" />
             </Button>
