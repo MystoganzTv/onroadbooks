@@ -23,21 +23,26 @@ import { formatMoneyCompact, formatPercent, formatRate } from "@/lib/formatters"
 import { expensesForTruck, loadsForTruck, orderedTrucks } from "@/lib/fleet";
 import { isOperatingExpense } from "@/lib/finance/terminology";
 import { defaultEntryDate } from "@/lib/periods";
+import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
+import { getAppLocale } from "@/lib/i18n-server";
 import {
   periodFromSearchParams,
   truckFromSearchParams,
   type SearchParams,
 } from "@/lib/period-params";
 
-export const metadata: Metadata = { title: "Expenses" };
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getAppLocale();
+  return { title: getWebDictionary(locale).expenses.metadataTitle };
+}
 
 export default async function ExpensesPage({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const params = await searchParams;
-  const session = await requireSession();
+  const [params, session, locale] = await Promise.all([searchParams, requireSession(), getAppLocale()]);
+  const copy = getWebDictionary(locale).expenses;
   const { trucks, loads, expenses, fuelEntries, documents, settings, financialObligations, paymentEvents } = await getRepository(
     session.businessId,
   ).getDataset();
@@ -68,8 +73,12 @@ export default async function ExpensesPage({
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <PageHeader
-        title="Expenses"
-        description={`${period.label} - ${periodExpenses.length} ${periodExpenses.length === 1 ? "entry" : "entries"}`}
+        title={copy.title}
+        description={interpolate(copy.periodEntries, {
+          period: period.label,
+          count: periodExpenses.length,
+          unit: periodExpenses.length === 1 ? copy.entry : copy.entries,
+        })}
         actions={
           <ExpenseFormDialog
             loads={periodLoads}
@@ -87,38 +96,38 @@ export default async function ExpensesPage({
       </div>
 
       <section
-        aria-label="Expense summary"
+        aria-label={copy.summaryLabel}
         className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
       >
         <MiniStat
-          label="Operating Expenses"
+          label={copy.operatingExpenses}
           value={formatMoneyCompact(summary.operatingExpenses)}
           tone="negative"
         />
         <MiniStat
-          label="Debt Service"
+          label={copy.debtService}
           value={formatMoneyCompact(summary.debtService)}
           tone={summary.debtService > 0 ? "negative" : "neutral"}
-          sub="interest + principal + unsplit"
+          sub={copy.debtServiceDetail}
         />
         <MiniStat
-          label="Fixed"
+          label={copy.fixed}
           value={formatMoneyCompact(summary.fixedExpenses)}
-          sub={`${formatPercent(fixedShare)} of spend`}
+          sub={interpolate(copy.shareOfSpend, { share: formatPercent(fixedShare) })}
           tone="info"
         />
         <MiniStat
-          label="Variable"
+          label={copy.variable}
           value={formatMoneyCompact(summary.variableExpenses)}
-          sub={`${formatPercent(100 - fixedShare)} of spend`}
+          sub={interpolate(copy.shareOfSpend, { share: formatPercent(100 - fixedShare) })}
           tone="warning"
         />
-        <MiniStat label="Fuel" value={formatMoneyCompact(summary.fuelExpense)} />
+        <MiniStat label={copy.fuel} value={formatMoneyCompact(summary.fuelExpense)} />
         <MiniStat
-          label="Actual Cost / Mile"
+          label={copy.actualCostPerMile}
           value={formatRate(summary.costPerMile)}
           tone="negative"
-          sub="Operating Expenses only"
+          sub={copy.operatingOnly}
         />
       </section>
 

@@ -4,6 +4,9 @@ import * as React from "react";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+import { useLanguage } from "@/components/shell/language-provider";
+
 import {
   addDriverSettlementAdjustmentAction,
   deleteDriverSettlementAdjustmentAction,
@@ -28,6 +31,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export function DriverSettlementAdjustmentDialog({ settlementId }: { settlementId: string }) {
+  const { locale, dictionary } = useLanguage();
+  const copy = dictionary.driverPay;
+  const common = dictionary.common;
   const [open, setOpen] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
   const [type, setType] = React.useState<DriverSettlementAdjustmentType>("ACCESSORIAL_PAY");
@@ -42,7 +48,7 @@ export function DriverSettlementAdjustmentDialog({ settlementId }: { settlementI
     if (!parsed.success) {
       const next = fieldErrors(parsed.error);
       setErrors(next);
-      toast.error(validationMessage(next, { type: "Type", amount: "Amount", reason: "Reason" }));
+      toast.error(validationMessage(next, { type: copy.adjustmentType, amount: copy.amount, reason: copy.reason }));
       requestAnimationFrame(() => focusFirstError("driver-adjustment-form"));
       return;
     }
@@ -50,10 +56,10 @@ export function DriverSettlementAdjustmentDialog({ settlementId }: { settlementI
       const result = await addDriverSettlementAdjustmentAction(values);
       if (!result.ok) {
         setErrors(result.fieldErrors ?? {});
-        toast.error(result.error);
+        toast.error(localizedClientError(result.error));
         return;
       }
-      toast.success("Adjustment added", { description: "The draft net pay has been updated." });
+      toast.success(copy.adjustmentAdded, { description: copy.adjustmentAddedDescription });
       setAmount("");
       setReason("");
       setErrors({});
@@ -63,38 +69,38 @@ export function DriverSettlementAdjustmentDialog({ settlementId }: { settlementI
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button variant="outline" size="sm"><Plus /> Add adjustment</Button></DialogTrigger>
+      <DialogTrigger asChild><Button variant="outline" size="sm"><Plus /> {copy.addAdjustment}</Button></DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Add statement adjustment</DialogTitle>
+          <DialogTitle>{copy.addAdjustmentTitle}</DialogTitle>
           <DialogDescription>
-            Add operational earnings, reimbursements, deductions or advances. A clear reason is required for the driver-facing statement.
+            {copy.addAdjustmentDescription}
           </DialogDescription>
         </DialogHeader>
         <DialogBody>
           <form id="driver-adjustment-form" onSubmit={submit} className="space-y-4" noValidate>
-            <Field label="Adjustment type" htmlFor="adjustment-type" required error={errors.type}>
+            <Field label={copy.adjustmentType} htmlFor="adjustment-type" required error={errors.type}>
               <Select value={type} onValueChange={(value) => setType(value as DriverSettlementAdjustmentType)}>
                 <SelectTrigger id="adjustment-type"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {DRIVER_ADJUSTMENT_TYPES.map((option) => (
-                    <SelectItem key={option.id} value={option.id}>{option.label}</SelectItem>
+                    <SelectItem key={option.id} value={option.id}>{locale === "es" ? option.labelEs : option.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Amount" htmlFor="adjustment-amount" required error={errors.amount}>
+            <Field label={copy.amount} htmlFor="adjustment-amount" required error={errors.amount}>
               <Input id="adjustment-amount" type="number" min="0.01" step="0.01" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0.00" />
             </Field>
-            <Field label="Reason" htmlFor="adjustment-reason" required error={errors.reason}>
-              <Input id="adjustment-reason" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={240} placeholder="Example: Detention at receiver" />
+            <Field label={copy.reason} htmlFor="adjustment-reason" required error={errors.reason}>
+              <Input id="adjustment-reason" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={240} placeholder={copy.reasonPlaceholder} />
             </Field>
           </form>
         </DialogBody>
         <DialogFooter>
-          <Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={pending}>Cancel</Button>
+          <Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={pending}>{common.cancel}</Button>
           <Button type="submit" form="driver-adjustment-form" size="sm" disabled={pending}>
-            {pending ? <Loader2 className="animate-spin" /> : <Plus />} Add to draft
+            {pending ? <Loader2 className="animate-spin" /> : <Plus />} {copy.addToDraft}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -109,6 +115,8 @@ export function DeleteDriverSettlementAdjustmentButton({
   settlement: Pick<DriverSettlement, "id" | "status">;
   adjustmentId: string;
 }) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.driverPay;
   const [pending, startTransition] = React.useTransition();
   if (settlement.status !== "DRAFT") return null;
 
@@ -117,11 +125,11 @@ export function DeleteDriverSettlementAdjustmentButton({
       variant="ghost"
       size="icon"
       disabled={pending}
-      aria-label="Delete adjustment"
+      aria-label={copy.deleteAdjustment}
       onClick={() => startTransition(async () => {
         const result = await deleteDriverSettlementAdjustmentAction(settlement.id, adjustmentId);
-        if (!result.ok) toast.error(result.error);
-        else toast.success("Adjustment removed");
+        if (!result.ok) toast.error(localizedClientError(result.error));
+        else toast.success(copy.adjustmentRemoved);
       })}
     >
       {pending ? <Loader2 className="animate-spin" /> : <Trash2 />}

@@ -18,6 +18,9 @@ import {
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+import { useLanguage } from "@/components/shell/language-provider";
+
 import { ConfirmDelete } from "@/components/shared/confirm-delete";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Badge } from "@/components/ui/badge";
@@ -43,7 +46,9 @@ import {
 import { deleteExpenseAction } from "@/lib/actions/expenses";
 import type { Document } from "@/lib/types";
 import { behaviorOf, categoryColor, categoryLabel, EXPENSE_CATEGORIES } from "@/lib/categories";
-import { formatDateShort, formatMoney } from "@/lib/formatters";
+import { formatMoney } from "@/lib/formatters";
+import { formatLocaleDate } from "@/lib/i18n-format";
+import { interpolate } from "@/lib/i18n/dictionaries";
 import type { Expense, ExpenseBehavior, LoadWithMetrics, Truck } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ExpenseFormDialog } from "./expense-form-dialog";
@@ -71,6 +76,8 @@ export function ExpensesTable({
   defaultTruckId,
 }: ExpensesTableProps) {
   const router = useRouter();
+  const { locale, dictionary } = useLanguage();
+  const copy = dictionary.expenses;
   const [search, setSearch] = React.useState("");
   const [category, setCategory] = React.useState("all");
   const [behavior, setBehavior] = React.useState("all");
@@ -88,7 +95,7 @@ export function ExpensesTable({
       if (behavior !== "all" && behaviorOf(expense.category, categoryBehavior) !== behavior)
         return false;
       if (!query) return true;
-      return [expense.description, expense.vendor ?? "", categoryLabel(expense.category), expense.notes ?? ""]
+      return [expense.description, expense.vendor ?? "", categoryLabel(expense.category, locale), expense.notes ?? ""]
         .join(" ")
         .toLowerCase()
         .includes(query);
@@ -98,19 +105,19 @@ export function ExpensesTable({
       let cmp = 0;
       if (sort.key === "amount") cmp = a.amount - b.amount;
       else if (sort.key === "category")
-        cmp = categoryLabel(a.category).localeCompare(categoryLabel(b.category));
+        cmp = categoryLabel(a.category, locale).localeCompare(categoryLabel(b.category, locale));
       else if (sort.key === "description") cmp = a.description.localeCompare(b.description);
       else if (sort.key === "vendor") cmp = (a.vendor ?? "").localeCompare(b.vendor ?? "");
       else cmp = a.date.localeCompare(b.date);
       return sort.dir === "asc" ? cmp : -cmp;
     });
-  }, [expenses, search, category, behavior, sort, categoryBehavior]);
+  }, [expenses, search, category, behavior, sort, categoryBehavior, locale]);
 
   const total = filtered.reduce((sum, expense) => sum + expense.amount, 0);
   // With one truck every cost is that truck's, so saying so on every row is
   // noise. With a fleet it is the first thing you need to know.
   const showCharge = trucks.length > 1;
-  const truckName = (id: string | null) => trucks.find((t) => t.id === id)?.name ?? "Unknown truck";
+  const truckName = (id: string | null) => trucks.find((t) => t.id === id)?.name ?? copy.unknownTruck;
   const hasFilters = search !== "" || category !== "all" || behavior !== "all";
 
   function toggleSort(key: SortKey) {
@@ -124,19 +131,19 @@ export function ExpensesTable({
     const result = await deleteExpenseAction(expense.id);
     setDeleting(null);
     if (result.ok) {
-      toast.success("Expense deleted", { description: expense.description });
+      toast.success(copy.expenseDeleted, { description: expense.description });
       router.refresh();
     } else {
-      toast.error(result.error);
+      toast.error(localizedClientError(result.error));
     }
   }
 
   const columns: { key: SortKey; label: string; numeric?: boolean }[] = [
-    { key: "date", label: "Date" },
-    { key: "category", label: "Category" },
-    { key: "description", label: "Description" },
-    { key: "vendor", label: "Vendor" },
-    { key: "amount", label: "Amount", numeric: true },
+    { key: "date", label: copy.date },
+    { key: "category", label: copy.category },
+    { key: "description", label: copy.description },
+    { key: "vendor", label: copy.vendor },
+    { key: "amount", label: copy.amount, numeric: true },
   ];
 
   return (
@@ -147,34 +154,34 @@ export function ExpensesTable({
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search description, vendor..."
+            placeholder={copy.searchPlaceholder}
             className="pl-7"
-            aria-label="Search expenses"
+            aria-label={copy.searchLabel}
           />
         </div>
 
         <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger className="w-[11.5rem]" aria-label="Filter by category">
+          <SelectTrigger className="w-[11.5rem]" aria-label={copy.filterCategory}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All categories</SelectItem>
+            <SelectItem value="all">{copy.allCategories}</SelectItem>
             {EXPENSE_CATEGORIES.map((item) => (
               <SelectItem key={item.id} value={item.id}>
-                {item.label}
+                {categoryLabel(item.id, locale)}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
 
         <Select value={behavior} onValueChange={setBehavior}>
-          <SelectTrigger className="w-[10.5rem]" aria-label="Filter fixed or variable">
+          <SelectTrigger className="w-[10.5rem]" aria-label={copy.filterBehavior}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All costs</SelectItem>
-            <SelectItem value="FIXED">Fixed only</SelectItem>
-            <SelectItem value="VARIABLE">Variable only</SelectItem>
+            <SelectItem value="all">{copy.allCosts}</SelectItem>
+            <SelectItem value="FIXED">{copy.fixedOnly}</SelectItem>
+            <SelectItem value="VARIABLE">{copy.variableOnly}</SelectItem>
           </SelectContent>
         </Select>
 
@@ -189,23 +196,23 @@ export function ExpensesTable({
             }}
           >
             <X />
-            Clear
+            {copy.clear}
           </Button>
         ) : null}
 
         <span className="ml-auto whitespace-nowrap text-2xs text-muted-foreground tnum">
-          {filtered.length} of {expenses.length}
+          {interpolate(copy.shownOfTotal, { shown: filtered.length, total: expenses.length })}
         </span>
       </div>
 
       {filtered.length === 0 ? (
         <EmptyState
           icon={Receipt}
-          title={hasFilters ? "No expenses match these filters" : "No expenses in this period"}
+          title={hasFilters ? copy.noFilterMatches : copy.noExpenses}
           description={
             hasFilters
-              ? "Clear the filters to see everything recorded in this period."
-              : "Add an expense to start tracking cost per mile."
+              ? copy.clearFiltersDescription
+              : copy.addExpenseDescription
           }
           action={
             hasFilters ? (
@@ -218,7 +225,7 @@ export function ExpensesTable({
                   setBehavior("all");
                 }}
               >
-                Clear filters
+                {copy.clearFilters}
               </Button>
             ) : (
               <ExpenseFormDialog
@@ -260,7 +267,7 @@ export function ExpensesTable({
                     </TableHead>
                   );
                 })}
-                <TableHead className="w-[5.25rem] text-right">Actions</TableHead>
+                <TableHead className="w-[5.25rem] text-right">{dictionary.common.actions}</TableHead>
               </TableRow>
             </TableHeader>
 
@@ -278,7 +285,7 @@ export function ExpensesTable({
                 return (
                   <TableRow key={expense.id}>
                     <TableCell className="text-muted-foreground">
-                      {formatDateShort(expense.date)}
+                      {formatLocaleDate(expense.date, locale, { month: "short", day: "numeric" })}
                     </TableCell>
                     <TableCell>
                       <span className="inline-flex items-center gap-1.5">
@@ -287,9 +294,9 @@ export function ExpensesTable({
                           style={{ background: categoryColor(expense.category) }}
                           aria-hidden
                         />
-                        {categoryLabel(expense.category)}
+                        {categoryLabel(expense.category, locale)}
                         <Badge variant={isFixed ? "info" : "outline"} className="ml-0.5">
-                          {isFixed ? "Fixed" : "Var"}
+                          {isFixed ? copy.fixed : copy.variable}
                         </Badge>
                       </span>
                     </TableCell>
@@ -298,13 +305,13 @@ export function ExpensesTable({
                       {expense.recurring ? (
                         <Repeat
                           className="ml-1.5 inline size-3 text-muted-foreground"
-                          aria-label="Recurring"
+                          aria-label={copy.recurring}
                         />
                       ) : null}
                       {documents.some((d) => d.expenseId === expense.id) ? (
                         <Paperclip
                           className="ml-1.5 inline size-3 text-muted-foreground"
-                          aria-label="Receipt attached"
+                          aria-label={copy.receiptAttached}
                         />
                       ) : null}
                       {expense.receiptNumber ? (
@@ -315,18 +322,18 @@ export function ExpensesTable({
                       {mirrored ? (
                         <Badge variant="outline" className="ml-1.5">
                           {mirroredFuel
-                            ? "From Fuel"
+                            ? copy.fromFuel
                             : mirroredDriver
-                              ? "From Driver Pay"
+                              ? copy.fromDriverPay
                             : mirroredLoad
-                              ? "From Load"
-                              : "From Service"}
+                              ? copy.fromLoad
+                              : copy.fromService}
                         </Badge>
                       ) : null}
                       {showCharge ? (
                         <span className="ml-1.5 text-2xs text-muted-foreground">
                           {expense.scope === "BUSINESS"
-                            ? "Overhead"
+                            ? copy.overhead
                             : truckName(expense.truckId)}
                         </span>
                       ) : null}
@@ -346,8 +353,8 @@ export function ExpensesTable({
                               <Button
                                 variant="ghost"
                                 size="icon-sm"
-                                aria-label="Edit load expense"
-                                title="Edit here and update the linked load"
+                                aria-label={copy.editLoadExpense}
+                                title={copy.editLoadExpenseHere}
                               >
                                 <Pencil />
                               </Button>
@@ -361,7 +368,7 @@ export function ExpensesTable({
                             categoryBehavior={categoryBehavior}
                             trucks={trucks}
                             trigger={
-                              <Button variant="ghost" size="icon-sm" aria-label="Edit expense">
+                              <Button variant="ghost" size="icon-sm" aria-label={copy.editExpense}>
                                 <Pencil />
                               </Button>
                             }
@@ -379,17 +386,17 @@ export function ExpensesTable({
                               }
                               aria-label={
                                 mirroredFuel
-                                  ? "Edit on the Fuel page"
+                                  ? copy.editFuelPage
                                   : mirroredDriver
-                                    ? "Open the driver statement"
-                                    : "Edit on the Truck maintenance tab"
+                                    ? copy.openDriverStatement
+                                    : copy.editMaintenance
                               }
                               title={
                                 mirroredFuel
-                                  ? "Written by a fuel entry - edit it on the Fuel page"
+                                  ? copy.writtenByFuel
                                   : mirroredDriver
-                                    ? "Written by a paid driver statement"
-                                    : "Written by a service record - edit it on the Truck page"
+                                    ? copy.writtenByDriver
+                                    : copy.writtenByService
                               }
                             >
                               <ExternalLink />
@@ -410,7 +417,7 @@ export function ExpensesTable({
                             <Button
                               variant="ghost"
                               size="icon-sm"
-                              aria-label="Delete expense"
+                              aria-label={copy.deleteExpense}
                               disabled={deleting === expense.id}
                               className="text-muted-foreground hover:text-neg"
                             >
@@ -432,7 +439,7 @@ export function ExpensesTable({
                   colSpan={4}
                   className="text-2xs uppercase tracking-wider text-muted-foreground"
                 >
-                  Total
+                  {copy.total}
                 </TableCell>
                 <TableCell className="text-right tnum font-semibold text-neg">
                   -{formatMoney(total)}

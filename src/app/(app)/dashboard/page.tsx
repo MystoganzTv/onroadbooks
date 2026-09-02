@@ -78,7 +78,6 @@ import {
   selectActionableFinancialProblems,
   selectOwnerMoneyPresentation,
 } from "@/lib/finance";
-import type { ActionableProblem } from "@/lib/finance/presentation";
 import {
   formatMiles,
   formatMoneyCompact,
@@ -94,14 +93,18 @@ import {
   truckFromSearchParams,
   type SearchParams,
 } from "@/lib/period-params";
-import { defaultEntryDate, monthLabel, previousPeriod, todayISO, type Period } from "@/lib/periods";
+import { defaultEntryDate, monthLabel, previousPeriod, todayISO } from "@/lib/periods";
 import { recurringExpenseSuggestions } from "@/lib/recurring-expenses";
 import { roleCan } from "@/lib/roles";
 import { cn } from "@/lib/utils";
-import { appText } from "@/lib/i18n";
+import { getWebDictionary } from "@/lib/i18n/dictionaries";
+import { formatLocalePeriod } from "@/lib/i18n-format";
 import { getAppLocale } from "@/lib/i18n-server";
 
-export const metadata: Metadata = { title: "Dashboard" };
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getAppLocale();
+  return { title: getWebDictionary(locale).dashboard.metadataTitle };
+}
 
 /**
  * THE COCKPIT
@@ -129,12 +132,12 @@ export default async function DashboardPage({
 }) {
   const params = await searchParams;
   const [session, locale] = await Promise.all([requireSession(), getAppLocale()]);
-  const tx = (english: string, spanish: string) => appText(locale, english, spanish);
+  const copy = getWebDictionary(locale).dashboard;
   const role = session.role ?? "VIEWER";
   const ownerPlanning = roleCan(role, "manage_owner_finances");
   const dataset = await getRepository(session.businessId).getDataset();
   const period = periodFromSearchParams(params);
-  const periodDisplayLabel = localizedPeriodLabel(period, locale);
+  const periodDisplayLabel = formatLocalePeriod(period, locale);
   const prior = previousPeriod(period);
 
   const {
@@ -247,11 +250,8 @@ export default async function DashboardPage({
     unallocatedDebtService: ownerPlanning ? summary.unallocatedDebtService : 0,
     reserveFundingGap: cockpit && ownerPlanning ? reserveFundingGap : 0,
   });
-  const displayedProblems = locale === "es"
-    ? actionableProblems.map(localizeActionableProblem)
-    : actionableProblems;
-  const paymentDateProblem = displayedProblems.find((problem) => problem.id === "payment-dates");
-  const secondaryProblems = displayedProblems.filter((problem) => problem.id !== "payment-dates");
+  const paymentDateProblem = actionableProblems.find((problem) => problem.id === "payment-dates");
+  const secondaryProblems = actionableProblems.filter((problem) => problem.id !== "payment-dates");
   const maintenanceReserve = reserveBalanceFor(balances, "MAINTENANCE");
   // Health is reported for one unit at a time, because "miles remaining" is a
   // fact about a specific odometer.
@@ -262,13 +262,14 @@ export default async function DashboardPage({
     today,
     thresholdsFrom(settings),
     maintenanceReserve?.balance ?? 0,
+    locale,
   );
 
   const insights = buildCockpitInsights({
-    period,
+    period: { ...period, label: periodDisplayLabel },
     summary,
     previous: priorSummary,
-    previousLabel: prior.shortLabel,
+    previousLabel: formatLocalePeriod(prior, locale),
     categories,
     costBasis,
     deadhead,
@@ -279,6 +280,7 @@ export default async function DashboardPage({
     lanes,
     maintenance,
     includeOwnerPlanning: ownerPlanning,
+    locale,
   });
 
   const buckets = periodBuckets(loads, expenses, period);
@@ -318,16 +320,13 @@ export default async function DashboardPage({
     return (
       <div className="space-y-5 p-4 lg:p-6">
         <PageHeader
-          title={tx("Business Overview", "Resumen del negocio")}
-          description={tx(
-            "Revenue, costs, mileage, and cash available in one place.",
-            "Ingresos, gastos, millas y efectivo disponible en un solo lugar.",
-          )}
+          title={copy.title}
+          description={copy.description}
           actions={
             <Button asChild variant="outline" size="sm">
               <Link href="/calculator">
                 <Calculator className="size-4" />
-                {tx("Load calculator", "Calculadora de cargas")}
+                {copy.loadCalculator}
               </Link>
             </Button>
           }
@@ -345,17 +344,14 @@ export default async function DashboardPage({
   return (
     <div className="space-y-5 p-4 lg:p-6">
       <PageHeader
-        title={tx("Business Overview", "Resumen del negocio")}
-        description={tx(
-          "Revenue, costs, mileage, and cash available in one place.",
-          "Ingresos, gastos, millas y efectivo disponible en un solo lugar.",
-        )}
+        title={copy.title}
+        description={copy.description}
         actions={
           <>
             <Button asChild variant="outline" size="sm">
               <Link href="/calculator">
                 <Calculator className="size-4" />
-                {tx("Load calculator", "Calculadora de cargas")}
+                {copy.loadCalculator}
               </Link>
             </Button>
             {expenseAction}
@@ -374,8 +370,8 @@ export default async function DashboardPage({
 
       {/* ---- The bottom line ------------------------------------------- */}
       <Section
-        title={tx("The bottom line", "El resultado")}
-        description={`${periodDisplayLabel} · ${summary.loadCount} ${summary.loadCount === 1 ? tx("load", "carga") : tx("loads", "cargas")} · ${formatMiles(summary.totalMiles)}`}
+        title={copy.bottomLine}
+        description={`${periodDisplayLabel} · ${summary.loadCount} ${summary.loadCount === 1 ? copy.load : copy.loads} · ${formatMiles(summary.totalMiles)}`}
       >
         <HeroMetrics
           summary={summary}
@@ -387,12 +383,11 @@ export default async function DashboardPage({
             profitPerMile: pctChange(summary.profitPerMile, priorSummary.profitPerMile),
           }}
           showOwnerPlanning={ownerPlanning}
-          locale={locale}
         />
         {ownerPlanning && !cockpit ? (
           <PlanGate
             capability="cockpit"
-            what="Set aside tax and maintenance as each half-month closes, and see what is genuinely free to take out."
+            what={copy.cockpitGate}
           />
         ) : null}
       </Section>
@@ -416,34 +411,34 @@ export default async function DashboardPage({
 
       {/* ---- Business health -------------------------------------------- */}
       <Section
-        title={tx("Business health", "Salud del negocio")}
-        description={tx("What a mile costs, and whether the pace holds", "Cuánto cuesta cada milla y si el ritmo es sostenible")}
+        title={copy.businessHealth}
+        description={copy.healthDescription}
       >
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <MiniStat label={tx("Total Miles", "Millas totales")} value={formatNumber(summary.totalMiles)} sub="mi" />
-          <MiniStat label={tx("Loaded Miles", "Millas cargadas")} value={formatNumber(summary.loadedMiles)} sub="mi" />
+          <MiniStat label={copy.totalMiles} value={formatNumber(summary.totalMiles)} sub="mi" />
+          <MiniStat label={copy.loadedMiles} value={formatNumber(summary.loadedMiles)} sub="mi" />
           <MiniStat
-            label={tx("Deadhead Miles", "Millas vacías")}
+            label={copy.deadheadMiles}
             value={formatNumber(summary.deadheadMiles)}
             sub={formatPercent(summary.deadheadPct)}
             tone={deadhead.elevated ? "warning" : "neutral"}
           />
           <MiniStat
-            label={tx("Actual Cost / Mile", "Costo real / milla")}
+            label={copy.actualCostMile}
             value={costBasis.sufficient ? formatRateValue(costBasis.trueCostPerMile) : "—"}
-            sub={tx("actual, not prorated", "real, no prorrateado")}
+            sub={copy.actualNotProrated}
             tone="negative"
           />
           <MiniStat
-            label={tx("Revenue / Mile", "Ingreso / milla")}
+            label={copy.revenueMile}
             value={formatRateValue(summary.revenuePerMile)}
-            sub={tx("all miles", "todas las millas")}
+            sub={copy.allMiles}
             tone="info"
           />
           <MiniStat
-            label={tx("Loads Completed", "Cargas completadas")}
+            label={copy.loadsCompleted}
             value={formatNumber(summary.loadCount)}
-            sub={`${formatMoneyCompact(summary.collectedRevenue)} ${tx("collected", "cobrado")}`}
+            sub={`${formatMoneyCompact(summary.collectedRevenue)} ${copy.collected}`}
             tone="neutral"
           />
         </div>
@@ -469,7 +464,7 @@ export default async function DashboardPage({
       </Section>
 
       {/* ---- Money flow -------------------------------------------------- */}
-      <Section title={tx("Where the money went", "A dónde se fue el dinero")} description={periodDisplayLabel}>
+      <Section title={copy.moneyWent} description={periodDisplayLabel}>
         <div className="grid gap-3 xl:grid-cols-3">
           <MoneyFlow
             ownerPay={ownerPay}
@@ -483,10 +478,10 @@ export default async function DashboardPage({
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Route className="size-3.5 text-muted-foreground" />
-                <CardTitle>{tx("You Earned vs Business Expenses", "Lo que ganaste vs gastos del negocio")}</CardTitle>
+                <CardTitle>{copy.earnedVsExpenses}</CardTitle>
               </div>
               <span className="text-2xs text-muted-foreground">
-                {period.days > 62 ? tx("By month", "Por mes") : tx("By day", "Por día")}
+                {period.days > 62 ? copy.byMonth : copy.byDay}
               </span>
             </CardHeader>
             <CardContent className="px-2 py-3">
@@ -498,8 +493,8 @@ export default async function DashboardPage({
 
       {/* ---- Load performance ------------------------------------------- */}
       <Section
-        title={tx("Load performance", "Rendimiento de cargas")}
-        description={tx("The one to repeat, and the one to learn from", "La que conviene repetir y la que deja una lección")}
+        title={copy.loadPerformance}
+        description={copy.loadPerformanceDescription}
       >
         <BestWorstLoads
           best={best}
@@ -512,7 +507,7 @@ export default async function DashboardPage({
 
       {/* ---- Operations intelligence ------------------------------------ */}
       {cockpit ? (
-        <Section title={tx("Operations intelligence", "Análisis operativo")} description={tx("Who pays, and where", "Quién paga y dónde")}>
+        <Section title={copy.operations} description={copy.operationsDescription}>
           <div className="grid gap-3 lg:grid-cols-2">
             <BrokerPanel
               brokers={brokers}
@@ -531,8 +526,8 @@ export default async function DashboardPage({
 
       {/* ---- Reserves and the truck ------------------------------------- */}
       <Section
-        title={ownerPlanning ? tx("Reserves and the truck", "Reservas y camión") : tx("Truck condition", "Estado del camión")}
-        description={ownerPlanning ? tx("Am I setting enough aside", "¿Estoy reservando lo suficiente?") : tx("Maintenance due and upcoming cost", "Mantenimiento pendiente y próximos costos")}
+        title={ownerPlanning ? copy.reservesTruck : copy.truckCondition}
+        description={ownerPlanning ? copy.reservesDescription : copy.conditionDescription}
       >
         <div className="grid gap-3 lg:grid-cols-2">
           {cockpit && ownerPlanning ? (
@@ -553,33 +548,13 @@ export default async function DashboardPage({
 
       {/* ---- Insights ---------------------------------------------------- */}
       <Section
-        title={tx("Insights", "Observaciones")}
-        description={tx("Deterministic observations from this period's data", "Conclusiones directas de los datos de este período")}
+        title={copy.insights}
+        description={copy.insightsDescription}
       >
         <InsightsPanel insights={insights} />
       </Section>
     </div>
   );
-}
-
-function localizedPeriodLabel(period: Period, locale: "en" | "es"): string {
-  if (locale === "en") return period.label;
-  const [year, month] = period.month.split("-").map(Number);
-  const monthYear = new Intl.DateTimeFormat("es-US", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  })
-    .format(new Date(Date.UTC(year, month - 1, 1)))
-    .replace(/^./, (character) => character.toUpperCase());
-  if (period.key === "first") return `1–15 de ${monthYear}`;
-  if (period.key === "second") return `16–fin de ${monthYear}`;
-  if (period.key === "quarter") return `Trimestre de ${monthYear}`;
-  if (period.key === "ytd") return `${year} hasta hoy`;
-  if (period.key === "today") return `Hoy · ${period.start}`;
-  if (period.key === "week") return `Esta semana · ${period.start}–${period.end}`;
-  if (period.key === "custom") return `${period.start}–${period.end}`;
-  return monthYear;
 }
 
 function localizedMonthName(monthValue: string): string {
@@ -591,62 +566,4 @@ function localizedMonthName(monthValue: string): string {
   })
     .format(new Date(Date.UTC(year, month - 1, 1)))
     .replace(/^./, (character) => character.toUpperCase());
-}
-
-function localizeActionableProblem(problem: ActionableProblem): ActionableProblem {
-  const count = problem.count ?? 0;
-  const copy: Record<ActionableProblem["id"], Pick<ActionableProblem, "headline" | "what" | "why"> & { actionLabel: string }> = {
-    "payment-dates": {
-      headline: "Pendiente de registrar",
-      what: count > 0
-        ? `Agrega las fechas de pago de ${count} ${count === 1 ? "carga pagada" : "cargas pagadas"}.`
-        : "Estas cargas aparecen pagadas, pero OnRoad no sabe cuándo llegó el efectivo.",
-      why: "OnRoad necesita las fechas antes de incluir este dinero en tu efectivo.",
-      actionLabel: "Corregir ahora",
-    },
-    "unclassified-debt": {
-      headline: "Pagos de deuda sin clasificar",
-      what: "Algunos pagos no están divididos entre intereses y principal.",
-      why: "El efectivo que salió se conoce, pero los reportes no pueden explicar el costo financiero.",
-      actionLabel: "Clasificar deuda",
-    },
-    "missing-fuel-details": {
-      headline: "Faltan detalles de combustible",
-      what: "El costo de combustible proviene de estimados y no de cargas reales en la bomba.",
-      why: "El MPG, precio por galón e información de IFTA permanecen incompletos.",
-      actionLabel: "Agregar combustible",
-    },
-    "missing-broker-customer": {
-      headline: "Falta broker o cliente",
-      what: "Algunas cargas no identifican quién debe el dinero.",
-      why: "Sin pagador no se pueden seguir correctamente los cobros ni el rendimiento del cliente.",
-      actionLabel: "Completar clientes",
-    },
-    "missing-invoice": {
-      headline: "Faltan facturas",
-      what: "Algunas cargas completadas todavía no se han facturado.",
-      why: "El cliente no puede pagar una factura que aún no se ha emitido.",
-      actionLabel: "Crear facturas",
-    },
-    "missing-ifta-records": {
-      headline: "Faltan millas para IFTA",
-      what: "Algunos viajes no tienen las millas por jurisdicción necesarias para IFTA.",
-      why: "El reporte trimestral seguirá incompleto hasta revisar esos viajes.",
-      actionLabel: "Completar millas IFTA",
-    },
-    "reserve-funding-gap": {
-      headline: "Reservas por debajo de la meta",
-      what: "Los saldos de reserva están por debajo de las metas configuradas para el negocio.",
-      why: "Hay menos dinero protegido para impuestos, mantenimiento o emergencias de lo planificado.",
-      actionLabel: "Financiar reservas",
-    },
-  };
-  const localized = copy[problem.id];
-  return {
-    ...problem,
-    headline: localized.headline,
-    what: localized.what,
-    why: localized.why,
-    action: { ...problem.action, label: localized.actionLabel },
-  };
 }

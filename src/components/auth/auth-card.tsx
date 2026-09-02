@@ -11,6 +11,9 @@ import { AuthOptions } from "@/components/auth/auth-options";
 import { Field } from "@/components/shared/field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import type { AppLocale } from "@/lib/i18n";
+import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
+import { localizeError } from "@/lib/i18n/errors";
 import { APP_NAME } from "@/lib/utils";
 
 /**
@@ -22,15 +25,18 @@ export function AuthCard({
   initialError = null,
   initialNotice = null,
   next = null,
+  locale,
 }: {
   mode: "login" | "setup";
   initialError?: string | null;
   initialNotice?: string | null;
   /** Already validated as a path on this site by `safeNextPath`. */
   next?: string | null;
+  locale: AppLocale;
 }) {
   const router = useRouter();
   const isSetup = mode === "setup";
+  const copy = getWebDictionary(locale).auth;
 
   const [values, setValues] = React.useState({
     businessName: "",
@@ -60,7 +66,7 @@ export function AuthCard({
 
       if (!response.ok) {
         const data = (await response.json().catch(() => null)) as { error?: string } | null;
-        setError(data?.error ?? "Something went wrong. Try again.");
+        setError(localizeError(data?.error, locale));
         return;
       }
 
@@ -74,7 +80,7 @@ export function AuthCard({
       router.replace("/dashboard");
       router.refresh();
     } catch {
-      setError("Could not reach the server. Check that it is running.");
+      setError(copy.serverError);
     } finally {
       setPending(false);
     }
@@ -89,11 +95,11 @@ export function AuthCard({
             className="mb-5 inline-flex items-center gap-1.5 text-2xs text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="size-3.5" aria-hidden />
-            Back to {APP_NAME}
+            {interpolate(copy.backTo, { app: APP_NAME })}
           </Link>
           <BrandLogo className="w-40" priority />
           <p className="mt-2 text-2xs text-muted-foreground">
-            {isSetup ? "Set up your account" : "Sign in to your books"}
+            {isSetup ? copy.setupAccount : copy.signInBooks}
           </p>
         </div>
 
@@ -102,11 +108,11 @@ export function AuthCard({
           noValidate
           className="space-y-4 rounded-lg border border-border bg-card p-5"
         >
-          <AuthOptions next={next} />
+          <AuthOptions next={next} locale={locale} />
 
           {isSetup ? (
             <>
-              <Field label="Business name" htmlFor="auth-business" required>
+              <Field label={copy.businessName} htmlFor="auth-business" required>
                 <Input
                   id="auth-business"
                   value={values.businessName}
@@ -117,7 +123,7 @@ export function AuthCard({
                   autoFocus
                 />
               </Field>
-              <Field label="Your name" htmlFor="auth-name">
+              <Field label={copy.yourName} htmlFor="auth-name">
                 <Input
                   id="auth-name"
                   value={values.name}
@@ -129,7 +135,7 @@ export function AuthCard({
             </>
           ) : null}
 
-          <Field label="Email" htmlFor="auth-email" required>
+          <Field label={copy.email} htmlFor="auth-email" required>
             <Input
               id="auth-email"
               type="email"
@@ -142,10 +148,10 @@ export function AuthCard({
           </Field>
 
           <Field
-            label="Password"
+            label={copy.password}
             htmlFor="auth-password"
             required
-            hint={isSetup ? "At least 10 characters" : undefined}
+            hint={isSetup ? copy.passwordHint : undefined}
           >
             <Input
               id="auth-password"
@@ -178,29 +184,29 @@ export function AuthCard({
 
           <Button type="submit" className="w-full" disabled={pending}>
             {pending ? <Loader2 className="animate-spin" /> : null}
-            {isSetup ? "Create account" : "Sign in"}
+            {isSetup ? copy.createAccount : copy.signIn}
           </Button>
 
           <p className="text-center text-[10px] leading-relaxed text-muted-foreground">
-            By continuing, you agree to the{" "}
+            {copy.termsPrefix}{" "}
             <Link href="/terms" className="underline underline-offset-2 hover:text-foreground">
-              Terms
+              {copy.terms}
             </Link>{" "}
-            and acknowledge the{" "}
+            {copy.privacyPrefix}{" "}
             <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">
-              Privacy Policy
+              {copy.privacy}
             </Link>
             .
           </p>
         </form>
 
         <p className="mt-4 text-center text-2xs leading-relaxed text-muted-foreground">
-          {isSetup ? "Already have an account?" : "New to OnRoad Books?"}{" "}
+          {isSetup ? copy.alreadyAccount : copy.newToApp}{" "}
           <Link
             href={isSetup ? "/login" : "/setup"}
             className="font-medium text-primary hover:underline"
           >
-            {isSetup ? "Log in" : "Create an account"}
+            {isSetup ? copy.logIn : copy.createAccount}
           </Link>
         </p>
       </div>

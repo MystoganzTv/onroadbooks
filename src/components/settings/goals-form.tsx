@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { Loader2, Target } from "lucide-react";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+
 import { Field } from "@/components/shared/field";
+import { useLanguage } from "@/components/shell/language-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,25 +22,10 @@ import {
 import { updateGoalsAction } from "@/lib/actions/goals";
 import { fieldErrors, focusFirstError, validationMessage } from "@/lib/form";
 import { formatMoney } from "@/lib/formatters";
+import { interpolate } from "@/lib/i18n/dictionaries";
 import { goalSchema } from "@/lib/schemas";
 import type { FinancialGoal } from "@/lib/types";
 import { toNumber, toRequiredNumber } from "@/lib/utils";
-
-const FIELD_LABELS: Record<string, string> = {
-  monthlyRevenueTarget: "Monthly booked revenue target",
-  monthlyProfitTarget: "Monthly operating profit target",
-  targetProfitPerMile: "Target operating profit per mile",
-  maxDeadheadPct: "Maximum deadhead",
-  targetLoads: "Target loads",
-  workingDaysPerWeek: "Working days per week",
-  expectedMonthlyMiles: "Expected monthly miles",
-};
-
-const DAY_OPTIONS = [
-  { value: "5", label: "5 — Monday to Friday" },
-  { value: "6", label: "6 — Monday to Saturday" },
-  { value: "7", label: "7 — every day" },
-];
 
 /**
  * Targets are monthly. Everything shorter is pro-rated by working days and
@@ -46,6 +34,19 @@ const DAY_OPTIONS = [
  */
 export function GoalsForm({ goals }: { goals: FinancialGoal }) {
   const router = useRouter();
+  const { dictionary } = useLanguage();
+  const copy = dictionary.settings;
+  const fieldLabels: Record<string, string> = {
+    monthlyRevenueTarget: copy.monthlyRevenueTarget, monthlyProfitTarget: copy.monthlyProfitTarget,
+    targetProfitPerMile: copy.targetProfitMile, maxDeadheadPct: copy.maximumDeadhead,
+    targetLoads: copy.targetLoads, workingDaysPerWeek: copy.workingDays,
+    expectedMonthlyMiles: copy.expectedMonthlyMiles,
+  };
+  const dayOptions = [
+    { value: "5", label: copy.mondayFriday },
+    { value: "6", label: copy.mondaySaturday },
+    { value: "7", label: copy.everyDay },
+  ];
   const [pending, startTransition] = React.useTransition();
   const [errors, setErrors] = React.useState<Record<string, string>>({});
 
@@ -83,7 +84,7 @@ export function GoalsForm({ goals }: { goals: FinancialGoal }) {
     if (!parsed.success) {
       const next = fieldErrors(parsed.error);
       setErrors(next);
-      toast.error(validationMessage(next, FIELD_LABELS));
+      toast.error(validationMessage(next, fieldLabels));
       requestAnimationFrame(() => focusFirstError("goals-form"));
       return;
     }
@@ -92,11 +93,11 @@ export function GoalsForm({ goals }: { goals: FinancialGoal }) {
     startTransition(async () => {
       const result = await updateGoalsAction(payload);
       if (result.ok) {
-        toast.success("Targets saved");
+        toast.success(copy.targetsSaved);
         router.refresh();
       } else {
         if (result.fieldErrors) setErrors(result.fieldErrors);
-        toast.error(result.error);
+        toast.error(localizedClientError(result.error));
       }
     });
   }
@@ -107,14 +108,14 @@ export function GoalsForm({ goals }: { goals: FinancialGoal }) {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Target className="size-3.5 text-muted-foreground" />
-            <CardTitle>Targets</CardTitle>
+            <CardTitle>{copy.targets}</CardTitle>
           </div>
-          <span className="text-2xs text-muted-foreground">Monthly, pro-rated per period</span>
+          <span className="text-2xs text-muted-foreground">{copy.targetsDescription}</span>
         </CardHeader>
 
         <CardContent className="grid gap-3 p-4 sm:grid-cols-2">
           <Field
-            label="Monthly revenue target"
+            label={copy.monthlyRevenueTarget}
             htmlFor="goal-revenue"
             required
             error={errors.monthlyRevenueTarget}
@@ -128,14 +129,14 @@ export function GoalsForm({ goals }: { goals: FinancialGoal }) {
           </Field>
 
           <Field
-            label="Monthly profit target"
+            label={copy.monthlyProfitTarget}
             htmlFor="goal-profit"
             required
             error={errors.monthlyProfitTarget}
             hint={
               dailyProfit > 0
-                ? `About ${formatMoney(dailyProfit)} a working day`
-                : "Drives the daily verdict on the dashboard"
+                ? interpolate(copy.dailyProfitHint, { amount: formatMoney(dailyProfit) })
+                : copy.dailyVerdictHint
             }
           >
             <Input
@@ -147,11 +148,11 @@ export function GoalsForm({ goals }: { goals: FinancialGoal }) {
           </Field>
 
           <Field
-            label="Target profit / mile"
+            label={copy.targetProfitMile}
             htmlFor="goal-ppm"
             required
             error={errors.targetProfitPerMile}
-            hint="Also the default in the target rate calculator"
+            hint={copy.calculatorDefault}
           >
             <Input
               id="goal-ppm"
@@ -162,11 +163,11 @@ export function GoalsForm({ goals }: { goals: FinancialGoal }) {
           </Field>
 
           <Field
-            label="Maximum deadhead %"
+            label={copy.maximumDeadhead}
             htmlFor="goal-deadhead"
             required
             error={errors.maxDeadheadPct}
-            hint="A ceiling, not a target"
+            hint={copy.ceilingNotTarget}
           >
             <Input
               id="goal-deadhead"
@@ -177,10 +178,10 @@ export function GoalsForm({ goals }: { goals: FinancialGoal }) {
           </Field>
 
           <Field
-            label="Target loads a month"
+            label={copy.targetLoads}
             htmlFor="goal-loads"
             error={errors.targetLoads}
-            hint="Optional"
+            hint={copy.optional}
           >
             <Input
               id="goal-loads"
@@ -191,11 +192,11 @@ export function GoalsForm({ goals }: { goals: FinancialGoal }) {
           </Field>
 
           <Field
-            label="Expected monthly miles"
+            label={copy.expectedMonthlyMiles}
             htmlFor="goal-miles"
             required
             error={errors.expectedMonthlyMiles}
-            hint="Loaded plus deadhead; used only for planning"
+            hint={copy.planningOnly}
           >
             <Input
               id="goal-miles"
@@ -206,11 +207,11 @@ export function GoalsForm({ goals }: { goals: FinancialGoal }) {
           </Field>
 
           <Field
-            label="Working days a week"
+            label={copy.workingDays}
             htmlFor="goal-days"
             required
             error={errors.workingDaysPerWeek}
-            hint="Sets the daily target and the month-end projection"
+            hint={copy.workingDaysHint}
           >
             <Select
               value={values.workingDaysPerWeek}
@@ -220,7 +221,7 @@ export function GoalsForm({ goals }: { goals: FinancialGoal }) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {DAY_OPTIONS.map((option) => (
+                {dayOptions.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
                   </SelectItem>
@@ -233,7 +234,7 @@ export function GoalsForm({ goals }: { goals: FinancialGoal }) {
         <CardFooter className="justify-end gap-2">
           <Button type="submit" size="sm" disabled={pending}>
             {pending ? <Loader2 className="animate-spin" /> : null}
-            Save targets
+            {copy.saveTargets}
           </Button>
         </CardFooter>
       </form>

@@ -60,7 +60,7 @@ export function AppShell({
       {/* Mobile drawer */}
       <Dialog open={mobileOpen} onOpenChange={setMobileOpen}>
         <DialogContent className="left-0 top-0 h-dvh w-64 max-w-[80vw] translate-x-0 translate-y-0 grid-rows-1 rounded-none border-y-0 border-l-0 p-0 data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left">
-          <DialogTitle className="sr-only">Navigation</DialogTitle>
+          <DialogTitle className="sr-only">{copy.navigation}</DialogTitle>
           <SidebarNav
             businessName={businessName}
             truckName={truckName}
@@ -85,7 +85,7 @@ export function AppShell({
             variant="ghost"
             size="icon-sm"
             onClick={() => setMobileOpen(true)}
-            aria-label="Open navigation"
+            aria-label={copy.openNavigation}
           >
             <Menu />
           </Button>

@@ -12,6 +12,7 @@ import {
 } from "recharts";
 
 import { ChartTooltip } from "./chart-tooltip";
+import { useLanguage } from "@/components/shell/language-provider";
 
 export interface RevenueExpensePoint {
   label: string;
@@ -33,6 +34,7 @@ export function RevenueExpenseChart({
   data: RevenueExpensePoint[];
   height?: number;
 }) {
+  const { dictionary } = useLanguage();
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data} margin={{ top: 8, right: 8, left: -12, bottom: 0 }} barGap={2}>
@@ -57,8 +59,8 @@ export function RevenueExpenseChart({
           iconSize={8}
           wrapperStyle={{ fontSize: 11, color: "hsl(var(--muted-foreground))" }}
         />
-        <Bar dataKey="revenue" name="You earned" fill="hsl(var(--pos))" radius={[2, 2, 0, 0]} maxBarSize={26} />
-        <Bar dataKey="expenses" name="Business expenses" fill="hsl(var(--neg))" radius={[2, 2, 0, 0]} maxBarSize={26} />
+        <Bar dataKey="revenue" name={dictionary.reports.earned} fill="hsl(var(--pos))" radius={[2, 2, 0, 0]} maxBarSize={26} />
+        <Bar dataKey="expenses" name={dictionary.reports.businessExpenses} fill="hsl(var(--neg))" radius={[2, 2, 0, 0]} maxBarSize={26} />
       </BarChart>
     </ResponsiveContainer>
   );

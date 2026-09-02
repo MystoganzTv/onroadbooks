@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { Loader2, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+import { useLanguage } from "@/components/shell/language-provider";
+
 import { createDriverAction, updateDriverAction } from "@/lib/actions/drivers";
 import { DRIVER_PAY_TYPES } from "@/lib/driver-pay";
 import { fieldErrors, focusFirstError, validationMessage } from "@/lib/form";
@@ -32,14 +35,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const FIELD_LABELS = {
-  name: "Driver name",
-  reference: "Internal reference",
-  defaultTruckId: "Default truck",
-  payType: "Pay method",
-  payRate: "Pay rate",
-};
-
 export function DriverFormDialog({
   driver,
   trucks,
@@ -50,6 +45,9 @@ export function DriverFormDialog({
   trigger?: React.ReactNode;
 }) {
   const router = useRouter();
+  const { locale, dictionary } = useLanguage();
+  const copy = dictionary.drivers;
+  const common = dictionary.common;
   const [open, setOpen] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
   const [errors, setErrors] = React.useState<Record<string, string>>({});
@@ -88,7 +86,13 @@ export function DriverFormDialog({
     if (!parsed.success) {
       const next = fieldErrors(parsed.error);
       setErrors(next);
-      toast.error(validationMessage(next, FIELD_LABELS));
+      toast.error(validationMessage(next, {
+        name: copy.driverName,
+        reference: copy.internalReference,
+        defaultTruckId: copy.defaultTruck,
+        payType: copy.payMethod,
+        payRate: copy.payRate,
+      }));
       requestAnimationFrame(() => focusFirstError("driver-form"));
       return;
     }
@@ -98,10 +102,10 @@ export function DriverFormDialog({
         : await createDriverAction(values);
       if (!result.ok) {
         setErrors(result.fieldErrors ?? {});
-        toast.error(result.error);
+        toast.error(localizedClientError(result.error));
         return;
       }
-      toast.success(driver ? "Driver updated" : "Driver added");
+      toast.success(driver ? copy.driverUpdated : copy.driverAdded);
       setOpen(false);
       router.refresh();
     });
@@ -112,22 +116,21 @@ export function DriverFormDialog({
       <DialogTrigger asChild>
         {trigger ?? (
           <Button size="sm">
-            <Plus /> Add driver
+            <Plus /> {copy.addDriver}
           </Button>
         )}
       </DialogTrigger>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{driver ? "Edit driver" : "Add driver"}</DialogTitle>
+          <DialogTitle>{driver ? copy.editDriver : copy.addDriver}</DialogTitle>
           <DialogDescription>
-            Store only operational pay terms. SSNs, bank details and tax withholding stay outside
-            OnRoad Books.
+            {copy.formDescription}
           </DialogDescription>
         </DialogHeader>
         <DialogBody>
           <form id="driver-form" onSubmit={submit} className="space-y-4" noValidate>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Driver name" htmlFor="driver-name" required error={errors.name}>
+              <Field label={copy.driverName} htmlFor="driver-name" required error={errors.name}>
                 <Input
                   id="driver-name"
                   value={name}
@@ -137,9 +140,9 @@ export function DriverFormDialog({
                 />
               </Field>
               <Field
-                label="Internal reference"
+                label={copy.internalReference}
                 htmlFor="driver-reference"
-                hint="Optional employee or contractor code"
+                hint={copy.referenceHint}
                 error={errors.reference}
               >
                 <Input
@@ -152,39 +155,39 @@ export function DriverFormDialog({
               </Field>
             </div>
             <Field
-              label="Default truck"
+              label={copy.defaultTruck}
               htmlFor="driver-truck"
-              hint="Entry shortcut only; every load keeps the truck it actually ran"
+              hint={copy.defaultTruckHint}
             >
               <Select value={defaultTruckId} onValueChange={setDefaultTruckId}>
                 <SelectTrigger id="driver-truck"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="NO_DEFAULT">No default truck</SelectItem>
+                  <SelectItem value="NO_DEFAULT">{copy.noDefaultTruck}</SelectItem>
                   {trucks.filter((truck) => truck.active || truck.id === driver?.defaultTruckId).map((truck) => (
                     <SelectItem key={truck.id} value={truck.id}>
-                      {truck.name}{truck.active ? "" : " (retired)"}
+                      {truck.name}{truck.active ? "" : ` (${copy.retired})`}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </Field>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Pay method" htmlFor="driver-pay-type" required>
+              <Field label={copy.payMethod} htmlFor="driver-pay-type" required>
                 <Select value={payType} onValueChange={(value) => setPayType(value as DriverPayType)}>
                   <SelectTrigger id="driver-pay-type"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {DRIVER_PAY_TYPES.map((type) => (
-                      <SelectItem key={type.id} value={type.id}>{type.label}</SelectItem>
+                      <SelectItem key={type.id} value={type.id}>{locale === "es" ? type.labelEs : type.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </Field>
               <Field
-                label={definition.rateLabel}
+                label={locale === "es" ? definition.rateLabelEs : definition.rateLabel}
                 htmlFor="driver-pay-rate"
                 required
                 error={errors.payRate}
-                hint={definition.suffix}
+                hint={locale === "es" ? definition.suffixEs : definition.suffix}
               >
                 <Input
                   id="driver-pay-rate"
@@ -201,11 +204,11 @@ export function DriverFormDialog({
         </DialogBody>
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={pending}>
-            Cancel
+            {common.cancel}
           </Button>
           <Button size="sm" type="submit" form="driver-form" disabled={pending}>
             {pending ? <Loader2 className="animate-spin" /> : driver ? <Pencil /> : <Plus />}
-            {driver ? "Save driver" : "Add driver"}
+            {driver ? copy.saveDriver : copy.addDriver}
           </Button>
         </DialogFooter>
       </DialogContent>

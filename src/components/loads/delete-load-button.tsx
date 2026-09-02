@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+import { useLanguage } from "@/components/shell/language-provider";
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,8 +20,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { deleteLoadAction } from "@/lib/actions/loads";
+import { interpolate } from "@/lib/i18n/dictionaries";
 
 export function DeleteLoadButton({ id, label }: { id: string; label: string }) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.loads;
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
@@ -27,12 +33,12 @@ export function DeleteLoadButton({ id, label }: { id: string; label: string }) {
     startTransition(async () => {
       const result = await deleteLoadAction(id);
       if (result.ok) {
-        toast.success("Load deleted", { description: label });
+        toast.success(copy.deleted, { description: label });
         setOpen(false);
         router.push("/loads");
         router.refresh();
       } else {
-        toast.error(result.error);
+        toast.error(localizedClientError(result.error));
       }
     });
   }
@@ -42,28 +48,28 @@ export function DeleteLoadButton({ id, label }: { id: string; label: string }) {
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="text-muted-foreground hover:text-neg">
           <Trash2 />
-          Delete
+          {copy.delete}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Delete this load?</DialogTitle>
+          <DialogTitle>{copy.deleteTitle}</DialogTitle>
           <DialogDescription>
-            {label}. Revenue and miles from this load are removed from every period total.
+            {interpolate(copy.deleteDescription, { label })}
           </DialogDescription>
         </DialogHeader>
         <DialogBody>
           <p className="text-sm text-muted-foreground">
-            Linked expenses and fuel entries are kept, but unlinked from this load.
+            {copy.unlinkDescription}
           </p>
         </DialogBody>
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
-            Cancel
+            {dictionary.common.cancel}
           </Button>
           <Button variant="destructive" size="sm" onClick={confirm} disabled={pending}>
             {pending ? <Loader2 className="animate-spin" /> : null}
-            Delete load
+            {copy.deleteLoad}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, ChevronRight, Package } from "lucide-react";
 
 import { EmptyState } from "@/components/shared/empty-state";
+import { useLanguage } from "@/components/shell/language-provider";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,20 +18,23 @@ import {
   TableRow,
   TableWrapper,
 } from "@/components/ui/table";
-import { formatDateShort, formatMoney, formatNumber, formatRateValue } from "@/lib/formatters";
+import { formatMoney, formatNumber, formatRateValue } from "@/lib/formatters";
+import { formatLocaleDate } from "@/lib/i18n-format";
 import type { LoadWithMetrics } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export function RecentLoads({ loads }: { loads: LoadWithMetrics[] }) {
   const router = useRouter();
+  const { locale, dictionary } = useLanguage();
+  const copy = dictionary.dashboard;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Recent Loads</CardTitle>
+        <CardTitle>{copy.recentLoads}</CardTitle>
         <Button asChild variant="ghost" size="sm" className="-my-1 text-muted-foreground">
           <Link href="/loads">
-            All loads
+            {copy.allLoads}
             <ArrowRight />
           </Link>
         </Button>
@@ -39,8 +43,8 @@ export function RecentLoads({ loads }: { loads: LoadWithMetrics[] }) {
       {loads.length === 0 ? (
         <EmptyState
           icon={Package}
-          title="No loads in this period"
-          description="Pick another period, or add a load to see it here."
+          title={copy.noLoadsPeriod}
+          description={copy.pickPeriod}
           compact
         />
       ) : (
@@ -48,13 +52,13 @@ export function RecentLoads({ loads }: { loads: LoadWithMetrics[] }) {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead>Date</TableHead>
-                <TableHead>Route</TableHead>
-                <TableHead className="hidden sm:table-cell">Broker</TableHead>
-                <TableHead className="text-right">Miles</TableHead>
-                <TableHead className="text-right">Rate</TableHead>
-                <TableHead className="text-right">Contribution/mi</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>{copy.date}</TableHead>
+                <TableHead>{copy.route}</TableHead>
+                <TableHead className="hidden sm:table-cell">{copy.broker}</TableHead>
+                <TableHead className="text-right">{copy.miles}</TableHead>
+                <TableHead className="text-right">{copy.rate}</TableHead>
+                <TableHead className="text-right">{copy.contributionPerMile}</TableHead>
+                <TableHead>{copy.status}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -65,7 +69,7 @@ export function RecentLoads({ loads }: { loads: LoadWithMetrics[] }) {
                   onClick={() => router.push(`/loads/${load.id}`)}
                 >
                   <TableCell className="text-muted-foreground">
-                    {formatDateShort(load.date)}
+                    {formatLocaleDate(load.date, locale, "short")}
                   </TableCell>
                   <TableCell>
                     <Link
@@ -74,7 +78,7 @@ export function RecentLoads({ loads }: { loads: LoadWithMetrics[] }) {
                       className="rounded-sm outline-none group-hover:underline focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       {load.originCity}, {load.originState}
-                      <span className="mx-1 text-muted-foreground">to</span>
+                      <span className="mx-1 text-muted-foreground">{dictionary.loads.to}</span>
                       {load.destinationCity}, {load.destinationState}
                     </Link>
                   </TableCell>

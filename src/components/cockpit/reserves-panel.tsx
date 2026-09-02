@@ -1,10 +1,14 @@
+"use client";
+
 import Link from "next/link";
 import { Landmark } from "lucide-react";
 
+import { useLanguage } from "@/components/shell/language-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney, formatMoneyCompact } from "@/lib/formatters";
 import type { ReserveLine } from "@/lib/finance/owner-pay";
 import type { ReserveBalance } from "@/lib/types";
+import { interpolate } from "@/lib/i18n/dictionaries";
 import { cn } from "@/lib/utils";
 
 /**
@@ -24,18 +28,20 @@ export function ReservesPanel({
   href?: string;
   className?: string;
 }) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.dashboard;
   return (
     <Card className={className}>
       <CardHeader>
         <div className="flex items-center gap-2">
           <Landmark className="size-3.5 text-muted-foreground" />
-          <CardTitle>Reserves</CardTitle>
+          <CardTitle>{copy.reserves}</CardTitle>
         </div>
         <Link
           href={href}
           className="text-2xs font-medium text-primary underline-offset-2 hover:underline focus-ring"
         >
-          Manage
+          {copy.manage}
         </Link>
       </CardHeader>
       <CardContent className="p-0">
@@ -54,8 +60,10 @@ export function ReservesPanel({
                 </div>
 
                 <p className="mt-0.5 text-2xs text-muted-foreground tnum">
-                  To set aside for {periodLabel} · recorded balance{" "}
-                  {formatMoneyCompact(balance.balance)}
+                  {interpolate(copy.setAsideFor, {
+                    period: periodLabel,
+                    balance: formatMoneyCompact(balance.balance),
+                  })}
                 </p>
 
                 {balance.targetProgress !== null ? (
@@ -72,13 +80,16 @@ export function ReservesPanel({
 
                 <p className="mt-1 text-2xs text-muted-foreground tnum">
                   {balance.periodContributions > 0
-                    ? `+${formatMoney(balance.periodContributions)} in ${periodLabel}`
-                    : `No contribution in ${periodLabel}`}
+                    ? interpolate(copy.contributedIn, {
+                        amount: formatMoney(balance.periodContributions),
+                        period: periodLabel,
+                      })
+                    : interpolate(copy.noContributionIn, { period: periodLabel })}
                   {balance.periodWithdrawals > 0
-                    ? ` · -${formatMoney(balance.periodWithdrawals)} taken out`
+                    ? ` · -${interpolate(copy.takenOut, { amount: formatMoney(balance.periodWithdrawals) })}`
                     : ""}
                   {balance.account.targetBalance
-                    ? ` · target ${formatMoneyCompact(balance.account.targetBalance)}`
+                    ? ` · ${interpolate(copy.targetAmount, { amount: formatMoneyCompact(balance.account.targetBalance) })}`
                     : ""}
                 </p>
               </li>
@@ -86,8 +97,7 @@ export function ReservesPanel({
           })}
         </ul>
         <p className="border-t border-border px-4 py-2 text-2xs leading-relaxed text-muted-foreground">
-          Saved percentages calculate what to set aside immediately. Recorded balances change
-          only when you close a settlement or add a contribution.
+          {copy.reserveExplanation}
         </p>
       </CardContent>
     </Card>

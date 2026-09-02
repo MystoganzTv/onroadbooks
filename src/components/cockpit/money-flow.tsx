@@ -1,13 +1,15 @@
 import { ArrowDown, ChevronDown, CircleDollarSign } from "lucide-react";
 
-import { categoryColor } from "@/lib/categories";
+import { categoryColor, categoryLabel } from "@/lib/categories";
 import { formatMoney, formatMoneyCompact, formatPercent } from "@/lib/formatters";
 import type { OwnerPay } from "@/lib/finance/owner-pay";
 import { selectOwnerMoneyPresentation } from "@/lib/finance/presentation";
 import { isOperatingExpenseCategory } from "@/lib/finance/terminology";
 import type { CategoryTotal } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { appText, type AppLocale } from "@/lib/i18n";
+import type { AppLocale } from "@/lib/i18n";
+import { useLanguage } from "@/components/shell/language-provider";
+import { interpolate } from "@/lib/i18n/dictionaries";
 
 interface MoneyFlowProps {
   ownerPay: OwnerPay;
@@ -29,7 +31,8 @@ export function MoneyFlow({
   showOwnerPlanning = true,
   locale = "en",
 }: MoneyFlowProps) {
-  const tx = (english: string, spanish: string) => appText(locale, english, spanish);
+  const { dictionary } = useLanguage();
+  const copy = dictionary.dashboard;
   const presentation = selectOwnerMoneyPresentation({
     ...ownerPay,
     safeToPay: ownerPay.safeToPay,
@@ -48,7 +51,7 @@ export function MoneyFlow({
   const shown = operatingCategories.slice(0, maxRows);
   const restTotal = operatingCategories.slice(maxRows).reduce((total, row) => total + row.amount, 0);
   const rows = restTotal > 0
-    ? [...shown, { category: "OTHER" as const, label: "Everything else", amount: restTotal, share: 0, behavior: "VARIABLE" as const, count: 0 }]
+    ? [...shown, { category: "OTHER" as const, label: copy.everythingElse, amount: restTotal, share: 0, behavior: "VARIABLE" as const, count: 0 }]
     : shown;
   const available = presentation.availableToYou.state === "KNOWN"
     ? presentation.availableToYou.amount
@@ -63,7 +66,7 @@ export function MoneyFlow({
   if (revenue <= 0 && ownerPay.operatingExpenses <= 0) {
     return (
       <div className={cn("rounded-lg border border-dashed border-border bg-card p-8 text-center", className)}>
-        <p className="text-sm text-muted-foreground">{tx("No money activity recorded for", "No hay actividad de dinero registrada para")} {periodLabel}.</p>
+        <p className="text-sm text-muted-foreground">{interpolate(copy.noMoneyActivity, { period: periodLabel })}</p>
       </div>
     );
   }
@@ -75,32 +78,32 @@ export function MoneyFlow({
           <CircleDollarSign className="size-4" />
         </span>
         <div>
-          <h3 className="text-sm font-semibold">{tx("Where is my money?", "¿Dónde está mi dinero?")}</h3>
+          <h3 className="text-sm font-semibold">{copy.whereMoney}</h3>
           <p className="mt-0.5 text-2xs leading-relaxed text-muted-foreground">
-            {tx("One path from work completed to cash that is actually free to take.", "El recorrido desde el trabajo completado hasta el efectivo que realmente puedes retirar.")}
+            {copy.whereMoneyDescription}
           </p>
         </div>
       </header>
 
       <div className="grid lg:grid-cols-2">
         <div className="border-b border-border lg:border-b-0 lg:border-r">
-          <FlowHeading label={tx("Performance · what the business produced", "Rendimiento · lo que produjo el negocio")} />
-          <FlowRow label={tx("You earned", "Ganaste")} question={tx("How much did I earn?", "¿Cuánto gané?")} value={revenue} tone="info" width={width(revenue)} />
+          <FlowHeading label={copy.performanceHeading} />
+          <FlowRow label={copy.youEarned} question={copy.howMuchEarn} value={revenue} tone="info" width={width(revenue)} />
 
           <div className="space-y-2 border-t border-border px-4 py-3">
             <div className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-1.5 text-2xs font-medium uppercase tracking-wide text-muted-foreground">
-                <ArrowDown className="size-3" /> {tx("Business expenses", "Gastos del negocio")}
+                <ArrowDown className="size-3" /> {copy.businessExpenses}
               </span>
               <span className="text-sm font-semibold text-neg tnum">-{formatMoney(ownerPay.operatingExpenses)}</span>
             </div>
             {rows.length === 0 ? (
-              <p className="text-xs text-muted-foreground">{tx("No business expenses in this period.", "No hay gastos del negocio en este período.")}</p>
+              <p className="text-xs text-muted-foreground">{copy.noBusinessExpenses}</p>
             ) : (
               <ul className="space-y-1.5">
                 {rows.map((row) => (
                   <li key={row.category + row.label} className="grid grid-cols-[7.5rem_1fr_auto] items-center gap-2.5">
-                    <span className="truncate text-xs text-muted-foreground">{row.label}</span>
+                    <span className="truncate text-xs text-muted-foreground">{row.category === "OTHER" && restTotal > 0 ? copy.everythingElse : categoryLabel(row.category, locale)}</span>
                     <span className="h-2 overflow-hidden rounded-full bg-surface-sunken">
                       <span
                         className="block h-full rounded-full"
@@ -115,45 +118,45 @@ export function MoneyFlow({
           </div>
 
           <FlowRow
-            label={tx("Your business made", "Tu negocio produjo")}
-            question={tx("How much did the business make?", "¿Cuánto produjo el negocio?")}
+            label={copy.businessMade}
+            question={copy.howMuchMade}
             value={ownerPay.operatingProfit}
             tone={ownerPay.operatingProfit >= 0 ? "positive" : "negative"}
             width={width(ownerPay.operatingProfit)}
-            note={revenue > 0 ? `${formatPercent((ownerPay.operatingProfit / revenue) * 100)} margin after operating costs` : undefined}
+            note={revenue > 0 ? interpolate(copy.marginAfterCosts, { percent: formatPercent((ownerPay.operatingProfit / revenue) * 100) }) : undefined}
           />
         </div>
 
         <div>
-          <FlowHeading label={tx("Cash · what is available now", "Efectivo · lo que está disponible ahora")} />
-          <FlowRow label={tx("You collected", "Cobraste")} question={tx("How much did I collect?", "¿Cuánto cobré?")} value={ownerPay.collectedRevenue} tone="info" width={width(ownerPay.collectedRevenue)} />
+          <FlowHeading label={copy.cashHeading} />
+          <FlowRow label={copy.youCollected} question={copy.howMuchCollect} value={ownerPay.collectedRevenue} tone="info" width={width(ownerPay.collectedRevenue)} />
           {stillWaiting !== null && stillWaiting > 0 ? (
             <FlowRow
-              label={tx("Waiting to be recorded", "Pendiente de registrar")}
-              question={tx("How much is still owed or needs a payment date?", "¿Cuánto falta cobrar o necesita fecha de pago?")}
+              label={copy.waitingRecorded}
+              question={copy.howMuchWaiting}
               value={stillWaiting}
               tone="warning"
               width={width(stillWaiting)}
-              note={tx("Not counted as available cash", "No se cuenta como efectivo disponible")}
+              note={copy.notAvailableCash}
             />
           ) : null}
-          <FlowRow label={tx("Business expenses", "Gastos del negocio")} question={tx("How much did I spend running the business?", "¿Cuánto gasté operando el negocio?")} value={-ownerPay.operatingExpenses} tone="negative" width={width(ownerPay.operatingExpenses)} />
-          <FlowRow label={tx("Debt & financing payments", "Pagos de deuda y financiamiento")} question={tx("How much went to debt and financing?", "¿Cuánto fue a deuda y financiamiento?")} value={-ownerPay.debtService} tone="negative" width={width(ownerPay.debtService)} />
+          <FlowRow label={copy.businessExpenses} question={copy.howMuchSpend} value={-ownerPay.operatingExpenses} tone="negative" width={width(ownerPay.operatingExpenses)} />
+          <FlowRow label={copy.debtPayments} question={copy.howMuchDebt} value={-ownerPay.debtService} tone="negative" width={width(ownerPay.debtService)} />
 
           {showOwnerPlanning ? (
             <div className={cn("border-t-2 px-4 py-4", (available ?? 0) > 0 ? "border-pos/40 bg-pos-soft/40" : "border-info/35 bg-info-soft/30")}>
               <div className="flex items-end justify-between gap-3">
                 <div>
-                  <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{tx("Available to you", "Disponible para ti")}</p>
-                  <p className="mt-1 text-2xs text-muted-foreground">{tx("How much can I take?", "¿Cuánto puedo retirar?")}</p>
+                  <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{copy.availableToYou}</p>
+                  <p className="mt-1 text-2xs text-muted-foreground">{copy.howMuchTake}</p>
                 </div>
                 <span className={cn("text-3xl font-semibold tracking-tight tnum", (available ?? 0) > 0 ? "text-pos" : "text-info")}>
-                  {available === null ? tx("Not enough data", "Datos insuficientes") : formatMoneyCompact(available)}
+                  {available === null ? copy.notEnoughData : formatMoneyCompact(available)}
                 </span>
               </div>
               {fundingGap !== null && fundingGap > 0 ? (
                 <p className="mt-2 text-xs text-neg tnum">
-                  {tx("Cash still needed", "Efectivo que aún falta")}: {formatMoney(fundingGap)}
+                  {copy.cashStillNeeded}: {formatMoney(fundingGap)}
                 </p>
               ) : null}
             </div>
@@ -163,14 +166,14 @@ export function MoneyFlow({
             <div className="border-t border-border bg-surface-sunken/45 px-4 py-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                  {tx("When cash is available", "Cuando haya efectivo disponible")}
+                  {copy.whenCashAvailable}
                 </p>
                 <p className="text-xs font-semibold text-warn tnum">
-                  {tx("Suggested set aside", "Reserva sugerida")}: {formatMoneyCompact(ownerPay.reserveTotal)}
+                  {copy.suggestedSetAside}: {formatMoneyCompact(ownerPay.reserveTotal)}
                 </p>
               </div>
               <p className="mt-1 text-2xs text-muted-foreground">
-                {tx("Recommended reserves are not added to today's cash shortfall.", "Las reservas recomendadas no se suman al efectivo que falta hoy.")}
+                {copy.reservesNotShortfall}
               </p>
             </div>
           ) : null}
@@ -179,18 +182,18 @@ export function MoneyFlow({
 
       <details className="group border-t border-border">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-xs font-medium text-muted-foreground hover:bg-accent/35 hover:text-foreground focus-ring">
-          {tx("Financial details", "Detalles financieros")}
+          {copy.financialDetails}
           <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
         </summary>
         <dl className="grid gap-px border-t border-border bg-border/70 sm:grid-cols-2 lg:grid-cols-4">
-          <Detail label={tx("Booked Revenue", "Ingresos registrados")} value={ownerPay.bookedRevenue} />
-          <Detail label={tx("Collected Revenue", "Ingresos cobrados")} value={ownerPay.collectedRevenue} />
-          <Detail label={tx("Accounts Receivable", "Cuentas por cobrar")} value={ownerPay.accountsReceivable} />
-          <Detail label={tx("Operating Profit", "Ganancia operativa")} value={ownerPay.operatingProfit} />
-          <Detail label={tx("Interest Expense", "Gasto de intereses")} value={ownerPay.interestExpense} />
-          <Detail label={tx("Principal Payment", "Pago de principal")} value={ownerPay.principalPayment} />
-          <Detail label={tx("Debt Service", "Servicio de deuda")} value={ownerPay.debtService} />
-          <Detail label={tx("Cash After Debt Service", "Efectivo después de deuda")} value={ownerPay.cashAfterDebtService} />
+          <Detail label={copy.bookedRevenue} value={ownerPay.bookedRevenue} />
+          <Detail label={copy.collectedRevenue} value={ownerPay.collectedRevenue} />
+          <Detail label={copy.accountsReceivable} value={ownerPay.accountsReceivable} />
+          <Detail label={copy.operatingProfit} value={ownerPay.operatingProfit} />
+          <Detail label={copy.interestExpense} value={ownerPay.interestExpense} />
+          <Detail label={copy.principalPayment} value={ownerPay.principalPayment} />
+          <Detail label={copy.debtService} value={ownerPay.debtService} />
+          <Detail label={copy.cashAfterDebt} value={ownerPay.cashAfterDebtService} />
         </dl>
       </details>
     </section>

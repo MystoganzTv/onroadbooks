@@ -6,12 +6,18 @@ import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { requireAdminPageSession } from "@/lib/auth/admin";
 import { getAuthStore } from "@/lib/db";
+import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
+import { getAppLocale } from "@/lib/i18n-server";
 import { isPlatformAdminEmail } from "@/lib/platform-admin";
 
-export const metadata: Metadata = { title: "Admin" };
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getAppLocale();
+  return { title: getWebDictionary(locale).admin.metadataTitle };
+}
 
 export default async function AdminPage() {
-  await requireAdminPageSession();
+  const [, locale] = await Promise.all([requireAdminPageSession(), getAppLocale()]);
+  const copy = getWebDictionary(locale).admin;
   const accounts = (await getAuthStore().listAccounts()).map((account) => ({
     ...account,
     isPlatformAdmin: isPlatformAdminEmail(account.email),
@@ -33,17 +39,17 @@ export default async function AdminPage() {
   const complimentary = customers.filter((account) => account.accessSource === "complimentary").length;
 
   const metrics = [
-    { label: "Customer accounts", value: customers.length, note: `${joinedThisWeek} joined in the last 7 days`, icon: Users, tone: "text-info" },
-    { label: "Engaged (30 days)", value: engaged, note: `${started} have started their books`, icon: Activity, tone: "text-primary" },
-    { label: "Trials", value: trials, note: "Currently evaluating Pro", icon: ShieldCheck, tone: "text-primary" },
-    { label: "Managed access", value: paid + complimentary, note: `${paid} Stripe · ${complimentary} complimentary`, icon: CreditCard, tone: "text-pos" },
+    { label: copy.customerAccounts, value: customers.length, note: interpolate(copy.joinedLastSevenDays, { count: joinedThisWeek }), icon: Users, tone: "text-info" },
+    { label: copy.engagedThirtyDays, value: engaged, note: interpolate(copy.startedBooks, { count: started }), icon: Activity, tone: "text-primary" },
+    { label: copy.trials, value: trials, note: copy.evaluatingPro, icon: ShieldCheck, tone: "text-primary" },
+    { label: copy.managedAccess, value: paid + complimentary, note: interpolate(copy.managedAccessNote, { paid, complimentary }), icon: CreditCard, tone: "text-pos" },
   ];
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <PageHeader
-        title="Admin Control Center"
-        description="Monitor adoption, manage access, and support accounts without opening their private business records."
+        title={copy.title}
+        description={copy.description}
       />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

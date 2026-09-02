@@ -4,6 +4,8 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Download, FileText, ImageIcon, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { useLanguage } from "@/components/shell/language-provider";
+import { interpolate } from "@/lib/i18n/dictionaries";
 
 import { ConfirmDelete } from "@/components/shared/confirm-delete";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +22,8 @@ interface DocumentListProps {
 }
 
 export function DocumentList({ documents, readOnly, className }: DocumentListProps) {
+  const { dictionary, locale } = useLanguage();
+  const copy = dictionary.documents;
   const router = useRouter();
   const [deleting, setDeleting] = React.useState<string | null>(null);
 
@@ -28,10 +32,10 @@ export function DocumentList({ documents, readOnly, className }: DocumentListPro
     try {
       const response = await fetch(`/api/documents/${document.id}`, { method: "DELETE" });
       if (!response.ok) throw new Error("Delete failed");
-      toast.success("Document removed", { description: document.label });
+      toast.success(copy.removed, { description: document.label });
       router.refresh();
     } catch {
-      toast.error("Could not remove that document.");
+      toast.error(copy.removeFailed);
     } finally {
       setDeleting(null);
     }
@@ -62,25 +66,25 @@ export function DocumentList({ documents, readOnly, className }: DocumentListPro
               </p>
             </div>
             <Badge variant="outline" className="shrink-0">
-              {documentTypeShort(document.type)}
+              {documentTypeShort(document.type, locale)}
             </Badge>
             <div className="flex shrink-0 gap-0.5">
-              <Button asChild variant="ghost" size="icon-sm" aria-label={`Download ${document.label}`}>
+              <Button asChild variant="ghost" size="icon-sm" aria-label={interpolate(copy.download, { label: document.label })}>
                 <a href={`/api/documents/${document.id}?download=1`}>
                   <Download />
                 </a>
               </Button>
               {readOnly ? null : (
                 <ConfirmDelete
-                  entity="document"
+                  entity={copy.entity}
                   label={`${document.label} (${document.fileName})`}
-                  consequences={["The stored file itself"]}
+                  consequences={[copy.storedFile]}
                   onConfirm={() => remove(document)}
                   trigger={
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      aria-label={`Delete ${document.label}`}
+                      aria-label={interpolate(copy.delete, { label: document.label })}
                       className="text-muted-foreground hover:text-neg"
                       disabled={deleting === document.id}
                     >

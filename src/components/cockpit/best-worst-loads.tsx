@@ -1,14 +1,18 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowUpRight, ThumbsDown, Trophy } from "lucide-react";
 
 import { LoadScoreBadge } from "@/components/cockpit/load-score-badge";
+import { useLanguage } from "@/components/shell/language-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  formatDateShort,
   formatMoneyCompact,
   formatPercent,
   formatRateValue,
 } from "@/lib/formatters";
+import { formatLocaleDate } from "@/lib/i18n-format";
+import { interpolate } from "@/lib/i18n/dictionaries";
 import type { ScoredLoad } from "@/lib/finance/load-score";
 import { cn } from "@/lib/utils";
 
@@ -21,12 +25,14 @@ interface BestWorstLoadsProps {
 
 /** The two loads worth looking at: the one to repeat and the one to learn from. */
 export function BestWorstLoads({ best, worst, periodQuery, periodLabel }: BestWorstLoadsProps) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.dashboard;
   if (!best) {
     return (
       <Card className="border-dashed">
         <CardContent className="p-6 text-center">
           <p className="text-sm text-muted-foreground">
-            No loads recorded in {periodLabel} yet.
+            {interpolate(copy.noLoadsRecorded, { period: periodLabel })}
           </p>
         </CardContent>
       </Card>
@@ -42,7 +48,7 @@ export function BestWorstLoads({ best, worst, periodQuery, periodLabel }: BestWo
         <Card className="border-dashed">
           <CardContent className="flex h-full items-center justify-center p-6 text-center">
             <p className="text-xs text-muted-foreground">
-              A second load in {periodLabel} will show the weakest one here for comparison.
+              {interpolate(copy.secondLoadComparison, { period: periodLabel })}
             </p>
           </CardContent>
         </Card>
@@ -60,6 +66,8 @@ function LoadCard({
   kind: "best" | "worst";
   periodQuery: string;
 }) {
+  const { locale, dictionary } = useLanguage();
+  const copy = dictionary.dashboard;
   const Icon = kind === "best" ? Trophy : ThumbsDown;
 
   return (
@@ -76,7 +84,7 @@ function LoadCard({
           <Icon
             className={cn("size-3.5", kind === "best" ? "text-pos" : "text-neg")}
           />
-          <CardTitle>{kind === "best" ? "Best load" : "Worst load"}</CardTitle>
+          <CardTitle>{kind === "best" ? copy.bestLoad : copy.worstLoad}</CardTitle>
         </div>
         <LoadScoreBadge score={load.score} />
       </CardHeader>
@@ -98,25 +106,25 @@ function LoadCard({
             </span>
           </Link>
           <p className="mt-0.5 truncate text-2xs text-muted-foreground">
-            {formatDateShort(load.date)}
+            {formatLocaleDate(load.date, locale, "short")}
             {load.broker ? ` · ${load.broker}` : ""} ·{" "}
             {Math.round(load.metrics.totalMiles).toLocaleString()} mi
           </p>
         </div>
 
         <dl className="grid grid-cols-4 gap-2">
-          <Figure label="Gross" value={formatMoneyCompact(load.grossRate)} />
+          <Figure label={copy.gross} value={formatMoneyCompact(load.grossRate)} />
           <Figure
-            label="Contribution"
+            label={copy.contribution}
             value={formatMoneyCompact(load.metrics.tripProfit)}
             tone={load.metrics.tripProfit >= 0 ? "text-pos" : "text-neg"}
           />
           <Figure
-            label="Contribution / mi"
+            label={copy.contributionPerMile}
             value={formatRateValue(load.metrics.profitPerMile)}
             tone={load.metrics.profitPerMile >= 0 ? "text-pos" : "text-neg"}
           />
-          <Figure label="Deadhead" value={formatPercent(load.metrics.deadheadPct, 0)} />
+          <Figure label={copy.deadhead} value={formatPercent(load.metrics.deadheadPct, 0)} />
         </dl>
       </CardContent>
     </Card>

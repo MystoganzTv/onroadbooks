@@ -5,6 +5,9 @@ import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+import { useLanguage } from "@/components/shell/language-provider";
+
 import { Field } from "@/components/shared/field";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +26,7 @@ import { categoryLabel } from "@/lib/categories";
 import { formatMoney } from "@/lib/formatters";
 import { loadExpenseAmountSchema } from "@/lib/schemas";
 import type { Expense } from "@/lib/types";
+import { interpolate } from "@/lib/i18n/dictionaries";
 
 interface LoadExpenseFormDialogProps {
   expense: Expense;
@@ -32,6 +36,9 @@ interface LoadExpenseFormDialogProps {
 /** Edits a generated ledger row at its load source without leaving Expenses. */
 export function LoadExpenseFormDialog({ expense, trigger }: LoadExpenseFormDialogProps) {
   const router = useRouter();
+  const { locale, dictionary } = useLanguage();
+  const copy = dictionary.expenses;
+  const common = dictionary.common;
   const [open, setOpen] = React.useState(false);
   const [amount, setAmount] = React.useState(String(expense.amount));
   const [error, setError] = React.useState<string>();
@@ -50,7 +57,7 @@ export function LoadExpenseFormDialog({ expense, trigger }: LoadExpenseFormDialo
     const numericAmount = amount.trim() === "" ? Number.NaN : Number(amount);
     const parsed = loadExpenseAmountSchema.safeParse(numericAmount);
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Enter a valid amount.");
+      setError(parsed.error.issues[0]?.message ?? copy.validAmount);
       return;
     }
 
@@ -58,16 +65,16 @@ export function LoadExpenseFormDialog({ expense, trigger }: LoadExpenseFormDialo
     startTransition(async () => {
       const result = await updateLoadExpenseAction(expense.id, parsed.data);
       if (!result.ok) {
-        setError(result.error);
-        toast.error(result.error);
+        setError(localizedClientError(result.error));
+        toast.error(localizedClientError(result.error));
         return;
       }
 
-      toast.success(parsed.data === 0 ? "Load expense removed" : "Load expense updated", {
+      toast.success(parsed.data === 0 ? copy.loadExpenseRemoved : copy.loadExpenseUpdated, {
         description:
           parsed.data === 0
-            ? `${categoryLabel(expense.category)} was set to $0 on the load.`
-            : `${categoryLabel(expense.category)} - ${formatMoney(parsed.data)}`,
+            ? interpolate(copy.setToZero, { category: categoryLabel(expense.category, locale) })
+            : `${categoryLabel(expense.category, locale)} · ${formatMoney(parsed.data)}`,
       });
       changeOpen(false);
       router.refresh();
@@ -79,21 +86,20 @@ export function LoadExpenseFormDialog({ expense, trigger }: LoadExpenseFormDialo
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit load expense</DialogTitle>
+          <DialogTitle>{copy.editLoadExpense}</DialogTitle>
           <DialogDescription>
-            This row comes from the linked load. Saving here updates the load and its profit
-            automatically.
+            {copy.loadExpenseDescription}
           </DialogDescription>
         </DialogHeader>
 
         <DialogBody>
           <form id={`load-expense-form-${expense.id}`} onSubmit={submit} noValidate>
             <Field
-              label={categoryLabel(expense.category)}
+              label={categoryLabel(expense.category, locale)}
               htmlFor={`load-expense-amount-${expense.id}`}
               required
               error={error}
-              hint="Set the amount to 0 to remove this cost from the expense ledger."
+              hint={copy.zeroRemovesCost}
             >
               <Input
                 id={`load-expense-amount-${expense.id}`}
@@ -114,7 +120,7 @@ export function LoadExpenseFormDialog({ expense, trigger }: LoadExpenseFormDialo
 
         <DialogFooter>
           <Button type="button" variant="outline" size="sm" onClick={() => changeOpen(false)}>
-            Cancel
+            {common.cancel}
           </Button>
           <Button
             type="submit"
@@ -123,7 +129,7 @@ export function LoadExpenseFormDialog({ expense, trigger }: LoadExpenseFormDialo
             disabled={pending}
           >
             {pending ? <Loader2 className="animate-spin" /> : null}
-            Save changes
+            {common.saveChanges}
           </Button>
         </DialogFooter>
       </DialogContent>

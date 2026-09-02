@@ -22,18 +22,19 @@ import {
   totalReserved,
 } from "@/lib/finance/reserves";
 import { calculateSafeOwnerPay, resolveReserveRules } from "@/lib/finance/owner-pay";
-import {
-  formatDateShort,
-  formatMoney,
-  formatMoneyCompact,
-  formatPercent,
-} from "@/lib/formatters";
+import { formatMoney, formatMoneyCompact, formatPercent } from "@/lib/formatters";
+import { formatLocaleDate, formatLocalePeriod } from "@/lib/i18n-format";
+import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
+import { getAppLocale } from "@/lib/i18n-server";
 import { periodFromSearchParams, type SearchParams } from "@/lib/period-params";
 import { planAllows } from "@/lib/plans";
 import { roleCan } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Reserves" };
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getAppLocale();
+  return { title: getWebDictionary(locale).reserves.metadataTitle };
+}
 
 /**
  * RESERVE BUCKETS.
@@ -47,15 +48,19 @@ export default async function ReservesPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const params = await searchParams;
-  const session = await requireSession();
+  const [params, session, locale] = await Promise.all([
+    searchParams,
+    requireSession(),
+    getAppLocale(),
+  ]);
+  const copy = getWebDictionary(locale).reserves;
   if (!roleCan(session.role ?? "VIEWER", "manage_owner_finances")) {
     return (
       <div className="space-y-4 p-4 lg:p-6">
-        <PageHeader title="Reserves" description="Owner planning workspace." />
+        <PageHeader title={copy.metadataTitle} description={copy.ownerWorkspace} />
         <Card className="mx-auto max-w-2xl">
           <CardContent className="p-6 text-sm leading-relaxed text-muted-foreground">
-            Reserve balances, rules and movements are available only to the workspace owner.
+            {copy.ownerOnly}
           </CardContent>
         </Card>
       </div>
@@ -76,12 +81,12 @@ export default async function ReservesPage({
     return (
       <div className="space-y-4 p-4 lg:p-6">
         <PageHeader
-          title="Reserves"
-          description="Virtual buckets, not bank accounts. What you are setting aside, and whether it is enough."
+          title={copy.metadataTitle}
+          description={copy.gateDescription}
         />
         <PlanGate
           capability="cockpit"
-          what="Set money aside for tax and the truck as each settlement closes, and see whether the buckets are keeping up."
+          what={copy.gateWhat}
         />
       </div>
     );
@@ -107,12 +112,16 @@ export default async function ReservesPage({
   const total = totalReserved(balances);
   const periodIn = balances.reduce((sum, b) => sum + b.periodContributions, 0);
   const periodOut = balances.reduce((sum, b) => sum + b.periodWithdrawals, 0);
+  const periodLabel = formatLocalePeriod(period, locale, "short");
+  const activeTruckCount = trucks.filter((truck) => truck.active).length;
+  const reserveName = (kind: (typeof reserveAccounts)[number]["kind"], name: string) =>
+    kind === "TAX" ? copy.taxReserve : kind === "MAINTENANCE" ? copy.maintenanceReserve : name;
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <PageHeader
-        title="Company Reserves · Whole Fleet"
-        description="Company-level planning buckets. Tax stays consolidated; maintenance is explained by truck below. These are planning ledgers, not bank accounts."
+        title={copy.title}
+        description={copy.description}
         actions={
           <>
             <ReserveAccountDialog />
@@ -129,45 +138,48 @@ export default async function ReservesPage({
             <Building2 className="size-4" />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-foreground">Company reserve ledger</p>
+            <p className="text-sm font-semibold text-foreground">{copy.companyLedger}</p>
             <p className="text-2xs text-muted-foreground">
-              One consolidated balance across every reserve bucket
+              {copy.consolidatedBalance}
             </p>
           </div>
         </div>
         <span className="rounded-full border border-info/30 bg-info-subtle px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-info">
-          Whole fleet · {trucks.filter((truck) => truck.active).length} active trucks
+          {interpolate(copy.wholeFleetActive, {
+            count: activeTruckCount,
+            unit: activeTruckCount === 1 ? copy.truck : copy.trucks,
+          })}
         </span>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <MiniStat
-          label="Company balance"
+          label={copy.companyBalance}
           value={formatMoneyCompact(total)}
-          sub="all reserve buckets"
+          sub={copy.allBuckets}
         />
         <MiniStat
-          label="Suggested set-aside"
+          label={copy.suggestedSetAside}
           value={formatMoneyCompact(ownerPay.reserveTotal)}
-          sub={`whole fleet · ${period.shortLabel}`}
+          sub={interpolate(copy.wholeFleetPeriod, { period: periodLabel })}
           tone="warning"
         />
         <MiniStat
-          label="Added"
+          label={copy.added}
           value={formatMoneyCompact(periodIn)}
-          sub={`company · ${period.shortLabel}`}
+          sub={interpolate(copy.companyPeriod, { period: periodLabel })}
           tone="positive"
         />
         <MiniStat
-          label="Taken out"
+          label={copy.takenOut}
           value={formatMoneyCompact(periodOut)}
-          sub={`company · ${period.shortLabel}`}
+          sub={interpolate(copy.companyPeriod, { period: periodLabel })}
           tone="warning"
         />
         <MiniStat
-          label="Buckets"
+          label={copy.buckets}
           value={String(balances.filter((b) => b.account.active).length)}
-          sub="active"
+          sub={getWebDictionary(locale).common.active.toLowerCase()}
         />
       </div>
 
@@ -186,19 +198,21 @@ export default async function ReservesPage({
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <Landmark className="size-3.5 text-muted-foreground" />
-                    <CardTitle>{balance.account.name}</CardTitle>
+                    <CardTitle>{reserveName(balance.account.kind, balance.account.name)}</CardTitle>
                     <span className="rounded-full border border-border bg-surface-sunken px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      {balance.account.kind === "MAINTENANCE" ? "Fleet total" : "Company-wide"}
+                      {balance.account.kind === "MAINTENANCE" ? copy.fleetTotal : copy.companyWide}
                     </span>
                   </div>
                   <p className="mt-0.5 text-2xs text-muted-foreground">
                     {rule && rule.pct > 0
-                      ? `${formatPercent(rule.pct, rule.pct % 1 === 0 ? 0 : 1)} of ${
-                          balance.account.basis === "OPERATING_PROFIT"
-                            ? "operating profit"
-                            : "Booked Revenue"
-                        } each settlement`
-                      : "No automatic contribution set"}
+                      ? interpolate(copy.automaticRule, {
+                          percent: formatPercent(rule.pct, rule.pct % 1 === 0 ? 0 : 1),
+                          basis:
+                            balance.account.basis === "OPERATING_PROFIT"
+                              ? copy.operatingProfit
+                              : copy.bookedRevenue,
+                        })
+                      : copy.noAutomaticContribution}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
@@ -206,7 +220,7 @@ export default async function ReservesPage({
                   {!builtIn ? (
                     <DeleteReserveAccountButton
                       id={balance.account.id}
-                      name={balance.account.name}
+                      name={reserveName(balance.account.kind, balance.account.name)}
                     />
                   ) : null}
                 </div>
@@ -216,7 +230,7 @@ export default async function ReservesPage({
                 <div className="px-4 py-3.5">
                   <div className="flex items-end justify-between gap-3">
                     <div>
-                      <p className="label-xs">Current balance</p>
+                      <p className="label-xs">{copy.currentBalance}</p>
                       <p
                         className={cn(
                           "mt-0.5 tnum text-3xl font-semibold leading-none tracking-tight",
@@ -228,10 +242,16 @@ export default async function ReservesPage({
                     </div>
                     <div className="text-right text-2xs text-muted-foreground tnum">
                       <p className="text-warn">
-                        {formatMoney(recommendation?.amount ?? 0)} suggested
+                        {interpolate(copy.suggested, {
+                          amount: formatMoney(recommendation?.amount ?? 0),
+                        })}
                       </p>
-                      <p className="text-pos">+{formatMoney(balance.contributions)} in</p>
-                      <p className="text-warn">-{formatMoney(balance.withdrawals)} out</p>
+                      <p className="text-pos">
+                        {interpolate(copy.moneyIn, { amount: formatMoney(balance.contributions) })}
+                      </p>
+                      <p className="text-warn">
+                        {interpolate(copy.moneyOut, { amount: formatMoney(balance.withdrawals) })}
+                      </p>
                     </div>
                   </div>
 
@@ -249,9 +269,14 @@ export default async function ReservesPage({
                         />
                       </div>
                       <p className="mt-1 text-2xs text-muted-foreground tnum">
-                        {Math.round(balance.targetProgress ?? 0)}% of a{" "}
-                        {formatMoneyCompact(balance.account.targetBalance)}{" "}
-                        {balance.account.kind === "MAINTENANCE" ? "fleet target" : "target"}
+                        {interpolate(copy.targetProgress, {
+                          percent: Math.round(balance.targetProgress ?? 0),
+                          amount: formatMoneyCompact(balance.account.targetBalance),
+                          target:
+                            balance.account.kind === "MAINTENANCE"
+                              ? copy.fleetTarget
+                              : copy.target,
+                        })}
                       </p>
                     </div>
                   ) : null}
@@ -264,15 +289,17 @@ export default async function ReservesPage({
                         <TruckIcon className="size-3.5 text-info" />
                         <div>
                           <p className="text-xs font-semibold text-foreground">
-                            Maintenance by truck
+                            {copy.maintenanceByTruck}
                           </p>
                           <p className="text-2xs text-muted-foreground">
-                            Each unit&apos;s share of this period&apos;s fleet recommendation
+                            {copy.maintenanceShare}
                           </p>
                         </div>
                       </div>
                       <p className="text-2xs font-medium text-muted-foreground tnum">
-                        {formatMoney(recommendation?.amount ?? 0)} fleet total
+                        {interpolate(copy.amountFleetTotal, {
+                          amount: formatMoney(recommendation?.amount ?? 0),
+                        })}
                       </p>
                     </div>
 
@@ -289,7 +316,7 @@ export default async function ReservesPage({
                               </p>
                               {!unit.active ? (
                                 <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                                  inactive
+                                  {copy.inactive}
                                 </span>
                               ) : null}
                             </div>
@@ -303,13 +330,15 @@ export default async function ReservesPage({
                                 />
                               </div>
                               <p className="shrink-0 text-2xs text-muted-foreground tnum">
-                                {formatMoney(unit.bookedRevenue)} earned
+                                {interpolate(copy.amountEarned, {
+                                  amount: formatMoney(unit.bookedRevenue),
+                                })}
                               </p>
                             </div>
                           </div>
                           <div className="text-right">
                             <p className="text-2xs uppercase tracking-wide text-muted-foreground">
-                              Set aside
+                              {copy.setAside}
                             </p>
                             <p className="text-sm font-semibold text-warn tnum">
                               {formatMoney(unit.suggestedReserve)}
@@ -320,11 +349,11 @@ export default async function ReservesPage({
                     </div>
 
                     <p className="border-t border-border/70 px-4 py-2.5 text-2xs leading-relaxed text-muted-foreground">
-                      Truck rows explain the suggested maintenance amount. The recorded balance and
-                      {balance.account.targetBalance
-                        ? ` ${formatMoneyCompact(balance.account.targetBalance)} target`
-                        : " target"}{" "}
-                      remain consolidated for the company.
+                      {interpolate(copy.consolidatedTarget, {
+                        target: balance.account.targetBalance
+                          ? formatMoneyCompact(balance.account.targetBalance)
+                          : copy.target,
+                      })}
                     </p>
                   </div>
                 ) : null}
@@ -332,7 +361,7 @@ export default async function ReservesPage({
                 <div className="border-t border-border">
                   <div className="flex items-center justify-between gap-2 px-4 py-2">
                     <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Movements
+                      {copy.movements}
                     </p>
                     <ReserveTransactionDialog
                       accounts={reserveAccounts}
@@ -342,7 +371,7 @@ export default async function ReservesPage({
                           type="button"
                           className="text-2xs font-medium text-primary underline-offset-2 hover:underline focus-ring"
                         >
-                          Add
+                          {copy.add}
                         </button>
                       }
                     />
@@ -350,7 +379,7 @@ export default async function ReservesPage({
 
                   {balance.transactions.length === 0 ? (
                     <p className="px-4 pb-3 text-2xs text-muted-foreground">
-                      Nothing recorded yet. Close a settlement and the contribution posts here.
+                      {copy.noMovements}
                     </p>
                   ) : (
                     <ul className="max-h-64 divide-y divide-border/70 overflow-y-auto">
@@ -362,8 +391,11 @@ export default async function ReservesPage({
                           <div className="min-w-0">
                             <p className="truncate text-xs text-foreground">{txn.description}</p>
                             <p className="text-2xs text-muted-foreground tnum">
-                              {formatDateShort(txn.date)}
-                              {txn.settlementId ? " · from a closed settlement" : ""}
+                              {formatLocaleDate(txn.date, locale, {
+                                month: "short",
+                                day: "numeric",
+                              })}
+                              {txn.settlementId ? ` · ${copy.fromClosedSettlement}` : ""}
                             </p>
                           </div>
                           <div className="flex shrink-0 items-center gap-1">
@@ -394,9 +426,7 @@ export default async function ReservesPage({
       </div>
 
       <p className="text-2xs leading-relaxed text-muted-foreground">
-        A balance here is the running sum of its movements, never a stored figure, so it always
-        matches the list above it. Contributions post when you close a settlement; if you reopen
-        that settlement they are reversed, and anything you entered by hand is left alone.
+        {copy.ledgerExplanation}
       </p>
     </div>
   );

@@ -28,25 +28,32 @@ import { expensesForTruck, loadsForTruck, orderedTrucks } from "@/lib/fleet";
 import { overheadCostPerMile, trailingCostBasis } from "@/lib/finance";
 import { defaultEntryDate, todayISO } from "@/lib/periods";
 import { hasFleetAccess } from "@/lib/plans";
+import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
+import { formatLocalePeriod } from "@/lib/i18n-format";
+import { getAppLocale } from "@/lib/i18n-server";
 import {
   periodFromSearchParams,
   truckFromSearchParams,
   type SearchParams,
 } from "@/lib/period-params";
 
-export const metadata: Metadata = { title: "Loads" };
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getAppLocale();
+  return { title: getWebDictionary(locale).loads.metadataTitle };
+}
 
 export default async function LoadsPage({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const params = await searchParams;
-  const session = await requireSession();
+  const [params, session, locale] = await Promise.all([searchParams, requireSession(), getAppLocale()]);
+  const copy = getWebDictionary(locale).loads;
   const { trucks, loads, expenses, fuelEntries, settings, drivers, subscription, paymentEvents } = await getRepository(
     session.businessId,
   ).getDataset();
   const period = periodFromSearchParams(params);
+  const periodLabel = formatLocalePeriod(period, locale);
   const ratingThresholds = thresholdsFromSettings(settings);
 
   const scopeTruckId = truckFromSearchParams(params, trucks);
@@ -71,8 +78,8 @@ export default async function LoadsPage({
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <PageHeader
-        title="Loads"
-        description={`${period.label} - every load dated inside the selected period`}
+        title={copy.title}
+        description={interpolate(copy.periodDescription, { period: periodLabel })}
         actions={<LoadFormDialog
             brokers={brokers}
             trucks={trucks}
@@ -90,75 +97,75 @@ export default async function LoadsPage({
       </div>
 
       <section
-        aria-label="Load summary"
+        aria-label={copy.summaryLabel}
         className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5"
       >
         <MiniStat
-          label="Loads"
+          label={copy.loads}
           value={formatNumber(summary.loadCount)}
-          sub="in period"
-          help="Records whose pickup date falls inside the selected period."
+          sub={copy.inPeriod}
+          help={copy.loadCountHelp}
           wrapText
         />
         <MiniStat
-          label="Booked Revenue"
+          label={copy.bookedRevenue}
           value={formatMoneyCompact(summary.bookedRevenue)}
           tone="info"
-          help="Gross amount earned on these loads, whether customers have paid yet or not."
+          help={copy.bookedRevenueHelp}
           wrapText
         />
         <MiniStat
-          label="Total Miles"
+          label={copy.totalMiles}
           value={formatNumber(summary.totalMiles)}
           sub="mi"
-          help="Loaded miles plus deadhead miles across the selected loads."
+          help={copy.totalMilesHelp}
           wrapText
         />
         <MiniStat
-          label="Deadhead %"
+          label={copy.deadheadPercent}
           value={formatPercent(summary.deadheadPct)}
           tone={isDeadheadElevated(summary.deadheadPct, settings.deadheadWarnPct) ? "warning" : "positive"}
-          help="Share of total miles driven empty. Lower is generally better."
+          help={copy.deadheadHelp}
           wrapText
         />
         <MiniStat
-          label="Direct Trip Costs"
+          label={copy.directTripCosts}
           value={formatMoneyCompact(tripExpenses)}
           tone="negative"
-          sub="trip costs + paid driver"
-          help="Fuel, tolls, dispatch, factoring, other trip costs and paid driver amounts attached directly to these loads."
+          sub={copy.tripCostsPaidDriver}
+          help={copy.directTripCostsHelp}
           wrapText
         />
         <MiniStat
-          label="Revenue / Mile"
+          label={copy.revenuePerMile}
           value={formatRate(summary.revenuePerMile)}
           tone="info"
-          sub={`Contribution Profit ${formatMoneyCompact(tripProfit)}`}
-          help="Gross load revenue divided by every loaded and deadhead mile driven."
+          sub={interpolate(copy.contributionProfitAmount, { amount: formatMoneyCompact(tripProfit) })}
+          help={copy.revenuePerMileHelp}
           wrapText
         />
         <MiniStat
-          label="Allocated Operating Costs"
+          label={copy.allocatedOperatingCosts}
           value={formatMoneyCompact(allocatedOperatingCosts)}
           tone="negative"
-          sub={`${costBasis.basisLabel} estimate`}
-          help="Estimated share of recurring business overhead, using the trailing cost per mile. These are not direct trip costs."
+          sub={interpolate(copy.estimate, { basis: costBasis.basisLabel })}
+          help={copy.allocatedOperatingCostsHelp}
           wrapText
         />
         <MiniStat
-          label="Est. Fully Loaded Operating Profit"
+          label={copy.fullyLoadedProfit}
           value={formatMoneyCompact(fullyLoadedOperatingProfit)}
           tone={fullyLoadedOperatingProfit >= 0 ? "positive" : "negative"}
-          sub="does not change rating"
-          help="Contribution profit after estimated operating overhead. It does not change individual load ratings."
+          sub={copy.doesNotChangeRating}
+          help={copy.fullyLoadedProfitHelp}
           wrapText
         />
         <MiniStat
-          label="Debt Cash Burden"
+          label={copy.debtCashBurden}
           value={formatMoneyCompact(debtCashBurden)}
           tone="warning"
-          sub="separate from profitability"
-          help="Debt and financing payments allocated by mileage. This affects cash, but is kept separate from operating profitability."
+          sub={copy.separateProfitability}
+          help={copy.debtCashBurdenHelp}
           wrapText
         />
       </section>
@@ -173,7 +180,7 @@ export default async function LoadsPage({
         defaultDate={defaultEntryDate(period)}
         ratingThresholds={ratingThresholds}
         deadheadWarnPct={settings.deadheadWarnPct}
-        emptyDescription={`No loads are dated inside ${period.label}. Try another period or add one.`}
+        emptyDescription={interpolate(copy.noLoadsPeriod, { period: periodLabel })}
       />
     </div>
   );

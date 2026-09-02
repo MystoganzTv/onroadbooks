@@ -5,15 +5,19 @@ import { useRouter } from "next/navigation";
 import { Loader2, RotateCcw, Save } from "lucide-react";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+
 import { Field } from "@/components/shared/field";
+import { useLanguage } from "@/components/shell/language-provider";
 import { fieldErrors, focusFirstError, validationMessage } from "@/lib/form";
 import { Button } from "@/components/ui/button";
 import { CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { updateSettingsAction } from "@/lib/actions/settings";
 import { calculateSafeOwnerPay, resolveReserveRules } from "@/lib/finance/owner-pay";
-import { categoryColor, defaultCategoryBehavior, EXPENSE_CATEGORIES } from "@/lib/categories";
+import { categoryColor, categoryLabel, defaultCategoryBehavior, EXPENSE_CATEGORIES } from "@/lib/categories";
 import { formatMoney } from "@/lib/formatters";
+import { interpolate, type WebDictionary } from "@/lib/i18n/dictionaries";
 import { settingsSchema } from "@/lib/schemas";
 import type {
   Business,
@@ -34,19 +38,6 @@ interface SettingsFormProps {
   reserveAccounts: ReserveAccount[];
 }
 
-const FIELD_LABELS: Record<string, string> = {
-  businessName: "Business name",
-  currency: "Currency",
-  taxReservePct: "Tax reserve %",
-  maintenanceReservePct: "Maintenance reserve %",
-  ratingGreatPerMile: "Great threshold",
-  ratingGoodPerMile: "Good threshold",
-  ratingMarginalPerMile: "Marginal threshold",
-  deadheadWarnPct: "Deadhead warning %",
-  maintenanceWarnMiles: "Maintenance due (miles)",
-  maintenanceWarnDays: "Maintenance due (days)",
-};
-
 export function SettingsForm({
   business,
   settings,
@@ -55,6 +46,15 @@ export function SettingsForm({
   reserveAccounts,
 }: SettingsFormProps) {
   const router = useRouter();
+  const { locale, dictionary } = useLanguage();
+  const copy = dictionary.settings;
+  const fieldLabels: Record<string, string> = {
+    businessName: copy.businessName, currency: copy.currency, taxReservePct: copy.taxReserve,
+    maintenanceReservePct: copy.maintenanceReserve, ratingGreatPerMile: copy.greatAt,
+    ratingGoodPerMile: copy.goodAt, ratingMarginalPerMile: copy.marginalAt,
+    deadheadWarnPct: copy.deadheadWarning, maintenanceWarnMiles: copy.maintenanceMiles,
+    maintenanceWarnDays: copy.maintenanceDays,
+  };
   const [businessName, setBusinessName] = React.useState(business.name);
   // Fixed at USD until a second currency exists; kept in state so the
   // payload shape does not change when one does.
@@ -115,7 +115,7 @@ export function SettingsForm({
       setErrors(next);
       // A failure the user cannot see is a dead button: announce it, name the
       // fields, and move focus to the first one.
-      toast.error(validationMessage(next, FIELD_LABELS));
+      toast.error(validationMessage(next, fieldLabels));
       requestAnimationFrame(() => focusFirstError("settings-form"));
       return;
     }
@@ -124,13 +124,13 @@ export function SettingsForm({
     startTransition(async () => {
       const result = await updateSettingsAction(payload);
       if (result.ok) {
-        toast.success("Settings saved", {
-          description: "Financial metrics, load ratings, and warning states recalculated.",
+        toast.success(copy.saved, {
+          description: copy.recalculated,
         });
         router.refresh();
       } else {
         setErrors(result.fieldErrors ?? {});
-        toast.error(result.error);
+        toast.error(localizedClientError(result.error));
       }
     });
   }
@@ -145,18 +145,18 @@ export function SettingsForm({
     setWarnMiles("2000");
     setWarnDays("30");
     setBehavior(defaultCategoryBehavior());
-    toast.info("Defaults restored -- save to apply.");
+    toast.info(copy.defaultsRestored);
   }
 
   return (
     <form id="settings-form" onSubmit={submit} noValidate className="space-y-4">
       <section className="rounded-lg border border-border bg-card">
         <CardHeader>
-          <CardTitle>Business</CardTitle>
+          <CardTitle>{copy.business}</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 p-4 sm:grid-cols-3">
           <Field
-            label="Business name"
+            label={copy.businessName}
             htmlFor="business-name"
             required
             error={errors.businessName}
@@ -171,29 +171,29 @@ export function SettingsForm({
             />
           </Field>
           <Field
-            label="Currency"
+            label={copy.currency}
             htmlFor="business-currency"
-            hint="USD only for now"
+            hint={copy.usdOnly}
             error={errors.currency}
           >
-            <Input id="business-currency" value={`${currency} - US Dollar`} readOnly disabled />
+            <Input id="business-currency" value={`${currency} - ${copy.usDollar}`} readOnly disabled />
           </Field>
         </CardContent>
       </section>
 
       <section className="rounded-lg border border-border bg-card">
         <CardHeader>
-          <CardTitle>Financial Defaults</CardTitle>
-          <span className="text-2xs text-muted-foreground">Preview: {previewLabel}</span>
+          <CardTitle>{copy.financialDefaults}</CardTitle>
+          <span className="text-2xs text-muted-foreground">{interpolate(copy.preview, { period: previewLabel })}</span>
         </CardHeader>
         <CardContent className="grid gap-4 p-4 lg:grid-cols-2">
           <div className="space-y-3">
             <Field
-              label="Tax reserve %"
+              label={copy.taxReserve}
               htmlFor="tax-pct"
               required
               error={errors.taxReservePct}
-              hint="Applied to Operating Profit. 20% is a common starting point."
+              hint={copy.taxReserveHint}
             >
               <Input
                 id="tax-pct"
@@ -208,11 +208,11 @@ export function SettingsForm({
               />
             </Field>
             <Field
-              label="Maintenance reserve %"
+              label={copy.maintenanceReserve}
               htmlFor="maintenance-pct"
               required
               error={errors.maintenanceReservePct}
-              hint="Applied to Booked Revenue, so unpaid invoices create a reserve requirement but never available cash."
+              hint={copy.maintenanceReserveHint}
             >
               <Input
                 id="maintenance-pct"
@@ -229,9 +229,9 @@ export function SettingsForm({
           </div>
 
           <div className="rounded-md border border-border bg-surface-sunken p-3">
-            <p className="label-xs">Live preview</p>
+            <p className="label-xs">{copy.livePreview}</p>
             <ul className="mt-2 space-y-1 text-sm">
-              <PreviewRow label="Operating Profit" value={formatMoney(livePreview.operatingProfit)} />
+              <PreviewRow label={copy.operatingProfit} value={formatMoney(livePreview.operatingProfit)} />
               {livePreview.reserves.map((reserve) => (
                 <PreviewRow
                   key={reserve.accountId}
@@ -243,7 +243,7 @@ export function SettingsForm({
             </ul>
             <div className="mt-2 border-t border-border pt-2">
               <PreviewRow
-                label="Safe to Pay Yourself"
+                label={copy.availableToYou}
                 value={formatMoney(livePreview.safeToPay)}
                 tone={livePreview.safeToPay >= 0 ? "pos" : "neg"}
                 strong
@@ -255,13 +255,13 @@ export function SettingsForm({
 
       <section className="rounded-lg border border-border bg-card">
         <CardHeader>
-          <CardTitle>Load Profitability Thresholds</CardTitle>
-          <span className="text-2xs text-muted-foreground">Contribution Profit per total mile</span>
+          <CardTitle>{copy.profitabilityThresholds}</CardTitle>
+          <span className="text-2xs text-muted-foreground">{copy.contributionPerTotalMile}</span>
         </CardHeader>
         <CardContent className="space-y-3 p-4">
           <div className="grid gap-3 sm:grid-cols-3">
             <Field
-              label="Great at or above"
+              label={copy.greatAt}
               htmlFor="rating-great"
               required
               error={errors.ratingGreatPerMile}
@@ -278,7 +278,7 @@ export function SettingsForm({
               />
             </Field>
             <Field
-              label="Good at or above"
+              label={copy.goodAt}
               htmlFor="rating-good"
               required
               error={errors.ratingGoodPerMile}
@@ -295,10 +295,10 @@ export function SettingsForm({
               />
             </Field>
             <Field
-              label="Marginal at or above"
+              label={copy.marginalAt}
               htmlFor="rating-marginal"
               required
-              hint="Anything below this rates Bad"
+              hint={copy.belowBad}
               error={errors.ratingMarginalPerMile}
             >
               <Input
@@ -318,26 +318,25 @@ export function SettingsForm({
             great={toNumber(ratingGreat)}
             good={toNumber(ratingGood)}
             marginal={toNumber(ratingMarginal)}
+            copy={copy}
           />
 
           <p className="text-2xs leading-relaxed text-muted-foreground">
-            Ratings use profit per <span className="text-foreground">total</span> mile -- gross rate
-            minus fuel, tolls, dispatch, factoring and other trip costs, divided by loaded plus
-            deadhead miles. A high rate per loaded mile never rates a load on its own.
+            {copy.ratingExplanation}
           </p>
         </CardContent>
       </section>
 
       <section className="rounded-lg border border-border bg-card">
         <CardHeader>
-          <CardTitle>Warning Thresholds</CardTitle>
+          <CardTitle>{copy.warningThresholds}</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 p-4 sm:grid-cols-3">
           <Field
-            label="Deadhead warning %"
+            label={copy.deadheadWarning}
             htmlFor="deadhead-warn"
             required
-            hint="Flags the dashboard above this share"
+            hint={copy.deadheadWarningHint}
             error={errors.deadheadWarnPct}
           >
             <Input
@@ -352,10 +351,10 @@ export function SettingsForm({
             />
           </Field>
           <Field
-            label="Maintenance due (miles)"
+            label={copy.maintenanceMiles}
             htmlFor="warn-miles"
             required
-            hint="Amber this far before service"
+            hint={copy.maintenanceMilesHint}
             error={errors.maintenanceWarnMiles}
           >
             <Input
@@ -369,10 +368,10 @@ export function SettingsForm({
             />
           </Field>
           <Field
-            label="Maintenance due (days)"
+            label={copy.maintenanceDays}
             htmlFor="warn-days"
             required
-            hint="Amber this far before a renewal"
+            hint={copy.maintenanceDaysHint}
             error={errors.maintenanceWarnDays}
           >
             <Input
@@ -391,9 +390,9 @@ export function SettingsForm({
 
       <section className="rounded-lg border border-border bg-card">
         <CardHeader>
-          <CardTitle>Expense Classification</CardTitle>
+          <CardTitle>{copy.expenseClassification}</CardTitle>
           <span className="text-2xs text-muted-foreground">
-            Drives the fixed / variable split in Reports
+            {copy.expenseClassificationHint}
           </span>
         </CardHeader>
         <CardContent className="grid gap-2 p-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -410,12 +409,12 @@ export function SettingsForm({
                     style={{ background: categoryColor(category.id) }}
                     aria-hidden
                   />
-                  <span className="truncate">{category.label}</span>
+                  <span className="truncate">{categoryLabel(category.id, locale)}</span>
                 </span>
                 <div
                   className="flex shrink-0 rounded border border-border bg-card p-0.5"
                   role="group"
-                  aria-label={`${category.label} classification`}
+                  aria-label={interpolate(copy.classificationFor, { category: categoryLabel(category.id, locale) })}
                 >
                   {(["FIXED", "VARIABLE"] as const).map((option) => (
                     <button
@@ -434,7 +433,7 @@ export function SettingsForm({
                           : "text-muted-foreground hover:text-foreground",
                       )}
                     >
-                      {option === "FIXED" ? "Fixed" : "Variable"}
+                      {option === "FIXED" ? copy.fixed : copy.variable}
                     </button>
                   ))}
                 </div>
@@ -445,11 +444,11 @@ export function SettingsForm({
         <CardFooter className="justify-between gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={resetDefaults}>
             <RotateCcw />
-            Restore defaults
+            {copy.restoreDefaults}
           </Button>
           <Button type="submit" size="sm" disabled={pending}>
             {pending ? <Loader2 className="animate-spin" /> : <Save />}
-            Save settings
+            {copy.saveSettings}
           </Button>
         </CardFooter>
       </section>
@@ -496,20 +495,22 @@ function RatingScale({
   great,
   good,
   marginal,
+  copy,
 }: {
   great: number;
   good: number;
   marginal: number;
+  copy: WebDictionary["settings"];
 }) {
   const bands = [
-    { label: "Bad", range: `below ${marginal.toFixed(2)}`, className: "bg-neg" },
+    { label: copy.bad, range: `${copy.below} ${marginal.toFixed(2)}`, className: "bg-neg" },
     {
-      label: "Marginal",
+      label: copy.marginal,
       range: `${marginal.toFixed(2)} - ${good.toFixed(2)}`,
       className: "bg-warn",
     },
-    { label: "Good", range: `${good.toFixed(2)} - ${great.toFixed(2)}`, className: "bg-info" },
-    { label: "Great", range: `${great.toFixed(2)}+`, className: "bg-pos" },
+    { label: copy.good, range: `${good.toFixed(2)} - ${great.toFixed(2)}`, className: "bg-info" },
+    { label: copy.great, range: `${great.toFixed(2)}+`, className: "bg-pos" },
   ];
 
   return (

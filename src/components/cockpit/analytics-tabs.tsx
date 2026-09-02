@@ -4,21 +4,23 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
 import { cn } from "@/lib/utils";
-
-const TABS = [
-  { href: "/analytics/cost-per-mile", label: "Actual Cost / Mile" },
-  { href: "/analytics/brokers", label: "Brokers" },
-  { href: "/analytics/lanes", label: "Lanes" },
-];
+import { useLanguage } from "@/components/shell/language-provider";
 
 /** Sub-navigation for the intelligence pages; carries the period along. */
 export function AnalyticsTabs() {
   const pathname = usePathname();
   const search = useSearchParams().toString();
+  const { dictionary } = useLanguage();
+  const copy = dictionary.analytics;
+  const tabs = [
+    { href: "/analytics/cost-per-mile", label: copy.costTab },
+    { href: "/analytics/brokers", label: copy.brokersTab },
+    { href: "/analytics/lanes", label: copy.lanesTab },
+  ];
 
   return (
-    <nav className="flex gap-1 overflow-x-auto" aria-label="Analytics sections">
-      {TABS.map((tab) => {
+    <nav className="flex gap-1 overflow-x-auto" aria-label={copy.analyticsSections}>
+      {tabs.map((tab) => {
         const active = pathname === tab.href;
         return (
           <Link

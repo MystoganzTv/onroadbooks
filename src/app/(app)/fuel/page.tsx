@@ -38,16 +38,21 @@ import {
   truckFromSearchParams,
   type SearchParams,
 } from "@/lib/period-params";
+import { getAppLocale } from "@/lib/i18n-server";
+import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
 
-export const metadata: Metadata = { title: "Fuel" };
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getAppLocale();
+  return { title: getWebDictionary(locale).fuel.metadataTitle };
+}
 
 export default async function FuelPage({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const params = await searchParams;
-  const session = await requireSession();
+  const [params, session, locale] = await Promise.all([searchParams, requireSession(), getAppLocale()]);
+  const copy = getWebDictionary(locale).fuel;
   const {
     trucks,
     loads: allLoads,
@@ -93,8 +98,8 @@ export default async function FuelPage({
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <PageHeader
-        title="Fuel"
-        description={`${period.label} - ${fuel.entryCount} detailed ${fuel.entryCount === 1 ? "fill-up" : "fill-ups"} - ${loadFuelEstimates.length} load ${loadFuelEstimates.length === 1 ? "estimate" : "estimates"}`}
+        title={copy.title}
+        description={interpolate(copy.periodSummary, { period: period.label, fills: fuel.entryCount, fillUnit: fuel.entryCount === 1 ? copy.fillUp : copy.fillUps, estimates: loadFuelEstimates.length, estimateUnit: loadFuelEstimates.length === 1 ? copy.estimate : copy.estimates })}
         actions={
           <FuelFormDialog
             loads={periodLoads}
@@ -112,25 +117,25 @@ export default async function FuelPage({
       </div>
 
       <section
-        aria-label="Fuel summary"
+        aria-label={copy.summaryLabel}
         className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
       >
         <MiniStat
-          label="Fuel Cost"
+          label={copy.fuelCost}
           value={formatMoneyCompact(summary.fuelExpense)}
           tone="negative"
-          sub={`${formatPercent(fuelShare)} of expenses · ${formatMoneyCompact(fuel.totalCost)} detailed`}
+          sub={interpolate(copy.expenseShare, { share: formatPercent(fuelShare), detailed: formatMoneyCompact(fuel.totalCost) })}
         />
-        <MiniStat label="Total Gallons" value={formatGallons(fuel.totalGallons)} />
+        <MiniStat label={copy.totalGallons} value={formatGallons(fuel.totalGallons)} />
         <MiniStat
-          label="Avg Price / Gal"
+          label={copy.averagePrice}
           value={formatPricePerGallon(fuel.averagePricePerGallon)}
         />
         <MiniStat
-          label="Fuel / Mile"
+          label={copy.fuelPerMile}
           value={formatRate(div(summary.fuelExpense, summary.totalMiles))}
           tone="warning"
-          sub={`${formatNumber(summary.totalMiles)} mi · all fuel costs`}
+          sub={interpolate(copy.allFuelCosts, { miles: formatNumber(summary.totalMiles) })}
         />
         <MiniStat
           label="MPG"
@@ -138,8 +143,8 @@ export default async function FuelPage({
           tone={fuel.milesPerGallon && fuel.milesPerGallon >= 8.5 ? "positive" : "neutral"}
           sub={
             fuel.odometerMiles
-              ? `${formatNumber(fuel.odometerMiles)} odometer mi`
-              : "needs 2 odometer readings"
+              ? interpolate(copy.odometerMiles, { miles: formatNumber(fuel.odometerMiles) })
+              : copy.needsReadings
           }
         />
       </section>
@@ -152,9 +157,9 @@ export default async function FuelPage({
       />
 
       <div>
-        <h2 className="text-sm font-semibold">Detailed fuel purchases</h2>
+        <h2 className="text-sm font-semibold">{copy.detailedPurchases}</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Actual gallons and pump details used for MPG and IFTA.
+          {copy.detailedDescription}
         </p>
       </div>
 
@@ -172,26 +177,18 @@ export default async function FuelPage({
         <CardHeader>
           <div className="flex items-center gap-2">
             <Gauge className="size-3.5 text-muted-foreground" />
-            <CardTitle>How MPG is calculated</CardTitle>
+            <CardTitle>{copy.mpgTitle}</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="p-4 pt-3">
           <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">
-            Period MPG uses the distance between the first and last odometer readings in the period,
-            divided by the gallons purchased after that first fill-up -- the standard tank-to-tank
-            method. The <span className="text-foreground">Segment MPG</span> column shows the same
-            calculation between each consecutive pair of readings, so a bad tank stands out
-            immediately. Entries without an odometer reading still count toward fuel spend but are
-            skipped for MPG.
+            {copy.mpgDescription}
           </p>
           <p className="mt-2 max-w-3xl text-xs leading-relaxed text-muted-foreground">
-            IFTA reports a different figure on purpose: it divides every mile in the quarter by
-            every gallon bought in it, including the tank you were already running on. Expect the
-            number on the{" "}
+            {copy.iftaDifference}{" "}
             <Link href="/ifta" className="text-primary underline underline-offset-2">
               IFTA
             </Link>{" "}
-            page to be lower until several fill-ups are on record.
           </p>
         </CardContent>
       </Card>

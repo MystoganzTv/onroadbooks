@@ -15,17 +15,24 @@ import { cn } from "@/lib/utils";
  */
 export function DisplaySettings() {
   const { theme, setTheme, scale, setScale } = useTheme();
-  const { locale, setLocale, copy } = useLanguage();
+  const { locale, setLocale, copy, dictionary } = useLanguage();
+  const settingsCopy = dictionary.settings;
+  const scaleCopy: Record<UiScale, { label: string; hint: string }> = {
+    compact: { label: settingsCopy.compact, hint: settingsCopy.compactHint },
+    default: { label: settingsCopy.defaultScale, hint: settingsCopy.defaultScaleHint },
+    large: { label: settingsCopy.large, hint: settingsCopy.largeHint },
+    xlarge: { label: settingsCopy.largest, hint: settingsCopy.largestHint },
+  };
 
   return (
     <section className="rounded-lg border border-border bg-card">
       <CardHeader>
         <div className="flex items-center gap-2">
           <Monitor className="size-4 text-muted-foreground" />
-          <CardTitle>{locale === "es" ? "Preferencias de la aplicación" : "App preferences"}</CardTitle>
+          <CardTitle>{settingsCopy.appTitle}</CardTitle>
         </div>
         <span className="text-2xs text-muted-foreground">
-          {locale === "es" ? "Guardado en este dispositivo" : "Saved on this device"}
+          {settingsCopy.savedDevice}
         </span>
       </CardHeader>
 
@@ -62,9 +69,7 @@ export function DisplaySettings() {
         <div>
           <p className="label-xs">{copy.textSize}</p>
           <p className="mt-1 text-2xs text-muted-foreground">
-            {locale === "es"
-              ? "Ajusta toda la interfaz: texto, espacios, controles y filas de tablas."
-              : "Scales the whole interface -- text, spacing, control heights and table rows -- not just the font."}
+            {settingsCopy.textScaleDescription}
           </p>
           <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {UI_SCALES.map((option) => (
@@ -88,9 +93,9 @@ export function DisplaySettings() {
                   )}
                   style={{ fontSize: `${option.value * 0.875}rem` }}
                 >
-                  {option.label}
+                  {scaleCopy[option.id].label}
                 </span>
-                <span className="mt-0.5 block text-2xs text-muted-foreground">{option.hint}</span>
+                <span className="mt-0.5 block text-2xs text-muted-foreground">{scaleCopy[option.id].hint}</span>
               </button>
             ))}
           </div>
@@ -102,9 +107,7 @@ export function DisplaySettings() {
             <p className="label-xs">{copy.language}</p>
           </div>
           <p className="mt-1 text-2xs text-muted-foreground">
-            {locale === "es"
-              ? "Cambia el idioma de navegación y de las pantallas principales."
-              : "Changes the language used in navigation and primary screens."}
+            {settingsCopy.languageDescription}
           </p>
           <div className="mt-2 grid grid-cols-2 gap-2 sm:max-w-sm">
             {APP_LOCALES.map((option) => (

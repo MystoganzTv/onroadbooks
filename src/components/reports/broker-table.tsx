@@ -1,7 +1,10 @@
+"use client";
+
 import { Building2, TrendingDown } from "lucide-react";
 
 import { EmptyState } from "@/components/shared/empty-state";
 import { RatingBadge } from "@/components/loads/rating-badge";
+import { useLanguage } from "@/components/shell/language-provider";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -37,6 +40,8 @@ export function BrokerTable({
   brokers: BrokerPerformance[];
   deadheadWarnPct?: number;
 }) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.reports;
   const best = brokers[0];
   const worst = brokers.length > 1 ? brokers[brokers.length - 1] : undefined;
 
@@ -45,16 +50,16 @@ export function BrokerTable({
       <CardHeader>
         <div className="flex items-center gap-2">
           <Building2 className="size-3.5 text-muted-foreground" />
-          <CardTitle>Broker Performance</CardTitle>
+          <CardTitle>{copy.brokerPerformance}</CardTitle>
         </div>
-        <span className="text-2xs text-muted-foreground">Ranked by Contribution Profit</span>
+        <span className="text-2xs text-muted-foreground">{copy.rankedByProfit}</span>
       </CardHeader>
 
       {brokers.length === 0 ? (
         <EmptyState
           icon={Building2}
-          title="No broker activity in this period"
-          description="Add loads with a broker name to see which relationships actually pay."
+          title={copy.noBrokerActivity}
+          description={copy.noBrokerDescription}
           compact
         />
       ) : (
@@ -63,16 +68,16 @@ export function BrokerTable({
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableHead>Broker</TableHead>
-                  <TableHead className="text-right">Loads</TableHead>
-                  <TableHead className="text-right">Booked Revenue</TableHead>
-                  <TableHead className="text-right print:hidden">Miles</TableHead>
-                  <TableHead className="text-right">DH %</TableHead>
-                  <TableHead className="text-right print:hidden">$/Loaded</TableHead>
-                  <TableHead className="text-right">Contribution Profit</TableHead>
-                  <TableHead className="text-right">Contribution/mi</TableHead>
-                  <TableHead>Rating</TableHead>
-                  <TableHead className="text-right">Outstanding</TableHead>
+                  <TableHead>{copy.broker}</TableHead>
+                  <TableHead className="text-right">{copy.loads}</TableHead>
+                  <TableHead className="text-right">{copy.bookedRevenue}</TableHead>
+                  <TableHead className="text-right print:hidden">{copy.miles}</TableHead>
+                  <TableHead className="text-right">{copy.deadheadPct}</TableHead>
+                  <TableHead className="text-right print:hidden">{copy.perLoaded}</TableHead>
+                  <TableHead className="text-right">{copy.contributionProfit}</TableHead>
+                  <TableHead className="text-right">{copy.contributionPerMile}</TableHead>
+                  <TableHead>{copy.rating}</TableHead>
+                  <TableHead className="text-right">{copy.outstanding}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -139,24 +144,30 @@ export function BrokerTable({
           {best && worst && best.broker !== worst.broker ? (
             <div className="grid gap-3 border-t border-border p-4 sm:grid-cols-2">
               <div className="rounded-md border border-pos/30 bg-pos-soft p-3">
-                <p className="label-xs text-pos/80">Best relationship</p>
+                <p className="label-xs text-pos/80">{copy.bestRelationship}</p>
                 <p className="mt-1 truncate text-sm font-semibold text-pos">{best.broker}</p>
                 <p className="mt-0.5 text-2xs text-pos/90 tnum">
-                  {formatMoney(best.tripProfit)} Contribution Profit across {best.loadCount}{" "}
-                  {best.loadCount === 1 ? "load" : "loads"} at{" "}
-                  {formatRateValue(best.profitPerMile)}/mi
+                  {copy.bestRelationshipRead
+                    .replace("{profit}", formatMoney(best.tripProfit))
+                    .replace("{count}", String(best.loadCount))
+                    .replace(
+                      "{unit}",
+                      best.loadCount === 1 ? copy.load : copy.loads.toLowerCase(),
+                    )
+                    .replace("{rate}", formatRateValue(best.profitPerMile))}
                 </p>
               </div>
               <div className="rounded-md border border-border bg-surface-sunken p-3">
                 <p className="label-xs flex items-center gap-1.5">
                   <TrendingDown className="size-3" />
-                  Weakest relationship
+                  {copy.weakestRelationship}
                 </p>
                 <p className="mt-1 truncate text-sm font-semibold">{worst.broker}</p>
                 <p className="mt-0.5 text-2xs text-muted-foreground tnum">
-                  {formatMoney(worst.tripProfit)} Contribution Profit at{" "}
-                  {formatRateValue(worst.profitPerMile)}/mi with{" "}
-                  {formatPercent(worst.deadheadPct)} deadhead
+                  {copy.weakestRelationshipRead
+                    .replace("{profit}", formatMoney(worst.tripProfit))
+                    .replace("{rate}", formatRateValue(worst.profitPerMile))
+                    .replace("{deadhead}", formatPercent(worst.deadheadPct))}
                 </p>
               </div>
             </div>

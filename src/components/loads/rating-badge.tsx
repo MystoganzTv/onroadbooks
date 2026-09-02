@@ -1,4 +1,7 @@
+"use client";
+
 import { CircleAlert, CircleCheck, CircleMinus, TrendingUp } from "lucide-react";
+import { useLanguage } from "@/components/shell/language-provider";
 
 import { formatRateValue } from "@/lib/formatters";
 import type { ProfitabilityRating } from "@/lib/types";
@@ -49,7 +52,10 @@ export function RatingBadge({
   rating: ProfitabilityRating;
   className?: string;
 }) {
+  const { dictionary } = useLanguage();
   const style = RATING_STYLE[rating];
+  const labels = dictionary.loads;
+  const label = rating === "GREAT" ? labels.great : rating === "GOOD" ? labels.good : rating === "MARGINAL" ? labels.marginal : labels.bad;
   return (
     <span
       className={cn(
@@ -59,7 +65,7 @@ export function RatingBadge({
       )}
     >
       <span className={cn("size-1.5 rounded-full", style.dot)} aria-hidden />
-      {style.label}
+      {label}
     </span>
   );
 }
@@ -74,8 +80,11 @@ export function RatingVerdict({
   profitPerMile: number;
   className?: string;
 }) {
+  const { dictionary } = useLanguage();
   const style = RATING_STYLE[rating];
   const Icon = style.icon;
+  const copy = dictionary.loads;
+  const label = rating === "GREAT" ? copy.greatLoad : rating === "GOOD" ? copy.goodLoad : rating === "MARGINAL" ? copy.marginalLoad : copy.badLoad;
 
   return (
     <div
@@ -88,14 +97,14 @@ export function RatingVerdict({
       <span className="flex items-center gap-2">
         <Icon className="size-4 shrink-0" />
         <span className="text-lg font-semibold uppercase tracking-wide">
-          {style.label} load
+          {label}
         </span>
       </span>
       <span className="text-right">
         <span className="block tnum text-2xl font-semibold leading-none">
           {formatRateValue(profitPerMile)}
         </span>
-        <span className="text-2xs opacity-80">profit / mile</span>
+        <span className="text-2xs opacity-80">{copy.profitPerMile}</span>
       </span>
     </div>
   );

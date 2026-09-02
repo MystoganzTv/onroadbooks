@@ -1,4 +1,7 @@
+"use client";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLanguage } from "@/components/shell/language-provider";
 import { formatMoney, formatPercent, formatRate } from "@/lib/formatters";
 import type { Period } from "@/lib/periods";
 import type { PeriodSummary } from "@/lib/types";
@@ -14,10 +17,12 @@ interface HalfMonthSplitProps {
  * halving a monthly total.
  */
 export function HalfMonthSplit({ halves, monthLabel }: HalfMonthSplitProps) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.reports;
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Half-Month Split</CardTitle>
+        <CardTitle>{copy.halfMonthSplit}</CardTitle>
         <span className="text-2xs text-muted-foreground">{monthLabel}</span>
       </CardHeader>
       <CardContent className="grid gap-3 p-4 sm:grid-cols-2">
@@ -27,10 +32,12 @@ export function HalfMonthSplit({ halves, monthLabel }: HalfMonthSplitProps) {
             <div key={period.key} className="rounded-md border border-border bg-surface-sunken p-3">
               <div className="flex items-baseline justify-between">
                 <p className="text-sm font-medium">
-                  {period.key === "first" ? "Days 1 - 15" : `Days 16 - ${period.end.slice(-2)}`}
+                  {period.key === "first"
+                    ? copy.daysFirst
+                    : copy.daysSecond.replace("{day}", period.end.slice(-2).replace(/^0/, ""))}
                 </p>
                 <span className="text-2xs text-muted-foreground tnum">
-                  {summary.loadCount} loads
+                  {copy.loadCount.replace("{count}", String(summary.loadCount))}
                 </span>
               </div>
               <p
@@ -41,19 +48,19 @@ export function HalfMonthSplit({ halves, monthLabel }: HalfMonthSplitProps) {
               >
                 {formatMoney(summary.operatingProfit)}
               </p>
-              <p className="text-2xs text-muted-foreground">Operating Profit</p>
+              <p className="text-2xs text-muted-foreground">{copy.operatingProfit}</p>
 
               <dl className="mt-3 space-y-1 text-xs">
-                <Line label="Booked Revenue" value={formatMoney(summary.bookedRevenue)} />
-                <Line label="Collected Revenue" value={formatMoney(summary.collectedRevenue)} />
-                <Line label="Accounts Receivable" value={formatMoney(summary.accountsReceivable)} />
+                <Line label={copy.bookedRevenue} value={formatMoney(summary.bookedRevenue)} />
+                <Line label={copy.collectedRevenue} value={formatMoney(summary.collectedRevenue)} />
+                <Line label={copy.accountsReceivable} value={formatMoney(summary.accountsReceivable)} />
                 <Line
-                  label="Operating Expenses"
+                  label={copy.businessExpenses}
                   value={`-${formatMoney(summary.operatingExpenses)}`}
                   tone="neg"
                 />
-                <Line label="Margin" value={formatPercent(summary.netMargin)} />
-                <Line label="Operating Profit / mi" value={formatRate(summary.profitPerMile)} />
+                <Line label={copy.margin} value={formatPercent(summary.netMargin)} />
+                <Line label={copy.profitPerMile} value={formatRate(summary.profitPerMile)} />
               </dl>
             </div>
           );

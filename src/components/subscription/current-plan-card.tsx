@@ -1,9 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight, CreditCard } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLanguage } from "@/components/shell/language-provider";
 import { planOf, trialState } from "@/lib/plans";
 import type { Subscription } from "@/lib/types";
 
@@ -17,17 +20,19 @@ export function CurrentPlanCard({
   today: string;
   canManage?: boolean;
 }) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.plans;
   const plan = planOf(subscription);
   const trial = trialState(subscription, today);
   const isProTrial = plan.id === "OWNER" && trial;
   const statusLabel =
     subscription.status === "ACTIVE"
-      ? "Active"
+      ? copy.active
       : subscription.status === "TRIALING"
-        ? "Trial"
+        ? copy.trial
         : subscription.status === "PAST_DUE"
-          ? "Past due"
-          : "Canceled";
+          ? copy.pastDue
+          : copy.canceled;
   const statusTone =
     subscription.status === "ACTIVE"
       ? "positive"
@@ -37,34 +42,36 @@ export function CurrentPlanCard({
           ? "warning"
           : "outline";
   const actionLabel = isProTrial
-    ? "Keep OnRoad Pro"
+    ? copy.keepCurrentPro
     : subscription.status === "PAST_DUE"
-      ? "Fix billing"
+      ? copy.fixBilling
       : subscription.status === "CANCELED"
-        ? "Choose a plan"
+        ? copy.chooseAPlan
         : plan.id === "SOLO"
-          ? "Upgrade to Pro"
-          : "View plans & billing";
+          ? copy.upgradePro
+          : copy.viewPlans;
   const statusMessage = trial
     ? trial.expired
-      ? "Your trial has ended. Choose a monthly plan to keep using paid tools."
+      ? copy.trialEndedLong
       : trial.daysRemaining === 0
-        ? "Your free trial ends today."
-        : `${trial.daysRemaining} ${trial.daysRemaining === 1 ? "day" : "days"} left in your free trial.`
+        ? copy.trialEndsTodayLong
+        : copy.trialRemaining
+            .replace("{count}", String(trial.daysRemaining))
+            .replace("{unit}", trial.daysRemaining === 1 ? copy.day : copy.days)
     : subscription.status === "PAST_DUE"
-      ? "Your payment needs attention. Reading and exporting stay open while new entries are paused."
+      ? copy.paymentAttention
       : subscription.status === "CANCELED"
-        ? "Your subscription has ended. Your existing books remain available to read and export."
+        ? copy.subscriptionEnded
         : plan.id === "FLEET"
-          ? `Paid Fleet service for up to ${plan.truckLimit} trucks.`
-          : "Your current monthly plan for one truck.";
+          ? copy.fleetService.replace("{count}", String(plan.truckLimit))
+          : copy.currentOneTruck;
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
           <CreditCard className="size-3.5 text-muted-foreground" />
-          <CardTitle>Subscription</CardTitle>
+          <CardTitle>{copy.subscription}</CardTitle>
         </div>
         <Badge variant={statusTone}>{statusLabel}</Badge>
       </CardHeader>
@@ -83,7 +90,7 @@ export function CurrentPlanCard({
             </Link>
           </Button>
         ) : (
-          <p className="text-xs text-muted-foreground">Only the workspace owner can manage billing.</p>
+          <p className="text-xs text-muted-foreground">{copy.ownerManageOnly}</p>
         )}
       </CardContent>
     </Card>

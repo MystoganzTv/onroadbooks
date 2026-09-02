@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,6 +44,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useLanguage } from "@/components/shell/language-provider";
 import {
   adminDeleteAccount,
   adminEndComplimentaryAccess,
@@ -50,18 +53,14 @@ import {
   adminResetAccountData,
 } from "@/lib/actions/admin";
 import type { AdminAccountSummary } from "@/lib/db/repository";
+import { formatLocaleDate } from "@/lib/i18n-format";
+import { interpolate, type WebDictionary } from "@/lib/i18n/dictionaries";
+import type { AppLocale } from "@/lib/i18n";
 import { getPlan } from "@/lib/plans";
 
 type OperationKind = "grant-pro" | "grant-fleet" | "end" | "reset" | "delete";
 type AdminAccountRow = AdminAccountSummary & { isPlatformAdmin: boolean };
 type Operation = { kind: OperationKind; account: AdminAccountRow } | null;
-
-const ACCESS_LABELS: Record<AdminAccountSummary["accessSource"], string> = {
-  stripe: "Stripe",
-  complimentary: "Complimentary",
-  trial: "Trial",
-  inactive: "Inactive",
-};
 
 function statusVariant(status: AdminAccountSummary["subscriptionStatus"]) {
   if (status === "ACTIVE") return "positive" as const;
@@ -77,31 +76,23 @@ function accessVariant(source: AdminAccountSummary["accessSource"]) {
   return "outline" as const;
 }
 
-function dateLabel(value: string | null): string {
+function dateLabel(value: string | null, locale: AppLocale): string {
   if (!value) return "—";
-  const date = new Date(value.length === 10 ? `${value}T00:00:00.000Z` : value);
-  return Number.isNaN(date.getTime())
-    ? "—"
-    : new Intl.DateTimeFormat("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        timeZone: "UTC",
-      }).format(date);
+  return formatLocaleDate(value, locale);
 }
 
-function relativeDate(value: string | null, now: string): string {
-  if (!value) return "No product activity yet";
+function relativeDate(value: string | null, now: string, copy: WebDictionary["admin"], common: WebDictionary["common"]): string {
+  if (!value) return copy.noProductActivity;
   const timestamp = Date.parse(value);
-  if (!Number.isFinite(timestamp)) return "No product activity yet";
+  if (!Number.isFinite(timestamp)) return copy.noProductActivity;
   const days = Math.max(0, Math.floor((Date.parse(now) - timestamp) / 86_400_000));
-  if (days === 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days < 30) return `${days} days ago`;
+  if (days === 0) return common.today;
+  if (days === 1) return common.yesterday;
+  if (days < 30) return interpolate(copy.daysAgo, { count: days });
   const months = Math.floor(days / 30);
-  if (months < 12) return `${months} month${months === 1 ? "" : "s"} ago`;
+  if (months < 12) return interpolate(copy.monthsAgo, { count: months, unit: months === 1 ? copy.month : copy.months });
   const years = Math.floor(months / 12);
-  return `${years} year${years === 1 ? "" : "s"} ago`;
+  return interpolate(copy.yearsAgo, { count: years, unit: years === 1 ? copy.year : copy.years });
 }
 
 function adoptedModules(account: AdminAccountSummary): number {
@@ -116,28 +107,20 @@ function adoptedModules(account: AdminAccountSummary): number {
   ].filter((count) => count > 0).length;
 }
 
-function operationTitle(kind: OperationKind): string {
-  if (kind === "grant-pro") return "Grant complimentary Pro?";
-  if (kind === "grant-fleet") return "Grant complimentary Fleet?";
-  if (kind === "end") return "End complimentary access?";
-  if (kind === "reset") return "Reset this workspace?";
-  return "Delete this account?";
+function operationTitle(kind: OperationKind, copy: WebDictionary["admin"]): string {
+  if (kind === "grant-pro") return copy.grantProTitle;
+  if (kind === "grant-fleet") return copy.grantFleetTitle;
+  if (kind === "end") return copy.endTitle;
+  if (kind === "reset") return copy.resetTitle;
+  return copy.deleteTitle;
 }
 
-function operationMessage(kind: OperationKind): string {
-  if (kind === "grant-pro") {
-    return "This grants OnRoad Pro immediately without creating a Stripe subscription or charge. The access remains active until you end it here.";
-  }
-  if (kind === "grant-fleet") {
-    return "This grants OnRoad Fleet immediately, including multi-truck tools and per-unit reporting, without creating a Stripe subscription or charge. The access remains active until you end it here.";
-  }
-  if (kind === "end") {
-    return "Complimentary write access ends immediately and the workspace becomes read-only. Existing records and reports remain visible; subscribing restores write access.";
-  }
-  if (kind === "reset") {
-    return "All ledger records and uploaded documents will be permanently removed. Login, business name, and billing remain.";
-  }
-  return "The login, workspace, records, documents, and Supabase identity will be permanently removed.";
+function operationMessage(kind: OperationKind, copy: WebDictionary["admin"]): string {
+  if (kind === "grant-pro") return copy.grantProMessage;
+  if (kind === "grant-fleet") return copy.grantFleetMessage;
+  if (kind === "end") return copy.endMessage;
+  if (kind === "reset") return copy.resetMessage;
+  return copy.deleteMessage;
 }
 
 function UsageItem({
@@ -168,6 +151,18 @@ export function AdminAccountsTable({
   now: string;
 }) {
   const router = useRouter();
+  const { locale, dictionary } = useLanguage();
+  const copy = dictionary.admin;
+  const common = dictionary.common;
+  const accessLabels = React.useMemo<Record<AdminAccountSummary["accessSource"], string>>(
+    () => ({
+      stripe: "Stripe",
+      complimentary: copy.complimentary,
+      trial: copy.trial,
+      inactive: copy.inactive,
+    }),
+    [copy.complimentary, copy.inactive, copy.trial],
+  );
   const [query, setQuery] = React.useState("");
   const [details, setDetails] = React.useState<AdminAccountSummary | null>(null);
   const [operation, setOperation] = React.useState<Operation>(null);
@@ -183,12 +178,12 @@ export function AdminAccountsTable({
         account.name,
         account.businessName,
         getPlan(account.plan).name,
-        ACCESS_LABELS[account.accessSource],
+        accessLabels[account.accessSource],
       ]
         .filter(Boolean)
         .some((value) => value!.toLowerCase().includes(needle)),
     );
-  }, [accounts, query]);
+  }, [accounts, query, accessLabels]);
 
   function closeOperation() {
     if (pending) return;
@@ -213,15 +208,15 @@ export function AdminAccountsTable({
         result = await adminDeleteAccount(operation.account.userId, confirmation);
       }
       if (!result.ok) {
-        toast.error(result.error);
+        toast.error(localizedClientError(result.error));
         return;
       }
       const successMessage: Record<OperationKind, string> = {
-        "grant-pro": "Complimentary Pro granted",
-        "grant-fleet": "Complimentary Fleet granted",
-        end: "Complimentary access ended",
-        reset: "Account data reset",
-        delete: "Account deleted",
+        "grant-pro": copy.grantProSuccess,
+        "grant-fleet": copy.grantFleetSuccess,
+        end: copy.endSuccess,
+        reset: copy.resetSuccess,
+        delete: copy.deleteSuccess,
       };
       toast.success(successMessage[operation.kind]);
       setOperation(null);
@@ -245,9 +240,9 @@ export function AdminAccountsTable({
       <div className="rounded-lg border border-border bg-card">
         <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center">
           <div>
-            <h2 className="text-base font-semibold">Accounts</h2>
+            <h2 className="text-base font-semibold">{copy.accounts}</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {filtered.length} of {accounts.length} owners · usage metadata only
+              {interpolate(copy.ownersUsageOnly, { shown: filtered.length, total: accounts.length })}
             </p>
           </div>
           <div className="relative sm:ml-auto sm:w-80">
@@ -255,7 +250,7 @@ export function AdminAccountsTable({
             <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search account, plan, or access"
+              placeholder={copy.searchPlaceholder}
               className="pl-9"
             />
           </div>
@@ -265,12 +260,12 @@ export function AdminAccountsTable({
           <table className="w-full min-w-[1120px] text-left text-sm">
             <thead className="bg-surface-sunken/60 text-2xs uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th className="px-4 py-3 font-semibold">Owner</th>
-                <th className="px-4 py-3 font-semibold">Access</th>
-                <th className="px-4 py-3 font-semibold">Engagement</th>
-                <th className="px-4 py-3 font-semibold">Last activity</th>
-                <th className="px-4 py-3 font-semibold">Created</th>
-                <th className="px-4 py-3 text-right font-semibold">Controls</th>
+                <th className="px-4 py-3 font-semibold">{copy.owner}</th>
+                <th className="px-4 py-3 font-semibold">{copy.access}</th>
+                <th className="px-4 py-3 font-semibold">{copy.engagement}</th>
+                <th className="px-4 py-3 font-semibold">{copy.lastActivity}</th>
+                <th className="px-4 py-3 font-semibold">{copy.created}</th>
+                <th className="px-4 py-3 text-right font-semibold">{copy.controls}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -300,25 +295,25 @@ export function AdminAccountsTable({
                           {account.subscriptionStatus.replace("_", " ")}
                         </Badge>
                         <Badge variant={accessVariant(account.accessSource)}>
-                          {ACCESS_LABELS[account.accessSource]}
+                          {accessLabels[account.accessSource]}
                         </Badge>
                       </div>
                     </td>
                     <td className="px-4 py-4 text-xs text-muted-foreground">
-                      <p className="font-medium text-foreground">{account.counts.loads} loads · {account.counts.expenses} expenses</p>
-                      <p className="mt-1">{modules} of 7 product areas used</p>
+                      <p className="font-medium text-foreground">{interpolate(copy.loadsAndExpenses, { loads: account.counts.loads, expenses: account.counts.expenses })}</p>
+                      <p className="mt-1">{interpolate(copy.productAreasUsed, { count: modules })}</p>
                     </td>
                     <td className="px-4 py-4 text-xs text-muted-foreground">
                       <p className={account.lastActivityAt ? "font-medium text-foreground" : ""}>
-                        {relativeDate(account.lastActivityAt, now)}
+                        {relativeDate(account.lastActivityAt, now, copy, common)}
                       </p>
-                      {account.lastActivityAt ? <p className="mt-1 text-2xs">{dateLabel(account.lastActivityAt)}</p> : null}
+                      {account.lastActivityAt ? <p className="mt-1 text-2xs">{dateLabel(account.lastActivityAt, locale)}</p> : null}
                     </td>
-                    <td className="px-4 py-4 text-xs text-muted-foreground">{dateLabel(account.createdAt)}</td>
+                    <td className="px-4 py-4 text-xs text-muted-foreground">{dateLabel(account.createdAt, locale)}</td>
                     <td className="px-4 py-4">
                       <div className="flex flex-wrap items-center justify-end gap-2">
                         <Button size="sm" variant="outline" onClick={() => setDetails(account)}>
-                          <Eye /> Details
+                          <Eye /> {common.details}
                         </Button>
 
                         {!account.hasProviderSubscription ? (
@@ -331,19 +326,19 @@ export function AdminAccountsTable({
                             <DropdownMenuContent align="end" className="w-52">
                               {!complimentaryPro ? (
                                 <DropdownMenuItem onSelect={() => setOperation({ kind: "grant-pro", account })}>
-                                  <Gift className="size-4" /> Grant Pro
+                                <Gift className="size-4" /> {copy.grantPro}
                                 </DropdownMenuItem>
                               ) : null}
                               {!complimentaryFleet ? (
                                 <DropdownMenuItem onSelect={() => setOperation({ kind: "grant-fleet", account })}>
-                                  <Truck className="size-4" /> Grant Fleet
+                                <Truck className="size-4" /> {copy.grantFleet}
                                 </DropdownMenuItem>
                               ) : null}
                               {account.accessSource === "complimentary" ? (
                                 <>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem onSelect={() => setOperation({ kind: "end", account })}>
-                                    End complimentary access
+                                    {copy.endComplimentary}
                                   </DropdownMenuItem>
                                 </>
                               ) : null}
@@ -353,7 +348,7 @@ export function AdminAccountsTable({
 
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="outline" aria-label={`More actions for ${account.businessName}`}>
+                            <Button size="sm" variant="outline" aria-label={interpolate(copy.moreActions, { business: account.businessName })}>
                               <MoreHorizontal />
                             </Button>
                           </DropdownMenuTrigger>
@@ -362,16 +357,16 @@ export function AdminAccountsTable({
                               disabled={destructiveActionsProtected}
                               onSelect={() => setOperation({ kind: "reset", account })}
                             >
-                              <RotateCcw className="size-4" /> Reset workspace data
+                              <RotateCcw className="size-4" /> {copy.resetWorkspace}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               disabled={destructiveActionsProtected || account.hasProviderSubscription}
-                              title={account.hasProviderSubscription ? "Cancel Stripe billing first" : undefined}
+                              title={account.hasProviderSubscription ? copy.cancelStripeFirst : undefined}
                               className="text-destructive focus:bg-destructive/10 focus:text-destructive"
                               onSelect={() => setOperation({ kind: "delete", account })}
                             >
-                              <Trash2 className="size-4" /> Delete account
+                              <Trash2 className="size-4" /> {copy.deleteAccount}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -381,15 +376,14 @@ export function AdminAccountsTable({
                 );
               })}
               {filtered.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">No accounts match that search.</td></tr>
+                <tr><td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">{copy.noMatches}</td></tr>
               ) : null}
             </tbody>
           </table>
         </div>
 
         <div className="border-t border-border px-4 py-3 text-xs leading-relaxed text-muted-foreground">
-          Usage details exclude revenue, rates, routes, vendors, notes, file contents, and document names.
-          Stripe-managed accounts must be changed through billing.
+          {copy.privacyNote}
         </div>
       </div>
 
@@ -398,49 +392,49 @@ export function AdminAccountsTable({
           <DialogHeader>
             <DialogTitle>{details?.businessName}</DialogTitle>
             <DialogDescription>
-              Product adoption and workspace volume. No financial totals or record contents.
+              {copy.adoptionDescription}
             </DialogDescription>
           </DialogHeader>
           {details ? (
             <DialogBody className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-3">
-                <UsageItem icon={Activity} label="Last activity" value={relativeDate(details.lastActivityAt, now)} />
-                <UsageItem icon={WalletCards} label="Access source" value={ACCESS_LABELS[details.accessSource]} />
-                <UsageItem icon={Eye} label="Product adoption" value={`${adoptedModules(details)} / 7 areas`} />
+                <UsageItem icon={Activity} label={copy.lastActivity} value={relativeDate(details.lastActivityAt, now, copy, common)} />
+                <UsageItem icon={WalletCards} label={copy.accessSource} value={accessLabels[details.accessSource]} />
+                <UsageItem icon={Eye} label={copy.productAdoption} value={interpolate(copy.areas, { count: adoptedModules(details) })} />
               </div>
 
               <div>
-                <p className="mb-2 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">Workspace volume</p>
+                <p className="mb-2 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{copy.workspaceVolume}</p>
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                  <UsageItem icon={Truck} label="Trucks" value={`${details.counts.activeTrucks} active / ${details.counts.trucks} total`} />
-                  <UsageItem icon={ReceiptText} label="Loads" value={details.counts.loads} />
-                  <UsageItem icon={WalletCards} label="Expenses" value={details.counts.expenses} />
-                  <UsageItem icon={Fuel} label="Fuel entries" value={details.counts.fuelEntries} />
-                  <UsageItem icon={FileText} label="Documents" value={details.counts.documents} />
-                  <UsageItem icon={Wrench} label="Maintenance" value={details.counts.maintenance} />
-                  <UsageItem icon={Activity} label="Reserve moves" value={details.counts.reserveTransactions} />
-                  <UsageItem icon={ShieldCheck} label="Settlements" value={details.counts.settlements} />
+                  <UsageItem icon={Truck} label={copy.trucks} value={interpolate(copy.activeTrucks, { active: details.counts.activeTrucks, total: details.counts.trucks })} />
+                  <UsageItem icon={ReceiptText} label={copy.loads} value={details.counts.loads} />
+                  <UsageItem icon={WalletCards} label={copy.expenses} value={details.counts.expenses} />
+                  <UsageItem icon={Fuel} label={copy.fuelEntries} value={details.counts.fuelEntries} />
+                  <UsageItem icon={FileText} label={copy.documents} value={details.counts.documents} />
+                  <UsageItem icon={Wrench} label={copy.maintenance} value={details.counts.maintenance} />
+                  <UsageItem icon={Activity} label={copy.reserveMoves} value={details.counts.reserveTransactions} />
+                  <UsageItem icon={ShieldCheck} label={copy.settlements} value={details.counts.settlements} />
                 </div>
               </div>
 
               <div className="grid gap-3 rounded-md border border-border bg-surface-sunken/25 p-3 text-xs sm:grid-cols-3">
                 <div>
-                  <p className="text-2xs uppercase tracking-wider text-muted-foreground">Plan</p>
+                  <p className="text-2xs uppercase tracking-wider text-muted-foreground">{copy.plan}</p>
                   <p className="mt-1 font-medium">{getPlan(details.plan).name}</p>
                 </div>
                 <div>
-                  <p className="text-2xs uppercase tracking-wider text-muted-foreground">Period / trial ends</p>
-                  <p className="mt-1 font-medium">{dateLabel(details.currentPeriodEnd)}</p>
+                  <p className="text-2xs uppercase tracking-wider text-muted-foreground">{copy.periodTrialEnds}</p>
+                  <p className="mt-1 font-medium">{dateLabel(details.currentPeriodEnd, locale)}</p>
                 </div>
                 <div>
-                  <p className="text-2xs uppercase tracking-wider text-muted-foreground">Account created</p>
-                  <p className="mt-1 font-medium">{dateLabel(details.createdAt)}</p>
+                  <p className="text-2xs uppercase tracking-wider text-muted-foreground">{copy.accountCreated}</p>
+                  <p className="mt-1 font-medium">{dateLabel(details.createdAt, locale)}</p>
                 </div>
               </div>
             </DialogBody>
           ) : null}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setDetails(null)}>Close</Button>
+            <Button type="button" variant="outline" onClick={() => setDetails(null)}>{common.close}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -449,7 +443,7 @@ export function AdminAccountsTable({
         <DialogContent className="max-w-md">
           <form onSubmit={submit}>
             <DialogHeader>
-              <DialogTitle>{operation ? operationTitle(operation.kind) : "Account action"}</DialogTitle>
+              <DialogTitle>{operation ? operationTitle(operation.kind, copy) : copy.accountAction}</DialogTitle>
               <DialogDescription>
                 {operation?.account.businessName} · {operation?.account.email}
               </DialogDescription>
@@ -461,12 +455,12 @@ export function AdminAccountsTable({
                     ? "border-pos/25 bg-pos/[0.04]"
                     : "border-destructive/25 bg-destructive/[0.04]"
                 }`}>
-                  {operationMessage(operation.kind)}
+                  {operationMessage(operation.kind, copy)}
                 </p>
               ) : null}
               {needsTypedConfirmation ? (
                 <div className="space-y-1.5">
-                  <Label htmlFor="admin-confirmation">Type <span className="normal-case text-foreground">{expected}</span> to confirm</Label>
+                  <Label htmlFor="admin-confirmation">{interpolate(copy.typeToConfirm, { value: expected })}</Label>
                   <Input
                     id="admin-confirmation"
                     value={confirmation}
@@ -480,7 +474,7 @@ export function AdminAccountsTable({
               ) : null}
             </DialogBody>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={closeOperation} disabled={pending}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={closeOperation} disabled={pending}>{common.cancel}</Button>
               <Button
                 type="submit"
                 variant={operation?.kind === "grant-pro" || operation?.kind === "grant-fleet" ? "default" : "destructive"}
@@ -488,14 +482,14 @@ export function AdminAccountsTable({
               >
                 {pending ? <Loader2 className="animate-spin" /> : null}
                 {operation?.kind === "grant-pro"
-                  ? "Grant Pro"
+                  ? copy.grantPro
                   : operation?.kind === "grant-fleet"
-                    ? "Grant Fleet"
+                    ? copy.grantFleet
                   : operation?.kind === "end"
-                    ? "End complimentary access"
+                    ? copy.endComplimentary
                     : operation?.kind === "reset"
-                      ? "Reset permanently"
-                      : "Delete permanently"}
+                      ? copy.resetPermanently
+                      : copy.deletePermanently}
               </Button>
             </DialogFooter>
           </form>

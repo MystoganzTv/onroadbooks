@@ -1,26 +1,10 @@
+"use client";
+
 import type { ReactNode } from "react";
 import { BarChart3, CheckCircle2, Gauge, Receipt, Route } from "lucide-react";
 
-const STEPS = [
-  {
-    icon: Route,
-    number: "01",
-    title: "Log your first load",
-    description: "Add the route, miles and gross rate. It only takes a minute.",
-  },
-  {
-    icon: Receipt,
-    number: "02",
-    title: "Track what it cost",
-    description: "Fuel, tolls and operating expenses turn revenue into a real profit number.",
-  },
-  {
-    icon: Gauge,
-    number: "03",
-    title: "Know what you kept",
-    description: "Cost per mile and cash performance calculate automatically.",
-  },
-] as const;
+import { useLanguage } from "@/components/shell/language-provider";
+import { interpolate } from "@/lib/i18n/dictionaries";
 
 export function EmptyCockpit({
   businessName,
@@ -31,6 +15,14 @@ export function EmptyCockpit({
   loadAction: ReactNode;
   expenseAction: ReactNode;
 }) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.dashboard;
+  const steps = [
+    { icon: Route, number: "01", title: copy.firstLoadStep, description: copy.firstLoadStepDescription },
+    { icon: Receipt, number: "02", title: copy.trackCostStep, description: copy.trackCostStepDescription },
+    { icon: Gauge, number: "03", title: copy.knowKeptStep, description: copy.knowKeptStepDescription },
+  ] as const;
+
   return (
     <section
       className="overflow-hidden rounded-xl border border-border bg-card"
@@ -41,17 +33,16 @@ export function EmptyCockpit({
           <div className="max-w-2xl">
             <span className="inline-flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-[0.14em] text-primary">
               <BarChart3 className="size-3.5" />
-              Getting started
+              {copy.gettingStarted}
             </span>
             <h2
               id="empty-cockpit-title"
               className="mt-3 max-w-2xl text-2xl font-semibold tracking-tight sm:text-3xl"
             >
-              Add your first load to build your overview.
+              {copy.firstLoadOverview}
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-              {businessName} is ready. Record a load and its costs to see revenue, profit, cost per
-              mile, and cash available in one place.
+              {interpolate(copy.workspaceReady, { business: businessName })}
             </p>
           </div>
 
@@ -62,7 +53,7 @@ export function EmptyCockpit({
         </div>
 
         <div className="mt-8 grid gap-3 border-t border-border/70 pt-6 md:grid-cols-3">
-          {STEPS.map((step) => {
+          {steps.map((step) => {
             const Icon = step.icon;
             return (
               <div
@@ -90,7 +81,7 @@ export function EmptyCockpit({
       <div className="flex items-start gap-2 border-t border-border bg-surface-sunken/45 px-5 py-3 text-xs text-muted-foreground sm:px-8 lg:px-10">
         <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-pos" />
         <p>
-          This workspace is private to your account. Only records entered by your team appear here.
+          {copy.privateWorkspace}
         </p>
       </div>
     </section>

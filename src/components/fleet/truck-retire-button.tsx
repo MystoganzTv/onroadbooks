@@ -4,7 +4,10 @@ import { useRouter } from "next/navigation";
 import { Archive, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+
 import { ConfirmAction } from "@/components/shared/confirm-action";
+import { useLanguage } from "@/components/shell/language-provider";
 import { Button } from "@/components/ui/button";
 import { archiveTruckAction, restoreTruckAction } from "@/lib/actions/trucks";
 import { todayISO } from "@/lib/periods";
@@ -21,26 +24,28 @@ import type { Truck } from "@/lib/types";
  */
 export function TruckRetireButton({ truck, canRestore }: { truck: Truck; canRestore: boolean }) {
   const router = useRouter();
+  const { dictionary } = useLanguage();
+  const copy = dictionary.fleet;
 
   if (!truck.active) {
     return (
       <ConfirmAction
-        title={`Return ${truck.name} to active service?`}
-        description="The unit will become available for new loads and expenses again and will count toward your plan's active-truck limit."
-        confirmLabel="Return to service"
+        title={copy.returnTitle.replace("{truck}", truck.name)}
+        description={copy.returnDescription}
+        confirmLabel={copy.returnAction}
         trigger={
           <Button variant="outline" size="sm" disabled={!canRestore}>
             <RotateCcw className="size-4" />
-            Return to service
+            {copy.returnAction}
           </Button>
         }
         onConfirm={async () => {
           const result = await restoreTruckAction(truck.id);
           if (result.ok) {
-            toast.success(`${truck.name} is back in the fleet`);
+            toast.success(copy.returnedSuccess.replace("{truck}", truck.name));
             router.refresh();
           } else {
-            toast.error(result.error);
+            toast.error(localizedClientError(result.error));
           }
         }}
       />
@@ -49,9 +54,9 @@ export function TruckRetireButton({ truck, canRestore }: { truck: Truck; canRest
 
   return (
     <ConfirmAction
-      title={`Take ${truck.name} out of active service?`}
-      description="This does not delete the truck or any of its history. Past loads, expenses, fuel and service remain in reports; the unit simply becomes unavailable for new work."
-      confirmLabel="Take out of service"
+      title={copy.retireTitle.replace("{truck}", truck.name)}
+      description={copy.retireDescription}
+      confirmLabel={copy.retireAction}
       variant="destructive"
       trigger={
         <Button
@@ -60,18 +65,18 @@ export function TruckRetireButton({ truck, canRestore }: { truck: Truck; canRest
           className="border-neg/30 text-neg hover:bg-neg-soft hover:text-neg"
         >
           <Archive className="size-4" />
-          Take out of service
+          {copy.retireAction}
         </Button>
       }
       onConfirm={async () => {
         const result = await archiveTruckAction({ id: truck.id, soldOn: todayISO() });
         if (result.ok) {
-          toast.success(`${truck.name} retired`, {
-            description: "Its records are untouched.",
+          toast.success(copy.retiredSuccess.replace("{truck}", truck.name), {
+            description: copy.recordsUntouched,
           });
           router.refresh();
         } else {
-          toast.error(result.error);
+          toast.error(localizedClientError(result.error));
         }
       }}
     />

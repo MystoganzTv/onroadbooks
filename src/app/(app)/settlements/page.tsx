@@ -18,11 +18,17 @@ import {
 } from "@/lib/finance/settlement";
 import { selectOwnerMoneyPresentation } from "@/lib/finance/presentation";
 import { formatMoneyCompact, formatPercent, formatRateValue } from "@/lib/formatters";
+import { formatLocaleDate } from "@/lib/i18n-format";
+import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
+import { getAppLocale } from "@/lib/i18n-server";
 import { param, type SearchParams } from "@/lib/period-params";
 import { currentMonth, shiftMonth, todayISO } from "@/lib/periods";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Settlements" };
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getAppLocale();
+  return { title: getWebDictionary(locale).settlements.metadataTitle };
+}
 
 /** How far back the history list reaches. */
 const HISTORY_MONTHS = 11;
@@ -41,16 +47,19 @@ export default async function SettlementsPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const params = await searchParams;
-  const session = await requireSession();
+  const [params, session, locale] = await Promise.all([
+    searchParams,
+    requireSession(),
+    getAppLocale(),
+  ]);
+  const copy = getWebDictionary(locale).settlements;
   if (!roleCan(session.role ?? "VIEWER", "manage_owner_finances")) {
     return (
       <div className="space-y-4 p-4 lg:p-6">
-        <PageHeader title="Owner Settlements" description="Owner-only closeout workspace." />
+        <PageHeader title={copy.title} description={copy.ownerDescription} />
         <Card className="mx-auto max-w-2xl">
           <CardContent className="p-6 text-sm leading-relaxed text-muted-foreground">
-            Safe to Pay Yourself and Owner Settlement close/reopen controls are available only to
-            the workspace owner.
+            {copy.ownerOnly}
           </CardContent>
         </Card>
       </div>
@@ -63,12 +72,12 @@ export default async function SettlementsPage({
     return (
       <div className="space-y-4 p-4 lg:p-6">
         <PageHeader
-          title="Owner Settlements"
-          description="The twice-monthly review: 1-15 and 16 to month end."
+          title={copy.title}
+          description={copy.gateDescription}
         />
         <PlanGate
           capability="cockpit"
-          what="Close the half-month, freeze the figures you settled on, and post the reserve contributions they imply."
+          what={copy.gateWhat}
         />
       </div>
     );
@@ -106,23 +115,26 @@ export default async function SettlementsPage({
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <PageHeader
-        title="Owner Settlements"
-        description="Your half-month payday: what the truck earned, what the business kept, and what is available to you."
+        title={copy.title}
+        description={copy.description}
       />
 
       {openComplete.length > 0 ? (
         <div className="flex flex-col gap-3 rounded-lg border border-info/40 bg-info-soft/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-semibold text-foreground">
-              {openComplete.length} finished {openComplete.length === 1 ? "payday is" : "paydays are"} ready to review
+              {interpolate(copy.readyCount, {
+                count: openComplete.length,
+                unit: openComplete.length === 1 ? copy.payday : copy.paydays,
+              })}
             </p>
             <p className="mt-0.5 text-2xs text-muted-foreground">
-              Review the money, then settle the period to freeze its figures and post its reserves.
+              {copy.readyDescription}
             </p>
           </div>
           <Button asChild size="sm" variant="outline">
             <Link href={`/settlements?month=${openComplete[0].month}&half=${openComplete[0].half}`}>
-              Review payday
+              {copy.reviewPayday}
               <ArrowRight className="size-3.5" />
             </Link>
           </Button>
@@ -136,7 +148,7 @@ export default async function SettlementsPage({
           ) : (
             <Card>
               <CardContent className="p-8 text-center text-sm text-muted-foreground">
-                No settlement periods yet.
+                {copy.noPeriods}
               </CardContent>
             </Card>
           )}
@@ -145,15 +157,15 @@ export default async function SettlementsPage({
         <div className="min-w-0">
           <Card>
             <CardHeader>
-              <CardTitle>History</CardTitle>
+              <CardTitle>{copy.history}</CardTitle>
               <span className="text-2xs text-muted-foreground tnum">
-                {closedCount} closed
+                {interpolate(copy.closedCount, { count: closedCount })}
               </span>
             </CardHeader>
             <CardContent className="p-0">
               {history.length === 0 ? (
                 <p className="p-4 text-xs text-muted-foreground">
-                  Settlements appear here once a half-month has activity.
+                  {copy.noHistory}
                 </p>
               ) : (
                 <ul className="divide-y divide-border/70">
@@ -176,23 +188,29 @@ export default async function SettlementsPage({
                       >
                         <div className="flex items-baseline justify-between gap-2">
                           <span className="min-w-0 truncate text-xs font-medium text-foreground">
-                            {view.shortLabel}
+                            {formatLocaleDate(view.range.start, locale, {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                            –{formatLocaleDate(view.range.end, locale, { day: "numeric" })}
                           </span>
                           <span className="shrink-0 text-right">
-                            <span className="block text-[0.625rem] uppercase tracking-wide text-muted-foreground">Available</span>
+                            <span className="block text-[0.625rem] uppercase tracking-wide text-muted-foreground">{copy.available}</span>
                             <span className={cn("block tnum text-sm font-semibold", presentation.availableToYou.state === "KNOWN" && presentation.availableToYou.amount > 0 ? "text-pos" : "text-info")}>
                               {presentation.availableToYou.state === "KNOWN"
                                 ? formatMoneyCompact(presentation.availableToYou.amount)
-                                : "Unknown"}
+                                : copy.unknown}
                             </span>
                           </span>
                         </div>
                         <div className="mt-0.5 flex items-center justify-between gap-2">
                           <span className="truncate text-2xs text-muted-foreground tnum">
-                            {formatMoneyCompact(view.figures.grossRevenue)} rev ·{" "}
-                            {view.figures.loadCount} loads ·{" "}
-                            {formatRateValue(view.figures.profitPerMile)}/mi ·{" "}
-                            {formatPercent(view.figures.deadheadPct, 0)} DH
+                            {interpolate(copy.historyRead, {
+                              revenue: formatMoneyCompact(view.figures.grossRevenue),
+                              count: view.figures.loadCount,
+                              rate: formatRateValue(view.figures.profitPerMile),
+                              deadhead: formatPercent(view.figures.deadheadPct, 0),
+                            })}
                           </span>
                           <span
                             className={cn(
@@ -202,7 +220,7 @@ export default async function SettlementsPage({
                                 : "border-border text-muted-foreground",
                             )}
                           >
-                            {view.status === "CLOSED" ? "Closed" : "Open"}
+                            {view.status === "CLOSED" ? copy.closed : copy.open}
                           </span>
                         </div>
                       </Link>

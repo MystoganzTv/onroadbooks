@@ -6,6 +6,7 @@ import { ArrowRight, Calculator, RotateCcw, Target } from "lucide-react";
 import { LoadScoreBreakdown } from "@/components/cockpit/load-score-badge";
 import { LoadFormDialog } from "@/components/loads/load-form-dialog";
 import { Field } from "@/components/shared/field";
+import { useLanguage } from "@/components/shell/language-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,7 @@ import {
   formatRateValue,
 } from "@/lib/formatters";
 import type { Truck } from "@/lib/types";
+import { interpolate } from "@/lib/i18n/dictionaries";
 import { cn, toNumber } from "@/lib/utils";
 
 export interface CalculatorDefaults {
@@ -91,6 +93,8 @@ function initialValues(defaults: CalculatorDefaults): Values {
  * turns strings into numbers and numbers into layout.
  */
 export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.calculator;
   const [values, setValues] = React.useState<Values>(() => initialValues(defaults));
   const set = <K extends keyof Values>(key: K, value: Values[K]) =>
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -126,11 +130,11 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
       <TabsList>
         <TabsTrigger value="evaluate">
           <Calculator className="mr-1.5 size-3.5" />
-          Should I take it?
+          {copy.evaluateTab}
         </TabsTrigger>
         <TabsTrigger value="target">
           <Target className="mr-1.5 size-3.5" />
-          What should I ask?
+          {copy.targetTab}
         </TabsTrigger>
       </TabsList>
 
@@ -138,7 +142,7 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
         {/* ---- Inputs ------------------------------------------------- */}
         <Card className="min-w-0 xl:col-span-2">
           <CardHeader>
-            <CardTitle>The load</CardTitle>
+            <CardTitle>{copy.theLoad}</CardTitle>
             <Button
               type="button"
               variant="ghost"
@@ -146,12 +150,12 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
               onClick={() => setValues(initialValues(defaults))}
             >
               <RotateCcw className="size-3.5" />
-              Reset
+              {copy.reset}
             </Button>
           </CardHeader>
           <CardContent className="space-y-3 p-4">
             <TabsContent value="evaluate" className="m-0">
-              <Field label="Gross rate offered" htmlFor="calc-gross">
+              <Field label={copy.grossOffered} htmlFor="calc-gross">
                 <Input
                   id="calc-gross"
                   inputMode="decimal"
@@ -163,9 +167,9 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
             </TabsContent>
             <TabsContent value="target" className="m-0">
               <Field
-                label="Fully Loaded Operating Profit / mile target"
+                label={copy.targetProfit}
                 htmlFor="calc-target-ppm"
-                hint="After Direct Trip Costs and allocated Operating Costs; before Debt Service"
+                hint={copy.targetProfitHint}
               >
                 <Input
                   id="calc-target-ppm"
@@ -178,7 +182,7 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
             </TabsContent>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Loaded miles" htmlFor="calc-loaded">
+              <Field label={copy.loadedMiles} htmlFor="calc-loaded">
                 <Input
                   id="calc-loaded"
                   inputMode="numeric"
@@ -188,9 +192,9 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
                 />
               </Field>
               <Field
-                label="Deadhead to pickup"
+                label={copy.deadheadPickup}
                 htmlFor="calc-deadhead"
-                hint="Always counted"
+                hint={copy.alwaysCounted}
               >
                 <Input
                   id="calc-deadhead"
@@ -200,7 +204,7 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
                   onChange={(e) => set("deadheadMiles", e.target.value)}
                 />
               </Field>
-              <Field label="Fuel price / gal" htmlFor="calc-fuel">
+              <Field label={copy.fuelPrice} htmlFor="calc-fuel">
                 <Input
                   id="calc-fuel"
                   inputMode="decimal"
@@ -208,7 +212,7 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
                   onChange={(e) => set("fuelPrice", e.target.value)}
                 />
               </Field>
-              <Field label="Truck MPG" htmlFor="calc-mpg">
+              <Field label={copy.truckMpg} htmlFor="calc-mpg">
                 <Input
                   id="calc-mpg"
                   inputMode="decimal"
@@ -216,7 +220,7 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
                   onChange={(e) => set("mpg", e.target.value)}
                 />
               </Field>
-              <Field label="Estimated tolls" htmlFor="calc-tolls">
+              <Field label={copy.estimatedTolls} htmlFor="calc-tolls">
                 <Input
                   id="calc-tolls"
                   inputMode="decimal"
@@ -225,7 +229,7 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
                   onChange={(e) => set("tolls", e.target.value)}
                 />
               </Field>
-              <Field label="Other cost" htmlFor="calc-other" hint="Lumper, scale, permit">
+              <Field label={copy.otherCost} htmlFor="calc-other" hint={copy.otherCostHint}>
                 <Input
                   id="calc-other"
                   inputMode="decimal"
@@ -237,7 +241,7 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
 
             <FeeField
               id="dispatch"
-              label="Dispatch fee"
+              label={copy.dispatchFee}
               mode={values.dispatchMode}
               value={values.dispatchValue}
               onMode={(mode) => set("dispatchMode", mode)}
@@ -245,7 +249,7 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
             />
             <FeeField
               id="factoring"
-              label="Factoring fee"
+              label={copy.factoringFee}
               mode={values.factoringMode}
               value={values.factoringValue}
               onMode={(mode) => set("factoringMode", mode)}
@@ -254,38 +258,37 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
 
             <div className="rounded-md border border-dashed border-border bg-surface-sunken/50 p-3">
               <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Your truck&apos;s own numbers
+                {copy.ownNumbers}
               </p>
               <dl className="mt-2 space-y-1">
                 <BasisRow
-                label="Normalized cost / mile"
+                label={copy.normalizedCost}
                   value={
                     defaults.basisSufficient
                       ? formatRateValue(defaults.trueCostPerMile)
-                      : "Not enough data"
+                      : copy.notEnoughData
                   }
                 />
                 <BasisRow
-                  label="Allocated operating cost / mile"
+                  label={copy.allocatedCost}
                   value={formatRateValue(defaults.overheadPerMile)}
                 />
                 <BasisRow
-                  label="Debt service / mile (separate)"
+                  label={copy.debtPerMile}
                   value={formatRateValue(defaults.debtServicePerMile)}
                 />
               </dl>
               <p className="mt-2 text-2xs leading-relaxed text-muted-foreground">
                 {defaults.basisSufficient ? (
                   <>
-                    From {defaults.basisLabel.toLowerCase()} (
-                    {formatMiles(defaults.basisMiles)}). Allocated operating cost excludes fuel,
-                    tolls, dispatch and factoring because you enter those above. Debt service is
-                    shown separately and never changes the load&apos;s rating.
+                    {interpolate(copy.sufficientBasis, {
+                      basis: defaults.basisLabel.toLowerCase(),
+                      miles: formatMiles(defaults.basisMiles),
+                    })}
                   </>
                 ) : (
                   <>
-                    Not enough recorded miles yet, so allocated operating cost is treated as $0.00.
-                    The rating still uses the load&apos;s direct trip costs only.
+                    {copy.insufficientBasis}
                   </>
                 )}
               </p>
@@ -322,12 +325,43 @@ function EvaluateResult({
   defaults: CalculatorDefaults;
   values: Values;
 }) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.calculator;
+  const lineCopy = (line: (typeof estimate.lines)[number]) => {
+    const label = line.key === "fuel"
+      ? copy.fuel
+      : line.key === "tolls"
+        ? copy.tolls
+        : line.key === "dispatch"
+          ? copy.dispatch
+          : line.key === "factoring"
+            ? copy.factoring
+            : copy.otherCosts;
+    const hint = line.key === "fuel"
+      ? toNumber(values.mpg) > 0
+        ? interpolate(copy.fuelLineHint, {
+            gallons: estimate.gallons.toFixed(1),
+            price: `$${toNumber(values.fuelPrice).toFixed(2)}`,
+            mpg: toNumber(values.mpg).toFixed(1),
+          })
+        : copy.enterMpg
+      : line.key === "dispatch"
+        ? values.dispatchMode === "PCT"
+          ? interpolate(copy.percentGross, { percent: values.dispatchValue })
+          : copy.flatFee
+        : line.key === "factoring"
+          ? values.factoringMode === "PCT"
+            ? interpolate(copy.percentGross, { percent: values.factoringValue })
+            : copy.flatFee
+          : undefined;
+    return { label, hint };
+  };
   if (!estimate.valid) {
     return (
       <Card className="border-dashed">
         <CardContent className="p-8 text-center">
           <p className="text-sm text-muted-foreground">
-            Enter loaded miles and MPG to price the load.
+            {copy.enterEvaluate}
           </p>
         </CardContent>
       </Card>
@@ -338,51 +372,53 @@ function EvaluateResult({
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Estimated result</CardTitle>
+          <CardTitle>{copy.estimatedResult}</CardTitle>
           <span className="text-2xs text-muted-foreground tnum">
-            {formatMiles(estimate.totalMiles)} total ·{" "}
-            {formatPercent(estimate.deadheadPct, 0)} deadhead
+            {interpolate(copy.totalDeadhead, {
+              miles: formatMiles(estimate.totalMiles),
+              percent: formatPercent(estimate.deadheadPct, 0),
+            })}
           </span>
         </CardHeader>
         <CardContent className="p-0">
           <dl className="divide-y divide-border/70">
-            <Line label="Gross rate" value={formatMoney(toNumber(values.grossRate))} strong />
+            <Line label={copy.grossRate} value={formatMoney(toNumber(values.grossRate))} strong />
             {estimate.lines.map((line) => (
               <Line
                 key={line.key}
-                label={line.label}
-                hint={line.note}
+                label={lineCopy(line).label}
+                hint={lineCopy(line).hint}
                 value={`-${formatMoney(line.amount)}`}
                 tone="neg"
               />
             ))}
             <Line
-              label="Contribution Profit"
-              hint="Gross rate minus direct trip costs — rating basis"
+              label={copy.contributionProfit}
+              hint={copy.contributionHint}
               value={formatMoney(estimate.contributionProfit)}
               tone={estimate.contributionProfit >= 0 ? undefined : "neg"}
               strong
             />
             <Line
-              label="Allocated Operating Costs"
-              hint="Normalized history; excludes debt service"
+              label={copy.allocatedCosts}
+              hint={copy.allocatedHint}
               value={`-${formatMoney(estimate.allocatedOperatingCosts)}`}
               tone="neg"
             />
             <Line
-              label="Estimated Fully Loaded Operating Profit"
+              label={copy.estimatedProfit}
               value={formatMoney(estimate.fullyLoadedOperatingProfit)}
               tone={estimate.fullyLoadedOperatingProfit >= 0 ? undefined : "neg"}
               strong
             />
             <Line
-              label="Debt Service"
-              hint="Cash burden only — never used by the rating"
+              label={copy.debtFinancing}
+              hint={copy.debtHint}
               value={`-${formatMoney(estimate.debtService)}`}
               tone="neg"
             />
             <Line
-              label="Cash After Debt Service"
+              label={copy.cashAfterDebt}
               value={formatMoney(estimate.cashAfterDebtService)}
               tone={estimate.cashAfterDebtService >= 0 ? undefined : "neg"}
               strong
@@ -399,10 +435,12 @@ function EvaluateResult({
           >
             <div>
               <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                Contribution Profit · Rating Basis
+                {copy.ratingBasis}
               </p>
               <p className="mt-1 text-2xs text-muted-foreground tnum">
-                {formatPercent(estimate.contributionMargin)} margin · direct trip costs only
+                {interpolate(copy.marginDirect, {
+                  percent: formatPercent(estimate.contributionMargin),
+                })}
               </p>
             </div>
             <div className="text-right">
@@ -432,9 +470,9 @@ function EvaluateResult({
       <Card>
         <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
           <div className="min-w-0">
-            <p className="text-xs font-medium text-foreground">Ran this load?</p>
+            <p className="text-xs font-medium text-foreground">{copy.ranLoad}</p>
             <p className="mt-0.5 text-2xs text-muted-foreground">
-              Carry these numbers straight into a load record.
+              {copy.carryNumbers}
             </p>
           </div>
           <LoadFormDialog
@@ -454,7 +492,7 @@ function EvaluateResult({
             }}
             trigger={
               <Button type="button" variant="outline" size="sm">
-                Save as a load
+                {copy.saveLoad}
                 <ArrowRight className="size-3.5" />
               </Button>
             }
@@ -463,8 +501,7 @@ function EvaluateResult({
       </Card>
 
       <p className="px-1 text-2xs leading-relaxed text-muted-foreground">
-        An estimate from your own cost history, not a quote. Fuel burn, tolls and fees on the day
-        decide the real number.
+        {copy.estimateDisclaimer}
       </p>
     </>
   );
@@ -488,13 +525,22 @@ function TargetResult({
   target: ReturnType<typeof calculateTargetRate>;
   values: Values;
 }) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.calculator;
+  const tierCopy = {
+    operatingBreakeven: [copy.operatingBreakeven, copy.operatingBreakevenDescription],
+    cashBreakeven: [copy.cashBreakeven, copy.cashBreakevenDescription],
+    minimum: [copy.minimum, copy.minimumDescription],
+    good: [copy.good, copy.goodDescription],
+    great: [copy.great, copy.greatDescription],
+    target: [copy.target, copy.targetDescription],
+  } as const;
   if (target.impossible) {
     return (
       <Card className="border-neg/40">
         <CardContent className="p-6">
           <p className="text-sm text-neg">
-            Dispatch and factoring together take 100% or more of the gross. No rate can clear a
-            profit until those come down.
+            {copy.impossible}
           </p>
         </CardContent>
       </Card>
@@ -506,7 +552,7 @@ function TargetResult({
       <Card className="border-dashed">
         <CardContent className="p-8 text-center">
           <p className="text-sm text-muted-foreground">
-            Enter loaded miles and MPG to work out what to quote.
+            {copy.enterTarget}
           </p>
         </CardContent>
       </Card>
@@ -519,9 +565,9 @@ function TargetResult({
     <>
       <Card>
         <CardHeader>
-          <CardTitle>What to quote</CardTitle>
+          <CardTitle>{copy.whatToQuote}</CardTitle>
           <span className="text-2xs text-muted-foreground tnum">
-            {formatMiles(target.totalMiles)} total
+            {interpolate(copy.totalMiles, { miles: formatMiles(target.totalMiles) })}
           </span>
         </CardHeader>
         <CardContent className="space-y-2 p-4">
@@ -534,15 +580,17 @@ function TargetResult({
               )}
             >
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide">{tier.label}</p>
-                <p className="mt-0.5 text-2xs opacity-80">{tier.description}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide">{tierCopy[tier.key][0]}</p>
+                <p className="mt-0.5 text-2xs opacity-80">{tierCopy[tier.key][1]}</p>
               </div>
               <div className="shrink-0 text-right">
                 <p className="tnum text-xl font-semibold leading-none tracking-tight">
                   {formatMoneyCompact(tier.rate)}
                 </p>
                 <p className="mt-1 text-2xs opacity-70 tnum">
-                  {formatRateValue(tier.ratePerLoadedMile)}/loaded mi
+                  {interpolate(copy.perLoadedMile, {
+                    rate: formatRateValue(tier.ratePerLoadedMile),
+                  })}
                 </p>
               </div>
             </div>
@@ -552,32 +600,37 @@ function TargetResult({
 
       <Card>
         <CardHeader>
-          <CardTitle>How that was worked out</CardTitle>
+          <CardTitle>{copy.workedOut}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 p-4">
           <dl className="divide-y divide-border/70">
             <Line
-              label="Fuel"
-              hint={`${target.gallons.toFixed(1)} gal at $${toNumber(values.fuelPrice).toFixed(2)}/gal`}
+              label={copy.fuel}
+              hint={interpolate(copy.fuelHint, {
+                gallons: target.gallons.toFixed(1),
+                price: `$${toNumber(values.fuelPrice).toFixed(2)}`,
+              })}
               value={formatMoney(target.fuelCost)}
             />
-            <Line label="Tolls" value={formatMoney(target.tolls)} />
-            <Line label="Other cost" value={formatMoney(target.otherCost)} />
+            <Line label={copy.tolls} value={formatMoney(target.tolls)} />
+            <Line label={copy.otherCost} value={formatMoney(target.otherCost)} />
             <Line
-              label="Allocated operating costs"
-              hint={`${formatMiles(target.totalMiles)} at the normalized operating rate`}
+              label={copy.allocatedCosts}
+              hint={interpolate(copy.allocatedCostHint, {
+                miles: formatMiles(target.totalMiles),
+              })}
               value={formatMoney(target.overhead)}
             />
             <Line
-              label="Debt service (cash burden only)"
-              hint="Excluded from GREAT / GOOD / MARGINAL / BAD"
+              label={copy.debtCashOnly}
+              hint={copy.debtExcluded}
               value={formatMoney(target.debtService)}
             />
             {target.flatFees > 0 ? (
-              <Line label="Flat dispatch / factoring" value={formatMoney(target.flatFees)} />
+              <Line label={copy.flatFees} value={formatMoney(target.flatFees)} />
             ) : null}
             <Line
-              label="Costs that do not move with the rate"
+              label={copy.fixedTripCosts}
               value={formatMoney(target.fixedTripCost)}
               strong
             />
@@ -585,15 +638,16 @@ function TargetResult({
 
           <div className="rounded-md border border-border bg-surface-sunken/60 p-3">
             <p className="text-2xs leading-relaxed text-muted-foreground">
-              Dispatch and factoring are {feePct}% of whatever the rate ends up being, so they
-              cannot simply be added on. The rate is solved for instead:
+              {interpolate(copy.feeExplanation, { percent: feePct })}
             </p>
             <p className="mt-2 rounded bg-card px-2.5 py-2 font-mono text-2xs text-foreground">
-              rate = (costs + profit wanted) ÷ (1 − {(target.grossFeeRate).toFixed(3)})
+              {interpolate(copy.rateFormula, { rate: target.grossFeeRate.toFixed(3) })}
             </p>
             <p className="mt-2 text-2xs text-muted-foreground tnum">
-              Costs {formatMoney(target.fixedTripCost)} · {formatRateValue(target.costPerMile)} per
-              total mile before any profit.
+              {interpolate(copy.costsBeforeProfit, {
+                amount: formatMoney(target.fixedTripCost),
+                rate: formatRateValue(target.costPerMile),
+              })}
             </p>
           </div>
         </CardContent>
@@ -619,6 +673,7 @@ function FeeField({
   onMode: (mode: FeeMode) => void;
   onValue: (value: string) => void;
 }) {
+  const { dictionary } = useLanguage();
   return (
     <Field label={label} htmlFor={`calc-${id}`}>
       <div className="flex gap-2">
@@ -632,7 +687,7 @@ function FeeField({
         <div
           className="flex shrink-0 overflow-hidden rounded-md border border-border"
           role="group"
-          aria-label={`${label} unit`}
+          aria-label={interpolate(dictionary.calculator.feeUnit, { label })}
         >
           {(["PCT", "AMOUNT"] as FeeMode[]).map((option) => (
             <button

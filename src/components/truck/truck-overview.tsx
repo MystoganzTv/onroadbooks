@@ -16,6 +16,8 @@ import {
   iftaReportingLabel,
 } from "@/lib/ifta-eligibility";
 import type { Truck } from "@/lib/types";
+import { useLanguage } from "@/components/shell/language-provider";
+import { interpolate } from "@/lib/i18n/dictionaries";
 
 interface TruckOverviewProps {
   truck: Truck;
@@ -37,6 +39,8 @@ export function TruckOverview({
   canRestore,
   profileIncomplete,
 }: TruckOverviewProps) {
+  const { dictionary, locale } = useLanguage();
+  const copy = dictionary.truck;
   const [editing, setEditing] = React.useState(false);
   const iftaStatus = iftaApplicability(truck);
   const identityIncomplete = ![truck.year, truck.make, truck.model].some(Boolean);
@@ -56,15 +60,15 @@ export function TruckOverview({
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 id="truck-information-title" className="text-sm font-semibold">
-            Truck information
+            {copy.truckInformation}
           </h2>
           <p className="mt-0.5 text-2xs text-muted-foreground">
-            Profile, ownership and current operating status for this unit.
+            {copy.informationDescription}
           </p>
         </div>
         <Button type="button" size="sm" variant="outline" onClick={() => setEditing(true)}>
           <Pencil className="size-4" />
-          Update truck
+          {copy.updateTruck}
         </Button>
       </div>
 
@@ -73,25 +77,25 @@ export function TruckOverview({
           <CardHeader>
             <div className="flex items-center gap-2">
               <Gauge className="size-3.5 text-muted-foreground" />
-              <CardTitle>Odometer &amp; Fuel</CardTitle>
+              <CardTitle>{copy.odometerFuel}</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-x-5 gap-y-6 p-4 lg:p-5">
-            <Metric label="Starting" value={formatOdometer(truck.startingOdometer)} sub="mi" />
+            <Metric label={copy.starting} value={formatOdometer(truck.startingOdometer)} sub="mi" />
             <Metric
-              label="Current"
+              label={copy.current}
               value={formatOdometer(truck.currentOdometer)}
-              sub="latest recorded reading"
+              sub={copy.latestReading}
             />
             <Metric
-              label="Miles Driven"
+              label={copy.milesDriven}
               value={formatNumber(odometerMiles)}
-              sub="since purchase"
+              sub={copy.sincePurchase}
             />
             <Metric
-              label="Lifetime MPG"
+              label={copy.lifetimeMpg}
               value={milesPerGallon ? milesPerGallon.toFixed(1) : "--"}
-              sub={milesPerGallon ? "tank to tank" : "needs 2 readings"}
+              sub={milesPerGallon ? copy.tankToTank : copy.needsReadings}
             />
           </CardContent>
         </Card>
@@ -100,23 +104,23 @@ export function TruckOverview({
           <CardHeader>
             <div className="flex items-center gap-2">
               <TruckIcon className="size-3.5 text-muted-foreground" />
-              <CardTitle>Ownership</CardTitle>
+              <CardTitle>{copy.ownership}</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-x-5 gap-y-6 p-4 lg:p-5">
             <Metric
-              label="Purchase Price"
+              label={copy.purchasePrice}
               value={truck.purchasePrice ? formatMoney(truck.purchasePrice) : "--"}
             />
             <Metric
-              label="Monthly Payment"
+              label={copy.monthlyPayment}
               value={truck.monthlyPayment ? formatMoney(truck.monthlyPayment) : "--"}
-              sub={truck.monthlyPayment ? "used by monthly expense prompts" : undefined}
+              sub={truck.monthlyPayment ? copy.monthlyPrompts : undefined}
             />
             <Metric
-              label="Monthly Insurance"
+              label={copy.monthlyInsurance}
               value={truck.monthlyInsurance ? formatMoney(truck.monthlyInsurance) : "--"}
-              sub={truck.monthlyInsurance ? "used by monthly expense prompts" : undefined}
+              sub={truck.monthlyInsurance ? copy.monthlyPrompts : undefined}
             />
             <Metric label="VIN" value={truck.vin ?? "--"} valueClassName="text-xs font-mono" />
           </CardContent>
@@ -126,43 +130,43 @@ export function TruckOverview({
           <CardHeader>
             <div className="flex items-center gap-2">
               <ShieldCheck className="size-3.5 text-muted-foreground" />
-              <CardTitle>Unit Status</CardTitle>
+              <CardTitle>{copy.unitStatus}</CardTitle>
             </div>
             <Badge
               variant={!truck.active ? "outline" : profileIncomplete ? "warning" : "positive"}
             >
-              {!truck.active ? "Out of service" : profileIncomplete ? "Ready for setup" : "In service"}
+              {!truck.active ? copy.outOfService : profileIncomplete ? copy.readySetup : copy.inService}
             </Badge>
           </CardHeader>
           <CardContent className="space-y-3 p-4 lg:p-5">
             <p className="text-xs leading-relaxed text-muted-foreground">
               {truck.active
                 ? profileIncomplete
-                  ? "This starter unit can receive records, but its vehicle profile has not been completed."
-                  : "This unit is available for new loads, expenses and service entries."
-                : "This unit remains available in historical reports, but no new work can be assigned to it."}
+                  ? copy.incompleteDescription
+                  : copy.activeDescription
+                : copy.retiredDescription}
             </p>
             <div className="rounded-lg border border-border bg-surface-sunken/60 p-3">
-              <p className="text-2xs font-semibold text-foreground">IFTA profile</p>
+              <p className="text-2xs font-semibold text-foreground">{copy.iftaProfile}</p>
               <p className="mt-1 text-2xs leading-relaxed text-muted-foreground">
-                {iftaApplicabilityLabel(iftaStatus)}.
+                {iftaApplicabilityLabel(iftaStatus, locale)}.
                 {iftaStatus === "LIKELY_REQUIRED"
-                  ? " Track jurisdiction miles and fuel, then confirm exemptions with your base jurisdiction."
+                  ? ` ${copy.iftaTrack}`
                   : iftaStatus === "LIKELY_NOT_REQUIRED"
-                    ? " Update the vehicle if its weight, axles or operating area changes."
-                    : " Add axles, registered weight and operating area under Update truck."}
+                    ? ` ${copy.iftaUpdate}`
+                    : ` ${copy.iftaAdd}`}
               </p>
               <p className="mt-2 text-2xs leading-relaxed text-muted-foreground">
-                <span className="font-semibold text-foreground">Quarterly filing:</span>{" "}
-                {iftaReportingLabel(truck.iftaReportingEnabled)}.
+                <span className="font-semibold text-foreground">{copy.quarterlyFiling}</span>{" "}
+                {iftaReportingLabel(truck.iftaReportingEnabled, locale)}.
               </p>
             </div>
             {activeTruckCount > 1 || !truck.active ? (
               <div className="rounded-lg border border-border bg-surface-sunken/60 p-3">
                 <p className="mb-2.5 text-2xs leading-relaxed text-muted-foreground">
                   {truck.active
-                    ? "Taking a unit out of service never deletes its records. You can return it to service later."
-                    : "Returning this unit to service makes it selectable for new activity and uses one available plan slot."}
+                    ? copy.takeOut
+                    : copy.returnService}
                 </p>
                 <TruckRetireButton truck={truck} canRestore={canRestore} />
               </div>
@@ -176,7 +180,7 @@ export function TruckOverview({
                       : iftaStatus === "UNKNOWN"
                         ? "This unit stays active, but its IFTA assessment is still unknown. Add axles, registered weight and operating area under Update truck."
                         : "This unit stays active, but its IFTA filing decision is still pending. Confirm whether to include or exclude it under Update truck."
-                    : "This is your only active truck, so it stays in service. Add another active unit before taking this one out of service."}
+                    : copy.onlyActive}
                 </p>
               </div>
             )}
@@ -184,9 +188,7 @@ export function TruckOverview({
         </Card>
       </div>
       <p className="text-2xs leading-relaxed text-muted-foreground">
-        Load miles ({formatNumber(loadMiles)}) track work performed. The odometer changes only from
-        an Ending odometer on a load, a Fuel or Service reading, or Update truck—never by adding an
-        estimated route automatically.
+        {interpolate(copy.odometerExplanation, { miles: formatNumber(loadMiles) })}
       </p>
     </section>
   );

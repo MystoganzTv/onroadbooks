@@ -1,10 +1,15 @@
+"use client";
+
 import Link from "next/link";
 import { Gauge } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { categoryColor } from "@/lib/categories";
+import { useLanguage } from "@/components/shell/language-provider";
+import { categoryColor, categoryLabel } from "@/lib/categories";
 import { formatMoney, formatRateValue } from "@/lib/formatters";
 import type { CostPerMile } from "@/lib/finance/cost-per-mile";
+import { interpolate } from "@/lib/i18n/dictionaries";
+import { formatLocaleNumber } from "@/lib/i18n-format";
 import { cn } from "@/lib/utils";
 
 interface CostPerMileCardProps {
@@ -30,13 +35,15 @@ export function CostPerMileCard({
   compact = false,
   className,
 }: CostPerMileCardProps) {
+  const { dictionary, locale } = useLanguage();
+  const copy = dictionary.analytics;
   if (!cost.sufficient) {
     return (
       <Card className={className}>
         <CardHeader>
           <div className="flex items-center gap-2">
             <Gauge className="size-3.5 text-muted-foreground" />
-            <CardTitle>{compact ? "Normalized Cost / Mile" : "Actual Cost / Mile"}</CardTitle>
+            <CardTitle>{compact ? copy.normalizedCostPerMile : copy.actualCostPerMile}</CardTitle>
           </div>
           {/*
             The basis belongs in the header even when the card is empty: two of
@@ -50,8 +57,7 @@ export function CostPerMileCard({
         </CardHeader>
         <CardContent className="p-4">
           <p className="text-xs leading-relaxed text-muted-foreground">
-            No miles recorded for this basis, so there is nothing to divide costs by yet. Add
-            a load with miles and this fills in.
+            {copy.noMiles}
           </p>
         </CardContent>
       </Card>
@@ -65,7 +71,7 @@ export function CostPerMileCard({
       <CardHeader>
         <div className="flex items-center gap-2">
           <Gauge className="size-3.5 text-muted-foreground" />
-          <CardTitle>{compact ? "Normalized Cost / Mile" : "Actual Cost / Mile"}</CardTitle>
+          <CardTitle>{compact ? copy.normalizedCostPerMile : copy.actualCostPerMile}</CardTitle>
         </div>
         <span className="text-2xs text-muted-foreground">{cost.basisLabel}</span>
       </CardHeader>
@@ -73,11 +79,11 @@ export function CostPerMileCard({
       <CardContent className="space-y-3.5 p-4">
         <div className="flex items-end justify-between gap-4">
           <div className="grid flex-1 grid-cols-2 gap-3">
-            <Split label="Fixed / mile" value={cost.fixedCostPerMile} tone="text-info" />
-            <Split label="Variable / mile" value={cost.variableCostPerMile} tone="text-warn" />
+            <Split label={copy.fixedPerMile} value={cost.fixedCostPerMile} tone="text-info" />
+            <Split label={copy.variablePerMile} value={cost.variableCostPerMile} tone="text-warn" />
           </div>
           <div className="shrink-0 text-right">
-            <p className="label-xs">{compact ? "Normalized cost / mile" : "Actual cost / mile"}</p>
+            <p className="label-xs">{compact ? copy.normalizedCostPerMile : copy.actualCostPerMile}</p>
             <p className="mt-0.5 tnum text-3xl font-semibold leading-none tracking-tight text-foreground">
               {formatRateValue(cost.actualCostPerMile)}
             </p>
@@ -91,7 +97,7 @@ export function CostPerMileCard({
               key={line.category}
               className="h-full"
               style={{ width: `${line.share}%`, backgroundColor: categoryColor(line.category) }}
-              title={`${line.label}: ${formatRateValue(line.perMile)}/mi`}
+              title={`${categoryLabel(line.category, locale)}: ${formatRateValue(line.perMile)}/mi`}
             />
           ))}
         </div>
@@ -106,7 +112,7 @@ export function CostPerMileCard({
                     style={{ backgroundColor: categoryColor(line.category) }}
                     aria-hidden
                   />
-                  <span className="truncate text-2xs text-muted-foreground">{line.label}</span>
+                  <span className="truncate text-2xs text-muted-foreground">{categoryLabel(line.category, locale)}</span>
                 </span>
                 <span className="shrink-0 tnum text-2xs text-foreground">
                   {formatRateValue(line.perMile)}
@@ -118,20 +124,27 @@ export function CostPerMileCard({
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-2xs text-muted-foreground">
           <span className="tnum">
-            {formatMoney(cost.totalCost)} over {Math.round(cost.totalMiles).toLocaleString()} mi
+            {interpolate(copy.costOverMiles, {
+              amount: formatMoney(cost.totalCost),
+              miles: formatLocaleNumber(Math.round(cost.totalMiles), locale),
+            })}
           </span>
           {margin !== undefined ? (
             <span
               className={cn("tnum font-medium", margin >= 0 ? "text-pos" : "text-neg")}
             >
-              {margin >= 0 ? "Keeping" : "Losing"} {formatRateValue(Math.abs(margin))} per mile
+              {margin >= 0 ? copy.keeping : copy.losing}{" "}
+              {interpolate(copy.perMile, { amount: formatRateValue(Math.abs(margin)) })}
             </span>
           ) : null}
         </div>
 
         {cost.debtServiceTotal > 0 ? (
           <p className="border-t border-border pt-3 text-2xs text-muted-foreground tnum">
-            Debt Service is separate: {formatMoney(cost.debtServiceTotal)} · {formatRateValue(cost.debtServicePerMile)}/mi cash burden.
+            {interpolate(copy.debtSeparate, {
+              amount: formatMoney(cost.debtServiceTotal),
+              rate: formatRateValue(cost.debtServicePerMile),
+            })}
           </p>
         ) : null}
 
@@ -140,7 +153,7 @@ export function CostPerMileCard({
             href={href}
             className="inline-block text-2xs font-medium text-primary underline-offset-2 hover:underline focus-ring"
           >
-            See the full cost-per-mile breakdown
+            {copy.fullCostBreakdown}
           </Link>
         ) : null}
       </CardContent>

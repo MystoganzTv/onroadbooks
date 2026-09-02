@@ -35,8 +35,14 @@ import {
   type SearchParams,
 } from "@/lib/period-params";
 import { cn } from "@/lib/utils";
+import { getWebDictionary, interpolate, type WebDictionary } from "@/lib/i18n/dictionaries";
+import { getAppLocale } from "@/lib/i18n-server";
+import { formatLocalePeriod } from "@/lib/i18n-format";
 
-export const metadata: Metadata = { title: "Lane Intelligence" };
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getAppLocale();
+  return { title: getWebDictionary(locale).analytics.laneMetadata };
+}
 
 /**
  * LANE INTELLIGENCE.
@@ -50,8 +56,12 @@ export default async function LanesPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const params = await searchParams;
-  const session = await requireSession();
+  const [params, session, locale] = await Promise.all([
+    searchParams,
+    requireSession(),
+    getAppLocale(),
+  ]);
+  const copy = getWebDictionary(locale).analytics;
   const { trucks, loads: allLoads, fuelEntries, settings, subscription } = await getRepository(
     session.businessId,
   ).getDataset();
@@ -64,12 +74,12 @@ export default async function LanesPage({
     return (
       <div className="space-y-4 p-4 lg:p-6">
         <PageHeader
-          title="Lanes"
-          description="Which market-to-market runs actually pay, in the direction you ran them."
+          title={copy.laneGateTitle}
+          description={copy.laneGateDescription}
         />
         <PlanGate
           capability="cockpit"
-          what="See which lanes pay and which ones only look busy — directional, and never ranked on a sample too thin to mean anything."
+          what={copy.laneGateWhat}
         />
       </div>
     );
@@ -89,6 +99,8 @@ export default async function LanesPage({
   const qualified = lanes.filter((l) => l.qualified);
   const emerging = lanes.filter((l) => !l.qualified);
   const bestPerMile = lanes.reduce((best, lane) => Math.max(best, lane.profitPerMile), 0);
+  const periodLabel = formatLocalePeriod(period, locale);
+  const periodShort = formatLocalePeriod(period, locale, "short");
 
   // A round trip only reads as a round trip when both directions are ranked.
   const pairs = qualified
@@ -107,8 +119,8 @@ export default async function LanesPage({
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <PageHeader
-        title="Lane Intelligence"
-        description="Which runs pay. Direction matters — the way out and the way back are separate businesses."
+        title={copy.laneTitle}
+        description={copy.laneDescription}
       />
       <AnalyticsTabs />
       <div className="flex flex-wrap items-center gap-2">
@@ -131,7 +143,7 @@ export default async function LanesPage({
                   grouping === option && "bg-background font-medium text-foreground shadow-sm",
                 )}
               >
-                {option}
+                {option === "market" ? copy.market : copy.state}
               </Link>
             );
           })}
@@ -139,31 +151,33 @@ export default async function LanesPage({
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <MiniStat label="Lanes run" value={String(lanes.length)} sub={period.shortLabel} />
-        <MiniStat label="Ranked" value={String(qualified.length)} sub={`${LANE_MIN_LOADS}+ loads`} />
+        <MiniStat label={copy.lanesRun} value={String(lanes.length)} sub={periodShort} />
+        <MiniStat label={copy.ranked} value={String(qualified.length)} sub={interpolate(copy.minimumLoads, { count: LANE_MIN_LOADS })} />
         <MiniStat
-          label="Best lane"
+          label={copy.bestLane}
           value={qualified[0] ? formatRateValue(qualified[0].profitPerMile) : "—"}
-          sub={qualified[0]?.label ?? "Not enough data"}
+          sub={qualified[0]?.label ?? copy.notEnoughData}
           tone="info"
         />
         <MiniStat
-          label="Weakest lane"
+          label={copy.weakestLane}
           value={
             qualified.length > 1
               ? formatRateValue(qualified[qualified.length - 1].profitPerMile)
               : "—"
           }
-          sub={qualified.length > 1 ? qualified[qualified.length - 1].label : "Not enough data"}
+          sub={qualified.length > 1 ? qualified[qualified.length - 1].label : copy.notEnoughData}
         />
       </div>
 
       {pairs.length > 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>Round trips</CardTitle>
+            <CardTitle>{copy.roundTrips}</CardTitle>
             <span className="text-2xs text-muted-foreground">
-              The same two {grouping === "market" ? "markets" : "states"}, each direction priced separately
+              {interpolate(copy.roundTripDescription, {
+                group: grouping === "market" ? copy.markets : copy.states,
+              })}
             </span>
           </CardHeader>
           <CardContent className="grid gap-3 p-4 lg:grid-cols-2">
@@ -176,12 +190,13 @@ export default async function LanesPage({
                   {pair.out.originLabel} ↔ {pair.out.destinationLabel}
                 </p>
                 <div className="mt-2 space-y-1.5">
-                  <Direction lane={pair.out} />
-                  <Direction lane={pair.back} />
+                  <Direction lane={pair.out} copy={copy} />
+                  <Direction lane={pair.back} copy={copy} />
                 </div>
                 <p className="mt-2 text-2xs text-muted-foreground tnum">
-                  {formatRateValue(Math.abs(pair.out.profitPerMile - pair.back.profitPerMile))} per
-                  mile difference between the two directions.
+                  {interpolate(copy.directionDifference, {
+                    rate: formatRateValue(Math.abs(pair.out.profitPerMile - pair.back.profitPerMile)),
+                  })}
                 </p>
               </div>
             ))}
@@ -191,28 +206,28 @@ export default async function LanesPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>All lanes</CardTitle>
-          <span className="text-2xs text-muted-foreground">Best contribution profit per mile first</span>
+          <CardTitle>{copy.allLanes}</CardTitle>
+          <span className="text-2xs text-muted-foreground">{copy.bestFirst}</span>
         </CardHeader>
         <CardContent className="p-0">
           {lanes.length === 0 ? (
             <p className="p-6 text-center text-sm text-muted-foreground">
-              No loads in {period.label}.
+              {interpolate(copy.noLoads, { period: periodLabel })}
             </p>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Lane</TableHead>
-                    <TableHead className="text-right">Loads</TableHead>
-                    <TableHead className="text-right">Booked Revenue</TableHead>
-                    <TableHead className="text-right">Miles</TableHead>
-                    <TableHead className="text-right">Rate $/loaded mi</TableHead>
-                    <TableHead className="text-right">Contribution $/mi</TableHead>
-                    <TableHead className="text-right">Contribution Margin</TableHead>
-                    <TableHead className="text-right">Deadhead</TableHead>
-                    <TableHead className="w-28">Relative</TableHead>
+                    <TableHead>{copy.lane}</TableHead>
+                    <TableHead className="text-right">{copy.loads}</TableHead>
+                    <TableHead className="text-right">{copy.bookedRevenue}</TableHead>
+                    <TableHead className="text-right">{copy.miles}</TableHead>
+                    <TableHead className="text-right">{copy.rateLoaded}</TableHead>
+                    <TableHead className="text-right">{copy.contributionPerMile}</TableHead>
+                    <TableHead className="text-right">{copy.contributionMargin}</TableHead>
+                    <TableHead className="text-right">{copy.deadhead}</TableHead>
+                    <TableHead className="w-28">{copy.relative}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -223,7 +238,9 @@ export default async function LanesPage({
                         {lane.loadCount}
                         {lane.qualified ? null : (
                           <span className="block text-2xs text-muted-foreground">
-                            {LANE_MIN_LOADS - lane.loadCount} more to rank
+                            {interpolate(copy.moreToRank, {
+                              count: LANE_MIN_LOADS - lane.loadCount,
+                            })}
                           </span>
                         )}
                       </TableCell>
@@ -256,7 +273,9 @@ export default async function LanesPage({
                             nothing, while the bar shows the real spread. */}
                         <span
                           className="block h-2 overflow-hidden rounded-full bg-surface-sunken"
-                          title={`${formatRateValue(lane.profitPerMile)} per mile`}
+                          title={interpolate(copy.perMile, {
+                            amount: formatRateValue(lane.profitPerMile),
+                          })}
                         >
                           <span
                             className={cn(
@@ -284,29 +303,26 @@ export default async function LanesPage({
 
       <p className="text-2xs leading-relaxed text-muted-foreground">
         {emerging.length > 0
-          ? `${emerging.length} ${
-              emerging.length === 1
-                ? "lane has fewer than"
-                : "lanes have fewer than"
-            } ${LANE_MIN_LOADS} loads and ${
-              emerging.length === 1 ? "is" : "are"
-            } shown greyed out rather than ranked. `
+          ? interpolate(copy.emergingMethod, {
+              count: emerging.length,
+              unit: emerging.length === 1 ? copy.laneHas : copy.lanesHave,
+              minimum: LANE_MIN_LOADS,
+              verb: emerging.length === 1 ? copy.is : copy.are,
+            })
           : ""}
-        A lane needs {LANE_MIN_LOADS} loads before it is ranked — two runs is an anecdote, and a
-        ranking built on anecdotes is worse than none. Market grouping normalizes nearby freight
-        cities into the same commercial area; switch to states when the sample is still small.
+        {interpolate(copy.laneMethod, { count: LANE_MIN_LOADS })}
       </p>
     </div>
   );
 }
 
-function Direction({ lane }: { lane: { label: string; loadCount: number; profitPerMile: number } }) {
+function Direction({ lane, copy }: { lane: { label: string; loadCount: number; profitPerMile: number }; copy: WebDictionary["analytics"] }) {
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="flex min-w-0 items-center gap-1 text-2xs text-muted-foreground">
         <ArrowRight className="size-3 shrink-0" />
         <span className="truncate">
-          {lane.label} · {lane.loadCount} loads
+          {lane.label} · {lane.loadCount} {copy.loads.toLowerCase()}
         </span>
       </span>
       <span

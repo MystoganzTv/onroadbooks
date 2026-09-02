@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+import { useLanguage } from "@/components/shell/language-provider";
+import { interpolate } from "@/lib/i18n/dictionaries";
+
 import {
   DocumentUploader,
   uploadPending,
@@ -97,6 +101,8 @@ export function MaintenanceFormDialog({
   truckId,
   trigger,
 }: MaintenanceFormDialogProps) {
+  const { dictionary, locale } = useLanguage();
+  const copy = dictionary.maintenance;
   const router = useRouter();
   const isEdit = Boolean(record);
 
@@ -211,21 +217,19 @@ export function MaintenanceFormDialog({
           ? await uploadPending("MAINTENANCE", result.id, attachments)
           : { uploaded: 0, failed: 0 };
         if (upload.failed > 0) {
-          toast.error(
-            `The document could not be attached. The service was saved -- add it by editing the record. ${upload.error ?? ""}`.trim(),
-          );
+          toast.error(interpolate(copy.documentFailed, { error: upload.error ?? "" }).trim());
         }
-        toast.success(isEdit ? "Service record updated" : "Service logged", {
+        toast.success(isEdit ? copy.updated : copy.logged, {
           description:
             payload.cost > 0 && payload.recordAsExpense
-              ? `${formatMoney(payload.cost)} also added to the expense ledger`
+              ? interpolate(copy.addedLedger, { amount: formatMoney(payload.cost) })
               : undefined,
         });
         setOpen(false);
         router.refresh();
       } else {
         setErrors(result.fieldErrors ?? {});
-        toast.error(result.error);
+        toast.error(localizedClientError(result.error));
       }
     });
   }
@@ -236,23 +240,23 @@ export function MaintenanceFormDialog({
         {trigger ?? (
           <Button size="sm">
             <Plus />
-            Log Service
+            {copy.logService}
           </Button>
         )}
       </DialogTrigger>
 
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit service record" : "Log a service"}</DialogTitle>
+          <DialogTitle>{isEdit ? copy.editService : copy.formTitle}</DialogTitle>
           <DialogDescription>
-            Intervals are prefilled from the service type -- adjust them if yours differ.
+            {copy.formDescription}
           </DialogDescription>
         </DialogHeader>
 
         <DialogBody>
           <form id="maintenance-form" onSubmit={submit} className="space-y-4" noValidate>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Service type" htmlFor="maint-type" required error={errors.type}>
+              <Field label={copy.serviceType} htmlFor="maint-type" required error={errors.type}>
                 <Select value={values.type} onValueChange={(v) => changeType(v as MaintenanceType)}>
                   <SelectTrigger id="maint-type">
                     <SelectValue />
@@ -260,14 +264,14 @@ export function MaintenanceFormDialog({
                   <SelectContent>
                     {MAINTENANCE_TYPES.map((type) => (
                       <SelectItem key={type.id} value={type.id}>
-                        {type.label}
+                        {locale === "es" ? type.labelEs : type.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </Field>
               <Field
-                label="Service date"
+                label={copy.serviceDate}
                 htmlFor="maint-date"
                 required
                 error={errors.serviceDate}
@@ -284,11 +288,11 @@ export function MaintenanceFormDialog({
             </div>
 
             <div>
-              <Label className="mb-1.5 block">Tracked by</Label>
+              <Label className="mb-1.5 block">{copy.trackedBy}</Label>
               <div
                 className="inline-flex rounded-md border border-border bg-surface-sunken p-0.5"
                 role="group"
-                aria-label="Tracking basis"
+                aria-label={copy.trackingBasis}
               >
                 {BASIS_OPTIONS.map((option) => (
                   <button
@@ -304,17 +308,17 @@ export function MaintenanceFormDialog({
                         : "text-muted-foreground hover:text-foreground",
                     )}
                   >
-                    {option.label}
+                    {option.id === "DATE" ? copy.byDate : option.id === "MILEAGE" ? copy.byMileage : copy.both}
                   </button>
                 ))}
               </div>
               <p className="mt-1 text-2xs text-muted-foreground">
-                {BASIS_OPTIONS.find((o) => o.id === values.basis)?.hint}
+                {values.basis === "DATE" ? copy.dateHint : values.basis === "MILEAGE" ? copy.mileageHint : copy.bothHint}
               </p>
             </div>
 
             <div className="grid grid-cols-3 gap-3">
-              <Field label="Odometer" htmlFor="maint-odometer" error={errors.odometer}>
+              <Field label={copy.odometer} htmlFor="maint-odometer" error={errors.odometer}>
                 <Input
                   id="maint-odometer"
                   type="number"
@@ -324,7 +328,7 @@ export function MaintenanceFormDialog({
                   onChange={(e) => set("odometer", e.target.value)}
                 />
               </Field>
-              <Field label="Cost" htmlFor="maint-cost" error={errors.cost}>
+              <Field label={copy.cost} htmlFor="maint-cost" error={errors.cost}>
                 <Input
                   id="maint-cost"
                   type="number"
@@ -336,21 +340,21 @@ export function MaintenanceFormDialog({
                   placeholder="0.00"
                 />
               </Field>
-              <Field label="Vendor" htmlFor="maint-vendor" error={errors.vendor}>
+              <Field label={copy.vendor} htmlFor="maint-vendor" error={errors.vendor}>
                 <Input
                   id="maint-vendor"
                   maxLength={120}
                   aria-invalid={Boolean(errors.vendor)}
                   value={values.vendor}
                   onChange={(e) => set("vendor", e.target.value)}
-                  placeholder="Optional"
+                  placeholder={copy.optional}
                 />
               </Field>
             </div>
 
             <div className="grid grid-cols-2 gap-3 rounded-md border border-border bg-surface-sunken p-3">
               <Field
-                label="Next service date"
+                label={copy.nextDate}
                 htmlFor="maint-next-date"
                 required={needsDate}
                 error={errors.nextServiceDate}
@@ -365,7 +369,7 @@ export function MaintenanceFormDialog({
                 />
               </Field>
               <Field
-                label="Next service odometer"
+                label={copy.nextOdometer}
                 htmlFor="maint-next-odo"
                 required={needsMiles}
                 error={errors.nextServiceOdometer}
@@ -389,14 +393,14 @@ export function MaintenanceFormDialog({
                   htmlFor="maint-expense"
                   className="normal-case tracking-normal text-foreground"
                 >
-                  Also record as an expense
+                  {copy.recordExpense}
                 </Label>
                 <p className="mt-0.5 text-2xs text-muted-foreground">
-                  Keeps operating expenses complete without entering the cost twice.
+                  {copy.expenseDescription}
                 </p>
                 {isEdit && record?.expenseId && !values.recordAsExpense ? (
                   <p className="mt-1 text-2xs text-warn">
-                    Saving now deletes the existing ledger row for this service.
+                    {copy.deletesLedger}
                   </p>
                 ) : null}
               </div>
@@ -407,7 +411,7 @@ export function MaintenanceFormDialog({
               />
             </div>
 
-            <Field label="Notes" htmlFor="maint-notes" error={errors.notes}>
+            <Field label={copy.notes} htmlFor="maint-notes" error={errors.notes}>
               <Textarea
                 id="maint-notes"
                 rows={2}
@@ -415,12 +419,12 @@ export function MaintenanceFormDialog({
                 aria-invalid={Boolean(errors.notes)}
                 value={values.notes}
                 onChange={(e) => set("notes", e.target.value)}
-                placeholder="Optional"
+                placeholder={copy.optional}
               />
             </Field>
 
             <div className="space-y-2 border-t border-border pt-3">
-              <p className="label-xs">Receipt / document</p>
+              <p className="label-xs">{copy.receipt}</p>
               {isEdit && record ? (
                 <>
                   {documents.length > 0 ? <DocumentList documents={documents} /> : null}
@@ -440,11 +444,11 @@ export function MaintenanceFormDialog({
 
         <DialogFooter>
           <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>
-            Cancel
+            {dictionary.common.cancel}
           </Button>
           <Button type="submit" form="maintenance-form" size="sm" disabled={pending}>
             {pending ? <Loader2 className="animate-spin" /> : null}
-            {isEdit ? "Save changes" : "Log service"}
+            {isEdit ? copy.saveChanges : copy.logService}
           </Button>
         </DialogFooter>
       </DialogContent>

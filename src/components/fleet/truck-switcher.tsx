@@ -39,8 +39,9 @@ export function TruckSwitcher({
 }) {
   const pathname = usePathname();
   const search = useSearchParams();
-  const { locale } = useLanguage();
-  const resolvedAllLabel = allLabel ?? (locale === "es" ? "Toda la flota" : "Whole fleet");
+  const { dictionary } = useLanguage();
+  const copy = dictionary.fleet;
+  const resolvedAllLabel = allLabel ?? copy.wholeFleet;
 
   if (trucks.length < 2) return null;
 
@@ -77,7 +78,7 @@ export function TruckSwitcher({
       <div
         className={cn("grid w-full gap-2 sm:grid-cols-2 xl:grid-cols-3", className)}
         role="group"
-        aria-label="Choose a truck"
+        aria-label={copy.chooseTruck}
       >
         {trucks.map((truck) => {
           const active = selectedId === truck.id;
@@ -112,19 +113,19 @@ export function TruckSwitcher({
                   <span className="truncate text-sm font-semibold text-foreground">{truck.name}</span>
                   {!truck.active ? (
                     <span className="rounded border border-border px-1.5 py-0.5 text-2xs font-medium text-muted-foreground">
-                      Retired
+                      {copy.retired}
                     </span>
                   ) : null}
                 </span>
                 <span className="mt-0.5 block truncate text-2xs text-muted-foreground">
-                  {description || "Vehicle details not added"}
+                  {description || copy.vehicleMissing}
                 </span>
               </span>
               {active ? (
                 <span
                   className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
-                  aria-label="Currently viewing"
-                  title="Currently viewing"
+                  aria-label={copy.currentlyViewing}
+                  title={copy.currentlyViewing}
                 >
                   <Check className="size-3" />
                 </span>
@@ -143,7 +144,7 @@ export function TruckSwitcher({
         className,
       )}
       role="group"
-      aria-label="Truck"
+      aria-label={copy.truck}
     >
       <span className="px-1.5 text-muted-foreground" aria-hidden>
         <TruckIcon className="size-3.5" />

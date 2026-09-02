@@ -5,7 +5,10 @@ import { useTransition } from "react";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+
 import { ConfirmDelete } from "@/components/shared/confirm-delete";
+import { useLanguage } from "@/components/shell/language-provider";
 import { Button } from "@/components/ui/button";
 import {
   deleteReserveAccountAction,
@@ -14,21 +17,23 @@ import {
 
 export function DeleteReserveAccountButton({ id, name }: { id: string; name: string }) {
   const router = useRouter();
+  const { dictionary } = useLanguage();
+  const copy = dictionary.reserves;
   const [, startTransition] = useTransition();
 
   return (
     <ConfirmDelete
-      entity="bucket"
+      entity={copy.bucket}
       label={name}
-      consequences={["Every movement recorded in this bucket"]}
+      consequences={[copy.bucketConsequence]}
       onConfirm={() =>
         startTransition(async () => {
           const result = await deleteReserveAccountAction(id);
           if (result.ok) {
-            toast.success("Bucket deleted");
+            toast.success(copy.bucketDeleted);
             router.refresh();
           } else {
-            toast.error(result.error);
+            toast.error(localizedClientError(result.error));
           }
         })
       }
@@ -46,6 +51,8 @@ export function DeleteReserveTransactionButton({
   posted: boolean;
 }) {
   const router = useRouter();
+  const { dictionary } = useLanguage();
+  const copy = dictionary.reserves;
   const [, startTransition] = useTransition();
 
   if (posted) {
@@ -54,8 +61,8 @@ export function DeleteReserveTransactionButton({
         variant="ghost"
         size="icon-sm"
         disabled
-        aria-label="Posted by a closed settlement"
-        title="Posted by a closed settlement. Reopen the settlement to remove it."
+        aria-label={copy.postedBySettlement}
+        title={copy.postedBySettlementHint}
         className="text-muted-foreground/40"
       >
         <Trash2 />
@@ -65,16 +72,16 @@ export function DeleteReserveTransactionButton({
 
   return (
     <ConfirmDelete
-      entity="movement"
+      entity={copy.movement}
       label={label}
       onConfirm={() =>
         startTransition(async () => {
           const result = await deleteReserveTransactionAction(id);
           if (result.ok) {
-            toast.success("Movement removed");
+            toast.success(copy.movementRemoved);
             router.refresh();
           } else {
-            toast.error(result.error);
+            toast.error(localizedClientError(result.error));
           }
         })
       }

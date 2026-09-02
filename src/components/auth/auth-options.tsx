@@ -3,6 +3,9 @@
 import * as React from "react";
 import Script from "next/script";
 import { Loader2 } from "lucide-react";
+import type { AppLocale } from "@/lib/i18n";
+import { getWebDictionary } from "@/lib/i18n/dictionaries";
+import { localizeError } from "@/lib/i18n/errors";
 
 type CredentialResponse = { credential?: string };
 
@@ -42,12 +45,13 @@ async function hashNonce(nonce: string): Promise<string> {
     .join("");
 }
 
-export function AuthOptions({ next = null }: { next?: string | null }) {
+export function AuthOptions({ next = null, locale }: { next?: string | null; locale: AppLocale }) {
   const buttonRef = React.useRef<HTMLDivElement>(null);
   const initializedRef = React.useRef(false);
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  const copy = getWebDictionary(locale).auth;
 
   const initializeGoogle = React.useCallback(async () => {
     if (initializedRef.current || !buttonRef.current || !window.google || !clientId) return;
@@ -60,7 +64,7 @@ export function AuthOptions({ next = null }: { next?: string | null }) {
       });
       const nonceData = (await nonceResponse.json().catch(() => null)) as { nonce?: string } | null;
       if (!nonceResponse.ok || !nonceData?.nonce) {
-        throw new Error("Could not initialize Google sign-in.");
+        throw new Error(copy.googleInitializing);
       }
 
       const hashedNonce = await hashNonce(nonceData.nonce);
@@ -71,7 +75,7 @@ export function AuthOptions({ next = null }: { next?: string | null }) {
         use_fedcm_for_prompt: true,
         callback: async ({ credential }) => {
           if (!credential) {
-            setError("Google did not return a sign-in credential.");
+            setError(copy.googleCredential);
             return;
           }
 
@@ -89,14 +93,14 @@ export function AuthOptions({ next = null }: { next?: string | null }) {
               redirectTo?: string;
             } | null;
             if (!response.ok || !result?.redirectTo) {
-              throw new Error(result?.error ?? "Google sign-in could not be completed.");
+              throw new Error(result?.error ? localizeError(result.error, locale) : copy.googleFailed);
             }
             window.location.assign(next ?? result.redirectTo);
           } catch (callbackError) {
             setError(
               callbackError instanceof Error
                 ? callbackError.message
-                : "Google sign-in could not be completed.",
+                : copy.googleFailed,
             );
             setPending(false);
           }
@@ -123,10 +127,10 @@ export function AuthOptions({ next = null }: { next?: string | null }) {
       setError(
         initializationError instanceof Error
           ? initializationError.message
-          : "Could not initialize Google sign-in.",
+          : copy.googleInitializing,
       );
     }
-  }, [clientId, next]);
+  }, [clientId, copy.googleCredential, copy.googleFailed, copy.googleInitializing, locale, next]);
 
   return (
     <div className="space-y-3">
@@ -134,7 +138,7 @@ export function AuthOptions({ next = null }: { next?: string | null }) {
         src="https://accounts.google.com/gsi/client"
         strategy="afterInteractive"
         onReady={() => void initializeGoogle()}
-        onError={() => setError("Could not load Google sign-in. Try again.")}
+        onError={() => setError(copy.googleLoading)}
       />
       <div className="relative min-h-9 w-full" aria-busy={pending}>
         <div
@@ -144,14 +148,14 @@ export function AuthOptions({ next = null }: { next?: string | null }) {
         {pending ? (
           <div
             className="absolute inset-0 flex items-center justify-center"
-            aria-label="Signing in with Google"
+            aria-label={copy.googleSigningIn}
           >
             <Loader2 className="size-4 animate-spin" />
           </div>
         ) : null}
       </div>
       {!clientId ? (
-        <p className="text-center text-2xs text-neg">Google sign-in is not configured.</p>
+        <p className="text-center text-2xs text-neg">{copy.googleNotConfigured}</p>
       ) : null}
       {error ? (
         <p className="text-center text-2xs text-neg" role="alert">
@@ -160,7 +164,7 @@ export function AuthOptions({ next = null }: { next?: string | null }) {
       ) : null}
       <div className="flex items-center gap-3 text-2xs uppercase tracking-[0.12em] text-muted-foreground">
         <span className="h-px flex-1 bg-border" />
-        Or continue with email
+        {copy.continueEmail}
         <span className="h-px flex-1 bg-border" />
       </div>
     </div>

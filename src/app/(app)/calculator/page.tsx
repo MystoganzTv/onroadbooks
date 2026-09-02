@@ -9,8 +9,13 @@ import { getRepository } from "@/lib/db";
 import { overheadCostPerMile, trailingCostBasis } from "@/lib/finance/cost-per-mile";
 import { todayISO } from "@/lib/periods";
 import { planAllows } from "@/lib/plans";
+import { getWebDictionary } from "@/lib/i18n/dictionaries";
+import { getAppLocale } from "@/lib/i18n-server";
 
-export const metadata: Metadata = { title: "Load Calculator" };
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getAppLocale();
+  return { title: getWebDictionary(locale).calculator.metadataTitle };
+}
 
 /**
  * The calculator runs on the truck's OWN history, not on averages:
@@ -26,7 +31,8 @@ export const metadata: Metadata = { title: "Load Calculator" };
  *                used to classify the load.
  */
 export default async function CalculatorPage() {
-  const session = await requireSession();
+  const [session, locale] = await Promise.all([requireSession(), getAppLocale()]);
+  const copy = getWebDictionary(locale).calculator;
   const dataset = await getRepository(session.businessId).getDataset();
   const { trucks, loads, expenses, fuelEntries, settings, goals } = dataset;
 
@@ -34,12 +40,12 @@ export default async function CalculatorPage() {
     return (
       <div className="space-y-4 p-4 lg:p-6">
         <PageHeader
-          title="Load Calculator"
-          description="Price a load before you say yes, or work out what to quote the broker."
+          title={copy.title}
+          description={copy.description}
         />
         <PlanGate
           capability="cockpit"
-          what="Price a load before you say yes, and work out the rate to quote — costed on this truck's own fuel, fees and overhead rather than an average."
+          what={copy.gateWhat}
         />
       </div>
     );
@@ -77,8 +83,8 @@ export default async function CalculatorPage() {
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <PageHeader
-        title="Load Calculator"
-        description="Price a load before you say yes, or work out what to quote the broker."
+        title={copy.title}
+        description={copy.description}
       />
       <CalculatorPanel defaults={defaults} />
     </div>

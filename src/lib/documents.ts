@@ -7,24 +7,27 @@
  */
 
 import type { Dataset, DocumentOwner, DocumentType } from "./types";
+import type { AppLocale } from "./i18n";
 
 export interface DocumentTypeDefinition {
   id: DocumentType;
   label: string;
   short: string;
+  labelEs: string;
+  shortEs: string;
 }
 
 export const DOCUMENT_TYPES: DocumentTypeDefinition[] = [
-  { id: "RATE_CONFIRMATION", label: "Rate Confirmation", short: "Rate Con" },
-  { id: "BOL", label: "Bill of Lading", short: "BOL" },
-  { id: "POD", label: "Proof of Delivery", short: "POD" },
-  { id: "INVOICE", label: "Invoice", short: "Invoice" },
-  { id: "RECEIPT", label: "Receipt", short: "Receipt" },
-  { id: "REGISTRATION", label: "Registration", short: "Registration" },
-  { id: "INSURANCE", label: "Insurance", short: "Insurance" },
-  { id: "TITLE", label: "Title", short: "Title" },
-  { id: "INSPECTION", label: "Inspection", short: "Inspection" },
-  { id: "OTHER", label: "Other", short: "Other" },
+  { id: "RATE_CONFIRMATION", label: "Rate Confirmation", short: "Rate Con", labelEs: "Confirmación de tarifa", shortEs: "Conf. tarifa" },
+  { id: "BOL", label: "Bill of Lading", short: "BOL", labelEs: "Conocimiento de embarque", shortEs: "BOL" },
+  { id: "POD", label: "Proof of Delivery", short: "POD", labelEs: "Comprobante de entrega", shortEs: "POD" },
+  { id: "INVOICE", label: "Invoice", short: "Invoice", labelEs: "Factura", shortEs: "Factura" },
+  { id: "RECEIPT", label: "Receipt", short: "Receipt", labelEs: "Recibo", shortEs: "Recibo" },
+  { id: "REGISTRATION", label: "Registration", short: "Registration", labelEs: "Registro", shortEs: "Registro" },
+  { id: "INSURANCE", label: "Insurance", short: "Insurance", labelEs: "Seguro", shortEs: "Seguro" },
+  { id: "TITLE", label: "Title", short: "Title", labelEs: "Título", shortEs: "Título" },
+  { id: "INSPECTION", label: "Inspection", short: "Inspection", labelEs: "Inspección", shortEs: "Inspección" },
+  { id: "OTHER", label: "Other", short: "Other", labelEs: "Otro", shortEs: "Otro" },
 ];
 
 const BY_ID = new Map(DOCUMENT_TYPES.map((t) => [t.id, t]));
@@ -39,12 +42,14 @@ export const DOCUMENT_TYPES_FOR: Record<DocumentOwner, DocumentType[]> = {
   MAINTENANCE: ["RECEIPT", "INVOICE", "INSPECTION", "OTHER"],
 };
 
-export function documentTypeLabel(id: string): string {
-  return BY_ID.get(id as DocumentType)?.label ?? "Document";
+export function documentTypeLabel(id: string, locale: AppLocale = "en"): string {
+  const item = BY_ID.get(id as DocumentType);
+  return item ? (locale === "es" ? item.labelEs : item.label) : locale === "es" ? "Documento" : "Document";
 }
 
-export function documentTypeShort(id: string): string {
-  return BY_ID.get(id as DocumentType)?.short ?? "Doc";
+export function documentTypeShort(id: string, locale: AppLocale = "en"): string {
+  const item = BY_ID.get(id as DocumentType);
+  return item ? (locale === "es" ? item.shortEs : item.short) : "Doc";
 }
 
 /** Final stored-file limit; production uploads bypass the Vercel Function body. */

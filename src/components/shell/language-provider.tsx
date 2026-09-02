@@ -8,11 +8,13 @@ import {
   SHELL_COPY,
   type AppLocale,
 } from "@/lib/i18n";
+import { getWebDictionary, type WebDictionary } from "@/lib/i18n/dictionaries";
 
 interface LanguageContextValue {
   locale: AppLocale;
   setLocale: (locale: AppLocale) => void;
   copy: (typeof SHELL_COPY)[AppLocale];
+  dictionary: WebDictionary;
 }
 
 const LanguageContext = React.createContext<LanguageContextValue | null>(null);
@@ -43,7 +45,7 @@ export function LanguageProvider({
   );
 
   const value = React.useMemo(
-    () => ({ locale, setLocale, copy: SHELL_COPY[locale] }),
+    () => ({ locale, setLocale, copy: SHELL_COPY[locale], dictionary: getWebDictionary(locale) }),
     [locale, setLocale],
   );
 
@@ -55,4 +57,3 @@ export function useLanguage(): LanguageContextValue {
   if (!context) throw new Error("useLanguage must be used inside LanguageProvider");
   return context;
 }
-

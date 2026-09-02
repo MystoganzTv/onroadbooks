@@ -5,6 +5,10 @@ import { Loader2, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+import { useLanguage } from "@/components/shell/language-provider";
+import { interpolate } from "@/lib/i18n/dictionaries";
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -76,6 +80,8 @@ function initialRows(load: LoadMileageDialogProps["load"]): MileageRow[] {
 }
 
 export function LoadMileageDialog({ load, trigger }: LoadMileageDialogProps) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.ifta;
   const router = useRouter();
   const totalTripMiles = load.loadedMiles + load.deadheadMiles;
   const [open, setOpen] = React.useState(false);
@@ -107,11 +113,11 @@ export function LoadMileageDialog({ load, trigger }: LoadMileageDialogProps) {
       nonTaxableMiles: Math.round(toNumber(row.nonTaxableMiles)),
     }));
     if (assignedMiles > totalTripMiles) {
-      setError("Assigned jurisdiction miles cannot exceed total trip miles.");
+      setError(copy.exceedTotal);
       return;
     }
     if (mileage.some((row) => row.nonTaxableMiles > row.totalMiles)) {
-      setError("Non-taxable miles cannot exceed that jurisdiction's total miles.");
+      setError(copy.exceedJurisdiction);
       return;
     }
 
@@ -119,15 +125,15 @@ export function LoadMileageDialog({ load, trigger }: LoadMileageDialogProps) {
     startTransition(async () => {
       const result = await saveLoadIftaMilesAction(load.id, mileage);
       if (!result.ok) {
-        setError(result.error);
-        toast.error(result.error);
+        setError(localizedClientError(result.error));
+        toast.error(localizedClientError(result.error));
         return;
       }
-      toast.success("IFTA mileage updated", {
+      toast.success(copy.mileageUpdated, {
         description:
           remainingMiles > 0
-            ? `${formatMiles(remainingMiles)} remain unassigned.`
-            : "All trip miles are assigned to jurisdictions.",
+            ? interpolate(copy.remainUnassigned, { miles: formatMiles(remainingMiles) })
+            : copy.allAssigned,
       });
       changeOpen(false);
       router.refresh();
@@ -139,26 +145,23 @@ export function LoadMileageDialog({ load, trigger }: LoadMileageDialogProps) {
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Assign IFTA miles</DialogTitle>
+          <DialogTitle>{copy.assignTitle}</DialogTitle>
           <DialogDescription>
-            {load.originCity}, {load.originState} to {load.destinationCity},{" "}
-            {load.destinationState} - {formatMiles(totalTripMiles)} total trip miles.
+            {interpolate(copy.assignDescription, { origin: `${load.originCity}, ${load.originState}`, destination: `${load.destinationCity}, ${load.destinationState}`, miles: formatMiles(totalTripMiles) })}
           </DialogDescription>
         </DialogHeader>
 
         <DialogBody>
           <form id={`ifta-mileage-${load.id}`} onSubmit={submit} className="space-y-3">
             <p className="rounded-md border border-warn/30 bg-warn/5 px-3 py-2 text-2xs leading-relaxed text-muted-foreground">
-              Origin and destination are prefilled only as starting points. Add every state or
-              province actually crossed. Intermediate jurisdictions and the origin of deadhead
-              miles cannot be inferred from the load.
+              {copy.startingPoints}
             </p>
 
             <div className="space-y-2">
               <div className="grid grid-cols-[6.5rem_1fr_1fr_auto] gap-2 px-1 text-2xs font-medium text-muted-foreground">
-                <span>Jurisdiction</span>
-                <span>Total miles</span>
-                <span>Non-taxable</span>
+                <span>{copy.jurisdiction}</span>
+                <span>{copy.totalMiles}</span>
+                <span>{copy.nonTaxable}</span>
                 <span className="w-8" aria-hidden />
               </div>
               {rows.map((row) => (
@@ -167,7 +170,7 @@ export function LoadMileageDialog({ load, trigger }: LoadMileageDialogProps) {
                     value={row.jurisdiction}
                     onValueChange={(jurisdiction) => updateRow(row.id, { jurisdiction })}
                   >
-                    <SelectTrigger aria-label="IFTA jurisdiction">
+                    <SelectTrigger aria-label={copy.jurisdiction}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -184,7 +187,7 @@ export function LoadMileageDialog({ load, trigger }: LoadMileageDialogProps) {
                     inputMode="numeric"
                     min={0}
                     step={1}
-                    placeholder="Total miles"
+                    placeholder={copy.totalMiles}
                     value={row.totalMiles}
                     onChange={(event) => updateRow(row.id, { totalMiles: event.target.value })}
                   />
@@ -194,7 +197,7 @@ export function LoadMileageDialog({ load, trigger }: LoadMileageDialogProps) {
                     inputMode="numeric"
                     min={0}
                     step={1}
-                    placeholder="Non-taxable"
+                    placeholder={copy.nonTaxable}
                     value={row.nonTaxableMiles}
                     onChange={(event) => updateRow(row.id, { nonTaxableMiles: event.target.value })}
                   />
@@ -202,7 +205,7 @@ export function LoadMileageDialog({ load, trigger }: LoadMileageDialogProps) {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    aria-label={`Remove ${row.jurisdiction}`}
+                    aria-label={interpolate(copy.removeJurisdiction, { jurisdiction: row.jurisdiction })}
                     onClick={() => setRows((current) => current.filter((item) => item.id !== row.id))}
                   >
                     <Trash2 />
@@ -236,13 +239,13 @@ export function LoadMileageDialog({ load, trigger }: LoadMileageDialogProps) {
                 })
               }
             >
-              <Plus /> Add jurisdiction
+              <Plus /> {copy.addJurisdiction}
             </Button>
 
             <div className="flex flex-wrap justify-between gap-2 text-2xs text-muted-foreground tnum">
-              <span>Assigned {formatMiles(assignedMiles)}</span>
+              <span>{interpolate(copy.assignedAmount, { miles: formatMiles(assignedMiles) })}</span>
               <span className={remainingMiles > 0 ? "text-warn" : "text-pos"}>
-                {formatMiles(remainingMiles)} unassigned
+                {interpolate(copy.unassigned, { miles: formatMiles(remainingMiles) })}
               </span>
             </div>
             {error ? <p className="text-2xs text-neg">{error}</p> : null}
@@ -251,7 +254,7 @@ export function LoadMileageDialog({ load, trigger }: LoadMileageDialogProps) {
 
         <DialogFooter>
           <Button type="button" variant="outline" size="sm" onClick={() => changeOpen(false)}>
-            Cancel
+            {dictionary.common.cancel}
           </Button>
           <Button
             type="submit"
@@ -260,7 +263,7 @@ export function LoadMileageDialog({ load, trigger }: LoadMileageDialogProps) {
             disabled={pending || assignedMiles > totalTripMiles}
           >
             {pending ? <Loader2 className="animate-spin" /> : null}
-            Save mileage
+            {copy.saveMileage}
           </Button>
         </DialogFooter>
       </DialogContent>

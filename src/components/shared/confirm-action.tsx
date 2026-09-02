@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Loader2 } from "lucide-react";
 
+import { useLanguage } from "@/components/shell/language-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -38,6 +39,7 @@ export function ConfirmAction({
   trigger,
   onConfirm,
 }: ConfirmActionProps) {
+  const { dictionary } = useLanguage();
   const [open, setOpen] = React.useState(false);
   const [pending, setPending] = React.useState(false);
 
@@ -61,12 +63,12 @@ export function ConfirmAction({
         </DialogHeader>
         <DialogBody>
           <p className="text-xs text-muted-foreground">
-            You can change this again afterwards.
+            {dictionary.common.actionReversible}
           </p>
         </DialogBody>
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={pending}>
-            Cancel
+            {dictionary.common.cancel}
           </Button>
           <Button variant={variant} size="sm" onClick={confirm} disabled={pending}>
             {pending ? <Loader2 className="animate-spin" /> : null}

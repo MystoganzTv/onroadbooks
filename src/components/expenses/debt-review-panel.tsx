@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { CircleDollarSign, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+import { useLanguage } from "@/components/shell/language-provider";
+
 import { Field } from "@/components/shared/field";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +31,9 @@ import {
 } from "@/components/ui/select";
 import { classifyDebtPaymentAction } from "@/lib/actions/expenses";
 import { reconcileDebtPaymentSplit } from "@/lib/finance/debt-payment";
-import { formatDateShort, formatMoney } from "@/lib/formatters";
+import { formatMoney } from "@/lib/formatters";
+import { formatLocaleDate } from "@/lib/i18n-format";
+import { interpolate, type WebDictionary } from "@/lib/i18n/dictionaries";
 import type { Expense, FinancialObligation, Truck } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +48,8 @@ export function DebtReviewPanel({
   obligations: FinancialObligation[];
   trucks: Truck[];
 }) {
+  const { locale, dictionary } = useLanguage();
+  const copy = dictionary.expenses;
   const unknown = expenses.filter(
     (expense) =>
       expense.category === "TRUCK_PAYMENT" &&
@@ -54,10 +61,10 @@ export function DebtReviewPanel({
       <CardHeader>
         <div className="flex items-center gap-2">
           <CircleDollarSign className="size-4 text-warn" />
-          <CardTitle>Payments needing financial classification</CardTitle>
+          <CardTitle>{copy.paymentsNeedClassification}</CardTitle>
         </div>
         <span className="text-2xs text-muted-foreground">
-          No loan/lease assumption has been made. Review {unknown.length} historical {unknown.length === 1 ? "payment" : "payments"} explicitly.
+          {interpolate(copy.classificationNote, { count: unknown.length, unit: unknown.length === 1 ? copy.payment : copy.payments })}
         </span>
       </CardHeader>
       <CardContent className="divide-y divide-border p-0">
@@ -65,7 +72,7 @@ export function DebtReviewPanel({
           <div key={expense.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{expense.description}</p>
-              <p className="text-xs text-muted-foreground">{formatDateShort(expense.date)} · {expense.vendor ?? "No lender recorded"} · {trucks.find((truck) => truck.id === expense.truckId)?.name ?? "Business"}</p>
+              <p className="text-xs text-muted-foreground">{formatLocaleDate(expense.date, locale, { month: "short", day: "numeric" })} · {expense.vendor ?? copy.noLender} · {trucks.find((truck) => truck.id === expense.truckId)?.name ?? copy.business}</p>
             </div>
             <span className="tnum text-sm font-semibold">{formatMoney(expense.amount)}</span>
             <DebtClassificationDialog expense={expense} obligations={obligations} />
@@ -84,6 +91,9 @@ function DebtClassificationDialog({
   obligations: FinancialObligation[];
 }) {
   const router = useRouter();
+  const { dictionary } = useLanguage();
+  const copy = dictionary.expenses;
+  const common = dictionary.common;
   const [open, setOpen] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
   const [treatment, setTreatment] = React.useState<Treatment>("LOAN_SPLIT");
@@ -119,8 +129,8 @@ function DebtClassificationDialog({
   function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!splitBalanced) {
-      toast.error("Principal + interest must equal the payment exactly.", {
-        description: splitMessage(reconciliation, expense.amount),
+      toast.error(copy.exactRequired, {
+        description: splitMessage(reconciliation, expense.amount, copy),
       });
       return;
     }
@@ -148,10 +158,10 @@ function DebtClassificationDialog({
         interestAmount: treatment === "LOAN_SPLIT" ? Number(interest) : undefined,
       });
       if (!result.ok) {
-        toast.error(result.error);
+        toast.error(localizedClientError(result.error));
         return;
       }
-      toast.success("Payment classified", { description: "The original total was preserved." });
+      toast.success(copy.paymentClassified, { description: copy.totalPreserved });
       setOpen(false);
       router.refresh();
     });
@@ -159,33 +169,33 @@ function DebtClassificationDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button size="sm" variant="outline">Review</Button></DialogTrigger>
+      <DialogTrigger asChild><Button size="sm" variant="outline">{copy.review}</Button></DialogTrigger>
       <DialogContent>
         <form onSubmit={submit} className="contents">
           <DialogHeader>
-            <DialogTitle>Classify {formatMoney(expense.amount)} payment</DialogTitle>
+            <DialogTitle>{interpolate(copy.classifyPayment, { amount: formatMoney(expense.amount) })}</DialogTitle>
             <DialogDescription>
-              This explicit review may split the existing row, but will never change its total.
+              {copy.classifyDescription}
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
-            <Field label="Financial treatment" htmlFor={`treatment-${expense.id}`} required>
+            <Field label={copy.treatment} htmlFor={`treatment-${expense.id}`} required>
               <Select value={treatment} onValueChange={(value) => { setTreatment(value as Treatment); setObligationId("new"); }}>
                 <SelectTrigger id={`treatment-${expense.id}`}><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="LOAN_SPLIT">Loan — split principal and interest</SelectItem>
-                  <SelectItem value="OPERATING_LEASE">Operating lease — operating expense</SelectItem>
-                  <SelectItem value="DEBT_UNALLOCATED">Keep unknown — debt service</SelectItem>
+                  <SelectItem value="LOAN_SPLIT">{copy.loanSplit}</SelectItem>
+                  <SelectItem value="OPERATING_LEASE">{copy.operatingLease}</SelectItem>
+                  <SelectItem value="DEBT_UNALLOCATED">{copy.keepUnknown}</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
 
-            <Field label="Obligation" htmlFor={`obligation-${expense.id}`}>
+            <Field label={copy.obligation} htmlFor={`obligation-${expense.id}`}>
               <Select value={obligationId} onValueChange={setObligationId}>
                 <SelectTrigger id={`obligation-${expense.id}`}><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="new">Create from this review</SelectItem>
-                  <SelectItem value="none">No obligation record</SelectItem>
+                  <SelectItem value="new">{copy.createFromReview}</SelectItem>
+                  <SelectItem value="none">{copy.noObligation}</SelectItem>
                   {matching.map((obligation) => <SelectItem key={obligation.id} value={obligation.id}>{obligation.name}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -193,10 +203,10 @@ function DebtClassificationDialog({
 
             {obligationId === "new" ? (
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Obligation name" htmlFor={`obligation-name-${expense.id}`}>
-                  <Input id={`obligation-name-${expense.id}`} value={name} onChange={(event) => setName(event.target.value)} placeholder="Truck loan or lease" />
+                <Field label={copy.obligationName} htmlFor={`obligation-name-${expense.id}`}>
+                  <Input id={`obligation-name-${expense.id}`} value={name} onChange={(event) => setName(event.target.value)} placeholder={copy.obligationPlaceholder} />
                 </Field>
-                <Field label="Expected monthly payment" htmlFor={`monthly-payment-${expense.id}`}>
+                <Field label={copy.expectedMonthlyPayment} htmlFor={`monthly-payment-${expense.id}`}>
                   <Input id={`monthly-payment-${expense.id}`} inputMode="decimal" value={monthlyPayment} onChange={(event) => setMonthlyPayment(event.target.value)} />
                 </Field>
               </div>
@@ -205,7 +215,7 @@ function DebtClassificationDialog({
             {treatment === "LOAN_SPLIT" ? (
               <div className="space-y-3">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Principal" htmlFor={`principal-${expense.id}`} required>
+                  <Field label={copy.principal} htmlFor={`principal-${expense.id}`} required>
                     <Input
                       id={`principal-${expense.id}`}
                       type="number"
@@ -218,7 +228,7 @@ function DebtClassificationDialog({
                       onChange={(event) => setPrincipal(event.target.value)}
                     />
                   </Field>
-                  <Field label="Interest" htmlFor={`interest-${expense.id}`} required>
+                  <Field label={copy.interest} htmlFor={`interest-${expense.id}`} required>
                     <Input
                       id={`interest-${expense.id}`}
                       type="number"
@@ -244,11 +254,11 @@ function DebtClassificationDialog({
                   aria-live="polite"
                 >
                   <div className="flex items-center justify-between gap-3 text-xs">
-                    <span className="text-muted-foreground">Payment to classify</span>
+                    <span className="text-muted-foreground">{copy.paymentToClassify}</span>
                     <span className="font-semibold tnum">{formatMoney(expense.amount)}</span>
                   </div>
                   <div className="mt-1 flex items-center justify-between gap-3 text-xs">
-                    <span className="text-muted-foreground">Principal + interest</span>
+                    <span className="text-muted-foreground">{copy.principalPlusInterest}</span>
                     <span className="font-semibold tnum">{splitInputsValid ? formatMoney(reconciliation.entered) : "—"}</span>
                   </div>
                   <p
@@ -262,16 +272,16 @@ function DebtClassificationDialog({
                     )}
                   >
                     {splitInputsValid
-                      ? splitMessage(reconciliation, expense.amount)
-                      : "Enter valid non-negative amounts before continuing."}
+                      ? splitMessage(reconciliation, expense.amount, copy)
+                      : copy.validAmounts}
                   </p>
                 </div>
               </div>
             ) : null}
           </DialogBody>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={pending || !splitBalanced}>{pending ? <Loader2 className="animate-spin" /> : null} Confirm classification</Button>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>{common.cancel}</Button>
+            <Button type="submit" disabled={pending || !splitBalanced}>{pending ? <Loader2 className="animate-spin" /> : null} {copy.confirmClassification}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -282,13 +292,14 @@ function DebtClassificationDialog({
 function splitMessage(
   reconciliation: ReturnType<typeof reconcileDebtPaymentSplit>,
   paymentAmount: number,
+  copy: WebDictionary["expenses"],
 ): string {
-  if (reconciliation.state === "BALANCED") return "Balanced exactly. Ready to classify.";
+  if (reconciliation.state === "BALANCED") return copy.exactBalance;
   if (reconciliation.state === "UNDER") {
-    return `${formatMoney(reconciliation.difference)} still needs to be assigned.`;
+    return interpolate(copy.amountStillNeeded, { amount: formatMoney(reconciliation.difference) });
   }
   if (reconciliation.state === "OVER") {
-    return `${formatMoney(Math.abs(reconciliation.difference))} over the ${formatMoney(paymentAmount)} payment. Reduce principal or interest.`;
+    return interpolate(copy.amountOver, { amount: formatMoney(Math.abs(reconciliation.difference)), payment: formatMoney(paymentAmount) });
   }
-  return "Enter valid non-negative amounts before continuing.";
+  return copy.validAmounts;
 }

@@ -1,4 +1,9 @@
+"use client";
+
+import { useLanguage } from "@/components/shell/language-provider";
 import { formatMoney, formatMoneyCompact, formatPercent, formatRateValue } from "@/lib/formatters";
+import { interpolate } from "@/lib/i18n/dictionaries";
+import { formatLocaleNumber } from "@/lib/i18n-format";
 import type { PeriodSummary } from "@/lib/types";
 import { APP_NAME } from "@/lib/utils";
 
@@ -34,6 +39,8 @@ export function ReportLetterhead({
   generatedAt,
   summary,
 }: ReportLetterheadProps) {
+  const { dictionary, locale } = useLanguage();
+  const copy = dictionary.reports;
   const profitable = summary.operatingProfit >= 0;
 
   return (
@@ -58,7 +65,7 @@ export function ReportLetterhead({
 
         <div className="flex flex-col items-end justify-between text-right">
           <p className="text-[7pt] font-medium uppercase tracking-[0.28em] text-white/60">
-            Financial Report
+            {copy.financialReport}
           </p>
           <div>
             <p className="text-[21pt] font-semibold leading-none tracking-tight text-white">
@@ -76,38 +83,35 @@ export function ReportLetterhead({
           <span className="font-normal text-neutral-600">{truckName}</span>
         </p>
         <p className="text-right text-[7.5pt] leading-snug text-neutral-500">
-          Compared against {comparisonLabel}
+          {interpolate(copy.comparedAgainst, { period: comparisonLabel })}
           <br />
-          Generated {generatedAt}
+          {interpolate(copy.generated, { date: generatedAt })}
         </p>
       </div>
 
       {/* The four numbers, set as a band rather than as cards. */}
       <div className="mt-3 grid grid-cols-4 border-y-2 border-[#0F1E38]">
-        <Figure label="Booked Revenue" value={formatMoneyCompact(summary.bookedRevenue)} />
-        <Figure label="Operating Expenses" value={formatMoneyCompact(summary.operatingExpenses)} />
+        <Figure label={copy.bookedRevenue} value={formatMoneyCompact(summary.bookedRevenue)} />
+        <Figure label={copy.businessExpenses} value={formatMoneyCompact(summary.operatingExpenses)} />
         <Figure
-          label="Operating Profit"
+          label={copy.operatingProfit}
           value={formatMoneyCompact(summary.operatingProfit)}
           accent={profitable ? "positive" : "negative"}
-          note={`${formatPercent(summary.netMargin)} margin`}
+          note={interpolate(copy.profitMargin, { percent: formatPercent(summary.netMargin) })}
         />
         <Figure
-          label="Operating Profit / Mile"
+          label={copy.profitPerMile}
           value={`${formatRateValue(summary.profitPerMile)}/mi`}
           accent={summary.profitPerMile >= 0 ? "positive" : "negative"}
-          note={`${Math.round(summary.totalMiles).toLocaleString()} mi driven`}
+          note={interpolate(copy.milesDriven, {
+            miles: formatLocaleNumber(Math.round(summary.totalMiles), locale),
+          })}
           last
         />
       </div>
 
       <p className="mt-2.5 max-w-[62ch] text-[7.5pt] leading-relaxed text-neutral-500">
-        Every figure is recomputed from the loads and expenses actually dated inside{" "}
-        {periodLabel}. Nothing is prorated or split out of a monthly total, and the halves of a
-        month sum exactly to the month. Booked Revenue is gross rate on completed loads;
-        Collected Revenue uses recorded invoice payment dates. Operating
-        expenses come from the expense ledger only, so trip costs recorded on a load are never
-        counted twice. Prepared for internal review — not an audited financial statement.
+        {interpolate(copy.reportMethod, { period: periodLabel })}
       </p>
     </header>
   );
@@ -181,15 +185,20 @@ export function ReportColophon({
   periodLabel: string;
   operatingExpenses: number;
 }) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.reports;
   return (
     <footer className="hidden pt-3 print:block">
       <div className="h-[2px] w-full bg-[#0F1E38]" />
       <div className="mt-2 flex items-baseline justify-between gap-6 text-[7.5pt] text-neutral-500">
         <span>
-          End of report · {periodLabel} · operating expenses {formatMoney(operatingExpenses)}
+          {interpolate(copy.endReport, {
+            period: periodLabel,
+            amount: formatMoney(operatingExpenses),
+          })}
         </span>
         <span className="uppercase tracking-[0.2em] text-neutral-400">
-          Drive the truck. Know the business.
+          {copy.tagline}
         </span>
       </div>
     </footer>

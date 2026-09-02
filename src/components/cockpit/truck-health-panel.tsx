@@ -1,10 +1,14 @@
+"use client";
+
 import Link from "next/link";
 import { Wrench } from "lucide-react";
 
+import { useLanguage } from "@/components/shell/language-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney, formatMoneyCompact } from "@/lib/formatters";
 import type { MaintenanceHealth } from "@/lib/finance/maintenance-health";
 import type { DueStatus } from "@/lib/types";
+import { interpolate } from "@/lib/i18n/dictionaries";
 import { cn } from "@/lib/utils";
 
 const STATUS: Record<DueStatus, { dot: string; text: string }> = {
@@ -32,6 +36,8 @@ export function TruckHealthPanel({
   className?: string;
   showReserve?: boolean;
 }) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.dashboard;
   const items = health.items.slice(0, limit);
 
   return (
@@ -39,20 +45,20 @@ export function TruckHealthPanel({
       <CardHeader>
         <div className="flex items-center gap-2">
           <Wrench className="size-3.5 text-muted-foreground" />
-          <CardTitle>Truck Health</CardTitle>
+          <CardTitle>{copy.truckHealth}</CardTitle>
         </div>
         <Link
           href="/truck"
           className="text-2xs font-medium text-primary underline-offset-2 hover:underline focus-ring"
         >
-          Service log
+          {copy.serviceLog}
         </Link>
       </CardHeader>
 
       <CardContent className="p-0">
         {items.length === 0 ? (
           <p className="p-4 text-xs text-muted-foreground">
-            Nothing scheduled. Log a service on the Truck page to start tracking intervals.
+            {copy.nothingScheduledTruck}
           </p>
         ) : (
           <ul className="divide-y divide-border/70">
@@ -78,15 +84,15 @@ export function TruckHealthPanel({
 
         <div className={cn("grid gap-3 border-t border-border p-4", showReserve ? "grid-cols-3" : "grid-cols-1")}>
           <Figure
-            label="Due soon"
+            label={copy.dueSoon}
             value={health.upcomingCost > 0 ? formatMoneyCompact(health.upcomingCost) : "—"}
             tone={health.upcomingCost > 0 ? "text-warn" : undefined}
           />
           {showReserve ? (
             <>
-              <Figure label="Reserve" value={formatMoneyCompact(health.reserveBalance)} />
+              <Figure label={copy.reserve} value={formatMoneyCompact(health.reserveBalance)} />
               <Figure
-                label="Coverage"
+                label={copy.coverage}
                 value={health.coverage !== null ? `${health.coverage.toFixed(2)}x` : "—"}
                 tone={
                   health.coverage === null
@@ -102,9 +108,12 @@ export function TruckHealthPanel({
 
         {health.unpricedCount > 0 ? (
           <p className="border-t border-border px-4 py-2 text-2xs text-muted-foreground">
-            {health.unpricedCount} due {health.unpricedCount === 1 ? "item has" : "items have"} never
-            been logged with a cost, so {health.unpricedCount === 1 ? "it is" : "they are"} not in
-            the {formatMoney(health.upcomingCost)} estimate.
+            {interpolate(copy.unpricedDue, {
+              count: health.unpricedCount,
+              unit: health.unpricedCount === 1 ? copy.itemHas : copy.itemsHave,
+              pronoun: health.unpricedCount === 1 ? copy.itIs : copy.theyAre,
+              amount: formatMoney(health.upcomingCost),
+            })}
           </p>
         ) : null}
       </CardContent>

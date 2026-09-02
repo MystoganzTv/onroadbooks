@@ -16,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLanguage } from "@/components/shell/language-provider";
 import {
   createCheckoutAction,
   openBillingPortalAction,
@@ -37,16 +38,6 @@ const PLAN_ICONS: Record<PlanId, ComponentType<{ className?: string; "aria-hidde
   SOLO: BookOpen,
   OWNER: Gauge,
   FLEET: Truck,
-};
-
-const STATUS_COPY: Record<
-  Subscription["status"],
-  { label: string; tone: "positive" | "warning" | "info" | "outline" }
-> = {
-  TRIALING: { label: "Trial", tone: "info" },
-  ACTIVE: { label: "Active", tone: "positive" },
-  PAST_DUE: { label: "Past due", tone: "warning" },
-  CANCELED: { label: "Canceled", tone: "outline" },
 };
 
 function BillingSubmit({
@@ -132,7 +123,15 @@ function PlanTile({
   featureLimit?: number;
   action?: ReactNode;
 }) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.plans;
   const Icon = PLAN_ICONS[plan.id];
+  const localized = {
+    SOLO: { tagline: copy.soloTagline, features: copy.soloFeatures.split("|"), note: null },
+    OWNER: { tagline: copy.proTagline, features: copy.proFeatures.split("|"), note: null },
+    FLEET: { tagline: copy.fleetTagline, features: copy.fleetFeatures.split("|"), note: copy.fleetNote },
+  } as const;
+  const planCopy = localized[plan.id];
 
   return (
     <div
@@ -168,12 +167,12 @@ function PlanTile({
         <p className="mt-3 text-sm font-semibold">{plan.name}</p>
         <p className="mt-1 tnum text-2xl font-bold tracking-tight">
           ${plan.priceMonthly}
-          <span className="text-2xs font-normal text-muted-foreground"> / month</span>
+          <span className="text-2xs font-normal text-muted-foreground"> {copy.perMonth}</span>
         </p>
-        <p className="mt-1 text-2xs text-muted-foreground">{plan.tagline}</p>
+        <p className="mt-1 text-2xs text-muted-foreground">{planCopy.tagline}</p>
 
         <ul className="mt-3 space-y-1.5">
-          {plan.features.slice(0, featureLimit).map((feature) => (
+          {planCopy.features.slice(0, featureLimit).map((feature) => (
             <li key={feature} className="flex items-start gap-2 text-2xs text-muted-foreground">
               <span
                 className={cn(
@@ -188,8 +187,8 @@ function PlanTile({
           ))}
         </ul>
 
-        {plan.note ? (
-          <p className="mt-2.5 text-2xs italic leading-relaxed text-muted-foreground">{plan.note}</p>
+        {planCopy.note ? (
+          <p className="mt-2.5 text-2xs italic leading-relaxed text-muted-foreground">{planCopy.note}</p>
         ) : null}
       </div>
 
@@ -211,6 +210,8 @@ function OneTruckPlan({
   billingReady,
   managedBilling,
 }: OneTruckPlanProps) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.plans;
   const plan = PLANS[id];
   const current = planOf(subscription);
   const isCurrent = current.id === id;
@@ -220,16 +221,16 @@ function OneTruckPlan({
     <PlanTile
       anchorId={id === "OWNER" ? "plan-pro" : undefined}
       plan={plan}
-      truckLabel="One truck"
+      truckLabel={copy.oneTruck}
       highlighted={isCurrent}
-      statusLabel={isCurrent ? "Current" : undefined}
+      statusLabel={isCurrent ? copy.current : undefined}
       action={
         showAction ? (
           managedBilling ? (
-            <PortalForm>Change in billing portal</PortalForm>
+            <PortalForm>{copy.changePortal}</PortalForm>
           ) : (
             <CheckoutForm plan={id} disabled={!billingReady} variant={isCurrent ? "default" : "outline"}>
-              {isCurrent ? `Keep ${plan.name}` : `Choose ${plan.name}`}
+              {(isCurrent ? copy.keepPlan : copy.choosePlan).replace("{plan}", plan.name)}
             </CheckoutForm>
           )
         ) : undefined
@@ -252,8 +253,15 @@ export function PlanCard({
   checkoutState?: string;
   billingState?: string;
 }) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.plans;
   const current = planOf(subscription);
-  const status = STATUS_COPY[subscription.status];
+  const status = ({
+    TRIALING: { label: copy.trial, tone: "info" },
+    ACTIVE: { label: copy.active, tone: "positive" },
+    PAST_DUE: { label: copy.pastDue, tone: "warning" },
+    CANCELED: { label: copy.canceled, tone: "outline" },
+  } as const)[subscription.status];
   const trial = current.id === "OWNER" ? trialState(subscription, today) : null;
   const fleet = PLANS.FLEET;
   const fleetActive = hasFleetAccess(subscription);
@@ -268,7 +276,7 @@ export function PlanCard({
       <CardHeader>
         <div className="flex items-center gap-2">
           <CreditCard className="size-3.5 text-muted-foreground" />
-          <CardTitle>Plan &amp; billing</CardTitle>
+          <CardTitle>{copy.planBilling}</CardTitle>
         </div>
         <Badge variant={status.tone}>{status.label}</Badge>
       </CardHeader>
@@ -276,17 +284,15 @@ export function PlanCard({
       <CardContent className="space-y-4 p-4">
         {checkoutState === "success" ? (
           <div className="rounded-lg border border-pos/30 bg-pos-soft p-3 text-xs text-pos">
-            Stripe received your subscription. Your plan updates automatically as soon as the
-            signed billing event arrives.
+            {copy.checkoutSuccess}
           </div>
         ) : checkoutState === "canceled" ? (
           <div className="rounded-lg border border-border bg-surface-sunken p-3 text-xs text-muted-foreground">
-            Checkout was canceled. Nothing was charged and your current access did not change.
+            {copy.checkoutCanceled}
           </div>
         ) : billingState === "managed" ? (
           <div className="rounded-lg border border-warn/30 bg-warn-soft p-3 text-xs text-warn">
-            This account already has a Stripe subscription. Use the billing portal to change it
-            without creating a duplicate.
+            {copy.alreadyManaged}
           </div>
         ) : null}
 
@@ -295,11 +301,11 @@ export function PlanCard({
             <div>
               <p className="text-sm font-semibold">{current.name}</p>
               <p className="mt-0.5 text-2xs text-muted-foreground">
-                Update the card, switch plans, download invoices or cancel securely in Stripe.
+                {copy.portalDescription}
               </p>
             </div>
             <div className="w-full shrink-0 sm:w-44">
-              <PortalForm>Manage billing</PortalForm>
+              <PortalForm>{copy.manageBilling}</PortalForm>
             </div>
           </div>
         ) : null}
@@ -311,20 +317,22 @@ export function PlanCard({
                 <Sparkles className="size-4" aria-hidden />
               </span>
               <div>
-                <p className="text-sm font-semibold">Your 7-day OnRoad Pro trial</p>
+                <p className="text-sm font-semibold">{copy.trialTitle}</p>
                 <p className="mt-0.5 text-2xs leading-relaxed text-muted-foreground">
                   {trial.expired
-                    ? "Your trial has ended."
+                    ? copy.trialEnded
                     : trial.daysRemaining === 0
-                      ? "Your trial ends today."
-                      : `${trial.daysRemaining} ${trial.daysRemaining === 1 ? "day" : "days"} left.`}{" "}
-                  Keep Pro for one truck at ${PLANS.OWNER.priceMonthly}/month.
+                      ? copy.trialEndsToday
+                      : copy.trialDays
+                          .replace("{count}", String(trial.daysRemaining))
+                          .replace("{unit}", trial.daysRemaining === 1 ? copy.day : copy.days)}{" "}
+                  {copy.keepProPrice.replace("{price}", `$${PLANS.OWNER.priceMonthly}`)}
                 </p>
               </div>
             </div>
             <div className="mt-3">
               <CheckoutForm plan="OWNER" disabled={!billingReady}>
-                Keep OnRoad Pro
+                {copy.keepPro}
               </CheckoutForm>
             </div>
           </div>
@@ -333,12 +341,10 @@ export function PlanCard({
         <section aria-labelledby="plans">
           <div className="mb-2.5">
             <h4 id="plans" className="text-xs font-semibold">
-              Plans
+              {copy.plans}
             </h4>
             <p className="mt-0.5 text-2xs leading-relaxed text-muted-foreground">
-              Solo Starter and OnRoad Pro cover one truck. OnRoad Fleet is a separate workspace
-              for two to eight, unlocked by its own subscription -- its navigation, truck switcher
-              and reports stay hidden until then.
+              {copy.plansDescription}
             </p>
           </div>
           <div className="grid gap-3 md:grid-cols-3">
@@ -353,16 +359,16 @@ export function PlanCard({
             ))}
             <PlanTile
               plan={fleet}
-              truckLabel={`Up to ${fleet.truckLimit} trucks`}
+              truckLabel={copy.upToTrucks.replace("{count}", String(fleet.truckLimit))}
               highlighted={fleetActive}
-              statusLabel={fleetActive ? "Active" : undefined}
+              statusLabel={fleetActive ? copy.active : undefined}
               action={
                 !fleetActive ? (
                   managedBilling ? (
-                    <PortalForm>Change to OnRoad Fleet</PortalForm>
+                    <PortalForm>{copy.changeFleet}</PortalForm>
                   ) : (
                     <CheckoutForm plan="FLEET" disabled={!billingReady} variant="outline">
-                      Choose OnRoad Fleet
+                      {copy.chooseFleet}
                     </CheckoutForm>
                   )
                 ) : undefined
@@ -373,12 +379,11 @@ export function PlanCard({
 
         <p className="text-2xs leading-relaxed text-muted-foreground">
           {billingReady
-            ? "Checkout and billing management are secured by Stripe. "
-            : "Online billing is being configured; checkout is temporarily unavailable. "}
-          Your books remain yours if a subscription lapses: reading and exporting stay open while
-          writing closes.{" "}
+            ? `${copy.billingReady} `
+            : `${copy.billingConfiguring} `}
+          {copy.booksRemain}{" "}
           <Link href="/welcome" className="text-primary underline-offset-2 hover:underline">
-            Run through setup again
+            {copy.runSetupAgain}
           </Link>
           .
         </p>

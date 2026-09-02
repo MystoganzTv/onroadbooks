@@ -82,7 +82,7 @@ export function SidebarNav({
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto p-2" aria-label="Main">
+      <nav className="flex-1 space-y-1 overflow-y-auto p-2" aria-label={copy.mainNavigation}>
         {visibleGroups.map((group) => {
           const expanded = !collapsed.includes(group.label);
           const holdsCurrentPage = group.items.some((item) =>

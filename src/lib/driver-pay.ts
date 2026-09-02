@@ -1,4 +1,5 @@
 import { roundMoney } from "./calculations";
+import type { AppLocale } from "./i18n";
 import type {
   Driver,
   DriverPayType,
@@ -11,32 +12,47 @@ import type {
 export const DRIVER_PAY_TYPES: {
   id: DriverPayType;
   label: string;
+  labelEs: string;
   rateLabel: string;
+  rateLabelEs: string;
   suffix: string;
+  suffixEs: string;
 }[] = [
   {
     id: "PERCENT_GROSS",
     label: "Percent of gross",
+    labelEs: "Porcentaje del bruto",
     rateLabel: "Percent",
+    rateLabelEs: "Porcentaje",
     suffix: "% of load revenue",
+    suffixEs: "% del ingreso de la carga",
   },
   {
     id: "PER_LOADED_MILE",
     label: "Per loaded mile",
+    labelEs: "Por milla cargada",
     rateLabel: "Rate per loaded mile",
+    rateLabelEs: "Tarifa por milla cargada",
     suffix: "/ loaded mi",
+    suffixEs: "/ milla cargada",
   },
   {
     id: "PER_TOTAL_MILE",
     label: "Per total mile",
+    labelEs: "Por milla total",
     rateLabel: "Rate per total mile",
+    rateLabelEs: "Tarifa por milla total",
     suffix: "/ total mi",
+    suffixEs: "/ milla total",
   },
   {
     id: "FLAT_PER_LOAD",
     label: "Flat per load",
+    labelEs: "Fijo por carga",
     rateLabel: "Amount per load",
+    rateLabelEs: "Importe por carga",
     suffix: "per load",
+    suffixEs: "por carga",
   },
 ];
 
@@ -57,10 +73,10 @@ export function calculateDriverPay(
   }
 }
 
-export function driverPayDescription(driver: Pick<Driver, "payType" | "payRate">): string {
+export function driverPayDescription(driver: Pick<Driver, "payType" | "payRate">, locale: AppLocale = "en"): string {
   const definition = DRIVER_PAY_TYPES.find((type) => type.id === driver.payType)!;
-  if (driver.payType === "PERCENT_GROSS") return `${driver.payRate}% of gross`;
-  return `$${driver.payRate.toFixed(2)} ${definition.suffix}`;
+  if (driver.payType === "PERCENT_GROSS") return locale === "es" ? `${driver.payRate}% del bruto` : `${driver.payRate}% of gross`;
+  return `$${driver.payRate.toFixed(2)} ${locale === "es" ? definition.suffixEs : definition.suffix}`;
 }
 
 export function unsettledLoadsForDriver(
@@ -114,13 +130,14 @@ export function driverSettlementTotals(settlement: DriverSettlement) {
 export const DRIVER_ADJUSTMENT_TYPES: {
   id: DriverSettlementAdjustmentType;
   label: string;
+  labelEs: string;
   direction: "ADD" | "SUBTRACT";
 }[] = [
-  { id: "ACCESSORIAL_PAY", label: "Accessorial pay", direction: "ADD" },
-  { id: "REIMBURSEMENT", label: "Reimbursement", direction: "ADD" },
-  { id: "OTHER_EARNING", label: "Other earning", direction: "ADD" },
-  { id: "DEDUCTION", label: "Deduction", direction: "SUBTRACT" },
-  { id: "ADVANCE", label: "Advance", direction: "SUBTRACT" },
+  { id: "ACCESSORIAL_PAY", label: "Accessorial pay", labelEs: "Pago adicional", direction: "ADD" },
+  { id: "REIMBURSEMENT", label: "Reimbursement", labelEs: "Reembolso", direction: "ADD" },
+  { id: "OTHER_EARNING", label: "Other earning", labelEs: "Otro ingreso", direction: "ADD" },
+  { id: "DEDUCTION", label: "Deduction", labelEs: "Deducción", direction: "SUBTRACT" },
+  { id: "ADVANCE", label: "Advance", labelEs: "Adelanto", direction: "SUBTRACT" },
 ];
 
 export function adjustmentDirection(type: DriverSettlementAdjustmentType): 1 | -1 {

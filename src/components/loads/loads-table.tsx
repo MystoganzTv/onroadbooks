@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { EmptyState } from "@/components/shared/empty-state";
+import { useLanguage } from "@/components/shell/language-provider";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,11 +38,12 @@ import {
 import { div, isDeadheadElevated, type RatingThresholds } from "@/lib/calculations";
 import type { DriverScheduleEntry } from "@/lib/driver-availability";
 import {
-  formatDateShort,
   formatMoney,
   formatNumber,
   formatRateValue,
 } from "@/lib/formatters";
+import { formatLocaleDate } from "@/lib/i18n-format";
+import { interpolate } from "@/lib/i18n/dictionaries";
 import { equipmentTypeLabel, loadCapacityLabel } from "@/lib/load-details";
 import type { Driver, LoadWithMetrics, Truck } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -72,22 +74,6 @@ interface Column {
   numeric?: boolean;
   className?: string;
 }
-
-const COLUMNS: Column[] = [
-  { key: "date", label: "Pickup" },
-  { key: "broker", label: "Broker" },
-  { key: "loadedMiles", label: "Loaded", numeric: true },
-  { key: "deadheadMiles", label: "DH", numeric: true },
-  { key: "totalMiles", label: "Total mi", numeric: true },
-  { key: "grossRate", label: "Rate", numeric: true },
-  { key: "ratePerLoaded", label: "$/Loaded", numeric: true },
-  { key: "ratePerTotal", label: "$/Total", numeric: true },
-  { key: "expenses", label: "Direct Trip Costs", numeric: true },
-  { key: "profit", label: "Contribution Profit", numeric: true },
-  { key: "profitPerMile", label: "Contribution/mi", numeric: true },
-  { key: "rating", label: "Rating" },
-  { key: "status", label: "Status" },
-];
 
 function valueFor(load: LoadWithMetrics, key: SortKey): string | number {
   switch (key) {
@@ -149,10 +135,25 @@ export function LoadsTable({
   deadheadWarnPct = 20,
   emptyDescription,
 }: LoadsTableProps) {
+  const { dictionary, locale } = useLanguage();
+  const copy = dictionary.loads;
+  const columns: Column[] = [
+    { key: "date", label: copy.pickup }, { key: "broker", label: copy.broker },
+    { key: "loadedMiles", label: copy.loaded, numeric: true },
+    { key: "deadheadMiles", label: copy.deadheadShort, numeric: true },
+    { key: "totalMiles", label: copy.totalMilesShort, numeric: true },
+    { key: "grossRate", label: copy.rate, numeric: true },
+    { key: "ratePerLoaded", label: copy.perLoaded, numeric: true },
+    { key: "ratePerTotal", label: copy.perTotal, numeric: true },
+    { key: "expenses", label: copy.directTripCosts, numeric: true },
+    { key: "profit", label: copy.contributionProfit, numeric: true },
+    { key: "profitPerMile", label: copy.contributionPerMile, numeric: true },
+    { key: "rating", label: copy.rating }, { key: "status", label: copy.status },
+  ];
   // Only worth a line on the row once there is more than one unit it could
   // have been.
   const showTruck = trucks.length > 1;
-  const truckName = (id: string) => trucks.find((t) => t.id === id)?.name ?? "Unknown truck";
+  const truckName = (id: string) => trucks.find((t) => t.id === id)?.name ?? copy.unknownTruck;
   const router = useRouter();
   const [search, setSearch] = React.useState("");
   const [broker, setBroker] = React.useState("all");
@@ -184,8 +185,8 @@ export function LoadsTable({
         load.broker ?? "",
         load.loadNumber ?? "",
         load.commodity ?? "",
-        equipmentTypeLabel(load.equipmentType),
-        loadCapacityLabel(load.loadCapacity),
+        equipmentTypeLabel(load.equipmentType, locale),
+        loadCapacityLabel(load.loadCapacity, locale),
         load.notes ?? "",
       ]
         .join(" ")
@@ -202,7 +203,7 @@ export function LoadsTable({
           : String(av).localeCompare(String(bv));
       return sort.dir === "asc" ? cmp : -cmp;
     });
-  }, [loads, search, broker, status, rating, from, to, sort]);
+  }, [loads, search, broker, status, rating, from, to, sort, locale]);
 
   const totals = React.useMemo(
     () =>
@@ -253,18 +254,18 @@ export function LoadsTable({
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search route, broker, equipment, commodity..."
+            placeholder={copy.searchPlaceholder}
             className="pl-7"
-            aria-label="Search loads"
+            aria-label={copy.searchLoads}
           />
         </div>
 
         <Select value={broker} onValueChange={setBroker}>
-          <SelectTrigger className="w-[12.5rem]" aria-label="Filter by broker">
+          <SelectTrigger className="w-[12.5rem]" aria-label={copy.filterBroker}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All brokers</SelectItem>
+            <SelectItem value="all">{copy.allBrokers}</SelectItem>
             {brokers.map((name) => (
               <SelectItem key={name} value={name}>
                 {name}
@@ -274,27 +275,27 @@ export function LoadsTable({
         </Select>
 
         <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-[9.5rem]" aria-label="Filter by status">
+          <SelectTrigger className="w-[9.5rem]" aria-label={copy.filterStatus}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            <SelectItem value="PENDING">Pending</SelectItem>
-            <SelectItem value="INVOICED">Invoiced</SelectItem>
-            <SelectItem value="PAID">Paid</SelectItem>
+            <SelectItem value="all">{copy.allStatuses}</SelectItem>
+            <SelectItem value="PENDING">{copy.pending}</SelectItem>
+            <SelectItem value="INVOICED">{copy.invoiced}</SelectItem>
+            <SelectItem value="PAID">{copy.paid}</SelectItem>
           </SelectContent>
         </Select>
 
         <Select value={rating} onValueChange={setRating}>
-          <SelectTrigger className="w-[9.5rem]" aria-label="Filter by rating">
+          <SelectTrigger className="w-[9.5rem]" aria-label={copy.filterRating}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All ratings</SelectItem>
-            <SelectItem value="GREAT">Great</SelectItem>
-            <SelectItem value="GOOD">Good</SelectItem>
-            <SelectItem value="MARGINAL">Marginal</SelectItem>
-            <SelectItem value="BAD">Bad</SelectItem>
+            <SelectItem value="all">{copy.allRatings}</SelectItem>
+            <SelectItem value="GREAT">{copy.great}</SelectItem>
+            <SelectItem value="GOOD">{copy.good}</SelectItem>
+            <SelectItem value="MARGINAL">{copy.marginal}</SelectItem>
+            <SelectItem value="BAD">{copy.bad}</SelectItem>
           </SelectContent>
         </Select>
 
@@ -304,44 +305,44 @@ export function LoadsTable({
             value={from}
             onChange={(e) => setFrom(e.target.value)}
             className="w-[9.5rem]"
-            aria-label="From date"
+            aria-label={copy.fromDate}
           />
-          <span className="text-xs text-muted-foreground">to</span>
+          <span className="text-xs text-muted-foreground">{copy.to}</span>
           <Input
             type="date"
             value={to}
             onChange={(e) => setTo(e.target.value)}
             className="w-[9.5rem]"
-            aria-label="To date"
+            aria-label={copy.toDate}
           />
         </div>
 
         {hasFilters ? (
           <Button variant="ghost" size="sm" onClick={clearFilters}>
             <X />
-            Clear
+            {copy.clear}
           </Button>
         ) : null}
 
         <span className="ml-auto whitespace-nowrap text-2xs text-muted-foreground tnum">
-          {filtered.length} of {loads.length} loads
+          {interpolate(copy.shownLoads, { shown: filtered.length, total: loads.length })}
         </span>
       </div>
 
       {filtered.length === 0 ? (
         <EmptyState
           icon={Package}
-          title={hasFilters ? "No loads match these filters" : "No loads yet"}
+          title={hasFilters ? copy.noMatch : copy.noLoadsYet}
           description={
             hasFilters
-              ? "Try widening the date range or clearing the broker and status filters."
+              ? copy.widenFilters
               : (emptyDescription ??
-                "Add your first load to start tracking Booked Revenue and Contribution Profit per mile.")
+                copy.firstLoad)
           }
           action={
             hasFilters ? (
               <Button variant="outline" size="sm" onClick={clearFilters}>
-                Clear filters
+                {copy.clearFilters}
               </Button>
             ) : (
               <LoadFormDialog
@@ -361,7 +362,7 @@ export function LoadsTable({
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                {COLUMNS.map((column) => {
+                {columns.map((column) => {
                   const active = sort.key === column.key;
                   const Icon = !active ? ArrowUpDown : sort.dir === "asc" ? ChevronUp : ChevronDown;
                   return (
@@ -402,11 +403,11 @@ export function LoadsTable({
                       className="rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <span className="group-hover:text-foreground">
-                        {formatDateShort(load.date)}
+                        {formatLocaleDate(load.date, locale, "short")}
                       </span>
                       <span className="ml-2 hidden text-foreground group-hover:underline xl:inline">
                         {load.originCity}, {load.originState}
-                        <span className="mx-1 text-muted-foreground">to</span>
+                        <span className="mx-1 text-muted-foreground">{copy.to}</span>
                         {load.destinationCity}, {load.destinationState}
                       </span>
                       <span className="ml-2 text-foreground group-hover:underline xl:hidden">
@@ -424,8 +425,8 @@ export function LoadsTable({
                     {load.equipmentType || load.loadCapacity || load.commodity ? (
                       <span className="block truncate text-2xs text-muted-foreground/80">
                         {[
-                          load.equipmentType ? equipmentTypeLabel(load.equipmentType) : null,
-                          load.loadCapacity ? loadCapacityLabel(load.loadCapacity) : null,
+                          load.equipmentType ? equipmentTypeLabel(load.equipmentType, locale) : null,
+                          load.loadCapacity ? loadCapacityLabel(load.loadCapacity, locale) : null,
                           load.commodity,
                         ]
                           .filter(Boolean)
@@ -498,7 +499,7 @@ export function LoadsTable({
             <TableFooter>
               <TableRow className="hover:bg-transparent">
                 <TableCell className="text-2xs uppercase tracking-wider text-muted-foreground">
-                  Totals
+                  {copy.totals}
                 </TableCell>
                 <TableCell />
                 <TableCell className="text-right tnum">{formatNumber(totals.loaded)}</TableCell>

@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Loader2, Trash2 } from "lucide-react";
 
+import { useLanguage } from "@/components/shell/language-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -38,6 +39,8 @@ export function ConfirmDelete({
   trigger,
   triggerLabel,
 }: ConfirmDeleteProps) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.common;
   const [open, setOpen] = React.useState(false);
   const [pending, setPending] = React.useState(false);
 
@@ -58,7 +61,7 @@ export function ConfirmDelete({
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label={triggerLabel ?? `Delete ${entity}`}
+            aria-label={triggerLabel ?? copy.deleteAria.replace("{entity}", entity)}
             className="text-muted-foreground hover:text-neg"
           >
             <Trash2 />
@@ -68,13 +71,13 @@ export function ConfirmDelete({
 
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Delete this {entity}?</DialogTitle>
+          <DialogTitle>{copy.deleteTitle.replace("{entity}", entity)}</DialogTitle>
           <DialogDescription>{label}</DialogDescription>
         </DialogHeader>
         <DialogBody>
           {consequences.length > 0 ? (
             <>
-              <p className="text-sm text-foreground/90">This also removes:</p>
+              <p className="text-sm text-foreground/90">{copy.alsoRemoves}</p>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
                 {consequences.map((item) => (
                   <li key={item}>{item}</li>
@@ -82,15 +85,15 @@ export function ConfirmDelete({
               </ul>
             </>
           ) : null}
-          <p className="mt-3 text-xs text-muted-foreground">This cannot be undone.</p>
+          <p className="mt-3 text-xs text-muted-foreground">{copy.cannotUndo}</p>
         </DialogBody>
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={pending}>
-            Cancel
+            {copy.cancel}
           </Button>
           <Button variant="destructive" size="sm" onClick={confirm} disabled={pending}>
             {pending ? <Loader2 className="animate-spin" /> : null}
-            Delete {entity}
+            {copy.deleteAction.replace("{entity}", entity)}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
-import { formatDateMedium, formatMoney } from "@/lib/formatters";
+import { formatMoney } from "@/lib/formatters";
 import {
   invoiceAgeDays,
   invoicePaymentSummary,
@@ -21,11 +21,19 @@ import {
 } from "@/lib/invoices";
 import { todayISO } from "@/lib/periods";
 import { roleCan } from "@/lib/roles";
+import { getAppLocale } from "@/lib/i18n-server";
+import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
+import { formatLocaleDate } from "@/lib/i18n-format";
 
-export const metadata: Metadata = { title: "Invoices" };
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getAppLocale();
+  return { title: getWebDictionary(locale).invoices.metadataTitle };
+}
 
 export default async function InvoicesPage() {
-  const session = await requireSession();
+  const [session, locale] = await Promise.all([requireSession(), getAppLocale()]);
+  const dictionary = getWebDictionary(locale);
+  const copy = dictionary.invoices;
   const dataset = await getRepository(session.businessId).getDataset();
   const today = todayISO();
   const canManage = roleCan(session.role ?? "VIEWER", "manage_finances");
@@ -42,48 +50,48 @@ export default async function InvoicesPage() {
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
-      <PageHeader title="Invoices" description="Issue freight invoices, track receivables, and download a ready-to-send PDF." />
+      <PageHeader title={copy.title} description={copy.description} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <MiniStat label="Accounts Receivable" value={formatMoney(outstanding.reduce((sum, load) => sum + payments.get(load.id)!.balance, 0))} sub={`${outstanding.length} invoices`} />
-        <MiniStat label="Overdue" value={formatMoney(overdue.reduce((sum, load) => sum + payments.get(load.id)!.balance, 0))} sub={`${overdue.length} invoices`} tone={overdue.length ? "warning" : undefined} />
-        <MiniStat label="Cash Collected" value={formatMoney(invoiced.reduce((sum, load) => sum + payments.get(load.id)!.collected, 0))} sub="recorded receipts" />
-        <MiniStat label="Uninvoiced loads" value={String(loads.filter((load) => !load.invoiceNumber).length)} sub="Ready to bill" />
+        <MiniStat label={copy.receivable} value={formatMoney(outstanding.reduce((sum, load) => sum + payments.get(load.id)!.balance, 0))} sub={interpolate(copy.invoiceCount, { count: outstanding.length, unit: outstanding.length === 1 ? copy.invoice : copy.invoices })} />
+        <MiniStat label={copy.overdue} value={formatMoney(overdue.reduce((sum, load) => sum + payments.get(load.id)!.balance, 0))} sub={interpolate(copy.invoiceCount, { count: overdue.length, unit: overdue.length === 1 ? copy.invoice : copy.invoices })} tone={overdue.length ? "warning" : undefined} />
+        <MiniStat label={copy.cashCollected} value={formatMoney(invoiced.reduce((sum, load) => sum + payments.get(load.id)!.collected, 0))} sub={copy.recordedReceipts} />
+        <MiniStat label={copy.uninvoicedLoads} value={String(loads.filter((load) => !load.invoiceNumber).length)} sub={copy.readyToBill} />
       </div>
       <Card>
-        <CardHeader><CardTitle>Freight invoices</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{copy.freightInvoices}</CardTitle></CardHeader>
         <CardContent className="p-0">
-          {loads.length === 0 ? <p className="p-6 text-center text-sm text-muted-foreground">Add a load before issuing an invoice.</p> : (
+          {loads.length === 0 ? <p className="p-6 text-center text-sm text-muted-foreground">{copy.addLoadFirst}</p> : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader><TableRow>
-                  <TableHead>Invoice / load</TableHead><TableHead>Customer</TableHead><TableHead>Lane</TableHead>
-                  <TableHead>Issued</TableHead><TableHead>Due</TableHead><TableHead>Status</TableHead>
-                  <TableHead className="text-right">Amount</TableHead><TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{copy.invoiceLoad}</TableHead><TableHead>{copy.customer}</TableHead><TableHead>{copy.lane}</TableHead>
+                  <TableHead>{copy.issued}</TableHead><TableHead>{copy.due}</TableHead><TableHead>{copy.status}</TableHead>
+                  <TableHead className="text-right">{copy.amount}</TableHead><TableHead className="text-right">{dictionary.common.actions}</TableHead>
                 </TableRow></TableHeader>
                 <TableBody>{loads.map((load) => {
                   const age = invoiceAgeDays(load);
                   const payment = payments.get(load.id)!;
                   return <TableRow key={load.id}>
                     <TableCell>
-                      <Link href={`/loads/${load.id}`} className="font-medium hover:underline">{load.invoiceNumber ?? load.loadNumber ?? "Unnumbered load"}</Link>
-                      {load.invoiceNumber && load.loadNumber ? <span className="block text-2xs text-muted-foreground">Load {load.loadNumber}</span> : null}
+                      <Link href={`/loads/${load.id}`} className="font-medium hover:underline">{load.invoiceNumber ?? load.loadNumber ?? copy.unnumberedLoad}</Link>
+                      {load.invoiceNumber && load.loadNumber ? <span className="block text-2xs text-muted-foreground">{interpolate(copy.loadNumber, { number: load.loadNumber })}</span> : null}
                     </TableCell>
                     <TableCell>{load.billToName ?? load.broker ?? "—"}</TableCell>
                     <TableCell className="whitespace-nowrap text-xs">{load.originCity}, {load.originState} → {load.destinationCity}, {load.destinationState}</TableCell>
-                    <TableCell>{load.invoiceDate ? formatDateMedium(load.invoiceDate) : "—"}</TableCell>
+                    <TableCell>{load.invoiceDate ? formatLocaleDate(load.invoiceDate, locale) : "—"}</TableCell>
                     <TableCell className={age != null && age > 0 ? "text-neg" : undefined}>
-                      {load.invoiceDueDate ? formatDateMedium(load.invoiceDueDate) : "—"}
-                      {age != null && age > 0 ? <span className="block text-2xs">{age}d overdue</span> : null}
+                      {load.invoiceDueDate ? formatLocaleDate(load.invoiceDueDate, locale) : "—"}
+                      {age != null && age > 0 ? <span className="block text-2xs">{interpolate(copy.daysOverdue, { days: age })}</span> : null}
                     </TableCell>
                     <TableCell><StatusBadge status={load.status} /></TableCell>
                     <TableCell className="text-right font-medium tnum">
                       {formatMoney(load.grossRate)}
-                      {payment.collected > 0 && payment.balance > 0 ? <span className="block text-2xs font-normal text-muted-foreground">{formatMoney(payment.balance)} due</span> : null}
+                      {payment.collected > 0 && payment.balance > 0 ? <span className="block text-2xs font-normal text-muted-foreground">{interpolate(copy.balanceDue, { amount: formatMoney(payment.balance) })}</span> : null}
                     </TableCell>
                     <TableCell><div className="flex items-center justify-end gap-1">
                       <InvoiceDialog load={load} suggestedNumber={suggestedNumber} today={today} canManage={canManage} />
-                      {load.invoiceNumber ? <Button asChild size="icon-sm" variant="outline" title="Download PDF"><a href={`/api/export/invoice/${load.id}`}><Download /></a></Button> : null}
-                      <Button asChild size="icon-sm" variant="ghost" title="Open load"><Link href={`/loads/${load.id}`}><ExternalLink /></Link></Button>
+                      {load.invoiceNumber ? <Button asChild size="icon-sm" variant="outline" title={copy.downloadPdf}><a href={`/api/export/invoice/${load.id}`}><Download /></a></Button> : null}
+                      <Button asChild size="icon-sm" variant="ghost" title={copy.openLoad}><Link href={`/loads/${load.id}`}><ExternalLink /></Link></Button>
                       {load.invoiceNumber ? <PaymentDialog loadId={load.id} balance={payment.balance} today={today} canManage={canManage} /> : null}
                       <InvoiceActions loadId={load.id} status={load.status} today={today} canManage={canManage} />
                     </div></TableCell>

@@ -31,7 +31,6 @@ import {
 import { calculateLoadScore } from "@/lib/finance/load-score";
 import { LoadScoreBreakdown } from "@/components/cockpit/load-score-badge";
 import {
-  formatDateLong,
   formatGallons,
   formatMiles,
   formatMoney,
@@ -42,16 +41,22 @@ import {
 import { categoryLabel } from "@/lib/categories";
 import { equipmentTypeLabel, loadCapacityLabel } from "@/lib/load-details";
 import { todayISO } from "@/lib/periods";
+import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
+import { formatLocaleDate } from "@/lib/i18n-format";
+import { getAppLocale } from "@/lib/i18n-server";
 
-export const metadata: Metadata = { title: "Load detail" };
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getAppLocale();
+  return { title: getWebDictionary(locale).loads.detailMetadataTitle };
+}
 
 export default async function LoadDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
-  const session = await requireSession();
+  const [{ id }, session, locale] = await Promise.all([params, requireSession(), getAppLocale()]);
+  const copy = getWebDictionary(locale).loads;
   const dataset = await getRepository(session.businessId).getDataset();
   const load = dataset.loads.find((item) => item.id === id);
   if (!load) notFound();
@@ -86,27 +91,27 @@ export default async function LoadDetailPage({
   const brokers = [...new Set(dataset.loads.map((l) => l.broker).filter(Boolean))].sort() as string[];
   const linkedExpenses = dataset.expenses.filter((expense) => expense.loadId === load.id);
   const documents = dataset.documents.filter((doc) => doc.loadId === load.id);
-  const route = `${load.originCity}, ${load.originState} to ${load.destinationCity}, ${load.destinationState}`;
+  const route = `${load.originCity}, ${load.originState} ${copy.to} ${load.destinationCity}, ${load.destinationState}`;
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <HistoryBackButton fallbackHref="/loads" label="Back" className="-ml-2 mb-1" />
+          <HistoryBackButton fallbackHref="/loads" label={copy.back} className="-ml-2 mb-1" />
           <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
             <MapPin className="size-4 shrink-0 text-muted-foreground" />
             <span className="truncate">{route}</span>
           </h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Pickup {formatDateLong(load.date)}
-            {load.deliveryDate ? ` - Delivery ${formatDateLong(load.deliveryDate)}` : ""}
+            {copy.pickup} {formatLocaleDate(load.date, locale, "long")}
+            {load.deliveryDate ? ` - ${copy.delivery} ${formatLocaleDate(load.deliveryDate, locale, "long")}` : ""}
             {load.broker ? ` - ${load.broker}` : ""}
-            {load.loadNumber ? ` - Load #${load.loadNumber}` : ""}
+            {load.loadNumber ? ` - ${interpolate(copy.loadNumber, { number: load.loadNumber })}` : ""}
             {dataset.trucks.length > 1
-              ? ` - ${dataset.trucks.find((t) => t.id === load.truckId)?.name ?? "Unknown truck"}`
+              ? ` - ${dataset.trucks.find((t) => t.id === load.truckId)?.name ?? copy.unknownTruck}`
               : ""}
             {load.driverId
-              ? ` - ${dataset.drivers.find((driver) => driver.id === load.driverId)?.name ?? "Unknown driver"}`
+              ? ` - ${dataset.drivers.find((driver) => driver.id === load.driverId)?.name ?? copy.unknownDriver}`
               : ""}
           </p>
         </div>
@@ -123,7 +128,7 @@ export default async function LoadDetailPage({
             trigger={
               <Button variant="outline" size="sm">
                 <Pencil />
-                Edit
+                {copy.edit}
               </Button>
             }
           />
@@ -139,71 +144,70 @@ export default async function LoadDetailPage({
 
         <Card>
           <CardHeader>
-            <CardTitle>Profitability Layers</CardTitle>
+            <CardTitle>{copy.profitabilityLayers}</CardTitle>
             <span className="text-2xs text-muted-foreground">
-              Rating uses Contribution Profit only · {allocationBasis.basisLabel} allocation
+              {interpolate(copy.ratingBasis, { basis: allocationBasis.basisLabel })}
             </span>
           </CardHeader>
           <CardContent className="space-y-3 p-4">
-            <Layer label="Gross Rate" value={load.grossRate} />
-            <Layer label="Direct Trip Costs" value={-metrics.tripExpenses} />
-            <Layer label="Contribution Profit" value={metrics.tripProfit} strong />
+            <Layer label={copy.grossRate} value={load.grossRate} />
+            <Layer label={copy.directTripCosts} value={-metrics.tripExpenses} />
+            <Layer label={copy.contributionProfit} value={metrics.tripProfit} strong />
             <Separator />
-            <Layer label="Allocated Operating Costs (estimate)" value={-allocatedOperatingCosts} />
+            <Layer label={copy.allocatedEstimate} value={-allocatedOperatingCosts} />
             <Layer
-              label="Estimated Fully Loaded Operating Profit"
+              label={copy.estimatedFullyLoaded}
               value={fullyLoadedOperatingProfit}
               strong
             />
             <Separator />
-            <Layer label="Debt Cash Burden (separate)" value={-debtCashBurden} />
+            <Layer label={copy.debtSeparate} value={-debtCashBurden} />
             <p className="text-2xs text-muted-foreground">
-              Debt Service is a business cash burden. It never changes this load&apos;s GREAT,
-              GOOD, MARGINAL or BAD classification.
+              {copy.debtRatingExplanation}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Trip Economics</CardTitle>
+            <CardTitle>{copy.tripEconomics}</CardTitle>
             <span className="text-2xs text-muted-foreground">
-              Deadhead {formatPercent(metrics.deadheadPct)} of total miles
+              {interpolate(copy.deadheadOfMiles, { percent: formatPercent(metrics.deadheadPct) })}
             </span>
           </CardHeader>
           <CardContent className="space-y-4 p-4">
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <Metric label="Gross Rate" value={formatMoney(load.grossRate)} />
-              <Metric label="Loaded Miles" value={formatMiles(load.loadedMiles)} />
-              <Metric label="Deadhead Miles" value={formatMiles(load.deadheadMiles)} />
-              <Metric label="Total Miles" value={formatMiles(metrics.totalMiles)} />
+              <Metric label={copy.grossRate} value={formatMoney(load.grossRate)} />
+              <Metric label={copy.loadedMiles} value={formatMiles(load.loadedMiles)} />
+              <Metric label={copy.deadheadMiles} value={formatMiles(load.deadheadMiles)} />
+              <Metric label={copy.totalMiles} value={formatMiles(metrics.totalMiles)} />
             </div>
 
             <Separator />
 
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               <Metric
-                label="Rate / Loaded Mile"
+                label={copy.rateLoadedMile}
                 value={`${formatRateValue(metrics.revenuePerLoadedMile)}/mi`}
               />
               <Metric
-                label="Rate / Total Mile"
+                label={copy.rateTotalMile}
                 value={`${formatRateValue(metrics.revenuePerTotalMile)}/mi`}
               />
               <Metric
-                label="Deadhead"
+                label={copy.deadheadShort}
                 value={formatPercent(metrics.deadheadPct)}
                 valueClassName={
                   isDeadheadElevated(metrics.deadheadPct, dataset.settings.deadheadWarnPct)
                     ? "text-warn"
                     : undefined
                 }
-                sub={`${formatMiles(load.deadheadMiles)} empty`}
+                sub={interpolate(copy.emptyMiles, { miles: formatMiles(load.deadheadMiles) })}
               />
               <Metric
-                label="Payment Status"
-                value={load.status.charAt(0) + load.status.slice(1).toLowerCase()}
-                sub={load.loadNumber ? `Load #${load.loadNumber}` : undefined}
+                label={copy.paymentStatus}
+                value={load.status === "PAID" ? copy.paid : load.status === "INVOICED" ? copy.invoiced : copy.pending}
+                sub={load.loadNumber ? interpolate(copy.loadNumber, { number: load.loadNumber }) : undefined}
               />
             </div>
 
@@ -211,7 +215,7 @@ export default async function LoadDetailPage({
               <>
                 <Separator />
                 <div>
-                  <p className="label-xs">Notes</p>
+                  <p className="label-xs">{copy.notes}</p>
                   <p className="mt-1 text-sm text-foreground/90">{load.notes}</p>
                 </div>
               </>
@@ -225,32 +229,32 @@ export default async function LoadDetailPage({
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Package className="size-3.5 text-muted-foreground" />
-                <CardTitle>Load Details</CardTitle>
+                <CardTitle>{copy.loadDetails}</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-x-4 gap-y-3 p-4">
-              <Metric label="Pickup" value={formatDateLong(load.date)} />
+              <Metric label={copy.pickup} value={formatLocaleDate(load.date, locale, "long")} />
               <Metric
-                label="Delivery"
-                value={load.deliveryDate ? formatDateLong(load.deliveryDate) : "Not specified"}
+                label={copy.delivery}
+                value={load.deliveryDate ? formatLocaleDate(load.deliveryDate, locale, "long") : copy.notSpecified}
               />
               <Metric
-                label="Equipment"
-                value={equipmentTypeLabel(load.equipmentType)}
+                label={copy.equipment}
+                value={equipmentTypeLabel(load.equipmentType, locale)}
                 sub={load.equipmentLengthFt ? `${load.equipmentLengthFt} ft` : undefined}
               />
-              <Metric label="Load Type" value={loadCapacityLabel(load.loadCapacity)} />
+              <Metric label={copy.loadType} value={loadCapacityLabel(load.loadCapacity, locale)} />
               <Metric
-                label="Weight"
-                value={load.weightLbs ? `${formatNumber(load.weightLbs)} lb` : "Not specified"}
+                label={copy.weight}
+                value={load.weightLbs ? `${formatNumber(load.weightLbs)} lb` : copy.notSpecified}
               />
-              <Metric label="Commodity" value={load.commodity ?? "Not specified"} />
+              <Metric label={copy.commodity} value={load.commodity ?? copy.notSpecified} />
               <Metric
-                label="Ending Odometer"
-                value={load.endingOdometer ? formatNumber(load.endingOdometer) : "Not recorded"}
+                label={copy.endingOdometer}
+                value={load.endingOdometer ? formatNumber(load.endingOdometer) : copy.notRecorded}
                 sub={load.endingOdometer ? "mi" : undefined}
               />
-              <Metric label="Trip Costs" value="Included in Expenses" />
+              <Metric label={copy.tripCosts} value={copy.includedExpenses} />
             </CardContent>
           </Card>
 
@@ -258,14 +262,14 @@ export default async function LoadDetailPage({
             <CardHeader>
               <div className="flex items-center gap-2">
                 <FileText className="size-3.5 text-muted-foreground" />
-                <CardTitle>Documents</CardTitle>
+                <CardTitle>{copy.documents}</CardTitle>
               </div>
               <span className="text-2xs text-muted-foreground tnum">{documents.length}</span>
             </CardHeader>
             <CardContent className="space-y-3 p-4">
               {documents.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  No rate confirmation, BOL, POD or invoice attached yet.
+                  {copy.noDocuments}
                 </p>
               ) : (
                 <DocumentList documents={documents} />
@@ -278,14 +282,13 @@ export default async function LoadDetailPage({
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Receipt className="size-3.5 text-muted-foreground" />
-                <CardTitle>Linked Expenses</CardTitle>
+                <CardTitle>{copy.linkedExpenses}</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="p-0">
               {linkedExpenses.length === 0 ? (
                 <p className="px-4 py-4 text-xs text-muted-foreground">
-                  No ledger expenses are linked to this load. Trip fuel, tolls and other costs above
-                  are recorded on the load itself.
+                  {copy.noLinkedExpenses}
                 </p>
               ) : (
                 <ul className="divide-y divide-border/70">
@@ -294,7 +297,7 @@ export default async function LoadDetailPage({
                       <span className="min-w-0">
                         <span className="block truncate text-sm">{expense.description}</span>
                         <span className="text-2xs text-muted-foreground">
-                          {categoryLabel(expense.category)}
+                          {categoryLabel(expense.category, locale)}
                         </span>
                       </span>
                       <span className="shrink-0 tnum text-sm text-neg">
@@ -311,13 +314,13 @@ export default async function LoadDetailPage({
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Fuel className="size-3.5 text-muted-foreground" />
-                <CardTitle>Linked Fuel</CardTitle>
+                <CardTitle>{copy.linkedFuel}</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="p-0">
               {linkedFuel.length === 0 ? (
                 <p className="px-4 py-4 text-xs text-muted-foreground">
-                  No fuel stops are linked to this load.
+                  {copy.noLinkedFuel}
                 </p>
               ) : (
                 <ul className="divide-y divide-border/70">
@@ -325,7 +328,7 @@ export default async function LoadDetailPage({
                     <li key={entry.id} className="flex items-baseline justify-between gap-3 px-4 py-2">
                       <span className="min-w-0">
                         <span className="block truncate text-sm">
-                          {entry.location ?? "Fuel stop"}
+                          {entry.location ?? copy.fuelStop}
                         </span>
                         <span className="text-2xs text-muted-foreground tnum">
                           {formatGallons(entry.gallons)}

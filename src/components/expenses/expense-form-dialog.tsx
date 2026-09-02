@@ -4,6 +4,8 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
+
+import { localizedClientError } from "@/lib/i18n/errors";
 import { useLanguage } from "@/components/shell/language-provider";
 
 import { Button } from "@/components/ui/button";
@@ -36,8 +38,9 @@ import {
 } from "@/components/documents/document-uploader";
 import { Label } from "@/components/ui/label";
 import { createExpenseAction, updateExpenseAction } from "@/lib/actions/expenses";
-import { behaviorOf, EXPENSE_CATEGORIES } from "@/lib/categories";
-import { formatDateShort, formatMoney } from "@/lib/formatters";
+import { behaviorOf, categoryLabel, EXPENSE_CATEGORIES } from "@/lib/categories";
+import { formatMoney } from "@/lib/formatters";
+import { formatLocaleDate } from "@/lib/i18n-format";
 import { todayISO } from "@/lib/periods";
 import { expenseSchema } from "@/lib/schemas";
 import { DocumentList } from "@/components/documents/document-list";
@@ -51,16 +54,6 @@ import type {
   Truck,
 } from "@/lib/types";
 import { toNumber } from "@/lib/utils";
-
-const FIELD_LABELS: Record<string, string> = {
-  vendor: "Vendor",
-  notes: "Notes",
-  description: "Description",
-  amount: "Amount",
-  category: "Category",
-  date: "Date",
-  receiptNumber: "Receipt number",
-};
 
 /** The sentinel the "charged to" control uses for fleet overhead. */
 const BUSINESS = "BUSINESS";
@@ -118,7 +111,9 @@ export function ExpenseFormDialog({
   trigger,
 }: ExpenseFormDialogProps) {
   const router = useRouter();
-  const { locale } = useLanguage();
+  const { locale, dictionary } = useLanguage();
+  const copy = dictionary.expenses;
+  const common = dictionary.common;
   const isEdit = Boolean(expense);
 
   /**
@@ -179,6 +174,7 @@ export function ExpenseFormDialog({
     setValues((prev) => ({ ...prev, [key]: value }));
 
   const behavior = behaviorOf(values.category, categoryBehavior);
+  const canLinkToLoad = ["FUEL", "TOLLS", "DISPATCH", "FACTORING", "OTHER"].includes(values.category);
 
   // A linked load is not just a label: it determines which unit caused the
   // cost. Only offer loads from the selected truck, and keep an existing
@@ -219,7 +215,7 @@ export function ExpenseFormDialog({
       description: values.description,
       vendor: values.vendor || null,
       amount: toNumber(values.amount),
-      loadId: values.loadId === "none" ? null : values.loadId,
+      loadId: !canLinkToLoad || values.loadId === "none" ? null : values.loadId,
       recurring: values.recurring,
       receiptNumber: values.receiptNumber || null,
       notes: values.notes || null,
@@ -231,7 +227,15 @@ export function ExpenseFormDialog({
       setErrors(next);
       // A failure the user cannot see is a dead button: announce it, name the
       // fields, and move focus to the first one.
-      toast.error(validationMessage(next, FIELD_LABELS));
+      toast.error(validationMessage(next, {
+        vendor: copy.vendor,
+        notes: copy.notes,
+        description: copy.description,
+        amount: copy.amount,
+        category: copy.category,
+        date: copy.date,
+        receiptNumber: copy.receiptNumber,
+      }));
       requestAnimationFrame(() => focusFirstError("expense-form"));
       return;
     }
@@ -246,21 +250,19 @@ export function ExpenseFormDialog({
         const upload = result.id
           ? await uploadPending("EXPENSE", result.id, attachments)
           : { uploaded: 0, failed: 0 };
-        toast.success(isEdit ? "Expense updated" : "Expense added", {
+        toast.success(isEdit ? copy.expenseUpdated : copy.expenseAdded, {
           description:
             `${values.description} - ${formatMoney(toNumber(values.amount))}` +
-            (upload.uploaded ? " - receipt attached" : ""),
+            (upload.uploaded ? ` · ${copy.receiptAttachedSuffix}` : ""),
         });
         if (upload.failed > 0) {
-          toast.error(
-            `The receipt could not be attached. The expense was saved -- add it by editing the row. ${upload.error ?? ""}`.trim(),
-          );
+          toast.error(`${copy.receiptUploadFailed} ${upload.error ?? ""}`.trim());
         }
         setOpen(false);
         router.refresh();
       } else {
         setErrors(result.fieldErrors ?? {});
-        toast.error(result.error);
+        toast.error(localizedClientError(result.error));
       }
     });
   }
@@ -271,7 +273,7 @@ export function ExpenseFormDialog({
         {trigger ?? (
           <Button size="sm" variant="outline">
             <Plus />
-            {locale === "es" ? "Agregar gasto" : "Add Expense"}
+            {copy.addExpense}
           </Button>
         )}
       </DialogTrigger>
@@ -280,18 +282,18 @@ export function ExpenseFormDialog({
         <DialogHeader>
           <DialogTitle>
             {isEdit
-              ? locale === "es" ? "Editar gasto" : "Edit expense"
-              : locale === "es" ? "Agregar gasto" : "Add expense"}
+              ? copy.editExpense
+              : copy.addExpense}
           </DialogTitle>
           <DialogDescription>
-            Category drives the fixed / variable split used across reports.
+            {copy.formDescription}
           </DialogDescription>
         </DialogHeader>
 
         <DialogBody>
           <form id="expense-form" onSubmit={submit} className="space-y-4" noValidate>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Date" htmlFor="expense-date" required error={errors.date}>
+              <Field label={copy.date} htmlFor="expense-date" required error={errors.date}>
                 <Input
                   id="expense-date"
                   type="date"
@@ -301,7 +303,7 @@ export function ExpenseFormDialog({
                   required
                 />
               </Field>
-              <Field label="Amount" htmlFor="expense-amount" required error={errors.amount}>
+              <Field label={copy.amount} htmlFor="expense-amount" required error={errors.amount}>
                 <Input
                   id="expense-amount"
                   type="number"
@@ -319,13 +321,13 @@ export function ExpenseFormDialog({
 
             {showCharge ? (
               <Field
-                label="Charged to"
+                label={copy.chargedTo}
                 htmlFor="expense-charge"
                 required
                 hint={
                   values.charge === BUSINESS
-                    ? "Overhead: subtracted from the fleet once, not billed to any truck"
-                    : "Counts against this truck's own profit"
+                    ? copy.overheadHint
+                    : copy.truckProfitHint
                 }
               >
                 <Select value={values.charge} onValueChange={changeCharge}>
@@ -336,20 +338,20 @@ export function ExpenseFormDialog({
                     {chargeOptions.map((truck) => (
                       <SelectItem key={truck.id} value={truck.id}>
                         {truck.name}
-                        {truck.active ? "" : " (retired)"}
+                        {truck.active ? "" : ` (${copy.retired})`}
                       </SelectItem>
                     ))}
-                    <SelectItem value={BUSINESS}>The business (overhead)</SelectItem>
+                    <SelectItem value={BUSINESS}>{copy.businessOverhead}</SelectItem>
                   </SelectContent>
                 </Select>
               </Field>
             ) : null}
 
             <Field
-              label="Category"
+              label={copy.category}
               htmlFor="expense-category"
               required
-              hint={`Classified as ${behavior === "FIXED" ? "a fixed" : "a variable"} cost`}
+              hint={behavior === "FIXED" ? copy.fixedClassification : copy.variableClassification}
               error={errors.category}
             >
               <Select
@@ -362,7 +364,7 @@ export function ExpenseFormDialog({
                 <SelectContent>
                   {EXPENSE_CATEGORIES.map((category) => (
                     <SelectItem key={category.id} value={category.id}>
-                      {category.label}
+                      {categoryLabel(category.id, locale)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -370,7 +372,7 @@ export function ExpenseFormDialog({
             </Field>
 
             <Field
-              label="Description"
+              label={copy.description}
               htmlFor="expense-description"
               required
               error={errors.description}
@@ -379,30 +381,30 @@ export function ExpenseFormDialog({
                 id="expense-description"
                 value={values.description}
                 onChange={(e) => set("description", e.target.value)}
-                placeholder="Oil change + filters"
+                placeholder={copy.descriptionPlaceholder}
                 aria-invalid={Boolean(errors.description)}
                 required
               />
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Vendor" htmlFor="expense-vendor" error={errors.vendor}>
+              <Field label={copy.vendor} htmlFor="expense-vendor" error={errors.vendor}>
                 <Input
                   id="expense-vendor"
                   maxLength={120}
                   aria-invalid={Boolean(errors.vendor)}
                   value={values.vendor}
                   onChange={(e) => set("vendor", e.target.value)}
-                  placeholder="Optional"
+                  placeholder={copy.optional}
                 />
               </Field>
-              <Field
-                label="Link to load"
+              {canLinkToLoad ? <Field
+                label={copy.linkToLoad}
                 htmlFor="expense-load"
                 hint={
                   values.charge === BUSINESS
-                    ? "Business overhead cannot be linked to a load"
-                    : "Only loads assigned to this truck are shown"
+                    ? copy.overheadNoLoad
+                    : copy.truckLoadsOnly
                 }
               >
                 <Select value={values.loadId} onValueChange={(value) => set("loadId", value)}>
@@ -410,23 +412,23 @@ export function ExpenseFormDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Not linked</SelectItem>
+                    <SelectItem value="none">{copy.notLinked}</SelectItem>
                     {/* The list is period-filtered, so a link made in another
                         period would otherwise render as a blank selection. */}
                     {linkOptions.map((load) => (
                       <SelectItem key={load.id} value={load.id}>
-                        {formatDateShort(load.date)} - {load.originCity} to {load.destinationCity}
+                        {formatLocaleDate(load.date, locale, "short")} · {load.originCity} {copy.routeConnector} {load.destinationCity}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </Field>
+              </Field> : null}
             </div>
 
             <Field
-              label="Receipt number"
+              label={copy.receiptNumber}
               htmlFor="expense-receipt"
-              hint="Invoice or receipt reference from the vendor"
+              hint={copy.receiptReference}
               error={errors.receiptNumber}
             >
               <Input
@@ -435,18 +437,17 @@ export function ExpenseFormDialog({
                 aria-invalid={Boolean(errors.receiptNumber)}
                 value={values.receiptNumber}
                 onChange={(e) => set("receiptNumber", e.target.value)}
-                placeholder="Optional"
+                placeholder={copy.optional}
               />
             </Field>
 
             <div className="flex items-center justify-between rounded-md border border-border bg-surface-sunken px-3 py-2">
               <div>
                 <Label htmlFor="expense-recurring" className="normal-case tracking-normal text-foreground">
-                  Recurring expense
+                  {copy.recurringExpense}
                 </Label>
                 <p className="mt-0.5 text-2xs text-muted-foreground">
-                  Saves this as a monthly template. The dashboard will prompt you when the next
-                  month is missing.
+                  {copy.recurringDescription}
                 </p>
               </div>
               <Switch
@@ -456,7 +457,7 @@ export function ExpenseFormDialog({
               />
             </div>
 
-            <Field label="Notes" htmlFor="expense-notes" error={errors.notes}>
+            <Field label={copy.notes} htmlFor="expense-notes" error={errors.notes}>
               <Textarea
                 id="expense-notes"
                 maxLength={2000}
@@ -464,12 +465,12 @@ export function ExpenseFormDialog({
                 value={values.notes}
                 onChange={(e) => set("notes", e.target.value)}
                 rows={2}
-                placeholder="Optional"
+                placeholder={copy.optional}
               />
             </Field>
 
             <div className="space-y-2 border-t border-border pt-3">
-              <p className="label-xs">Receipt</p>
+              <p className="label-xs">{copy.receipt}</p>
               {isEdit && expense ? (
                 <>
                   {documents.length > 0 ? <DocumentList documents={documents} /> : null}
@@ -489,11 +490,11 @@ export function ExpenseFormDialog({
 
         <DialogFooter>
           <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>
-            Cancel
+            {common.cancel}
           </Button>
           <Button type="submit" form="expense-form" size="sm" disabled={pending}>
             {pending ? <Loader2 className="animate-spin" /> : null}
-            {isEdit ? "Save changes" : "Add expense"}
+            {isEdit ? common.saveChanges : copy.addExpense}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -45,8 +45,14 @@ import {
   type SearchParams,
 } from "@/lib/period-params";
 import { cn } from "@/lib/utils";
+import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
+import { getAppLocale } from "@/lib/i18n-server";
+import { formatLocalePeriod } from "@/lib/i18n-format";
 
-export const metadata: Metadata = { title: "Broker Scorecard" };
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getAppLocale();
+  return { title: getWebDictionary(locale).analytics.brokerMetadata };
+}
 
 const SORT_KEYS = BROKER_SORTS.map((s) => s.key);
 
@@ -62,8 +68,12 @@ export default async function BrokersPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const params = await searchParams;
-  const session = await requireSession();
+  const [params, session, locale] = await Promise.all([
+    searchParams,
+    requireSession(),
+    getAppLocale(),
+  ]);
+  const copy = getWebDictionary(locale).analytics;
   const { trucks, loads: allLoads, fuelEntries, settings, subscription } = await getRepository(
     session.businessId,
   ).getDataset();
@@ -73,12 +83,12 @@ export default async function BrokersPage({
     return (
       <div className="space-y-4 p-4 lg:p-6">
         <PageHeader
-          title="Brokers"
-          description="Who is worth the most to you, and who pays well per mile. Two different questions."
+          title={copy.brokersTitle}
+          description={copy.brokerGateDescription}
         />
         <PlanGate
           capability="cockpit"
-          what="Rank the brokers you actually haul for on contribution profit per mile driven, not on the rate they quote."
+          what={copy.brokerGateWhat}
         />
       </div>
     );
@@ -102,12 +112,20 @@ export default async function BrokersPage({
   const best = bestBroker(brokers);
   const weakest = weakestBroker(brokers);
   const query = scopeQuery(period, truckId);
+  const periodLabel = formatLocalePeriod(period, locale);
+  const periodShort = formatLocalePeriod(period, locale, "short");
+  const sortLabels = {
+    profit: copy.sortProfit,
+    revenue: copy.sortRevenue,
+    profitPerMile: copy.sortProfitPerMile,
+    worstProfitPerMile: copy.sortWorstPerMile,
+  } as const;
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <PageHeader
-        title="Broker Scorecard"
-        description="Which brokers are actually making you money, measured on the miles they cost you."
+        title={copy.brokerScorecard}
+        description={copy.brokerDescription}
       />
       <AnalyticsTabs />
       <div className="flex flex-wrap items-center gap-2">
@@ -116,29 +134,29 @@ export default async function BrokersPage({
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <MiniStat label="Brokers" value={String(brokers.length)} sub={period.shortLabel} />
+        <MiniStat label={copy.brokers} value={String(brokers.length)} sub={periodShort} />
         <MiniStat
-          label="Strongest profit / mile"
+          label={copy.strongest}
           value={best ? formatRateValue(best.profitPerMile) : "—"}
-          sub={best?.broker ?? "Not enough loads"}
+          sub={best?.broker === "No broker" ? copy.noBroker : best?.broker ?? copy.notEnoughLoads}
           tone="info"
         />
         <MiniStat
-          label="Weakest profit / mile"
+          label={copy.weakest}
           value={weakest ? formatRateValue(weakest.profitPerMile) : "—"}
-          sub={weakest?.broker ?? "Not enough loads"}
+          sub={weakest?.broker === "No broker" ? copy.noBroker : weakest?.broker ?? copy.notEnoughLoads}
         />
         <MiniStat
-          label="Loads with no broker"
+          label={copy.noBrokerLoads}
           value={String(brokers.find((b) => b.broker === "No broker")?.loadCount ?? 0)}
-          sub="direct or unrecorded"
+          sub={copy.directUnrecorded}
         />
       </div>
 
       <Card>
         <CardHeader className="flex-wrap">
-          <CardTitle>Ranking</CardTitle>
-          <nav className="flex flex-wrap gap-1" aria-label="Sort brokers">
+          <CardTitle>{copy.ranking}</CardTitle>
+          <nav className="flex flex-wrap gap-1" aria-label={copy.sortBrokers}>
             {BROKER_SORTS.map((option) => (
               <Link
                 key={option.key}
@@ -151,7 +169,7 @@ export default async function BrokersPage({
                     : "text-muted-foreground hover:bg-accent hover:text-foreground",
                 )}
               >
-                {option.label}
+                {sortLabels[option.key]}
               </Link>
             ))}
           </nav>
@@ -159,33 +177,35 @@ export default async function BrokersPage({
         <CardContent className="p-0">
           {ranked.length === 0 ? (
             <p className="p-6 text-center text-sm text-muted-foreground">
-              No loads in {period.label}.
+              {interpolate(copy.noLoads, { period: periodLabel })}
             </p>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Broker</TableHead>
-                    <TableHead className="text-right">Loads</TableHead>
-                    <TableHead className="text-right">Booked Revenue</TableHead>
-                    <TableHead className="text-right">Miles</TableHead>
-                    <TableHead className="text-right">Gross $/mi</TableHead>
-                    <TableHead className="text-right">Contribution Profit</TableHead>
-                    <TableHead className="text-right">Contribution $/mi</TableHead>
-                    <TableHead className="text-right">Contribution Margin</TableHead>
-                    <TableHead className="text-right">Deadhead</TableHead>
-                    <TableHead className="text-right">Rating</TableHead>
+                    <TableHead>{copy.broker}</TableHead>
+                    <TableHead className="text-right">{copy.loads}</TableHead>
+                    <TableHead className="text-right">{copy.bookedRevenue}</TableHead>
+                    <TableHead className="text-right">{copy.miles}</TableHead>
+                    <TableHead className="text-right">{copy.grossPerMile}</TableHead>
+                    <TableHead className="text-right">{copy.contributionProfit}</TableHead>
+                    <TableHead className="text-right">{copy.contributionPerMile}</TableHead>
+                    <TableHead className="text-right">{copy.contributionMargin}</TableHead>
+                    <TableHead className="text-right">{copy.deadhead}</TableHead>
+                    <TableHead className="text-right">{copy.rating}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {ranked.map((broker) => (
                     <TableRow key={broker.broker}>
                       <TableCell className="font-medium">
-                        <span className="block truncate">{broker.broker}</span>
+                        <span className="block truncate">{broker.broker === "No broker" ? copy.noBroker : broker.broker}</span>
                         {broker.outstanding > 0 ? (
                           <span className="text-2xs text-warn tnum">
-                            {formatMoney(broker.outstanding)} outstanding
+                            {interpolate(copy.amountOutstanding, {
+                              amount: formatMoney(broker.outstanding),
+                            })}
                           </span>
                         ) : null}
                       </TableCell>
@@ -225,7 +245,7 @@ export default async function BrokersPage({
                         {broker.qualified ? (
                           <RatingBadge rating={broker.rating} />
                         ) : (
-                          <span className="text-2xs text-muted-foreground">1 load</span>
+                          <span className="text-2xs text-muted-foreground">{copy.oneLoad}</span>
                         )}
                       </TableCell>
                     </TableRow>
@@ -238,10 +258,7 @@ export default async function BrokersPage({
       </Card>
 
       <p className="text-2xs leading-relaxed text-muted-foreground">
-        Profit here is Contribution Profit: gross rate less the fuel, tolls, dispatch, factoring and other
-        costs recorded on each load, over every mile including deadhead. The ranking default is
-        total profit — who produced the most money — while the rating is per mile, which is what
-        decides whether their next load is worth taking.
+        {copy.brokerMethod}
       </p>
     </div>
   );

@@ -36,16 +36,21 @@ import { calculateMaintenanceHealth } from "@/lib/finance/maintenance-health";
 import { calculateReserveBalances, reserveBalanceFor } from "@/lib/finance/reserves";
 import { todayISO } from "@/lib/periods";
 import { formatMoneyCompact, formatNumber, formatRate } from "@/lib/formatters";
+import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
+import { getAppLocale } from "@/lib/i18n-server";
 
-export const metadata: Metadata = { title: "Truck" };
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getAppLocale();
+  return { title: getWebDictionary(locale).truck.metadataTitle };
+}
 
 export default async function TruckPage({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const params = await searchParams;
-  const session = await requireSession();
+  const [params, session, locale] = await Promise.all([searchParams, requireSession(), getAppLocale()]);
+  const copy = getWebDictionary(locale).truck;
   const ownerPlanning = roleCan(session.role ?? "VIEWER", "manage_owner_finances");
   const dataset = await getRepository(session.businessId).getDataset();
 
@@ -65,7 +70,7 @@ export default async function TruckPage({
   const today = todayISO();
   const thresholds = thresholdsFrom(dataset.settings);
   const records = dataset.maintenanceRecords.filter((r) => r.truckId === truck.id);
-  const upcoming = upcomingMaintenance(records, truck, today, thresholds);
+  const upcoming = upcomingMaintenance(records, truck, today, thresholds, locale);
   const truckDocuments = dataset.documents.filter((doc) => doc.truckId === truck.id);
   const overdue = upcoming.filter((item) => item.status === "OVERDUE").length;
   const dueSoon = upcoming.filter((item) => item.status === "DUE_SOON").length;
@@ -80,6 +85,7 @@ export default async function TruckPage({
     today,
     thresholds,
     reserveBalanceFor(balances, "MAINTENANCE")?.balance ?? 0,
+    locale,
   );
 
   const description = [truck.year, truck.make, truck.model].filter(Boolean).join(" ");
@@ -107,20 +113,20 @@ export default async function TruckPage({
     <div className="space-y-4 p-4 lg:p-6">
       <PageHeader
         title={truck.name}
-        description={description || "Add the year, make and model to complete this profile."}
+        description={description || copy.addProfile}
         actions={
           <>
             {overdue > 0 ? (
               <Badge variant="negative">
-                {overdue} overdue {overdue === 1 ? "service" : "services"}
+                {interpolate(copy.overdueService, { count: overdue, unit: overdue === 1 ? copy.service : copy.services })}
               </Badge>
             ) : dueSoon > 0 ? (
-              <Badge variant="warning">{dueSoon} approaching</Badge>
+              <Badge variant="warning">{interpolate(copy.approaching, { count: dueSoon })}</Badge>
             ) : null}
             <Badge
               variant={!truck.active ? "outline" : profileIncomplete ? "warning" : "positive"}
             >
-              {!truck.active ? "Retired" : profileIncomplete ? "Setup incomplete" : "Active"}
+              {!truck.active ? copy.retired : profileIncomplete ? copy.setupIncomplete : copy.active}
             </Badge>
             <MaintenanceFormDialog currentOdometer={truck.currentOdometer} truckId={truck.id} />
           </>
@@ -141,18 +147,18 @@ export default async function TruckPage({
             </span>
             <div className="min-w-0">
               <p className="text-2xs font-semibold uppercase tracking-[0.16em] text-primary">
-                Account mode
+                {copy.accountMode}
               </p>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <h2 id="account-mode-title" className="text-lg font-semibold tracking-tight">
-                  {fleetAccount ? "Fleet account" : "Individual account"}
+                  {fleetAccount ? copy.fleetAccount : copy.individualAccount}
                 </h2>
-                <Badge variant="info">{plan.name} plan</Badge>
+                <Badge variant="info">{interpolate(copy.plan, { name: plan.name })}</Badge>
               </div>
               <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
                 {fleetAccount
-                  ? "Each truck keeps its own revenue, costs, mileage and service history. Choose a unit below before editing its profile."
-                  : "This workspace is built around one active truck. Its loads, costs, mileage, service and documents all stay together."}
+                  ? copy.fleetDescription
+                  : copy.individualDescription}
               </p>
             </div>
           </div>
@@ -160,16 +166,16 @@ export default async function TruckPage({
           <div className="flex shrink-0 flex-wrap items-center gap-2 md:justify-end">
             <div className="mr-1 border-r border-border pr-3 text-right">
               <p className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">
-                Active trucks
+                {copy.activeTrucks}
               </p>
               <p className="tnum text-sm font-semibold">
-                {running} of {allowance.limit}
+                {interpolate(copy.of, { count: running, limit: allowance.limit })}
               </p>
             </div>
             <Button asChild variant="outline" size="sm">
               <Link href="/plans">
                 <Settings2 className="size-4" />
-                Manage plan
+                {copy.managePlan}
               </Link>
             </Button>
             {fleetAccount ? (
@@ -182,16 +188,16 @@ export default async function TruckPage({
           <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
             <div>
               <p className="text-xs font-semibold text-foreground">
-                {hasSeveralTrucks ? "Choose the truck you are viewing" : "Current truck"}
+                {hasSeveralTrucks ? copy.chooseTruck : copy.currentTruck}
               </p>
               <p className="mt-0.5 text-2xs text-muted-foreground">
-                The metrics and details below belong to the selected unit only.
+                {copy.selectedOnly}
               </p>
             </div>
             {hasSeveralTrucks ? (
               <Button asChild variant="ghost" size="sm">
                 <Link href="/fleet">
-                  Compare all units
+                  {copy.compareUnits}
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
@@ -217,17 +223,17 @@ export default async function TruckPage({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{truck.name}</p>
                   <p className="mt-0.5 truncate text-2xs text-muted-foreground">
-                    {description || "Vehicle details not added"}
+                    {description || copy.detailsNotAdded}
                   </p>
                 </div>
                 <Badge
                   variant={!truck.active ? "outline" : profileIncomplete ? "warning" : "positive"}
                 >
                   {!truck.active
-                    ? "Selected · Retired"
+                    ? copy.selectedRetired
                     : profileIncomplete
-                      ? "Selected · Setup incomplete"
-                      : "Selected · Active"}
+                      ? copy.selectedIncomplete
+                      : copy.selectedActive}
                 </Badge>
               </div>
             </div>
@@ -237,41 +243,41 @@ export default async function TruckPage({
 
       {hasLifetimeActivity ? (
         <section
-          aria-label="Lifetime economics"
+          aria-label={copy.lifetimeEconomics}
           className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8"
         >
           <MiniStat
-            label="Booked Revenue"
+            label={copy.bookedRevenue}
             value={formatMoneyCompact(lifetime.bookedRevenue)}
             tone="info"
-            sub={`${lifetime.loadCount} loads`}
+            sub={interpolate(copy.loads, { count: lifetime.loadCount })}
           />
           <MiniStat
-            label="Operating Expenses"
+            label={copy.businessExpenses}
             value={formatMoneyCompact(lifetime.operatingExpenses)}
             tone="negative"
           />
           <MiniStat
-            label="Operating Profit"
+            label={copy.businessMade}
             value={formatMoneyCompact(lifetime.operatingProfit)}
             tone={lifetime.operatingProfit >= 0 ? "positive" : "negative"}
           />
-          <MiniStat label="Total Miles" value={formatNumber(lifetime.totalMiles)} sub="from loads" />
+          <MiniStat label={copy.totalMiles} value={formatNumber(lifetime.totalMiles)} sub={copy.fromLoads} />
           <MiniStat
-            label="Actual Cost / Mile"
+            label={copy.actualCostMile}
             value={formatRate(lifetime.actualCostPerMile)}
             tone="negative"
           />
           <MiniStat
-            label="Operating Profit / Mile"
+            label={copy.profitMile}
             value={formatRate(lifetime.operatingProfitPerMile)}
             tone={lifetime.operatingProfitPerMile >= 0 ? "positive" : "negative"}
           />
-          <MiniStat label="Debt Service" value={formatMoneyCompact(lifetime.debtService)} tone="negative" />
+          <MiniStat label={copy.debtPayments} value={formatMoneyCompact(lifetime.debtService)} tone="negative" />
           <MiniStat
-            label="Cash After Debt Service"
+            label={copy.cashAfterDebt}
             value={formatMoneyCompact(lifetime.cashAfterDebtService)}
-            sub={`${formatMoneyCompact(lifetime.collectedRevenue)} collected`}
+            sub={interpolate(copy.collected, { amount: formatMoneyCompact(lifetime.collectedRevenue) })}
             tone={lifetime.cashAfterDebtService >= 0 ? "positive" : "negative"}
           />
         </section>
@@ -285,11 +291,9 @@ export default async function TruckPage({
               <TruckIcon className="size-4" />
             </span>
             <div>
-              <p className="text-sm font-semibold">No operating history yet</p>
+              <p className="text-sm font-semibold">{copy.noHistory}</p>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Financial and mileage metrics will appear after this unit receives its first load,
-                expense, fuel purchase or debt-service entry. Zero cards are hidden until there is
-                real activity to measure.
+                {copy.noHistoryDescription}
               </p>
             </div>
           </CardContent>
@@ -298,13 +302,13 @@ export default async function TruckPage({
 
       <Tabs defaultValue="overview">
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="overview">{copy.overview}</TabsTrigger>
           <TabsTrigger value="maintenance">
-            Maintenance
+            {copy.maintenance}
             {overdue > 0 ? <span className="ml-1.5 text-neg">{overdue}</span> : null}
           </TabsTrigger>
           <TabsTrigger value="documents">
-            Documents
+            {copy.documents}
             {truckDocuments.length > 0 ? (
               <span className="ml-1.5 text-muted-foreground">{truckDocuments.length}</span>
             ) : null}
@@ -339,16 +343,16 @@ export default async function TruckPage({
             <CardHeader>
               <div className="flex items-center gap-2">
                 <FileText className="size-3.5 text-muted-foreground" />
-                <CardTitle>Truck Documents</CardTitle>
+                <CardTitle>{copy.truckDocuments}</CardTitle>
               </div>
               <span className="text-2xs text-muted-foreground">
-                Registration, insurance, title, inspections
+                {copy.documentTypes}
               </span>
             </CardHeader>
             <CardContent className="space-y-3 p-4">
               {truckDocuments.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  Nothing filed against this truck yet.
+                  {copy.nothingFiled}
                 </p>
               ) : (
                 <DocumentList documents={truckDocuments} />

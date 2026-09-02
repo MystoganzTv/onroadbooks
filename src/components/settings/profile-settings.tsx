@@ -3,8 +3,8 @@
 import { LogOut, Mail, ShieldCheck, UserRound } from "lucide-react";
 
 import type { AppLocale } from "@/lib/i18n";
+import { getWebDictionary } from "@/lib/i18n/dictionaries";
 import type { MemberRole } from "@/lib/types";
-import { ROLE_DEFINITIONS } from "@/lib/roles";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -19,38 +19,44 @@ export function ProfileSettings({
   role: MemberRole;
   locale: AppLocale;
 }) {
-  const spanish = locale === "es";
+  const dictionary = getWebDictionary(locale);
+  const copy = dictionary.settings;
+  const roleLabels: Record<MemberRole, string> = {
+    OWNER: dictionary.team.owner,
+    ADMIN: dictionary.team.admin,
+    BOOKKEEPER: dictionary.team.bookkeeper,
+    DISPATCHER: dictionary.team.dispatcher,
+    VIEWER: dictionary.team.viewer,
+  };
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
           <UserRound className="size-4 text-primary" />
-          <CardTitle>{spanish ? "Mi perfil" : "My profile"}</CardTitle>
+          <CardTitle>{copy.profileTitle}</CardTitle>
         </div>
         <span className="text-2xs text-muted-foreground">
-          {spanish ? "Tu identidad de acceso, no la configuración del negocio" : "Your sign-in identity, separate from business settings"}
+          {copy.profileIdentity}
         </span>
       </CardHeader>
       <CardContent className="space-y-4 p-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <ProfileValue
             icon={UserRound}
-            label={spanish ? "Nombre" : "Name"}
-            value={name || (spanish ? "Sin nombre registrado" : "No name on file")}
+            label={copy.name}
+            value={name || copy.noName}
           />
-          <ProfileValue icon={Mail} label="Email" value={email} />
+          <ProfileValue icon={Mail} label={copy.email} value={email} />
           <ProfileValue
             icon={ShieldCheck}
-            label={spanish ? "Rol en este negocio" : "Role in this business"}
-            value={ROLE_DEFINITIONS[role].label}
+            label={copy.role}
+            value={roleLabels[role]}
           />
         </div>
         <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
           <p className="text-xs leading-relaxed text-muted-foreground">
-            {spanish
-              ? "El idioma, tema y tamaño de texto están en Preferencias de la app."
-              : "Language, theme, and text size live under App preferences."}
+            {copy.profilePreferences}
           </p>
           <Button
             type="button"
@@ -62,7 +68,7 @@ export function ProfileSettings({
             }}
           >
             <LogOut />
-            {spanish ? "Cerrar sesión" : "Sign out"}
+            {copy.signOut}
           </Button>
         </div>
       </CardContent>

@@ -1,5 +1,8 @@
+"use client";
+
 import { Lightbulb, TrendingDown, TrendingUp, TriangleAlert } from "lucide-react";
 
+import { useLanguage } from "@/components/shell/language-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { RankedInsight } from "@/lib/finance/insights";
 import { cn } from "@/lib/utils";
@@ -24,6 +27,8 @@ export function InsightsPanel({
   limit?: number;
   className?: string;
 }) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.dashboard;
   const shown = insights.slice(0, limit);
 
   return (
@@ -31,14 +36,14 @@ export function InsightsPanel({
       <CardHeader>
         <div className="flex items-center gap-2">
           <Lightbulb className="size-3.5 text-muted-foreground" />
-          <CardTitle>What the numbers say</CardTitle>
+          <CardTitle>{copy.whatNumbersSay}</CardTitle>
         </div>
-        <span className="text-2xs text-muted-foreground">Calculated, not generated</span>
+        <span className="text-2xs text-muted-foreground">{copy.calculatedNotGenerated}</span>
       </CardHeader>
       <CardContent className="p-0">
         {shown.length === 0 ? (
           <p className="p-4 text-xs text-muted-foreground">
-            Not enough data in this period to say anything useful yet.
+            {copy.insufficientInsights}
           </p>
         ) : (
           <ul className="divide-y divide-border/70">

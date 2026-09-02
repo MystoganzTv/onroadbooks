@@ -5,6 +5,9 @@ import { Fuel, Pencil, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+import { useLanguage } from "@/components/shell/language-provider";
+
 import { ConfirmDelete } from "@/components/shared/confirm-delete";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
@@ -21,12 +24,12 @@ import {
 import { deleteFuelEntryAction } from "@/lib/actions/fuel";
 import { div } from "@/lib/calculations";
 import {
-  formatDateShort,
   formatMoney,
   formatNumber,
   formatOdometer,
 } from "@/lib/formatters";
 import type { FuelEntry, LoadWithMetrics, Truck } from "@/lib/types";
+import { formatLocaleDate } from "@/lib/i18n-format";
 import { FuelFormDialog } from "./fuel-form-dialog";
 
 interface FuelTableProps {
@@ -49,6 +52,9 @@ export function FuelTable({
   hasLoadEstimates = false,
 }: FuelTableProps) {
   const router = useRouter();
+  const { locale, dictionary } = useLanguage();
+  const copy = dictionary.fuel;
+  const common = dictionary.common;
   const [deleting, setDeleting] = React.useState<string | null>(null);
 
   // Segment MPG: miles since the previous reading / gallons in this fill-up.
@@ -85,10 +91,10 @@ export function FuelTable({
     const result = await deleteFuelEntryAction(entry.id);
     setDeleting(null);
     if (result.ok) {
-      toast.success("Fuel entry deleted");
+      toast.success(copy.fuelEntryDeleted);
       router.refresh();
     } else {
-      toast.error(result.error);
+      toast.error(localizedClientError(result.error));
     }
   }
 
@@ -97,11 +103,11 @@ export function FuelTable({
       <div className="rounded-lg border border-border bg-card">
         <EmptyState
           icon={Fuel}
-          title="No detailed fill-ups in this period"
+          title={copy.noFillUps}
           description={
             hasLoadEstimates
-              ? "The load estimates above already count toward fuel spend. Add the actual gallons and odometer readings to calculate MPG and complete IFTA."
-              : "Log each fill-up with its odometer reading and the app will calculate MPG and fuel cost per mile."
+              ? copy.estimatesAlreadyCount
+              : copy.logFillUps
           }
           action={
             <FuelFormDialog
@@ -123,14 +129,14 @@ export function FuelTable({
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead>Date</TableHead>
-              <TableHead>Location</TableHead>
-              <TableHead className="text-right">Gallons</TableHead>
-              <TableHead className="text-right">$ / gal</TableHead>
-              <TableHead className="text-right">Total</TableHead>
-              <TableHead className="text-right">Odometer</TableHead>
-              <TableHead className="text-right">Segment MPG</TableHead>
-              <TableHead className="w-[4.375rem] text-right">Actions</TableHead>
+              <TableHead>{copy.date}</TableHead>
+              <TableHead>{copy.location}</TableHead>
+              <TableHead className="text-right">{copy.gallons}</TableHead>
+              <TableHead className="text-right">{copy.pricePerGallon}</TableHead>
+              <TableHead className="text-right">{copy.total}</TableHead>
+              <TableHead className="text-right">{copy.odometer}</TableHead>
+              <TableHead className="text-right">{copy.segmentMpg}</TableHead>
+              <TableHead className="w-[4.375rem] text-right">{common.actions}</TableHead>
             </TableRow>
           </TableHeader>
 
@@ -140,7 +146,7 @@ export function FuelTable({
               return (
                 <TableRow key={entry.id}>
                   <TableCell className="text-muted-foreground">
-                    {formatDateShort(entry.date)}
+                    {formatLocaleDate(entry.date, locale, { month: "short", day: "numeric" })}
                   </TableCell>
                   <TableCell className="max-w-[12.5rem] truncate">
                     {entry.location ?? "--"}
@@ -168,21 +174,21 @@ export function FuelTable({
                         loads={loads}
                         lastOdometer={lastOdometer}
                         trigger={
-                          <Button variant="ghost" size="icon-sm" aria-label="Edit fuel entry">
+                          <Button variant="ghost" size="icon-sm" aria-label={copy.editEntry}>
                             <Pencil />
                           </Button>
                         }
                       />
                       <ConfirmDelete
                         entity="fuel entry"
-                        label={`${formatDateShort(entry.date)} - ${formatNumber(entry.gallons, 1)} gal, ${formatMoney(entry.totalCost)}`}
-                        consequences={["Its matching Fuel row in the expense ledger"]}
+                        label={`${formatLocaleDate(entry.date, locale, { month: "short", day: "numeric" })} · ${formatNumber(entry.gallons, 1)} gal · ${formatMoney(entry.totalCost)}`}
+                        consequences={[copy.matchingLedgerRow]}
                         onConfirm={() => remove(entry)}
                         trigger={
                           <Button
                             variant="ghost"
                             size="icon-sm"
-                            aria-label="Delete fuel entry"
+                            aria-label={copy.deleteEntry}
                             disabled={deleting === entry.id}
                             className="text-muted-foreground hover:text-neg"
                           >
@@ -203,7 +209,7 @@ export function FuelTable({
                 colSpan={2}
                 className="text-2xs uppercase tracking-wider text-muted-foreground"
               >
-                Total
+                {copy.total}
               </TableCell>
               <TableCell className="text-right tnum font-semibold">
                 {formatNumber(totals.gallons, 1)}

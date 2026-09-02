@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+import { useLanguage } from "@/components/shell/language-provider";
+
 import { createDriverSettlementAction } from "@/lib/actions/driver-settlements";
 import { fieldErrors, focusFirstError, validationMessage } from "@/lib/form";
 import { driverSettlementSchema } from "@/lib/schemas";
@@ -38,6 +41,9 @@ export function DriverSettlementFormDialog({
   defaultPeriodEnd?: string;
 }) {
   const router = useRouter();
+  const { dictionary } = useLanguage();
+  const copy = dictionary.driverPay;
+  const common = dictionary.common;
   const [open, setOpen] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
   const [errors, setErrors] = React.useState<Record<string, string>>({});
@@ -57,9 +63,9 @@ export function DriverSettlementFormDialog({
       const next = fieldErrors(parsed.error);
       setErrors(next);
       toast.error(validationMessage(next, {
-        driverId: "Driver",
-        periodStart: "Start date",
-        periodEnd: "End date",
+        driverId: copy.driver,
+        periodStart: copy.startDate,
+        periodEnd: copy.endDate,
       }));
       requestAnimationFrame(() => focusFirstError("driver-settlement-form"));
       return;
@@ -68,11 +74,11 @@ export function DriverSettlementFormDialog({
       const result = await createDriverSettlementAction(values);
       if (!result.ok) {
         setErrors(result.fieldErrors ?? {});
-        toast.error(result.error);
+        toast.error(localizedClientError(result.error));
         return;
       }
-      toast.success("Driver statement prepared", {
-        description: "The included loads and pay terms are now frozen in this draft.",
+      toast.success(copy.prepared, {
+        description: copy.preparedDescription,
       });
       setOpen(false);
       if (result.id) router.push(`/driver-settlements/${result.id}`);
@@ -83,40 +89,40 @@ export function DriverSettlementFormDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" disabled={drivers.length === 0}><Plus /> Prepare statement</Button>
+        <Button size="sm" disabled={drivers.length === 0}><Plus /> {copy.prepareStatement}</Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Prepare driver statement</DialogTitle>
+          <DialogTitle>{copy.prepareTitle}</DialogTitle>
           <DialogDescription>
-            Every unsettled load assigned to this driver inside the date range is included. The draft freezes its pay terms and amounts.
+            {copy.prepareDescription}
           </DialogDescription>
         </DialogHeader>
         <DialogBody>
           <form id="driver-settlement-form" onSubmit={submit} className="space-y-4" noValidate>
-            <Field label="Driver" htmlFor="statement-driver" required error={errors.driverId}>
+            <Field label={copy.driver} htmlFor="statement-driver" required error={errors.driverId}>
               <Select value={driverId} onValueChange={setDriverId}>
-                <SelectTrigger id="statement-driver"><SelectValue placeholder="Choose a driver" /></SelectTrigger>
+                <SelectTrigger id="statement-driver"><SelectValue placeholder={copy.chooseDriver} /></SelectTrigger>
                 <SelectContent>{drivers.map((driver) => <SelectItem key={driver.id} value={driver.id}>{driver.name}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Start date" htmlFor="statement-start" required error={errors.periodStart}>
+              <Field label={copy.startDate} htmlFor="statement-start" required error={errors.periodStart}>
                 <Input id="statement-start" type="date" value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} />
               </Field>
-              <Field label="End date" htmlFor="statement-end" required error={errors.periodEnd}>
+              <Field label={copy.endDate} htmlFor="statement-end" required error={errors.periodEnd}>
                 <Input id="statement-end" type="date" min={periodStart} value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} />
               </Field>
             </div>
-            <Field label="Notes" htmlFor="statement-notes">
-              <Textarea id="statement-notes" value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={2000} placeholder="Optional operational note" />
+            <Field label={copy.notes} htmlFor="statement-notes">
+              <Textarea id="statement-notes" value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={2000} placeholder={copy.optionalNote} />
             </Field>
           </form>
         </DialogBody>
         <DialogFooter>
-          <Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={pending}>Cancel</Button>
+          <Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={pending}>{common.cancel}</Button>
           <Button type="submit" form="driver-settlement-form" size="sm" disabled={pending}>
-            {pending ? <Loader2 className="animate-spin" /> : <Plus />} Prepare draft
+            {pending ? <Loader2 className="animate-spin" /> : <Plus />} {copy.prepareDraft}
           </Button>
         </DialogFooter>
       </DialogContent>

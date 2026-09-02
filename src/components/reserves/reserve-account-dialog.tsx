@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { Loader2, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+
 import { Field } from "@/components/shared/field";
+import { useLanguage } from "@/components/shell/language-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -34,13 +37,6 @@ import { reserveAccountSchema } from "@/lib/schemas";
 import type { ReserveAccount, ReserveBasis } from "@/lib/types";
 import { toNumber } from "@/lib/utils";
 
-const FIELD_LABELS: Record<string, string> = {
-  name: "Name",
-  basis: "Charged against",
-  contributionPct: "Contribution",
-  targetBalance: "Target balance",
-};
-
 /**
  * Add or edit a bucket.
  *
@@ -56,7 +52,20 @@ export function ReserveAccountDialog({
   trigger?: React.ReactNode;
 }) {
   const router = useRouter();
+  const { dictionary } = useLanguage();
+  const copy = dictionary.reserves;
+  const fieldLabels: Record<string, string> = {
+    name: copy.name,
+    basis: copy.chargedAgainst,
+    contributionPct: copy.contribution,
+    targetBalance: copy.targetBalance,
+  };
   const builtIn = account?.kind === "TAX" || account?.kind === "MAINTENANCE";
+  const displayName = account?.kind === "TAX"
+    ? copy.taxReserve
+    : account?.kind === "MAINTENANCE"
+      ? copy.maintenanceReserve
+      : account?.name ?? "";
 
   const [open, setOpen] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
@@ -95,7 +104,7 @@ export function ReserveAccountDialog({
     if (!parsed.success) {
       const next = fieldErrors(parsed.error);
       setErrors(next);
-      toast.error(validationMessage(next, FIELD_LABELS));
+      toast.error(validationMessage(next, fieldLabels));
       requestAnimationFrame(() => focusFirstError("reserve-account-form"));
       return;
     }
@@ -107,12 +116,12 @@ export function ReserveAccountDialog({
         : await createReserveAccountAction(payload);
 
       if (result.ok) {
-        toast.success(account ? "Bucket updated" : "Bucket created");
+        toast.success(account ? copy.bucketUpdated : copy.bucketCreated);
         setOpen(false);
         router.refresh();
       } else {
         if (result.fieldErrors) setErrors(result.fieldErrors);
-        toast.error(result.error);
+        toast.error(localizedClientError(result.error));
       }
     });
   }
@@ -123,55 +132,52 @@ export function ReserveAccountDialog({
         {trigger ?? (
           <Button size="sm" variant={account ? "ghost" : "default"}>
             {account ? <Pencil className="size-3.5" /> : <Plus className="size-4" />}
-            {account ? "" : "New bucket"}
+            {account ? "" : copy.newBucket}
           </Button>
         )}
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <form id="reserve-account-form" onSubmit={submit}>
           <DialogHeader>
-            <DialogTitle>{account ? "Edit bucket" : "New reserve bucket"}</DialogTitle>
+            <DialogTitle>{account ? copy.editBucket : copy.newReserveBucket}</DialogTitle>
             <DialogDescription>
-              Buckets accrue when you close a settlement. They are a planning ledger, not a bank
-              account.
+              {copy.bucketDescription}
             </DialogDescription>
           </DialogHeader>
 
           <DialogBody className="space-y-3">
-            <Field label="Name" htmlFor="bucket-name" required error={errors.name}>
+            <Field label={copy.name} htmlFor="bucket-name" required error={errors.name}>
               <Input
                 id="bucket-name"
                 maxLength={60}
-                placeholder="Emergency Fund"
+                placeholder={copy.emergencyFund}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
             </Field>
 
-            <Field label="Charged against" htmlFor="bucket-basis" error={errors.basis}>
+            <Field label={copy.chargedAgainst} htmlFor="bucket-basis" error={errors.basis}>
               <Select value={basis} onValueChange={(value) => setBasis(value as ReserveBasis)}>
                 <SelectTrigger id="bucket-basis">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="GROSS_REVENUE">Gross revenue</SelectItem>
-                  <SelectItem value="OPERATING_PROFIT">Operating Profit</SelectItem>
+                  <SelectItem value="GROSS_REVENUE">{copy.grossRevenue}</SelectItem>
+                  <SelectItem value="OPERATING_PROFIT">{copy.operatingProfit}</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
 
             {builtIn ? (
               <p className="rounded-md border border-dashed border-border bg-surface-sunken/50 p-3 text-2xs leading-relaxed text-muted-foreground">
-                The {account?.name.toLowerCase()} percentage is set on the Settings page, so the
-                rate lives in exactly one place. Everything else about this bucket is editable
-                here.
+                {copy.settingsRate.replace("{name}", displayName.toLowerCase())}
               </p>
             ) : (
               <Field
-                label="Contribution"
+                label={copy.contribution}
                 htmlFor="bucket-pct"
                 error={errors.contributionPct}
-                hint="Percent taken each time a settlement closes"
+                hint={copy.contributionHint}
               >
                 <Input
                   id="bucket-pct"
@@ -184,10 +190,10 @@ export function ReserveAccountDialog({
             )}
 
             <Field
-              label="Target balance"
+              label={copy.targetBalance}
               htmlFor="bucket-target"
               error={errors.targetBalance}
-              hint="Optional. Shows a progress bar toward the number."
+              hint={copy.targetHint}
             >
               <Input
                 id="bucket-target"
@@ -207,11 +213,11 @@ export function ReserveAccountDialog({
               onClick={() => setOpen(false)}
               disabled={pending}
             >
-              Cancel
+              {dictionary.common.cancel}
             </Button>
             <Button type="submit" size="sm" disabled={pending}>
               {pending ? <Loader2 className="animate-spin" /> : null}
-              {account ? "Save bucket" : "Create bucket"}
+              {account ? copy.saveBucket : copy.createBucket}
             </Button>
           </DialogFooter>
         </form>

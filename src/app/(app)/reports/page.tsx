@@ -43,7 +43,11 @@ import {
   orderedTrucks,
   truckById,
 } from "@/lib/fleet";
-import { formatDateMedium } from "@/lib/formatters";
+import { categoryLabel } from "@/lib/categories";
+import { formatLocaleDate, formatLocalePeriod, localeTag } from "@/lib/i18n-format";
+import { getWebDictionary, interpolate, type WebDictionary } from "@/lib/i18n/dictionaries";
+import { getAppLocale } from "@/lib/i18n-server";
+import type { AppLocale } from "@/lib/i18n";
 import { isOperatingExpense } from "@/lib/finance/terminology";
 import {
   periodFromSearchParams,
@@ -51,21 +55,25 @@ import {
   truckFromSearchParams,
   type SearchParams,
 } from "@/lib/period-params";
-import { monthLabel, previousPeriod, trailingHalfMonths, trailingMonths } from "@/lib/periods";
+import { previousPeriod, trailingHalfMonths, trailingMonths } from "@/lib/periods";
 
-export const metadata: Metadata = { title: "Reports" };
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getAppLocale();
+  return { title: getWebDictionary(locale).reports.metadataTitle };
+}
 
 /** One truck is named; a fleet is counted. */
 function fleetLabel(
   trucks: Parameters<typeof activeTrucks>[0],
   truckId: string | null,
+  copy: WebDictionary["reports"],
 ): string {
   const selected = truckById(trucks, truckId);
   if (selected) return selected.name;
   const active = activeTrucks(trucks);
   if (active.length === 1) return active[0].name;
-  if (active.length === 0) return "No active truck";
-  return `${active.length} trucks`;
+  if (active.length === 0) return copy.noActiveTruck;
+  return interpolate(copy.truckCount, { count: active.length });
 }
 
 export default async function ReportsPage({
@@ -73,8 +81,12 @@ export default async function ReportsPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const params = await searchParams;
-  const session = await requireSession();
+  const [params, session, locale] = await Promise.all([
+    searchParams,
+    requireSession(),
+    getAppLocale(),
+  ]);
+  const copy = getWebDictionary(locale).reports;
   const { business, trucks, loads, expenses, fuelEntries, settings, paymentEvents, reserveAccounts } = await getRepository(
     session.businessId,
   ).getDataset();
@@ -110,18 +122,29 @@ export default async function ReportsPage({
 
   // Printed on the letterhead. Rendered on the server so the document states
   // when it was produced, rather than whenever a reader happens to open it.
-  const generatedAt = new Date().toLocaleString("en-US", {
+  const generatedAt = new Date().toLocaleString(localeTag(locale), {
     dateStyle: "long",
     timeStyle: "short",
   });
-  const rangeLabel = `${formatDateMedium(period.start)} to ${formatDateMedium(period.end)}`;
+  const rangeLabel = `${formatLocaleDate(period.start, locale)} ${copy.rangeConnector} ${formatLocaleDate(period.end, locale)}`;
+  const periodLong = formatLocalePeriod(period, locale);
+  const priorLong = formatLocalePeriod(prior, locale);
+  const periodShort = formatLocalePeriod(period, locale, "short");
+  const priorShort = formatLocalePeriod(prior, locale, "short");
+  const monthName = formatLocaleDate(`${period.month}-01`, locale, {
+    month: "long",
+    year: "numeric",
+  });
 
   return (
     <div className="report-doc space-y-4 p-4 lg:p-6 print:space-y-3 print:p-0">
       <div className="print:hidden">
         <PageHeader
-          title="Reports"
-          description={`${period.label} - compared against ${prior.label}`}
+          title={copy.title}
+          description={interpolate(copy.comparison, {
+            current: periodLong,
+            previous: priorLong,
+          })}
           actions={<ExportMenu query={query} year={Number(period.month.slice(0, 4))} />}
         />
       </div>
@@ -133,19 +156,16 @@ export default async function ReportsPage({
 
       <Card className="border-info/30 bg-info-soft/30 print:hidden">
         <CardContent className="p-4 text-xs leading-relaxed text-muted-foreground">
-          <span className="font-semibold text-foreground">Recommended for your accountant:</span>{" "}
-          download the year-end XLSX packet or print the current report to PDF. Invite a
-          Bookkeeper only when they need ongoing access to expenses, fuel, invoices, collections,
-          reports and exports. Owner reserves and Safe to Pay Yourself are excluded from the
-          accountant packet.
+          <span className="font-semibold text-foreground">{copy.accountantLead}</span>{" "}
+          {copy.accountantNote}
         </CardContent>
       </Card>
 
       <ReportLetterhead
         businessName={business.name}
-        truckName={fleetLabel(trucks, truckId)}
-        periodLabel={period.label}
-        comparisonLabel={prior.label}
+        truckName={fleetLabel(trucks, truckId, copy)}
+        periodLabel={periodLong}
+        comparisonLabel={priorLong}
         rangeLabel={rangeLabel}
         generatedAt={generatedAt}
         summary={summary}
@@ -156,20 +176,20 @@ export default async function ReportsPage({
           <ReportSummary
             current={summary}
             previous={priorSummary}
-            currentLabel={period.shortLabel}
-            previousLabel={prior.shortLabel}
+            currentLabel={periodShort}
+            previousLabel={priorShort}
           />
         </div>
         <div className="min-w-0 space-y-4 print-keep">
-          <HalfMonthSplit halves={halves} monthLabel={monthLabel(period.month)} />
+          <HalfMonthSplit halves={halves} monthLabel={monthName} />
         </div>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2 print:gap-3">
         <Card className="print-keep">
           <CardHeader>
-            <CardTitle>Booked Revenue vs Operating Expenses</CardTitle>
-            <span className="text-2xs text-muted-foreground">Last 8 half-months</span>
+            <CardTitle>{copy.revenueVsExpenses}</CardTitle>
+            <span className="text-2xs text-muted-foreground">{copy.lastHalfMonths}</span>
           </CardHeader>
           <CardContent className="px-2 py-3">
             <div className="print:hidden">
@@ -179,8 +199,8 @@ export default async function ReportsPage({
               <PrintBarChart
                 data={halfTrend}
                 series={[
-                  { dataKey: "revenue", name: "Booked Revenue", color: PRINT_INK.revenue },
-                  { dataKey: "expenses", name: "Operating Expenses", color: PRINT_INK.expense },
+                  { dataKey: "revenue", name: copy.bookedRevenue, color: PRINT_INK.revenue },
+                  { dataKey: "expenses", name: copy.businessExpenses, color: PRINT_INK.expense },
                 ]}
               />
             </div>
@@ -189,8 +209,8 @@ export default async function ReportsPage({
 
         <Card className="print-keep">
           <CardHeader>
-            <CardTitle>Operating Profit Trend</CardTitle>
-            <span className="text-2xs text-muted-foreground">Last 6 months</span>
+            <CardTitle>{copy.profitTrend}</CardTitle>
+            <span className="text-2xs text-muted-foreground">{copy.lastMonths}</span>
           </CardHeader>
           <CardContent className="px-2 py-3">
             <div className="print:hidden">
@@ -198,8 +218,8 @@ export default async function ReportsPage({
                 data={monthTrend}
                 height={240}
                 series={[
-                  { dataKey: "profit", name: "Operating Profit", color: "hsl(var(--pos))" },
-                  { dataKey: "revenue", name: "Booked Revenue", color: "hsl(var(--info))" },
+                  { dataKey: "profit", name: copy.operatingProfit, color: "hsl(var(--pos))" },
+                  { dataKey: "revenue", name: copy.bookedRevenue, color: "hsl(var(--info))" },
                 ]}
               />
             </div>
@@ -207,8 +227,8 @@ export default async function ReportsPage({
               <PrintLineChart
                 data={monthTrend}
                 series={[
-                  { dataKey: "profit", name: "Operating Profit", color: PRINT_INK.revenue },
-                  { dataKey: "revenue", name: "Booked Revenue", color: PRINT_INK.info },
+                  { dataKey: "profit", name: copy.operatingProfit, color: PRINT_INK.revenue },
+                  { dataKey: "revenue", name: copy.bookedRevenue, color: PRINT_INK.info },
                 ]}
               />
             </div>
@@ -217,8 +237,8 @@ export default async function ReportsPage({
 
         <Card className="print-keep">
           <CardHeader>
-            <CardTitle>Revenue per Mile Trend</CardTitle>
-            <span className="text-2xs text-muted-foreground">Last 8 half-months</span>
+            <CardTitle>{copy.revenuePerMileTrend}</CardTitle>
+            <span className="text-2xs text-muted-foreground">{copy.lastHalfMonths}</span>
           </CardHeader>
           <CardContent className="px-2 py-3">
             <div className="print:hidden">
@@ -226,8 +246,8 @@ export default async function ReportsPage({
                 data={halfTrend}
                 formatter="rate"
                 series={[
-                  { dataKey: "revenuePerMile", name: "Revenue / mi", color: "hsl(var(--info))" },
-                  { dataKey: "profitPerMile", name: "Operating Profit / mi", color: "hsl(var(--pos))" },
+                  { dataKey: "revenuePerMile", name: copy.revenuePerMile, color: "hsl(var(--info))" },
+                  { dataKey: "profitPerMile", name: copy.profitPerMile, color: "hsl(var(--pos))" },
                 ]}
               />
             </div>
@@ -236,8 +256,8 @@ export default async function ReportsPage({
                 data={halfTrend}
                 kind="rate"
                 series={[
-                  { dataKey: "revenuePerMile", name: "Revenue / mi", color: PRINT_INK.info },
-                  { dataKey: "profitPerMile", name: "Operating Profit / mi", color: PRINT_INK.revenue },
+                  { dataKey: "revenuePerMile", name: copy.revenuePerMile, color: PRINT_INK.info },
+                  { dataKey: "profitPerMile", name: copy.profitPerMile, color: PRINT_INK.revenue },
                 ]}
               />
             </div>
@@ -246,22 +266,22 @@ export default async function ReportsPage({
 
         <Card className="print-keep">
           <CardHeader>
-            <CardTitle>Cost per Mile Trend</CardTitle>
-            <span className="text-2xs text-muted-foreground">Last 8 half-months</span>
+            <CardTitle>{copy.costPerMileTrend}</CardTitle>
+            <span className="text-2xs text-muted-foreground">{copy.lastHalfMonths}</span>
           </CardHeader>
           <CardContent className="px-2 py-3">
             <div className="print:hidden">
               <TrendLineChart
                 data={halfTrend}
                 formatter="rate"
-                series={[{ dataKey: "costPerMile", name: "Cost / mi", color: "hsl(var(--neg))" }]}
+                series={[{ dataKey: "costPerMile", name: copy.costPerMile, color: "hsl(var(--neg))" }]}
               />
             </div>
             <div className="hidden print:block">
               <PrintLineChart
                 data={halfTrend}
                 kind="rate"
-                series={[{ dataKey: "costPerMile", name: "Cost / mi", color: PRINT_INK.expense }]}
+                series={[{ dataKey: "costPerMile", name: copy.costPerMile, color: PRINT_INK.expense }]}
               />
             </div>
           </CardContent>
@@ -278,8 +298,8 @@ export default async function ReportsPage({
         </div>
         <Card className="xl:col-span-2">
           <CardHeader>
-            <CardTitle>Fixed vs Variable</CardTitle>
-            <span className="text-2xs text-muted-foreground">{period.label}</span>
+            <CardTitle>{copy.fixedVsVariable}</CardTitle>
+            <span className="text-2xs text-muted-foreground">{periodLong}</span>
           </CardHeader>
           <CardContent className="space-y-4 p-4">
             <div className="print:hidden">
@@ -287,6 +307,8 @@ export default async function ReportsPage({
                 fixed={summary.fixedExpenses}
                 variable={summary.variableExpenses}
                 total={summary.operatingExpenses}
+                locale={locale}
+                copy={copy}
               />
             </div>
             <div className="hidden print:block">
@@ -297,31 +319,39 @@ export default async function ReportsPage({
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <BehaviorList
-                title="Fixed"
-                items={categories.filter((c) => c.behavior === "FIXED")}
+                title={copy.fixed}
+                items={categories.filter((c) => c.behavior === "FIXED").map((item) => ({
+                  ...item,
+                  label: categoryLabel(item.category, locale),
+                }))}
                 total={summary.fixedExpenses}
+                locale={locale}
+                emptyText={copy.nothingRecorded}
               />
               <BehaviorList
-                title="Variable"
-                items={categories.filter((c) => c.behavior === "VARIABLE")}
+                title={copy.variable}
+                items={categories.filter((c) => c.behavior === "VARIABLE").map((item) => ({
+                  ...item,
+                  label: categoryLabel(item.category, locale),
+                }))}
                 total={summary.variableExpenses}
+                locale={locale}
+                emptyText={copy.nothingRecorded}
               />
             </div>
             <p className="text-2xs leading-relaxed text-muted-foreground">
-              Fixed costs are the ones you owe whether the truck rolls or not. Variable costs move
-              with miles. Both classifications are editable per category in Settings, and every
-              report re-splits immediately.
+              {copy.classificationNote}
             </p>
           </CardContent>
         </Card>
       </div>
 
       <ReportColophon
-        periodLabel={period.label}
+        periodLabel={periodLong}
         operatingExpenses={summary.operatingExpenses}
       />
 
-      <ReportRunningFooter businessName={business.name} periodLabel={period.label} />
+      <ReportRunningFooter businessName={business.name} periodLabel={periodLong} />
     </div>
   );
 }
@@ -330,26 +360,30 @@ function SplitBar({
   fixed,
   variable,
   total,
+  locale,
+  copy,
 }: {
   fixed: number;
   variable: number;
   total: number;
+  locale: AppLocale;
+  copy: WebDictionary["reports"];
 }) {
   const fixedPct = total > 0 ? (fixed / total) * 100 : 0;
   const variablePct = total > 0 ? (variable / total) * 100 : 0;
   const money = (value: number) =>
-    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
+    new Intl.NumberFormat(localeTag(locale), { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
 
   return (
     <div>
       <div className="flex items-baseline justify-between text-sm">
         <span className="text-info">
-          Fixed {money(fixed)}{" "}
+          {copy.fixed} {money(fixed)}{" "}
           <span className="text-muted-foreground tnum">({fixedPct.toFixed(1)}%)</span>
         </span>
         <span className="text-warn">
           <span className="text-muted-foreground tnum">({variablePct.toFixed(1)}%)</span>{" "}
-          {money(variable)} Variable
+          {money(variable)} {copy.variable}
         </span>
       </div>
       <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-surface-sunken">
@@ -364,13 +398,17 @@ function BehaviorList({
   title,
   items,
   total,
+  locale,
+  emptyText,
 }: {
   title: string;
   items: { category: string; label: string; amount: number }[];
   total: number;
+  locale: AppLocale;
+  emptyText: string;
 }) {
   const money = (value: number) =>
-    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(value);
+    new Intl.NumberFormat(localeTag(locale), { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(value);
 
   return (
     <div className="rounded-md border border-border bg-surface-sunken p-3">
@@ -379,7 +417,7 @@ function BehaviorList({
         <p className="tnum text-sm font-semibold">{money(total)}</p>
       </div>
       {items.length === 0 ? (
-        <p className="mt-2 text-2xs text-muted-foreground">Nothing recorded in this period.</p>
+        <p className="mt-2 text-2xs text-muted-foreground">{emptyText}</p>
       ) : (
         <ul className="mt-2 space-y-1">
           {items.map((item) => (

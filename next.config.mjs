@@ -1,11 +1,21 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Reads its lazy city files with Node fs. Keeping it external preserves the
+  // package's real __dirname instead of moving it into a Next server chunk.
+  serverExternalPackages: ["@countrystatecity/countries"],
   // Prisma Client is generated outside node_modules. Explicitly trace its
   // native query engine so Vercel copies it into every server function that
   // may access the database.
   outputFileTracingIncludes: {
-    "/*": ["./src/generated/prisma/libquery_engine-*.node"],
+    "/*": [
+      "./src/generated/prisma/libquery_engine-*.node",
+      // The location package lazy-loads JSON with fs, which static tracing
+      // cannot discover. Only the two countries supported by the load form
+      // are copied into deployed server functions.
+      "./node_modules/@countrystatecity/countries/dist/data/United_States-US/**/*",
+      "./node_modules/@countrystatecity/countries/dist/data/Canada-CA/**/*",
+    ],
   },
   experimental: {
     serverActions: { bodySizeLimit: "2mb" },

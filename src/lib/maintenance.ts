@@ -15,10 +15,12 @@ import type {
   MaintenanceType,
   Truck,
 } from "./types";
+import type { AppLocale } from "./i18n";
 
 export interface MaintenanceTypeDefinition {
   id: MaintenanceType;
   label: string;
+  labelEs: string;
   /** What this item is naturally measured against. */
   defaultBasis: MaintenanceBasis;
   /** Suggested interval in miles, used to prefill the next-service field. */
@@ -30,19 +32,19 @@ export interface MaintenanceTypeDefinition {
 }
 
 export const MAINTENANCE_TYPES: MaintenanceTypeDefinition[] = [
-  { id: "OIL_CHANGE", label: "Oil Change", defaultBasis: "BOTH", intervalMiles: 15000, intervalMonths: 6 },
-  { id: "OIL_FILTER", label: "Oil Filter", defaultBasis: "MILEAGE", intervalMiles: 15000, intervalMonths: 6 },
-  { id: "FUEL_FILTER", label: "Fuel Filter", defaultBasis: "MILEAGE", intervalMiles: 30000, intervalMonths: 12 },
-  { id: "TIRES", label: "Tires", defaultBasis: "MILEAGE", intervalMiles: 60000, intervalMonths: null },
-  { id: "BRAKES", label: "Brakes", defaultBasis: "MILEAGE", intervalMiles: 50000, intervalMonths: null },
-  { id: "TRANSMISSION", label: "Transmission", defaultBasis: "MILEAGE", intervalMiles: 100000, intervalMonths: null },
-  { id: "COOLANT", label: "Coolant", defaultBasis: "BOTH", intervalMiles: 100000, intervalMonths: 24 },
-  { id: "BATTERY", label: "Battery", defaultBasis: "DATE", intervalMiles: null, intervalMonths: 36 },
-  { id: "DOT_INSPECTION", label: "DOT Inspection", defaultBasis: "DATE", intervalMiles: null, intervalMonths: 12 },
-  { id: "STATE_INSPECTION", label: "State Inspection", defaultBasis: "DATE", intervalMiles: null, intervalMonths: 12 },
-  { id: "REGISTRATION", label: "Registration", defaultBasis: "DATE", intervalMiles: null, intervalMonths: 12, renewal: true },
-  { id: "INSURANCE", label: "Insurance", defaultBasis: "DATE", intervalMiles: null, intervalMonths: 12, renewal: true },
-  { id: "OTHER", label: "Other", defaultBasis: "DATE", intervalMiles: null, intervalMonths: null },
+  { id: "OIL_CHANGE", label: "Oil Change", labelEs: "Cambio de aceite", defaultBasis: "BOTH", intervalMiles: 15000, intervalMonths: 6 },
+  { id: "OIL_FILTER", label: "Oil Filter", labelEs: "Filtro de aceite", defaultBasis: "MILEAGE", intervalMiles: 15000, intervalMonths: 6 },
+  { id: "FUEL_FILTER", label: "Fuel Filter", labelEs: "Filtro de combustible", defaultBasis: "MILEAGE", intervalMiles: 30000, intervalMonths: 12 },
+  { id: "TIRES", label: "Tires", labelEs: "Neumáticos", defaultBasis: "MILEAGE", intervalMiles: 60000, intervalMonths: null },
+  { id: "BRAKES", label: "Brakes", labelEs: "Frenos", defaultBasis: "MILEAGE", intervalMiles: 50000, intervalMonths: null },
+  { id: "TRANSMISSION", label: "Transmission", labelEs: "Transmisión", defaultBasis: "MILEAGE", intervalMiles: 100000, intervalMonths: null },
+  { id: "COOLANT", label: "Coolant", labelEs: "Refrigerante", defaultBasis: "BOTH", intervalMiles: 100000, intervalMonths: 24 },
+  { id: "BATTERY", label: "Battery", labelEs: "Batería", defaultBasis: "DATE", intervalMiles: null, intervalMonths: 36 },
+  { id: "DOT_INSPECTION", label: "DOT Inspection", labelEs: "Inspección DOT", defaultBasis: "DATE", intervalMiles: null, intervalMonths: 12 },
+  { id: "STATE_INSPECTION", label: "State Inspection", labelEs: "Inspección estatal", defaultBasis: "DATE", intervalMiles: null, intervalMonths: 12 },
+  { id: "REGISTRATION", label: "Registration", labelEs: "Registro", defaultBasis: "DATE", intervalMiles: null, intervalMonths: 12, renewal: true },
+  { id: "INSURANCE", label: "Insurance", labelEs: "Seguro", defaultBasis: "DATE", intervalMiles: null, intervalMonths: 12, renewal: true },
+  { id: "OTHER", label: "Other", labelEs: "Otro", defaultBasis: "DATE", intervalMiles: null, intervalMonths: null },
 ];
 
 const BY_ID = new Map(MAINTENANCE_TYPES.map((t) => [t.id, t]));
@@ -53,11 +55,10 @@ export function maintenanceType(id: string): MaintenanceTypeDefinition {
   return BY_ID.get(id as MaintenanceType) ?? BY_ID.get("OTHER")!;
 }
 
-export function maintenanceLabel(id: string): string {
-  return maintenanceType(id).label;
+export function maintenanceLabel(id: string, locale: AppLocale = "en"): string {
+  const definition = maintenanceType(id);
+  return locale === "es" ? definition.labelEs : definition.label;
 }
-
-const numberFmt = new Intl.NumberFormat("en-US");
 
 function daysBetween(fromISO: string, toISO: string): number {
   const from = Date.parse(`${fromISO}T00:00:00Z`);
@@ -104,6 +105,7 @@ export function computeDue(
   currentOdometer: number,
   today: string,
   thresholds: DueThresholds,
+  locale: AppLocale = "en",
 ): MaintenanceDue {
   const definition = maintenanceType(record.type);
   const usesMileage = record.basis !== "DATE" && record.nextServiceOdometer != null;
@@ -130,12 +132,12 @@ export function computeDue(
   return {
     record,
     type: record.type,
-    label: definition.label,
+    label: locale === "es" ? definition.labelEs : definition.label,
     status,
     milesRemaining,
     daysRemaining,
     urgency: urgencyOf(milesRemaining, daysRemaining, thresholds),
-    summary: summarize(definition, status, milesRemaining, daysRemaining, thresholds),
+    summary: summarize(definition, status, milesRemaining, daysRemaining, thresholds, locale),
   };
 }
 
@@ -168,10 +170,12 @@ function summarize(
   milesRemaining: number | null,
   daysRemaining: number | null,
   thresholds: DueThresholds,
+  locale: AppLocale,
 ): string {
-  if (status === "UNSCHEDULED") return "No next service scheduled";
+  if (status === "UNSCHEDULED") return locale === "es" ? "Sin próximo servicio programado" : "No next service scheduled";
 
-  const verb = definition.renewal ? "Renews" : "Due";
+  const verb = locale === "es" ? (definition.renewal ? "Renueva" : "Vence") : definition.renewal ? "Renews" : "Due";
+  const numberFmt = new Intl.NumberFormat(locale === "es" ? "es-US" : "en-US");
 
   if (status === "OVERDUE") {
     // Report whichever measure has actually run out; if both have, lead with
@@ -184,11 +188,11 @@ function summarize(
         (thresholds.warnMiles > 0 ? overMiles / thresholds.warnMiles : overMiles) >=
           (thresholds.warnDays > 0 ? overDays / thresholds.warnDays : overDays));
 
-    if (preferMiles) return `Overdue by ${numberFmt.format(overMiles!)} miles`;
+    if (preferMiles) return locale === "es" ? `Vencido por ${numberFmt.format(overMiles!)} millas` : `Overdue by ${numberFmt.format(overMiles!)} miles`;
     if (overDays !== null) {
-      return `Overdue by ${overDays} ${overDays === 1 ? "day" : "days"}`;
+      return locale === "es" ? `Vencido por ${overDays} ${overDays === 1 ? "día" : "días"}` : `Overdue by ${overDays} ${overDays === 1 ? "day" : "days"}`;
     }
-    return "Overdue";
+    return locale === "es" ? "Vencido" : "Overdue";
   }
 
   // Lead with whichever measure is closer to running out, scored against the
@@ -196,18 +200,18 @@ function summarize(
   const parts: { text: string; urgency: number }[] = [];
   if (milesRemaining !== null) {
     parts.push({
-      text: `${verb} in ${numberFmt.format(milesRemaining)} miles`,
+      text: locale === "es" ? `${verb} en ${numberFmt.format(milesRemaining)} millas` : `${verb} in ${numberFmt.format(milesRemaining)} miles`,
       urgency: thresholds.warnMiles > 0 ? milesRemaining / thresholds.warnMiles : milesRemaining,
     });
   }
   if (daysRemaining !== null) {
     parts.push({
-      text: `${verb} in ${daysRemaining} ${daysRemaining === 1 ? "day" : "days"}`,
+      text: locale === "es" ? `${verb} en ${daysRemaining} ${daysRemaining === 1 ? "día" : "días"}` : `${verb} in ${daysRemaining} ${daysRemaining === 1 ? "day" : "days"}`,
       urgency: thresholds.warnDays > 0 ? daysRemaining / thresholds.warnDays : daysRemaining,
     });
   }
   parts.sort((a, b) => a.urgency - b.urgency);
-  return parts[0]?.text ?? "Scheduled";
+  return parts[0]?.text ?? (locale === "es" ? "Programado" : "Scheduled");
 }
 
 /**
@@ -219,6 +223,7 @@ export function upcomingMaintenance(
   truck: Truck,
   today: string,
   thresholds: DueThresholds,
+  locale: AppLocale = "en",
 ): MaintenanceDue[] {
   const latestByType = new Map<string, MaintenanceRecord>();
   for (const record of records) {
@@ -249,7 +254,7 @@ export function upcomingMaintenance(
   const rank: Record<DueStatus, number> = { OVERDUE: 0, DUE_SOON: 1, OK: 2, UNSCHEDULED: 3 };
 
   return [...latestByType.values()]
-    .map((record) => computeDue(record, truck.currentOdometer, today, thresholds))
+    .map((record) => computeDue(record, truck.currentOdometer, today, thresholds, locale))
     .filter((due) => due.status !== "UNSCHEDULED")
     .sort((a, b) => {
       if (rank[a.status] !== rank[b.status]) return rank[a.status] - rank[b.status];

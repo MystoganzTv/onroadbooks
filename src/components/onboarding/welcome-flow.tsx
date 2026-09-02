@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Building2, Check, Loader2, Target, TruckIcon } from "lucide-react";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+import type { AppLocale } from "@/lib/i18n";
+import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
+
 import { Field } from "@/components/shared/field";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,9 +32,8 @@ interface WelcomeFlowProps {
   settings: FinancialSettings;
   goals: FinancialGoal;
   planName: string;
+  locale: AppLocale;
 }
-
-const STEPS = ["Your business", "Your truck", "How you run", "Done"] as const;
 
 function initialBusinessName(name: string): string {
   if (name === "My Trucking Business" || /^.+['’]s Trucking Business$/.test(name)) return "";
@@ -44,8 +47,13 @@ function initialBusinessName(name: string): string {
  * skippable. Every step writes through the same server actions the Settings
  * and Truck pages use, so onboarding cannot drift into a second data model.
  */
-export function WelcomeFlow({ business, truck, settings, goals, planName }: WelcomeFlowProps) {
+export function WelcomeFlow({ business, truck, settings, goals, planName, locale }: WelcomeFlowProps) {
   const router = useRouter();
+  const dictionary = getWebDictionary(locale);
+  const copy = dictionary.onboarding;
+  const settingsCopy = dictionary.settings;
+  const truckCopy = dictionary.truck;
+  const steps = [copy.businessStep, copy.truckStep, copy.runStep, copy.doneStep] as const;
   const [step, setStep] = React.useState(0);
   const [pending, startTransition] = React.useTransition();
   const [businessName, setBusinessName] = React.useState(initialBusinessName(business.name));
@@ -91,7 +99,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
 
   function saveBusiness() {
     if (!businessName.trim()) {
-      toast.error("Enter the business name you want shown across OnRoad Books.");
+      toast.error(copy.businessRequired);
       return;
     }
     startTransition(async () => {
@@ -110,7 +118,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
       });
 
       if (result.ok) setStep(1);
-      else toast.error(result.error);
+      else toast.error(localizedClientError(result.error));
     });
   }
 
@@ -142,7 +150,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
       });
 
       if (result.ok) setStep(2);
-      else toast.error(result.error);
+      else toast.error(localizedClientError(result.error));
     });
   }
 
@@ -166,7 +174,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
       });
 
       if (!settingsResult.ok) {
-        toast.error(settingsResult.error);
+        toast.error(localizedClientError(settingsResult.error));
         return;
       }
 
@@ -181,7 +189,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
       });
 
       if (goalsResult.ok) setStep(3);
-      else toast.error(goalsResult.error);
+      else toast.error(localizedClientError(goalsResult.error));
     });
   }
 
@@ -203,8 +211,8 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
 
   return (
     <div className="mx-auto w-full max-w-2xl p-4 py-8 lg:py-12">
-      <ol className="mb-6 flex items-center gap-2" aria-label="Setup progress">
-        {STEPS.map((label, index) => (
+      <ol className="mb-6 flex items-center gap-2" aria-label={copy.progress}>
+        {steps.map((label, index) => (
           <li key={label} className="flex flex-1 items-center gap-2">
             <span
               className={cn(
@@ -226,7 +234,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
             >
               {label}
             </span>
-            {index < STEPS.length - 1 ? (
+            {index < steps.length - 1 ? (
               <span className="h-px flex-1 bg-border" aria-hidden />
             ) : null}
           </li>
@@ -237,18 +245,17 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
         <section className="rounded-lg border border-border bg-card p-5">
           <div className="flex items-center gap-2">
             <Building2 className="size-4 text-muted-foreground" />
-            <h1 className="text-md font-semibold tracking-tight">Start with your business</h1>
+            <h1 className="text-md font-semibold tracking-tight">{copy.startBusiness}</h1>
           </div>
           <p className="mt-1 text-2xs text-muted-foreground">
-            Enter the name you want shown on your dashboard, invoices, reports, exports and
-            Business Settings. We do not use your Google name to guess your company name.
+            {copy.businessDescription}
           </p>
 
           <div className="mt-4">
             <Field
-              label="Business name"
+              label={settingsCopy.businessName}
               htmlFor="w-business-name"
-              hint="Legal name or the name customers know you by"
+              hint={copy.businessHint}
               required
             >
               <Input
@@ -267,7 +274,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
           <div className="mt-5 flex justify-end">
             <Button type="button" onClick={saveBusiness} disabled={pending}>
               {pending ? <Loader2 className="animate-spin" /> : null}
-              Continue
+              {copy.continue}
               <ArrowRight className="size-4" />
             </Button>
           </div>
@@ -278,20 +285,17 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
         <section className="rounded-lg border border-border bg-card p-5">
           <div className="flex items-center gap-2">
             <TruckIcon className="size-4 text-muted-foreground" />
-            <h1 className="text-md font-semibold tracking-tight">Tell us about the truck</h1>
+            <h1 className="text-md font-semibold tracking-tight">{copy.truckTitle}</h1>
           </div>
           <p className="mt-1 text-2xs text-muted-foreground">
-            Insurance contributes to operating cost per mile. The truck payment is tracked
-            separately as debt-service cash burden. You can change this later on the Truck page.
+            {copy.truckDescription}
           </p>
           <p className="mt-2 rounded-md border border-info/25 bg-info-soft px-3 py-2 text-2xs leading-relaxed text-muted-foreground">
-            Your workspace already includes a starter unit named {truck.name}. Keeping it for now
-            lets every load, expense, fuel purchase and service record belong to a truck. Its
-            profile will remain marked as incomplete until you add the vehicle details.
+            {interpolate(copy.starterUnit, { truck: truck.name })}
           </p>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <Field label="Name it" htmlFor="w-name" hint="However you refer to it">
+            <Field label={copy.nameIt} htmlFor="w-name" hint={copy.nameHint}>
               <Input
                 id="w-name"
                 value={truckValues.name}
@@ -301,7 +305,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
                 autoFocus
               />
             </Field>
-            <Field label="Current odometer" htmlFor="w-odo">
+            <Field label={truckCopy.currentOdometer} htmlFor="w-odo">
               <Input
                 id="w-odo"
                 inputMode="numeric"
@@ -309,7 +313,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
                 onChange={(e) => setTruckValue("currentOdometer", e.target.value)}
               />
             </Field>
-            <Field label="Year" htmlFor="w-year">
+            <Field label={truckCopy.year} htmlFor="w-year">
               <Input
                 id="w-year"
                 inputMode="numeric"
@@ -318,7 +322,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
                 placeholder="2021"
               />
             </Field>
-            <Field label="Make and model" htmlFor="w-make">
+            <Field label={copy.makeModel} htmlFor="w-make">
               <div className="flex gap-2">
                 <Input
                   id="w-make"
@@ -327,14 +331,14 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
                   placeholder="Freightliner"
                 />
                 <Input
-                  aria-label="Model"
+                  aria-label={copy.model}
                   value={truckValues.model}
                   onChange={(e) => setTruckValue("model", e.target.value)}
                   placeholder="M2 106"
                 />
               </div>
             </Field>
-            <Field label="Power-unit axles" htmlFor="w-axles" hint="Three or more may qualify regardless of weight">
+            <Field label={truckCopy.powerAxles} htmlFor="w-axles" hint={copy.axleHint}>
               <Input
                 id="w-axles"
                 inputMode="numeric"
@@ -344,9 +348,9 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
               />
             </Field>
             <Field
-              label="Registered gross/combined weight"
+              label={truckCopy.registeredWeight}
               htmlFor="w-registered-weight"
-              hint="Pounds shown on the registration; include the combination when applicable"
+              hint={copy.weightHint}
             >
               <Input
                 id="w-registered-weight"
@@ -357,9 +361,9 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
               />
             </Field>
             <Field
-              label="Operating area"
+              label={truckCopy.operatingArea}
               htmlFor="w-ifta-jurisdictions"
-              hint="Will this unit operate in two or more IFTA states or Canadian provinces?"
+              hint={truckCopy.operatingAreaHint}
               className="sm:col-span-2"
             >
               <Select
@@ -370,16 +374,16 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
               >
                 <SelectTrigger id="w-ifta-jurisdictions"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="UNKNOWN">Not sure yet</SelectItem>
-                  <SelectItem value="YES">Two or more IFTA jurisdictions</SelectItem>
-                  <SelectItem value="NO">One jurisdiction only</SelectItem>
+                  <SelectItem value="UNKNOWN">{truckCopy.unsure}</SelectItem>
+                  <SelectItem value="YES">{truckCopy.multipleJurisdictions}</SelectItem>
+                  <SelectItem value="NO">{truckCopy.oneJurisdiction}</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
             <Field
-              label="Quarterly IFTA filing"
+              label={truckCopy.quarterlyIfta}
               htmlFor="w-ifta-reporting"
-              hint="The profile gives a recommendation; you decide whether this truck enters the filing."
+              hint={copy.iftaDecisionHint}
               className="sm:col-span-2"
             >
               <Select
@@ -388,13 +392,13 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
               >
                 <SelectTrigger id="w-ifta-reporting"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="UNDECIDED">Decide later</SelectItem>
-                  <SelectItem value="INCLUDED">Include this truck in IFTA filings</SelectItem>
-                  <SelectItem value="EXCLUDED">Do not include this truck</SelectItem>
+                  <SelectItem value="UNDECIDED">{copy.decideLater}</SelectItem>
+                  <SelectItem value="INCLUDED">{truckCopy.includeIfta}</SelectItem>
+                  <SelectItem value="EXCLUDED">{truckCopy.excludeIfta}</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Monthly truck payment" htmlFor="w-payment">
+            <Field label={truckCopy.monthlyPayment} htmlFor="w-payment">
               <Input
                 id="w-payment"
                 inputMode="decimal"
@@ -403,7 +407,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
                 placeholder="1285"
               />
             </Field>
-            <Field label="Monthly insurance" htmlFor="w-insurance">
+            <Field label={truckCopy.monthlyInsurance} htmlFor="w-insurance">
               <Input
                 id="w-insurance"
                 inputMode="decimal"
@@ -422,18 +426,17 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
                 : "border-border bg-surface-sunken/60 text-muted-foreground",
             )}
           >
-            <span className="font-semibold">{iftaApplicabilityLabel(currentIftaStatus)}.</span>{" "}
-            OnRoad uses the 26,000 lb / three-axle qualification test and cross-jurisdiction
-            operation. Confirm exemptions and filing treatment with your base jurisdiction.
+            <span className="font-semibold">{iftaApplicabilityLabel(currentIftaStatus, locale)}.</span>{" "}
+            {copy.qualificationExplanation}
           </div>
 
           <div className="mt-5 flex items-center justify-between gap-3">
             <Button type="button" variant="ghost" size="sm" onClick={() => setStep(2)}>
-              Keep {truck.name} for now
+              {interpolate(copy.keepTruck, { truck: truck.name })}
             </Button>
             <Button type="button" onClick={saveTruck} disabled={pending}>
               {pending ? <Loader2 className="animate-spin" /> : null}
-              Continue
+              {copy.continue}
               <ArrowRight className="size-4" />
             </Button>
           </div>
@@ -444,18 +447,17 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
         <section className="rounded-lg border border-border bg-card p-5">
           <div className="flex items-center gap-2">
             <Target className="size-4 text-muted-foreground" />
-            <h1 className="text-md font-semibold tracking-tight">How you run the business</h1>
+            <h1 className="text-md font-semibold tracking-tight">{copy.runTitle}</h1>
           </div>
           <p className="mt-1 text-2xs text-muted-foreground">
-            These drive Safe to Pay Yourself and the pace tracker. Sensible defaults are filled
-            in — adjust them when you know your own numbers.
+            {copy.runDescription}
           </p>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <Field
-              label="Tax reserve"
+              label={copy.taxReserve}
               htmlFor="w-tax"
-              hint="Percent of operating profit set aside"
+              hint={copy.taxHint}
             >
               <Input
                 id="w-tax"
@@ -466,9 +468,9 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
               />
             </Field>
             <Field
-              label="Maintenance reserve"
+              label={copy.maintenanceReserve}
               htmlFor="w-maint"
-              hint="Percent of Booked Revenue set aside"
+              hint={copy.maintenanceHint}
             >
               <Input
                 id="w-maint"
@@ -477,7 +479,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
                 onChange={(e) => setRunValue("maintenanceReservePct", e.target.value)}
               />
             </Field>
-            <Field label="Monthly revenue target" htmlFor="w-rev">
+            <Field label={settingsCopy.monthlyRevenueTarget} htmlFor="w-rev">
               <Input
                 id="w-rev"
                 inputMode="decimal"
@@ -487,12 +489,12 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
               />
             </Field>
             <Field
-              label="Monthly profit target"
+              label={settingsCopy.monthlyProfitTarget}
               htmlFor="w-profit"
               hint={
                 dailyTarget > 0
-                  ? `About ${formatMoney(dailyTarget)} a working day`
-                  : "Drives the daily verdict"
+                  ? interpolate(settingsCopy.dailyProfitHint, { amount: formatMoney(dailyTarget) })
+                  : copy.dailyVerdict
               }
             >
               <Input
@@ -503,7 +505,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
                 placeholder="7500"
               />
             </Field>
-            <Field label="Working days a week" htmlFor="w-days" className="sm:col-span-2">
+            <Field label={settingsCopy.workingDays} htmlFor="w-days" className="sm:col-span-2">
               <Select
                 value={runValues.workingDaysPerWeek}
                 onValueChange={(value) => setRunValue("workingDaysPerWeek", value)}
@@ -512,9 +514,9 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="5">5 — Monday to Friday</SelectItem>
-                  <SelectItem value="6">6 — Monday to Saturday</SelectItem>
-                  <SelectItem value="7">7 — every day</SelectItem>
+                  <SelectItem value="5">{settingsCopy.mondayFriday}</SelectItem>
+                  <SelectItem value="6">{settingsCopy.mondaySaturday}</SelectItem>
+                  <SelectItem value="7">{settingsCopy.everyDay}</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
@@ -522,11 +524,11 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
 
           <div className="mt-5 flex items-center justify-between gap-3">
             <Button type="button" variant="ghost" size="sm" onClick={() => setStep(3)}>
-              Skip for now
+              {copy.skip}
             </Button>
             <Button type="button" onClick={saveHowYouRun} disabled={pending}>
               {pending ? <Loader2 className="animate-spin" /> : null}
-              Continue
+              {copy.continue}
               <ArrowRight className="size-4" />
             </Button>
           </div>
@@ -539,20 +541,19 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
             <Check className="size-5 text-pos" />
           </div>
           <h1 className="mt-3 text-lg font-semibold tracking-tight">
-            {businessName.trim()} is set up
+            {interpolate(copy.setupComplete, { business: businessName.trim() })}
           </h1>
           <p className="mx-auto mt-1.5 max-w-md text-xs leading-relaxed text-muted-foreground">
-            You are starting a 7-day {planName} trial. This workspace is private and empty by
-            design — add your first load when you are ready.
+            {interpolate(copy.trialReady, { plan: planName })}
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             <Button type="button" onClick={finish}>
-              Open the dashboard
+              {copy.openDashboard}
               <ArrowRight className="size-4" />
             </Button>
           </div>
           <p className="mt-4 text-2xs text-muted-foreground">
-            Everything here can be changed later under Business Settings.
+            {copy.changeLater}
           </p>
         </section>
       ) : null}

@@ -1,4 +1,5 @@
 import type { Truck } from "./types";
+import type { AppLocale } from "./i18n";
 
 /**
  * A product-facing assessment, not a tax ruling. Jurisdiction-specific
@@ -32,10 +33,10 @@ export function fleetIftaApplicability(trucks: IftaTruckFacts[]): IftaApplicabil
   return "LIKELY_NOT_REQUIRED";
 }
 
-export function iftaApplicabilityLabel(status: IftaApplicability): string {
-  if (status === "LIKELY_REQUIRED") return "IFTA tracking recommended";
-  if (status === "LIKELY_NOT_REQUIRED") return "IFTA not indicated by this profile";
-  return "IFTA status needs vehicle details";
+export function iftaApplicabilityLabel(status: IftaApplicability, locale: AppLocale = "en"): string {
+  if (status === "LIKELY_REQUIRED") return locale === "es" ? "Se recomienda llevar IFTA" : "IFTA tracking recommended";
+  if (status === "LIKELY_NOT_REQUIRED") return locale === "es" ? "Este perfil no indica que requiera IFTA" : "IFTA not indicated by this profile";
+  return locale === "es" ? "El estado IFTA necesita datos del vehículo" : "IFTA status needs vehicle details";
 }
 
 /** Explicit owner decisions, kept separate from the product's recommendation. */
@@ -47,8 +48,9 @@ export function iftaReportingTruckIds(
 
 export function iftaReportingLabel(
   enabled: boolean | null | undefined,
-): "Included" | "Excluded" | "Decision needed" {
-  if (enabled === true) return "Included";
-  if (enabled === false) return "Excluded";
-  return "Decision needed";
+  locale: AppLocale = "en",
+): string {
+  if (enabled === true) return locale === "es" ? "Incluido" : "Included";
+  if (enabled === false) return locale === "es" ? "Excluido" : "Excluded";
+  return locale === "es" ? "Decisión pendiente" : "Decision needed";
 }

@@ -16,6 +16,7 @@
 
 import { div, roundMoney } from "../calculations";
 import { maintenanceLabel, type DueThresholds, upcomingMaintenance } from "../maintenance";
+import type { AppLocale } from "../i18n";
 import type { MaintenanceDue, MaintenanceRecord, Truck } from "../types";
 
 export interface UpcomingService {
@@ -48,8 +49,9 @@ export function calculateMaintenanceHealth(
   today: string,
   thresholds: DueThresholds,
   reserveBalance: number,
+  locale: AppLocale = "en",
 ): MaintenanceHealth {
-  const items = upcomingMaintenance(records, truck, today, thresholds);
+  const items = upcomingMaintenance(records, truck, today, thresholds, locale);
 
   const lastCostByType = new Map<string, number>();
   for (const record of [...records].sort((a, b) => a.serviceDate.localeCompare(b.serviceDate))) {
@@ -61,7 +63,7 @@ export function calculateMaintenanceHealth(
     .map((due) => ({
       due,
       estimatedCost: lastCostByType.get(due.type) ?? null,
-      label: maintenanceLabel(due.type),
+      label: maintenanceLabel(due.type, locale),
     }));
 
   const upcomingCost = roundMoney(

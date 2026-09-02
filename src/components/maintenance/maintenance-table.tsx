@@ -5,6 +5,11 @@ import { Paperclip, Pencil, Trash2, Wrench } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+import { useLanguage } from "@/components/shell/language-provider";
+import { interpolate } from "@/lib/i18n/dictionaries";
+import { formatLocaleDate } from "@/lib/i18n-format";
+
 import { ConfirmDelete } from "@/components/shared/confirm-delete";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Badge } from "@/components/ui/badge";
@@ -21,8 +26,6 @@ import {
 } from "@/components/ui/table";
 import { deleteMaintenanceAction } from "@/lib/actions/maintenance";
 import {
-  formatDateMedium,
-  formatDateShort,
   formatMoney,
   formatOdometer,
 } from "@/lib/formatters";
@@ -49,6 +52,8 @@ export function MaintenanceTable({
   today,
   thresholds,
 }: MaintenanceTableProps) {
+  const { dictionary, locale } = useLanguage();
+  const copy = dictionary.maintenance;
   const router = useRouter();
   const [deleting, setDeleting] = React.useState<string | null>(null);
 
@@ -57,10 +62,10 @@ export function MaintenanceTable({
     const result = await deleteMaintenanceAction(record.id);
     setDeleting(null);
     if (result.ok) {
-      toast.success("Service record deleted", { description: maintenanceLabel(record.type) });
+      toast.success(copy.serviceDeleted, { description: maintenanceLabel(record.type, locale) });
       router.refresh();
     } else {
-      toast.error(result.error);
+      toast.error(localizedClientError(result.error));
     }
   }
 
@@ -71,8 +76,8 @@ export function MaintenanceTable({
       <div className="rounded-lg border border-border bg-card">
         <EmptyState
           icon={Wrench}
-          title="No service history yet"
-          description="Log oil changes, tires, inspections and renewals to build a maintenance record for this truck."
+          title={copy.noHistory}
+          description={copy.noHistoryDescription}
           action={<MaintenanceFormDialog currentOdometer={currentOdometer} truckId={truckId} />}
         />
       </div>
@@ -85,43 +90,43 @@ export function MaintenanceTable({
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead>Date</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead className="text-right">Odometer</TableHead>
-              <TableHead>Vendor</TableHead>
-              <TableHead className="text-right">Cost</TableHead>
-              <TableHead>Next service</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-[4.375rem] text-right">Actions</TableHead>
+              <TableHead>{copy.date}</TableHead>
+              <TableHead>{copy.type}</TableHead>
+              <TableHead className="text-right">{copy.odometer}</TableHead>
+              <TableHead>{copy.vendor}</TableHead>
+              <TableHead className="text-right">{copy.cost}</TableHead>
+              <TableHead>{copy.nextService}</TableHead>
+              <TableHead>{copy.status}</TableHead>
+              <TableHead className="w-[4.375rem] text-right">{copy.actions}</TableHead>
             </TableRow>
           </TableHeader>
 
           <TableBody>
             {records.map((record) => {
-              const due = computeDue(record, currentOdometer, today, thresholds);
+              const due = computeDue(record, currentOdometer, today, thresholds, locale);
               const style = DUE_STYLE[due.status];
               const attached = documents.filter((d) => d.maintenanceId === record.id);
 
               return (
                 <TableRow key={record.id}>
                   <TableCell className="text-muted-foreground">
-                    {formatDateShort(record.serviceDate)}
+                    {formatLocaleDate(record.serviceDate, locale, "short")}
                     <span className="ml-1 text-2xs opacity-70">
                       {record.serviceDate.slice(0, 4)}
                     </span>
                   </TableCell>
                   <TableCell>
                     <span className="flex items-center gap-1.5">
-                      {maintenanceLabel(record.type)}
+                      {maintenanceLabel(record.type, locale)}
                       {attached.length > 0 ? (
                         <Paperclip
                           className="size-3 text-muted-foreground"
-                          aria-label={`${attached.length} attached`}
+                          aria-label={interpolate(copy.attached, { count: attached.length })}
                         />
                       ) : null}
                       {record.expenseId ? (
-                        <Badge variant="outline" title="Also in the expense ledger">
-                          Ledger
+                        <Badge variant="outline" title={copy.ledgerTitle}>
+                          {copy.ledger}
                         </Badge>
                       ) : null}
                     </span>
@@ -136,7 +141,7 @@ export function MaintenanceTable({
                     {record.cost > 0 ? formatMoney(record.cost) : "--"}
                   </TableCell>
                   <TableCell className="text-muted-foreground tnum">
-                    {record.nextServiceDate ? formatDateMedium(record.nextServiceDate) : null}
+                    {record.nextServiceDate ? formatLocaleDate(record.nextServiceDate, locale, "medium") : null}
                     {record.nextServiceDate && record.nextServiceOdometer ? " / " : null}
                     {record.nextServiceOdometer ? formatOdometer(record.nextServiceOdometer) : null}
                     {!record.nextServiceDate && !record.nextServiceOdometer ? "--" : null}
@@ -154,18 +159,18 @@ export function MaintenanceTable({
                         documents={attached}
                         currentOdometer={currentOdometer}
                         trigger={
-                          <Button variant="ghost" size="icon-sm" aria-label="Edit service record">
+                          <Button variant="ghost" size="icon-sm" aria-label={copy.editRecord}>
                             <Pencil />
                           </Button>
                         }
                       />
                       <ConfirmDelete
-                        entity="service record"
-                        label={`${maintenanceLabel(record.type)} - ${formatDateMedium(record.serviceDate)}`}
+                        entity={copy.serviceRecord}
+                        label={`${maintenanceLabel(record.type, locale)} - ${formatLocaleDate(record.serviceDate, locale, "medium")}`}
                         consequences={[
-                          ...(record.expenseId ? ["Its linked row in the expense ledger"] : []),
+                          ...(record.expenseId ? [copy.linkedLedger] : []),
                           ...(attached.length > 0
-                            ? [`${attached.length} attached ${attached.length === 1 ? "document" : "documents"}`]
+                            ? [interpolate(copy.attachedDocuments, { count: attached.length, unit: attached.length === 1 ? copy.document : copy.documents })]
                             : []),
                         ]}
                         onConfirm={() => remove(record)}
@@ -173,7 +178,7 @@ export function MaintenanceTable({
                           <Button
                             variant="ghost"
                             size="icon-sm"
-                            aria-label="Delete service record"
+                            aria-label={copy.deleteRecord}
                             disabled={deleting === record.id}
                             className="text-muted-foreground hover:text-neg"
                           >
@@ -194,7 +199,7 @@ export function MaintenanceTable({
                 colSpan={4}
                 className="text-2xs uppercase tracking-wider text-muted-foreground"
               >
-                Lifetime service spend
+                {copy.lifetimeSpend}
               </TableCell>
               <TableCell className="text-right tnum font-semibold">{formatMoney(total)}</TableCell>
               <TableCell colSpan={3} />

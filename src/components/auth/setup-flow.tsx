@@ -14,12 +14,9 @@ import { Input } from "@/components/ui/input";
 import { setupSchema } from "@/lib/schemas";
 import { APP_NAME } from "@/lib/utils";
 import { fieldErrors, validationMessage } from "@/lib/form";
-
-const FIELD_LABELS: Record<string, string> = {
-  name: "Your name",
-  email: "Email",
-  password: "Password",
-};
+import type { AppLocale } from "@/lib/i18n";
+import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
+import { localizeError } from "@/lib/i18n/errors";
 
 /**
  * Creating the owner account.
@@ -28,8 +25,10 @@ const FIELD_LABELS: Record<string, string> = {
  * the welcome flow, and plan pricing belongs on the public pricing page or in
  * settings -- neither should make account creation feel like a checkout.
  */
-export function SetupFlow() {
+export function SetupFlow({ locale }: { locale: AppLocale }) {
   const router = useRouter();
+  const copy = getWebDictionary(locale).auth;
+  const fieldLabels = { name: copy.yourName, email: copy.email, password: copy.password };
 
   const [values, setValues] = React.useState({
     name: "",
@@ -51,7 +50,7 @@ export function SetupFlow() {
     if (!parsed.success) {
       const next = fieldErrors(parsed.error);
       setErrors(next);
-      setError(validationMessage(next, FIELD_LABELS));
+      setError(validationMessage(next, fieldLabels));
       return;
     }
 
@@ -68,14 +67,14 @@ export function SetupFlow() {
 
       if (!response.ok) {
         const data = (await response.json().catch(() => null)) as { error?: string } | null;
-        setError(data?.error ?? "Something went wrong. Try again.");
+        setError(localizeError(data?.error, locale));
         return;
       }
 
       router.replace("/welcome");
       router.refresh();
     } catch {
-      setError("Could not reach the server. Check that it is running.");
+      setError(copy.serverError);
     } finally {
       setPending(false);
     }
@@ -90,11 +89,11 @@ export function SetupFlow() {
             className="mb-5 inline-flex items-center gap-1.5 text-2xs text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="size-3.5" aria-hidden />
-            Back to {APP_NAME}
+            {interpolate(copy.backTo, { app: APP_NAME })}
           </Link>
           <BrandLogo className="w-40" priority />
           <p className="mt-2 text-2xs text-muted-foreground">
-            Drive the truck. Know the business.
+            {copy.tagline}
           </p>
         </div>
 
@@ -103,17 +102,17 @@ export function SetupFlow() {
           noValidate
           className="space-y-4 rounded-lg border border-border bg-card p-5"
         >
-          <AuthOptions />
+          <AuthOptions locale={locale} />
 
           <div className="space-y-4">
             <div>
-              <h1 className="text-md font-semibold tracking-tight">Create your account</h1>
+              <h1 className="text-md font-semibold tracking-tight">{copy.createTitle}</h1>
               <p className="mt-0.5 text-2xs text-muted-foreground">
-                Start your 7-day OnRoad Pro trial for one truck. No card required.
+                {copy.trialDescription}
               </p>
             </div>
 
-            <Field label="Your name" htmlFor="setup-name" error={errors.name}>
+            <Field label={copy.yourName} htmlFor="setup-name" error={errors.name}>
               <Input
                 id="setup-name"
                 value={values.name}
@@ -124,7 +123,7 @@ export function SetupFlow() {
               />
             </Field>
 
-            <Field label="Email" htmlFor="setup-email" required error={errors.email}>
+            <Field label={copy.email} htmlFor="setup-email" required error={errors.email}>
               <Input
                 id="setup-email"
                 type="email"
@@ -135,11 +134,11 @@ export function SetupFlow() {
             </Field>
 
             <Field
-              label="Password"
+              label={copy.password}
               htmlFor="setup-password"
               required
               error={errors.password}
-              hint="At least 10 characters"
+              hint={copy.passwordHint}
             >
               <Input
                 id="setup-password"
@@ -162,14 +161,14 @@ export function SetupFlow() {
 
           <Button type="submit" className="w-full" disabled={pending}>
             {pending ? <Loader2 className="animate-spin" /> : null}
-            Create account
+            {copy.createAccount}
           </Button>
         </form>
 
         <p className="mt-4 text-center text-2xs leading-relaxed text-muted-foreground">
-          Already have an account?{" "}
+          {copy.alreadyAccount}{" "}
           <Link href="/login" className="font-medium text-primary hover:underline">
-            Log in
+            {copy.logIn}
           </Link>
         </p>
       </div>

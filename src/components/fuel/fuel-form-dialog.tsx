@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+import { useLanguage } from "@/components/shell/language-provider";
+import { interpolate } from "@/lib/i18n/dictionaries";
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,23 +33,14 @@ import { Field } from "@/components/shared/field";
 import { fieldErrors, focusFirstError, validationMessage } from "@/lib/form";
 import { createFuelEntryAction, updateFuelEntryAction } from "@/lib/actions/fuel";
 import { roundMoney } from "@/lib/calculations";
-import { formatDateShort, formatMoney } from "@/lib/formatters";
+import { formatMoney } from "@/lib/formatters";
+import { formatLocaleDate, localeTag } from "@/lib/i18n-format";
 import { todayISO } from "@/lib/periods";
 import { fuelSchema } from "@/lib/schemas";
 import { orderedTrucks } from "@/lib/fleet";
 import { IFTA_JURISDICTIONS, inferFuelJurisdiction } from "@/lib/ifta";
 import type { FuelEntry, LoadWithMetrics, Truck } from "@/lib/types";
 import { toNumber } from "@/lib/utils";
-
-const FIELD_LABELS: Record<string, string> = {
-  location: "Location",
-  gallons: "Gallons",
-  pricePerGallon: "Price per gallon",
-  totalCost: "Total cost",
-  odometer: "Odometer",
-  date: "Date",
-  notes: "Notes",
-};
 
 interface FormState {
   date: string;
@@ -85,6 +80,9 @@ export function FuelFormDialog({
   trigger,
 }: FuelFormDialogProps) {
   const router = useRouter();
+  const { locale, dictionary } = useLanguage();
+  const copy = dictionary.fuel;
+  const common = dictionary.common;
   const isEdit = Boolean(entry);
 
   const truckOptions = React.useMemo(
@@ -193,7 +191,15 @@ export function FuelFormDialog({
       setErrors(next);
       // A failure the user cannot see is a dead button: announce it, name the
       // fields, and move focus to the first one.
-      toast.error(validationMessage(next, FIELD_LABELS));
+      toast.error(validationMessage(next, {
+        location: copy.location,
+        gallons: copy.gallons,
+        pricePerGallon: copy.priceGal,
+        totalCost: copy.totalCost,
+        odometer: copy.odometer,
+        date: copy.date,
+        notes: copy.notes,
+      }));
       requestAnimationFrame(() => focusFirstError("fuel-form"));
       return;
     }
@@ -205,14 +211,14 @@ export function FuelFormDialog({
         : await createFuelEntryAction(payload);
 
       if (result.ok) {
-        toast.success(isEdit ? "Fuel entry updated" : "Fuel entry added", {
+        toast.success(isEdit ? copy.entryUpdated : copy.entryAdded, {
           description: `${gallons.toFixed(1)} gal - ${formatMoney(totalCost)}`,
         });
         setOpen(false);
         router.refresh();
       } else {
         setErrors(result.fieldErrors ?? {});
-        toast.error(result.error);
+        toast.error(localizedClientError(result.error));
       }
     });
   }
@@ -223,16 +229,16 @@ export function FuelFormDialog({
         {trigger ?? (
           <Button size="sm">
             <Plus />
-            Add Fuel
+            {copy.addFuel}
           </Button>
         )}
       </DialogTrigger>
 
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit fuel entry" : "Add fuel entry"}</DialogTitle>
+          <DialogTitle>{isEdit ? copy.editFuel : copy.addFuelEntry}</DialogTitle>
           <DialogDescription>
-            Recording an odometer reading every fill-up is what makes MPG tracking work.
+            {copy.formDescription}
           </DialogDescription>
         </DialogHeader>
 
@@ -240,10 +246,10 @@ export function FuelFormDialog({
           <form id="fuel-form" onSubmit={submit} className="space-y-4" noValidate>
             {showTruck ? (
               <Field
-                label="Truck"
+                label={copy.truck}
                 htmlFor="fuel-truck"
                 required
-                hint="Sets the odometer this reading belongs to"
+                hint={copy.truckHint}
               >
                 <Select value={truckId} onValueChange={changeTruck}>
                   <SelectTrigger id="fuel-truck">
@@ -253,7 +259,7 @@ export function FuelFormDialog({
                     {truckOptions.map((truck) => (
                       <SelectItem key={truck.id} value={truck.id}>
                         {truck.name}
-                        {truck.active ? "" : " (retired)"}
+                        {truck.active ? "" : ` (${copy.retired})`}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -262,7 +268,7 @@ export function FuelFormDialog({
             ) : null}
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <Field label="Date" htmlFor="fuel-date" required error={errors.date}>
+              <Field label={copy.date} htmlFor="fuel-date" required error={errors.date}>
                 <Input
                   id="fuel-date"
                   type="date"
@@ -272,7 +278,7 @@ export function FuelFormDialog({
                   required
                 />
               </Field>
-              <Field label="Location" htmlFor="fuel-location" error={errors.location}>
+              <Field label={copy.location} htmlFor="fuel-location" error={errors.location}>
                 <Input
                   id="fuel-location"
                   maxLength={120}
@@ -283,10 +289,10 @@ export function FuelFormDialog({
                 />
               </Field>
               <Field
-                label="IFTA jurisdiction"
+                label={copy.jurisdiction}
                 htmlFor="fuel-jurisdiction"
                 error={errors.jurisdiction}
-                hint="Tax-paid gallons"
+                hint={copy.taxPaidGallons}
               >
                 <Select
                   value={values.jurisdiction}
@@ -296,7 +302,7 @@ export function FuelFormDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="UNASSIGNED">Unassigned</SelectItem>
+                    <SelectItem value="UNASSIGNED">{copy.unassigned}</SelectItem>
                     {IFTA_JURISDICTIONS.map((jurisdiction) => (
                       <SelectItem key={jurisdiction} value={jurisdiction}>
                         {jurisdiction}
@@ -308,7 +314,7 @@ export function FuelFormDialog({
             </div>
 
             <div className="grid grid-cols-3 gap-3">
-              <Field label="Gallons" htmlFor="fuel-gallons" required error={errors.gallons}>
+              <Field label={copy.gallons} htmlFor="fuel-gallons" required error={errors.gallons}>
                 <Input
                   id="fuel-gallons"
                   type="number"
@@ -322,7 +328,7 @@ export function FuelFormDialog({
                 />
               </Field>
               <Field
-                label="Price / gal"
+                label={copy.priceGal}
                 htmlFor="fuel-price"
                 required
                 error={errors.pricePerGallon}
@@ -340,10 +346,10 @@ export function FuelFormDialog({
                 />
               </Field>
               <Field
-                label="Total cost"
+                label={copy.totalCost}
                 htmlFor="fuel-total"
                 error={errors.totalCost}
-                hint={costEdited ? undefined : "Auto"}
+                hint={costEdited ? undefined : copy.auto}
               >
                 <Input
                   id="fuel-total"
@@ -362,9 +368,9 @@ export function FuelFormDialog({
 
             <div className="grid grid-cols-2 gap-3">
               <Field
-                label="Odometer"
+                label={copy.odometer}
                 htmlFor="fuel-odometer"
-                hint={lastOdometer ? `Last reading ${lastOdometer.toLocaleString()}` : "Optional"}
+                hint={lastOdometer ? interpolate(copy.lastReading, { value: lastOdometer.toLocaleString(localeTag(locale)) }) : copy.optional}
                 error={errors.odometer}
               >
                 <Input
@@ -379,21 +385,21 @@ export function FuelFormDialog({
                 />
               </Field>
               <Field
-                label="Link to load"
+                label={copy.linkToLoad}
                 htmlFor="fuel-load"
-                hint="Only loads assigned to this truck are shown"
+                hint={copy.truckLoadsOnly}
               >
                 <Select value={values.loadId} onValueChange={(value) => set("loadId", value)}>
                   <SelectTrigger id="fuel-load">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Not linked</SelectItem>
+                    <SelectItem value="none">{copy.notLinked}</SelectItem>
                     {/* The list is period-filtered, so a link made in another
                         period would otherwise render as a blank selection. */}
                     {linkOptions.map((load) => (
                       <SelectItem key={load.id} value={load.id}>
-                        {formatDateShort(load.date)} - {load.originCity} to {load.destinationCity}
+                        {formatLocaleDate(load.date, locale, "short")} · {load.originCity} {copy.routeConnector} {load.destinationCity}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -401,33 +407,31 @@ export function FuelFormDialog({
               </Field>
             </div>
 
-            <Field label="Notes" htmlFor="fuel-notes" error={errors.notes}>
+            <Field label={copy.notes} htmlFor="fuel-notes" error={errors.notes}>
               <Textarea
                 id="fuel-notes"
                 rows={2}
                 maxLength={2000}
                 value={values.notes}
                 onChange={(e) => set("notes", e.target.value)}
-                placeholder="Optional"
+                placeholder={copy.optional}
                 aria-invalid={Boolean(errors.notes)}
               />
             </Field>
 
             <p className="rounded-md border border-border bg-surface-sunken px-3 py-2 text-2xs text-muted-foreground">
-              Saving also records a matching{" "}
-              <span className="text-foreground">Fuel</span> row in the expense ledger, so operating
-              costs stay complete without entering it twice.
+              {copy.ledgerNotice}
             </p>
           </form>
         </DialogBody>
 
         <DialogFooter>
           <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>
-            Cancel
+            {common.cancel}
           </Button>
           <Button type="submit" form="fuel-form" size="sm" disabled={pending}>
             {pending ? <Loader2 className="animate-spin" /> : null}
-            {isEdit ? "Save changes" : "Add fuel"}
+            {isEdit ? common.saveChanges : copy.addFuel}
           </Button>
         </DialogFooter>
       </DialogContent>

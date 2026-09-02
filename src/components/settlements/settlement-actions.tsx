@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { Loader2, Lock, LockOpen } from "lucide-react";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+
 import { ConfirmAction } from "@/components/shared/confirm-action";
+import { useLanguage } from "@/components/shell/language-provider";
 import { Button } from "@/components/ui/button";
 import { closeSettlementAction, reopenSettlementAction } from "@/lib/actions/settlements";
 import type { SettlementHalf } from "@/lib/types";
@@ -27,39 +30,41 @@ export function CloseSettlementButton({
   reserveTotal: string;
 }) {
   const router = useRouter();
+  const { dictionary } = useLanguage();
+  const copy = dictionary.settlements;
   const [pending, startTransition] = React.useTransition();
 
   if (!complete) {
     return (
-      <Button type="button" size="sm" disabled title="This period has not finished yet">
+      <Button type="button" size="sm" disabled title={copy.periodNotFinished}>
         <Lock className="size-3.5" />
-        Close settlement
+        {copy.closeSettlement}
       </Button>
     );
   }
 
   return (
     <ConfirmAction
-      title="Close this settlement?"
-      description={`The figures are frozen exactly as they stand now, and ${reserveTotal} is posted into your reserve buckets. Later changes to a reserve percentage will not rewrite this settlement. You can reopen it if you need to.`}
-      confirmLabel="Close settlement"
+      title={copy.closeTitle}
+      description={copy.closeDescription.replace("{amount}", reserveTotal)}
+      confirmLabel={copy.closeSettlement}
       variant="default"
       trigger={
         <Button type="button" size="sm" disabled={pending}>
           {pending ? <Loader2 className="size-3.5 animate-spin" /> : <Lock className="size-3.5" />}
-          Close settlement
+          {copy.closeSettlement}
         </Button>
       }
       onConfirm={() =>
         startTransition(async () => {
           const result = await closeSettlementAction({ month, half });
           if (result.ok) {
-            toast.success("Settlement closed", {
-              description: "The snapshot is frozen and reserves have been posted.",
+            toast.success(copy.closedSuccess, {
+              description: copy.closedSuccessDescription,
             });
             router.refresh();
           } else {
-            toast.error(result.error);
+            toast.error(localizedClientError(result.error));
           }
         })
       }
@@ -69,13 +74,15 @@ export function CloseSettlementButton({
 
 export function ReopenSettlementButton({ id }: { id: string }) {
   const router = useRouter();
+  const { dictionary } = useLanguage();
+  const copy = dictionary.settlements;
   const [pending, startTransition] = React.useTransition();
 
   return (
     <ConfirmAction
-      title="Reopen this settlement?"
-      description="The frozen snapshot is cleared and the reserve contributions this close posted are removed. Manual movements in those buckets are left alone."
-      confirmLabel="Reopen"
+      title={copy.reopenTitle}
+      description={copy.reopenDescription}
+      confirmLabel={copy.reopen}
       trigger={
         <Button type="button" variant="outline" size="sm" disabled={pending}>
           {pending ? (
@@ -83,17 +90,17 @@ export function ReopenSettlementButton({ id }: { id: string }) {
           ) : (
             <LockOpen className="size-3.5" />
           )}
-          Reopen
+          {copy.reopen}
         </Button>
       }
       onConfirm={() =>
         startTransition(async () => {
           const result = await reopenSettlementAction(id);
           if (result.ok) {
-            toast.success("Settlement reopened");
+            toast.success(copy.reopenedSuccess);
             router.refresh();
           } else {
-            toast.error(result.error);
+            toast.error(localizedClientError(result.error));
           }
         })
       }

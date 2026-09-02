@@ -11,7 +11,6 @@ import {
 } from "@/lib/actions/team";
 import {
   ASSIGNABLE_ROLES,
-  ROLE_DEFINITIONS,
   type AssignableRole,
 } from "@/lib/roles";
 import type { MemberRole } from "@/lib/types";
@@ -19,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useLanguage } from "@/components/shell/language-provider";
 import {
   Select,
   SelectContent,
@@ -41,11 +41,18 @@ interface TeamManagerProps {
   canManage: boolean;
 }
 
-function displayName(member: TeamMemberView): string {
-  return member.name?.trim() || member.email.split("@")[0] || "Team member";
-}
-
 export function TeamManager({ members, canManage }: TeamManagerProps) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.team;
+  const displayName = (member: TeamMemberView) =>
+    member.name?.trim() || member.email.split("@")[0] || copy.teamMember;
+  const roleCopy = (memberRole: MemberRole) => ({
+    OWNER: [copy.owner, copy.ownerDescription],
+    ADMIN: [copy.admin, copy.adminDescription],
+    BOOKKEEPER: [copy.bookkeeper, copy.bookkeeperDescription],
+    DISPATCHER: [copy.dispatcher, copy.dispatcherDescription],
+    VIEWER: [copy.viewer, copy.viewerDescription],
+  } as const)[memberRole];
   const [pending, startTransition] = React.useTransition();
   const [email, setEmail] = React.useState("");
   const [name, setName] = React.useState("");
@@ -60,7 +67,7 @@ export function TeamManager({ members, canManage }: TeamManagerProps) {
       if (result.ok) {
         setEmail("");
         setName("");
-        setMessage({ ok: true, text: "Invitation sent. Access begins only after the email is verified." });
+        setMessage({ ok: true, text: copy.invitationSent });
       } else {
         setMessage({ ok: false, text: result.error });
       }
@@ -73,20 +80,20 @@ export function TeamManager({ members, canManage }: TeamManagerProps) {
       const result = await updateMemberRoleAction({ userId, role: nextRole });
       setMessage(
         result.ok
-          ? { ok: true, text: "Role updated. The new permissions apply immediately." }
+          ? { ok: true, text: copy.roleUpdated }
           : { ok: false, text: result.error },
       );
     });
   }
 
   function remove(member: TeamMemberView) {
-    if (!window.confirm(`Remove ${displayName(member)} from this workspace?`)) return;
+    if (!window.confirm(copy.removeConfirm.replace("{member}", displayName(member)))) return;
     setMessage(null);
     startTransition(async () => {
       const result = await removeMemberAction(member.id);
       setMessage(
         result.ok
-          ? { ok: true, text: "Member removed. Existing OnRoad sessions are now revoked." }
+          ? { ok: true, text: copy.memberRemoved }
           : { ok: false, text: result.error },
       );
     });
@@ -98,9 +105,9 @@ export function TeamManager({ members, canManage }: TeamManagerProps) {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Users className="size-4 text-primary" />
-            <CardTitle>People with app access</CardTitle>
+            <CardTitle>{copy.peopleAccess}</CardTitle>
           </div>
-          <Badge variant="outline">{members.length} total</Badge>
+          <Badge variant="outline">{copy.total.replace("{count}", String(members.length))}</Badge>
         </CardHeader>
         <CardContent className="p-0">
           {members.map((member) => (
@@ -112,17 +119,17 @@ export function TeamManager({ members, canManage }: TeamManagerProps) {
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="truncate text-sm font-semibold text-foreground">{displayName(member)}</p>
                   <Badge variant={member.joinedAt ? "positive" : "warning"}>
-                    {member.joinedAt ? "Active" : "Invitation pending"}
+                    {member.joinedAt ? copy.active : copy.invitationPending}
                   </Badge>
                 </div>
                 <p className="mt-0.5 truncate text-xs text-muted-foreground">{member.email}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {ROLE_DEFINITIONS[member.role].description}
+                  {roleCopy(member.role)[1]}
                 </p>
               </div>
 
               {member.role === "OWNER" ? (
-                <Badge variant="info">Owner</Badge>
+                <Badge variant="info">{copy.owner}</Badge>
               ) : (
                 <div className="flex items-center gap-2 sm:w-52">
                   <Select
@@ -130,18 +137,18 @@ export function TeamManager({ members, canManage }: TeamManagerProps) {
                     onValueChange={(value) => changeRole(member.id, value as AssignableRole)}
                     disabled={!canManage || pending}
                   >
-                    <SelectTrigger aria-label={`Role for ${displayName(member)}`}>
+                    <SelectTrigger aria-label={copy.roleFor.replace("{member}", displayName(member))}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {member.role === "VIEWER" ? (
                         <SelectItem value="VIEWER" disabled>
-                          Viewer (legacy)
+                          {copy.viewerLegacy}
                         </SelectItem>
                       ) : null}
                       {ASSIGNABLE_ROLES.map((value) => (
                         <SelectItem key={value} value={value}>
-                          {ROLE_DEFINITIONS[value].label}
+                          {roleCopy(value)[0]}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -153,7 +160,7 @@ export function TeamManager({ members, canManage }: TeamManagerProps) {
                       size="icon-sm"
                       disabled={pending}
                       onClick={() => remove(member)}
-                      aria-label={`Remove ${displayName(member)}`}
+                      aria-label={copy.removeMember.replace("{member}", displayName(member))}
                       className="text-muted-foreground hover:text-destructive"
                     >
                       <Trash2 />
@@ -171,16 +178,15 @@ export function TeamManager({ members, canManage }: TeamManagerProps) {
           <CardHeader>
             <div className="flex items-center gap-2">
               <FileSpreadsheet className="size-4 text-info" />
-              <CardTitle>Recommended for your accountant</CardTitle>
+              <CardTitle>{copy.accountantTitle}</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="space-y-3 text-xs leading-relaxed text-muted-foreground">
             <p>
-              Send the PDF/XLSX accountant package for periodic review or tax preparation. Invite
-              a Bookkeeper only when they need ongoing collaboration inside this company.
+              {copy.accountantDescription}
             </p>
             <Button asChild variant="outline" size="sm">
-              <Link href="/reports">Open reports and exports</Link>
+              <Link href="/reports">{copy.openReports}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -190,38 +196,37 @@ export function TeamManager({ members, canManage }: TeamManagerProps) {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <MailPlus className="size-4 text-primary" />
-                <CardTitle>Invite a member</CardTitle>
+                <CardTitle>{copy.inviteMember}</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
               <form className="space-y-3" onSubmit={invite}>
                 <div>
-                  <label htmlFor="member-name" className="mb-1 block text-xs font-medium">Name <span className="text-muted-foreground">(optional)</span></label>
+                  <label htmlFor="member-name" className="mb-1 block text-xs font-medium">{copy.name} <span className="text-muted-foreground">({copy.optional})</span></label>
                   <Input id="member-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={120} />
                 </div>
                 <div>
-                  <label htmlFor="member-email" className="mb-1 block text-xs font-medium">Email</label>
+                  <label htmlFor="member-email" className="mb-1 block text-xs font-medium">{copy.email}</label>
                   <Input id="member-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required maxLength={254} />
                 </div>
                 <div>
-                  <label htmlFor="member-role" className="mb-1 block text-xs font-medium">Role</label>
+                  <label htmlFor="member-role" className="mb-1 block text-xs font-medium">{copy.role}</label>
                   <Select value={role} onValueChange={(value) => setRole(value as AssignableRole)}>
                     <SelectTrigger id="member-role"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {ASSIGNABLE_ROLES.map((value) => (
-                        <SelectItem key={value} value={value}>{ROLE_DEFINITIONS[value].label}</SelectItem>
+                        <SelectItem key={value} value={value}>{roleCopy(value)[0]}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{ROLE_DEFINITIONS[role].description}</p>
+                  <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{roleCopy(role)[1]}</p>
                 </div>
                 <Button className="w-full" disabled={pending || !email.trim()}>
                   {pending ? <Loader2 className="animate-spin" /> : <MailPlus />}
-                  Send invitation
+                  {copy.sendInvitation}
                 </Button>
                 <p className="text-2xs leading-relaxed text-muted-foreground">
-                  This invitation is tied to this company. Drivers are added separately and do not
-                  receive app access.
+                  {copy.invitationScope}
                 </p>
               </form>
             </CardContent>
@@ -229,7 +234,7 @@ export function TeamManager({ members, canManage }: TeamManagerProps) {
         ) : (
           <Card>
             <CardContent className="p-4 text-sm leading-relaxed text-muted-foreground">
-              Only the workspace owner can invite people or change roles.
+              {copy.ownerInviteOnly}
             </CardContent>
           </Card>
         )}
@@ -241,17 +246,16 @@ export function TeamManager({ members, canManage }: TeamManagerProps) {
         ) : null}
 
         <Card>
-          <CardHeader><CardTitle>Role boundaries</CardTitle></CardHeader>
+          <CardHeader><CardTitle>{copy.roleBoundaries}</CardTitle></CardHeader>
           <CardContent className="space-y-3 text-xs leading-relaxed text-muted-foreground">
             {ASSIGNABLE_ROLES.map((value) => (
               <div key={value}>
-                <p className="font-semibold text-foreground">{ROLE_DEFINITIONS[value].label}</p>
-                <p>{ROLE_DEFINITIONS[value].description}</p>
+                <p className="font-semibold text-foreground">{roleCopy(value)[0]}</p>
+                <p>{roleCopy(value)[1]}</p>
               </div>
             ))}
             <p className="border-t border-border pt-3">
-              Billing, access management, reserves, Safe to Pay Yourself, Owner Settlement
-              close/reopen, account reset and account deletion always remain with the Owner.
+              {copy.ownerBoundary}
             </p>
           </CardContent>
         </Card>

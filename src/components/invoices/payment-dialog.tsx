@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Banknote, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+
 import { Field } from "@/components/shared/field";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +23,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { recordInvoicePaymentAction } from "@/lib/actions/invoices";
 import { formatMoney } from "@/lib/formatters";
+import { useLanguage } from "@/components/shell/language-provider";
+import { interpolate } from "@/lib/i18n/dictionaries";
 
 export function PaymentDialog({
   loadId,
@@ -34,6 +38,9 @@ export function PaymentDialog({
   canManage: boolean;
 }) {
   const router = useRouter();
+  const { dictionary } = useLanguage();
+  const copy = dictionary.invoices;
+  const common = dictionary.common;
   const [open, setOpen] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
   const [errors, setErrors] = React.useState<Record<string, string>>({});
@@ -58,10 +65,10 @@ export function PaymentDialog({
       });
       if (!result.ok) {
         setErrors(result.fieldErrors ?? {});
-        toast.error(result.error);
+        toast.error(localizedClientError(result.error));
         return;
       }
-      toast.success("Payment recorded");
+      toast.success(copy.paymentRecorded);
       setOpen(false);
       router.refresh();
     });
@@ -72,38 +79,37 @@ export function PaymentDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm" variant="outline">
-          <Banknote /> Record payment
+          <Banknote /> {copy.recordPayment}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <form onSubmit={submit} className="contents">
           <DialogHeader>
-            <DialogTitle>Record customer payment</DialogTitle>
+            <DialogTitle>{copy.recordCustomerPayment}</DialogTitle>
             <DialogDescription>
-              Remaining balance {formatMoney(balance)}. Partial payments remain in Accounts
-              Receivable until the balance reaches zero.
+              {interpolate(copy.remainingBalance, { amount: formatMoney(balance) })}
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="grid gap-4 sm:grid-cols-2">
-            <Field label="Payment date" htmlFor={`payment-date-${loadId}`} required error={errors.date}>
+            <Field label={copy.paymentDate} htmlFor={`payment-date-${loadId}`} required error={errors.date}>
               <Input id={`payment-date-${loadId}`} type="date" value={form.date} onChange={(event) => setForm((value) => ({ ...value, date: event.target.value }))} />
             </Field>
-            <Field label="Amount" htmlFor={`payment-amount-${loadId}`} required error={errors.amount}>
+            <Field label={copy.amount} htmlFor={`payment-amount-${loadId}`} required error={errors.amount}>
               <Input id={`payment-amount-${loadId}`} inputMode="decimal" value={form.amount} onChange={(event) => setForm((value) => ({ ...value, amount: event.target.value }))} />
             </Field>
-            <Field label="Method" htmlFor={`payment-method-${loadId}`}>
-              <Input id={`payment-method-${loadId}`} placeholder="ACH, check, factoring…" value={form.method} onChange={(event) => setForm((value) => ({ ...value, method: event.target.value }))} />
+            <Field label={copy.method} htmlFor={`payment-method-${loadId}`}>
+              <Input id={`payment-method-${loadId}`} placeholder={copy.methodPlaceholder} value={form.method} onChange={(event) => setForm((value) => ({ ...value, method: event.target.value }))} />
             </Field>
-            <Field label="Reference" htmlFor={`payment-reference-${loadId}`}>
+            <Field label={copy.reference} htmlFor={`payment-reference-${loadId}`}>
               <Input id={`payment-reference-${loadId}`} value={form.reference} onChange={(event) => setForm((value) => ({ ...value, reference: event.target.value }))} />
             </Field>
-            <Field label="Notes" htmlFor={`payment-notes-${loadId}`} className="sm:col-span-2">
+            <Field label={copy.notes} htmlFor={`payment-notes-${loadId}`} className="sm:col-span-2">
               <Textarea id={`payment-notes-${loadId}`} rows={3} value={form.notes} onChange={(event) => setForm((value) => ({ ...value, notes: event.target.value }))} />
             </Field>
           </DialogBody>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={pending}>{pending ? <Loader2 className="animate-spin" /> : null} Save payment</Button>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>{common.cancel}</Button>
+            <Button type="submit" disabled={pending}>{pending ? <Loader2 className="animate-spin" /> : null} {copy.savePayment}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

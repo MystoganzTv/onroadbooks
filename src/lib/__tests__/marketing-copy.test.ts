@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 
 import { LANDING_COPY } from "../marketing/copy";
 import { TRIAL_DAYS } from "../plans";
-import { APP_LOCALES, SHELL_COPY, appText, isAppLocale } from "../i18n";
+import { APP_LOCALES, SHELL_COPY, isAppLocale } from "../i18n";
 
 describe("landing trial promise", () => {
   it("uses the product trial duration in both languages", () => {
@@ -20,8 +20,6 @@ describe("landing trial promise", () => {
 describe("signed-in app language", () => {
   it("offers the same two explicit languages across the shell", () => {
     assert.deepEqual(APP_LOCALES.map((locale) => locale.id), ["en", "es"]);
-    assert.equal(appText("en", "Settings", "Configuración"), "Settings");
-    assert.equal(appText("es", "Settings", "Configuración"), "Configuración");
     assert.equal(SHELL_COPY.es.dashboard, "Resumen");
   });
 

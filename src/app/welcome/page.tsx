@@ -5,8 +5,13 @@ import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { planOf } from "@/lib/plans";
 import { primaryTruck } from "@/lib/fleet";
+import { getWebDictionary } from "@/lib/i18n/dictionaries";
+import { getAppLocale } from "@/lib/i18n-server";
 
-export const metadata: Metadata = { title: "Welcome" };
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getAppLocale();
+  return { title: getWebDictionary(locale).onboarding.metadataTitle };
+}
 
 /**
  * Post-signup setup.
@@ -21,7 +26,7 @@ export const metadata: Metadata = { title: "Welcome" };
 export const dynamic = "force-dynamic";
 
 export default async function WelcomePage() {
-  const session = await requireSession();
+  const [session, locale] = await Promise.all([requireSession(), getAppLocale()]);
   const { business, trucks, settings, goals, subscription } = await getRepository(
     session.businessId,
   ).getDataset();
@@ -34,6 +39,7 @@ export default async function WelcomePage() {
         settings={settings}
         goals={goals}
         planName={planOf(subscription).name}
+        locale={locale}
       />
     </div>
   );

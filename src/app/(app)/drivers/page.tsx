@@ -17,11 +17,18 @@ import { formatMoney, formatNumber } from "@/lib/formatters";
 import { hasFleetAccess } from "@/lib/plans";
 import { roleCan } from "@/lib/roles";
 import { Users } from "lucide-react";
+import { getAppLocale } from "@/lib/i18n-server";
+import { getWebDictionary } from "@/lib/i18n/dictionaries";
 
-export const metadata: Metadata = { title: "Drivers" };
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getAppLocale();
+  return { title: getWebDictionary(locale).drivers.metadataTitle };
+}
 
 export default async function DriversPage() {
-  const session = await requireSession();
+  const [session, locale] = await Promise.all([requireSession(), getAppLocale()]);
+  const copy = getWebDictionary(locale).drivers;
+  const common = getWebDictionary(locale).common;
   const dataset = await getRepository(session.businessId).getDataset();
   if (!hasFleetAccess(dataset.subscription)) redirect("/truck");
   const canManage = roleCan(session.role ?? "VIEWER", "manage_drivers");
@@ -39,50 +46,49 @@ export default async function DriversPage() {
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <PageHeader
-        title="Drivers"
-        description="Assign operational pay terms once, then attach each load to the person who ran it."
+        title={copy.title}
+        description={copy.description}
         actions={canManage ? <DriverFormDialog trucks={dataset.trucks} /> : null}
       />
       <div className="rounded-lg border border-info/30 bg-info-soft/40 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
         <span className="font-semibold text-foreground">
-          Adding a driver does not give them app access.
+          {copy.accessNoticeTitle}
         </span>{" "}
-        Drivers are operational records for load assignment and pay statements. App access is
-        managed separately under Settings → Access &amp; Roles.
+        {copy.accessNoticeBody}
       </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <MiniStat label="Active drivers" value={formatNumber(active.length)} />
-        <MiniStat label="Unsettled loads" value={formatNumber(unsettled.length)} />
-        <MiniStat label="Estimated unpaid" value={formatMoney(outstandingPay)} tone="warning" />
-        <MiniStat label="Statements paid" value={formatMoney(paid)} tone="positive" />
+        <MiniStat label={copy.activeDrivers} value={formatNumber(active.length)} />
+        <MiniStat label={copy.unsettledLoads} value={formatNumber(unsettled.length)} />
+        <MiniStat label={copy.estimatedUnpaid} value={formatMoney(outstandingPay)} tone="warning" />
+        <MiniStat label={copy.statementsPaid} value={formatMoney(paid)} tone="positive" />
       </div>
       <Card>
         <CardContent className="p-0">
           {dataset.drivers.length === 0 ? (
             <EmptyState
               icon={Users}
-              title="No drivers yet"
-              description="Add the first driver, choose a pay method, then assign loads to them. This does not create a sign-in."
+              title={copy.noDrivers}
+              description={copy.noDriversDescription}
               action={canManage ? <DriverFormDialog trucks={dataset.trucks} /> : undefined}
             />
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader><TableRow>
-                  <TableHead>Driver</TableHead><TableHead>Default unit</TableHead><TableHead>Pay agreement</TableHead>
-                  <TableHead className="text-right">Unsettled</TableHead><TableHead className="text-right">Estimated pay</TableHead>
-                  <TableHead>Status</TableHead>{canManage ? <TableHead className="text-right">Actions</TableHead> : null}
+                  <TableHead>{copy.driver}</TableHead><TableHead>{copy.defaultUnit}</TableHead><TableHead>{copy.payAgreement}</TableHead>
+                  <TableHead className="text-right">{copy.unsettled}</TableHead><TableHead className="text-right">{copy.estimatedPay}</TableHead>
+                  <TableHead>{copy.status}</TableHead>{canManage ? <TableHead className="text-right">{common.actions}</TableHead> : null}
                 </TableRow></TableHeader>
                 <TableBody>{dataset.drivers.map((driver) => {
                   const loads = unsettledLoadsForDriver(dataset.loads, dataset.driverSettlements, driver.id);
                   const due = loads.reduce((sum, load) => sum + calculateDriverPay(driver.payType, driver.payRate, load), 0);
                   return <TableRow key={driver.id}>
-                    <TableCell><Link href={`/drivers/${driver.id}`} className="font-medium text-primary hover:underline">{driver.name}</Link><p className="text-2xs text-muted-foreground">{driver.reference ?? "No internal reference"}</p></TableCell>
-                    <TableCell>{dataset.trucks.find((truck) => truck.id === driver.defaultTruckId)?.name ?? "Any unit"}</TableCell>
-                    <TableCell>{driverPayDescription(driver)}</TableCell>
+                    <TableCell><Link href={`/drivers/${driver.id}`} className="font-medium text-primary hover:underline">{driver.name}</Link><p className="text-2xs text-muted-foreground">{driver.reference ?? copy.noReference}</p></TableCell>
+                    <TableCell>{dataset.trucks.find((truck) => truck.id === driver.defaultTruckId)?.name ?? copy.anyUnit}</TableCell>
+                    <TableCell>{driverPayDescription(driver, locale)}</TableCell>
                     <TableCell className="text-right tnum">{loads.length}</TableCell>
                     <TableCell className="text-right tnum">{formatMoney(due)}</TableCell>
-                    <TableCell><Badge variant={driver.active ? "positive" : "default"}>{driver.active ? "Active" : "Inactive"}</Badge></TableCell>
+                    <TableCell><Badge variant={driver.active ? "positive" : "default"}>{driver.active ? common.active : common.inactive}</Badge></TableCell>
                     {canManage ? <TableCell><DriverRowActions driver={driver} trucks={dataset.trucks} /></TableCell> : null}
                   </TableRow>;
                 })}</TableBody>
@@ -92,7 +98,7 @@ export default async function DriversPage() {
         </CardContent>
       </Card>
       <p className="text-2xs text-muted-foreground">
-        OnRoad Books stores names, an optional internal code and pay terms only. It does not store SSNs, bank details or tax-withholding data and is not a payroll processor.
+        {copy.privacyNote}
       </p>
     </div>
   );

@@ -6,6 +6,9 @@ import { PieChart } from "lucide-react";
 import { categoryColor } from "@/lib/categories";
 import { formatMoney, formatPercent } from "@/lib/formatters";
 import type { CategoryTotal } from "@/lib/types";
+import { useLanguage } from "@/components/shell/language-provider";
+import { categoryLabel } from "@/lib/categories";
+import { interpolate } from "@/lib/i18n/dictionaries";
 
 interface CategoryBreakdownProps {
   categories: CategoryTotal[];
@@ -13,16 +16,18 @@ interface CategoryBreakdownProps {
 }
 
 export function CategoryBreakdown({ categories, total }: CategoryBreakdownProps) {
+  const { locale, dictionary } = useLanguage();
+  const copy = dictionary.expenses;
   if (categories.length === 0) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Category Breakdown</CardTitle>
+          <CardTitle>{copy.categoryBreakdown}</CardTitle>
         </CardHeader>
         <EmptyState
           icon={PieChart}
-          title="Nothing to break down yet"
-          description="Expense categories appear here once you record spend in this period."
+          title={copy.nothingToBreakDown}
+          description={copy.breakdownDescription}
           compact
         />
       </Card>
@@ -32,8 +37,10 @@ export function CategoryBreakdown({ categories, total }: CategoryBreakdownProps)
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Category Breakdown</CardTitle>
-        <span className="text-2xs text-muted-foreground">{categories.length} categories</span>
+        <CardTitle>{copy.categoryBreakdown}</CardTitle>
+        <span className="text-2xs text-muted-foreground">
+          {interpolate(copy.categoryCount, { count: categories.length, unit: categories.length === 1 ? copy.categoryUnit : copy.categoryUnits })}
+        </span>
       </CardHeader>
       <CardContent className="space-y-4 p-4">
         <div className="print:hidden">
@@ -53,7 +60,7 @@ export function CategoryBreakdown({ categories, total }: CategoryBreakdownProps)
                     style={{ background: categoryColor(category.category) }}
                     aria-hidden
                   />
-                  <span className="truncate">{category.label}</span>
+                  <span className="truncate">{categoryLabel(category.category, locale)}</span>
                 </span>
                 <span className="flex shrink-0 items-baseline gap-2 tnum">
                   <span className="text-muted-foreground">{formatPercent(category.share)}</span>

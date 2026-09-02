@@ -1,6 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import { Target, TrendingUp } from "lucide-react";
 
+import { useLanguage } from "@/components/shell/language-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   formatMoney,
@@ -10,6 +13,7 @@ import {
   formatRateValue,
 } from "@/lib/formatters";
 import type { GoalProgress, Projection } from "@/lib/finance/goals";
+import { interpolate } from "@/lib/i18n/dictionaries";
 import { cn } from "@/lib/utils";
 
 interface GoalProgressCardProps {
@@ -46,12 +50,31 @@ export function GoalProgressCard({
   periodLabel,
   className,
 }: GoalProgressCardProps) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.dashboard;
+  const goalLabel = (goal: GoalProgress) => {
+    if (goal.key === "revenue") return copy.youEarned;
+    if (goal.key === "profit") return copy.businessMade;
+    if (goal.key === "profitPerMile") return copy.profitPerMile;
+    if (goal.key === "deadhead") return copy.deadhead;
+    return copy.loads;
+  };
+  const goalNote = (goal: GoalProgress) => {
+    if (goal.prorated) {
+      const percent = goal.note.match(/\d+/)?.[0] ?? "0";
+      return interpolate(copy.monthlyTargetShare, { percent });
+    }
+    if (goal.key === "profitPerMile") return copy.targetRateAnyPeriod;
+    if (goal.key === "deadhead") return copy.ceilingAnyPeriod;
+    return copy.monthlyTarget;
+  };
+
   return (
     <Card className={className}>
       <CardHeader>
         <div className="flex items-center gap-2">
           <Target className="size-3.5 text-muted-foreground" />
-          <CardTitle>On Track?</CardTitle>
+          <CardTitle>{copy.onTrack}</CardTitle>
         </div>
         <span className="text-2xs text-muted-foreground">{periodLabel}</span>
       </CardHeader>
@@ -59,11 +82,11 @@ export function GoalProgressCard({
       <CardContent className="space-y-3.5 p-4">
         {goals.length === 0 ? (
           <p className="text-xs leading-relaxed text-muted-foreground">
-            No targets set yet.{" "}
+            {copy.noTargets}{" "}
             <Link href="/settings?section=business#goals" className="text-primary underline-offset-2 hover:underline">
-              Set a monthly revenue and profit target
+              {copy.setTargets}
             </Link>{" "}
-            and this becomes a pace tracker.
+            {copy.paceTracker}
           </p>
         ) : (
           <ul className="space-y-3">
@@ -73,7 +96,7 @@ export function GoalProgressCard({
               return (
                 <li key={goal.key}>
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-xs font-medium text-foreground">{goal.label}</span>
+                    <span className="text-xs font-medium text-foreground">{goalLabel(goal)}</span>
                     <span className="tnum text-xs text-muted-foreground">
                       <span className={cn("font-semibold", good ? "text-pos" : "text-foreground")}>
                         {display(goal, goal.current)}
@@ -92,7 +115,7 @@ export function GoalProgressCard({
                     />
                   </div>
                   <div className="mt-1 flex items-center justify-between gap-2">
-                    <span className="text-2xs text-muted-foreground">{goal.note}</span>
+                    <span className="text-2xs text-muted-foreground">{goalNote(goal)}</span>
                     <span
                       className={cn(
                         "tnum text-2xs font-medium",
@@ -101,8 +124,8 @@ export function GoalProgressCard({
                     >
                       {goal.lowerIsBetter
                         ? good
-                          ? "Under ceiling"
-                          : "Over ceiling"
+                          ? copy.underCeiling
+                          : copy.overCeiling
                         : `${Math.round(goal.pct)}%`}
                     </span>
                   </div>
@@ -117,17 +140,18 @@ export function GoalProgressCard({
             <div className="flex items-center gap-1.5">
               <TrendingUp className="size-3 text-muted-foreground" />
               <span className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Projection
+                {copy.projection}
               </span>
             </div>
             <p className="mt-1.5 tnum text-xl font-semibold tracking-tight text-foreground">
               {formatMoneyCompact(projection.projectedRevenue)}
             </p>
             <p className="mt-1 text-2xs leading-relaxed text-muted-foreground tnum">
-              {projection.workingDaysRemaining} working{" "}
-              {projection.workingDaysRemaining === 1 ? "day" : "days"} left at{" "}
-              {formatMoney(projection.revenuePerWorkingDay)} a day. Straight-line projection from
-              the pace so far, not money already earned.
+              {interpolate(copy.projectionExplanation, {
+                days: projection.workingDaysRemaining,
+                unit: projection.workingDaysRemaining === 1 ? copy.day : copy.days,
+                amount: formatMoney(projection.revenuePerWorkingDay),
+              })}
             </p>
           </div>
         ) : null}

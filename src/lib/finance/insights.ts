@@ -33,6 +33,9 @@ import type { LanePerformance } from "./lanes";
 import type { MaintenanceHealth } from "./maintenance-health";
 import type { OwnerPay } from "./owner-pay";
 import type { Projection } from "./goals";
+import type { AppLocale } from "../i18n";
+import { getWebDictionary, interpolate } from "../i18n/dictionaries";
+import { localeTag } from "../i18n-format";
 
 export interface RankedInsight extends Insight {
   /** Higher shows first. */
@@ -55,17 +58,16 @@ export interface InsightInput {
   maintenance: MaintenanceHealth;
   /** Owner-only planning language and reserve coverage. */
   includeOwnerPlanning?: boolean;
+  locale?: AppLocale;
 }
 
-const usd = (value: number, digits = 0) =>
-  new Intl.NumberFormat("en-US", {
+const usd = (value: number, digits = 0, locale: AppLocale = "en") =>
+  new Intl.NumberFormat(localeTag(locale), {
     style: "currency",
     currency: "USD",
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   }).format(Number.isFinite(value) ? value : 0);
-
-const rate = (value: number) => usd(value, 2);
 
 export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
   const {
@@ -83,7 +85,11 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
     lanes,
     maintenance,
     includeOwnerPlanning = true,
+    locale = "en",
   } = input;
+  const copy = getWebDictionary(locale).dashboard;
+  const money = (value: number, digits = 0) => usd(value, digits, locale);
+  const rate = (value: number) => money(value, 2);
 
   const out: RankedInsight[] = [];
   const comparable = previous.loadCount > 0;
@@ -94,7 +100,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
         id: "empty",
         tone: "neutral",
         priority: 100,
-        text: `No loads recorded for ${period.label}. Add a load to see how the truck performed.`,
+        text: interpolate(copy.insightEmpty, { period: period.label }),
       },
     ];
   }
@@ -107,7 +113,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
         id: "ppm-trend",
         tone: delta >= 0 ? "positive" : "negative",
         priority: 90,
-        text: `Profit per mile ${delta >= 0 ? "improved" : "declined"} ${Math.abs(delta).toFixed(1)}% versus ${previousLabel}, ${rate(previous.profitPerMile)} to ${rate(summary.profitPerMile)}.`,
+        text: interpolate(copy.insightProfitTrend, { direction: delta >= 0 ? copy.improved : copy.declined, percent: Math.abs(delta).toFixed(1), previous: previousLabel, from: rate(previous.profitPerMile), to: rate(summary.profitPerMile) }),
       });
     }
   }
@@ -120,7 +126,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
         id: "deadhead-trend",
         tone: change <= 0 ? "positive" : deadhead.elevated ? "warning" : "neutral",
         priority: 85,
-        text: `Deadhead ${change > 0 ? "increased" : "fell"} from ${previous.deadheadPct.toFixed(1)}% to ${summary.deadheadPct.toFixed(1)}% of total miles.`,
+        text: interpolate(copy.insightDeadheadTrend, { direction: change > 0 ? copy.increased : copy.fell, from: previous.deadheadPct.toFixed(1), to: summary.deadheadPct.toFixed(1) }),
       });
     }
   }
@@ -130,7 +136,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
       id: "deadhead-cost",
       tone: "warning",
       priority: 80,
-      text: `${Math.round(deadhead.deadheadMiles).toLocaleString()} empty miles at ${rate(deadhead.costPerMile)} actual operating cost per mile is about ${usd(deadhead.cost)} of running cost with no load revenue behind it.`,
+      text: interpolate(copy.insightDeadheadCost, { miles: Math.round(deadhead.deadheadMiles).toLocaleString(localeTag(locale)), rate: rate(deadhead.costPerMile), cost: money(deadhead.cost) }),
     });
   }
 
@@ -141,7 +147,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
       id: "fuel-share",
       tone: fuel.share > 35 ? "warning" : "neutral",
       priority: 60,
-      text: `Fuel was ${fuel.share.toFixed(1)}% of operating expenses this period, ${usd(fuel.amount)} of ${usd(summary.operatingExpenses)}.`,
+      text: interpolate(copy.insightFuelShare, { percent: fuel.share.toFixed(1), amount: money(fuel.amount), total: money(summary.operatingExpenses) }),
     });
   }
 
@@ -150,7 +156,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
       id: "cost-split",
       tone: "neutral",
       priority: 55,
-      text: `Actual operating cost is ${rate(costBasis.trueCostPerMile)} per mile: ${rate(costBasis.fixedCostPerMile)} fixed and ${rate(costBasis.variableCostPerMile)} variable. Debt service is tracked separately.`,
+      text: interpolate(copy.insightCostSplit, { total: rate(costBasis.trueCostPerMile), fixed: rate(costBasis.fixedCostPerMile), variable: rate(costBasis.variableCostPerMile) }),
     });
   }
 
@@ -161,14 +167,14 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
         id: "revenue-gap",
         tone: "neutral",
         priority: 88,
-        text: `You need ${usd(projection.revenueGap)} more revenue to reach the ${usd(projection.revenueTarget)} target for ${period.label}.`,
+        text: interpolate(copy.insightRevenueGap, { amount: money(projection.revenueGap), target: money(projection.revenueTarget), period: period.label }),
       });
     } else {
       out.push({
         id: "revenue-hit",
         tone: "positive",
         priority: 88,
-        text: `Revenue target for ${period.label} is met, ${usd(Math.abs(projection.revenueGap))} past ${usd(projection.revenueTarget)}.`,
+        text: interpolate(copy.insightRevenueHit, { period: period.label, amount: money(Math.abs(projection.revenueGap)), target: money(projection.revenueTarget) }),
       });
     }
   }
@@ -178,7 +184,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
       id: "projection",
       tone: projection.projectedRevenue >= projection.revenueTarget ? "positive" : "warning",
       priority: 86,
-      text: `${projection.workingDaysRemaining} working ${projection.workingDaysRemaining === 1 ? "day" : "days"} left at ${usd(projection.revenuePerWorkingDay)} a day projects ${usd(projection.projectedRevenue)} by period end. Projection, not booked revenue.`,
+      text: interpolate(copy.insightProjection, { days: projection.workingDaysRemaining, unit: projection.workingDaysRemaining === 1 ? copy.day : copy.days, daily: money(projection.revenuePerWorkingDay), projected: money(projection.projectedRevenue) }),
     });
   }
 
@@ -190,7 +196,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
       id: "top-broker",
       tone: "positive",
       priority: 70,
-      text: `${best.broker} is your most profitable broker per mile this period: ${rate(best.profitPerMile)} across ${best.loadCount} loads, ${usd(best.tripProfit)} of trip profit.`,
+      text: interpolate(copy.insightTopBroker, { broker: best.broker, rate: rate(best.profitPerMile), count: best.loadCount, profit: money(best.tripProfit) }),
     });
   }
   if (rankedBrokers.length >= 2) {
@@ -201,7 +207,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
         id: "weak-broker",
         tone: "warning",
         priority: 50,
-        text: `${weakest.broker} pays ${rate(best.profitPerMile - weakest.profitPerMile)} per mile less than ${best.broker} over ${weakest.loadCount} loads.`,
+        text: interpolate(copy.insightWeakBroker, { weakest: weakest.broker, difference: rate(best.profitPerMile - weakest.profitPerMile), best: best.broker, count: weakest.loadCount }),
       });
     }
   }
@@ -214,7 +220,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
       id: "lane-spread",
       tone: "neutral",
       priority: 45,
-      text: `${bestLane.label} returns ${rate(bestLane.profitPerMile)} a mile against ${rate(worstLane.profitPerMile)} on ${worstLane.label}.`,
+      text: interpolate(copy.insightLaneSpread, { best: bestLane.label, bestRate: rate(bestLane.profitPerMile), worstRate: rate(worstLane.profitPerMile), worst: worstLane.label }),
     });
   }
 
@@ -224,7 +230,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
       id: "maintenance-coverage",
       tone: maintenance.coverage >= 1 ? "positive" : "warning",
       priority: maintenance.coverage >= 1 ? 40 : 92,
-      text: `The maintenance reserve covers about ${maintenance.coverage.toFixed(1)}x the ${usd(maintenance.upcomingCost)} of service currently due.`,
+      text: interpolate(copy.insightMaintenanceCoverage, { coverage: maintenance.coverage.toFixed(1), amount: money(maintenance.upcomingCost) }),
     });
   }
   if (maintenance.overdueCount > 0) {
@@ -232,7 +238,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
       id: "maintenance-overdue",
       tone: "warning",
       priority: 95,
-      text: `${maintenance.overdueCount} maintenance ${maintenance.overdueCount === 1 ? "item is" : "items are"} past due on the truck.`,
+      text: interpolate(copy.insightMaintenanceOverdue, { count: maintenance.overdueCount, unit: maintenance.overdueCount === 1 ? copy.itemIs : copy.itemsAre }),
     });
   }
 
@@ -241,10 +247,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
       id: "take-home",
       tone: ownerPay.takeHomeRate >= 30 ? "positive" : "neutral",
       priority: 65,
-      text: `After debt payments and ${usd(ownerPay.reserveTotal)} of suggested set-asides, ${usd(ownerPay.safeToPay)} is available to you, or ${ownerPay.takeHomeRate.toFixed(1)}c of every collected dollar.`.replace(
-        "c of",
-        " cents of",
-      ),
+      text: interpolate(copy.insightTakeHome, { reserves: money(ownerPay.reserveTotal), available: money(ownerPay.safeToPay), cents: ownerPay.takeHomeRate.toFixed(1) }),
     });
   }
 
@@ -254,8 +257,8 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
       tone: "warning",
       priority: 62,
       text: includeOwnerPlanning
-        ? `${usd(summary.accountsReceivable)} of what you earned is still owed and cannot become available cash until collected.`
-        : `${usd(summary.accountsReceivable)} of what you earned is still owed and has not been collected.`,
+        ? interpolate(copy.insightOutstandingOwner, { amount: money(summary.accountsReceivable) })
+        : interpolate(copy.insightOutstanding, { amount: money(summary.accountsReceivable) }),
     });
   }
 
@@ -267,7 +270,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
         id: "repairs",
         tone: "warning",
         priority: 58,
-        text: `Repairs were ${usd(repairs.amount)}, ${share.toFixed(1)}% of spend, across ${repairs.count} ${repairs.count === 1 ? "entry" : "entries"}.`,
+        text: interpolate(copy.insightRepairs, { amount: money(repairs.amount), percent: share.toFixed(1), count: repairs.count, unit: repairs.count === 1 ? copy.entry : copy.entries }),
       });
     }
   }
@@ -279,7 +282,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
         id: "cpm-trend",
         tone: delta <= 0 ? "positive" : "warning",
         priority: 72,
-        text: `Cost per mile ${delta <= 0 ? "fell" : "rose"} ${Math.abs(delta).toFixed(1)}% versus ${previousLabel}, ${rate(previous.costPerMile)} to ${rate(summary.costPerMile)}.`,
+        text: interpolate(copy.insightCostTrend, { direction: delta <= 0 ? copy.fell : copy.rose, percent: Math.abs(delta).toFixed(1), previous: previousLabel, from: rate(previous.costPerMile), to: rate(summary.costPerMile) }),
       });
     }
   }

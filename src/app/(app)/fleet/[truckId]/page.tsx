@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth";
+import { categoryLabel } from "@/lib/categories";
 import {
   linkedFuelByLoad,
   categoryTotals,
@@ -39,6 +40,9 @@ import {
   formatPercent,
   formatRateValue,
 } from "@/lib/formatters";
+import { formatLocaleDate, formatLocalePeriod } from "@/lib/i18n-format";
+import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
+import { getAppLocale } from "@/lib/i18n-server";
 import { hasFleetAccess } from "@/lib/plans";
 import {
   periodFromSearchParams,
@@ -48,7 +52,10 @@ import {
 } from "@/lib/period-params";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Unit performance" };
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getAppLocale();
+  return { title: getWebDictionary(locale).fleet.unitMetadataTitle };
+}
 
 export default async function FleetUnitPage({
   params,
@@ -57,11 +64,13 @@ export default async function FleetUnitPage({
   params: Promise<{ truckId: string }>;
   searchParams: Promise<SearchParams>;
 }) {
-  const [{ truckId }, queryParams, session] = await Promise.all([
+  const [{ truckId }, queryParams, session, locale] = await Promise.all([
     params,
     searchParams,
     requireSession(),
+    getAppLocale(),
   ]);
+  const copy = getWebDictionary(locale).fleet;
   const dataset = await getRepository(session.businessId).getDataset();
   if (!hasFleetAccess(dataset.subscription)) redirect("/truck");
 
@@ -99,18 +108,20 @@ export default async function FleetUnitPage({
     .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))
     .slice(0, 8);
   const vehicle = [truck.year, truck.make, truck.model].filter(Boolean).join(" ");
+  const periodLong = formatLocalePeriod(period, locale);
+  const periodShort = formatLocalePeriod(period, locale, "short");
 
   return (
     <div className="report-doc space-y-4 p-4 lg:p-6 print:p-0">
       <div className="print:hidden">
         <HistoryBackButton
           fallbackHref={`/fleet?${periodQuery(period)}`}
-          label="Back"
+          label={copy.back}
           className="-ml-2 mb-3"
         />
         <PageHeader
           title={truck.name}
-          description={`${vehicle || "Vehicle details not added"} · ${period.label}`}
+          description={`${vehicle || copy.vehicleMissing} · ${periodLong}`}
           actions={<ExportMenu query={query} year={Number(period.month.slice(0, 4))} />}
         />
       </div>
@@ -121,40 +132,40 @@ export default async function FleetUnitPage({
 
       <div className="hidden border-b-2 border-foreground pb-3 print:block">
         <p className="text-2xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          OnRoad Books · Unit Contribution Statement
+          {copy.printStatement}
         </p>
         <div className="mt-1 flex items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold">{truck.name}</h1>
-            <p className="text-sm text-muted-foreground">{vehicle || "Vehicle details not added"}</p>
+            <p className="text-sm text-muted-foreground">{vehicle || copy.vehicleMissing}</p>
           </div>
-          <p className="text-right text-xs text-muted-foreground">{period.label}</p>
+          <p className="text-right text-xs text-muted-foreground">{periodLong}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 print:grid-cols-4">
         <MiniStat
-          label="Booked Revenue"
+          label={copy.bookedRevenue}
           value={formatMoneyCompact(summary.bookedRevenue)}
-          sub={`${summary.loadCount} ${summary.loadCount === 1 ? "load" : "loads"}`}
+          sub={`${summary.loadCount} ${summary.loadCount === 1 ? copy.load : copy.loads}`}
           tone="info"
         />
         <MiniStat
-          label="Unit costs"
+          label={copy.unitCosts}
           value={formatMoneyCompact(summary.operatingExpenses)}
-          sub="charged to this truck"
+          sub={copy.chargedToTruck}
           tone={summary.operatingExpenses > 0 ? "negative" : "neutral"}
         />
         <MiniStat
-          label="Contribution"
+          label={copy.contribution}
           value={formatMoneyCompact(summary.operatingProfit)}
-          sub={`${formatPercent(summary.netMargin)} margin`}
+          sub={interpolate(copy.margin, { percent: formatPercent(summary.netMargin) })}
           tone={summary.operatingProfit >= 0 ? "positive" : "negative"}
         />
         <MiniStat
-          label="Contribution / mile"
+          label={copy.contributionPerMile}
           value={formatRateValue(summary.profitPerMile)}
-          sub={`over ${formatMiles(summary.totalMiles)}`}
+          sub={interpolate(copy.overMiles, { miles: formatMiles(summary.totalMiles) })}
           tone={summary.profitPerMile >= 0 ? "positive" : "negative"}
         />
       </div>
@@ -163,42 +174,46 @@ export default async function FleetUnitPage({
         <Card className="print-keep xl:col-span-2">
           <CardHeader>
             <div>
-              <CardTitle>Unit Contribution Statement</CardTitle>
+              <CardTitle>{copy.unitStatement}</CardTitle>
               <p className="mt-1 text-2xs text-muted-foreground">
-                Booked Revenue less operating costs assigned to {truck.name}; Debt Service is separate.
+                {interpolate(copy.unitStatementDescription, { truck: truck.name })}
               </p>
             </div>
-            <span className="text-2xs text-muted-foreground">{period.shortLabel}</span>
+            <span className="text-2xs text-muted-foreground">{periodShort}</span>
           </CardHeader>
           <CardContent className="p-0">
-            <StatementLine label="Booked Revenue" value={summary.bookedRevenue} emphasis />
+            <StatementLine label={copy.bookedRevenue} value={summary.bookedRevenue} emphasis />
             <div className="border-y border-border bg-surface-sunken/35 px-4 py-2">
-              <p className="label-xs">Operating expenses</p>
+              <p className="label-xs">{copy.businessExpenses}</p>
             </div>
             {categories.length === 0 ? (
               <p className="px-4 py-4 text-sm text-muted-foreground">
-                No costs were charged to this unit in {period.label}.
+                {interpolate(copy.noUnitCosts, { period: periodLong })}
               </p>
             ) : (
               categories.map((category) => (
                 <StatementLine
                   key={category.category}
-                  label={category.label}
+                  label={categoryLabel(category.category, locale)}
                   value={-category.amount}
-                  note={category.behavior === "FIXED" ? "Fixed" : "Variable"}
+                  note={
+                    category.behavior === "FIXED"
+                      ? getWebDictionary(locale).common.fixed
+                      : getWebDictionary(locale).common.variable
+                  }
                 />
               ))
             )}
             <StatementLine
-              label="Total unit costs"
+              label={copy.totalUnitCosts}
               value={-summary.operatingExpenses}
               emphasis
             />
             <div className="flex items-baseline justify-between border-t-2 border-border bg-primary/5 px-4 py-3">
               <div>
-                <p className="font-semibold">Unit contribution</p>
+                <p className="font-semibold">{copy.unitContribution}</p>
                 <p className="mt-0.5 text-2xs text-muted-foreground">
-                  Booked Revenue minus operating costs caused by this truck
+                  {copy.unitContributionHint}
                 </p>
               </div>
               <p
@@ -215,26 +230,25 @@ export default async function FleetUnitPage({
 
         <Card className="print-keep">
           <CardHeader>
-            <CardTitle>Fleet context</CardTitle>
+            <CardTitle>{copy.fleetContext}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <ContextLine label="This unit's contribution" value={contribution.contribution} />
-            <ContextLine label="All units' contribution" value={fleet.contribution} />
-            <ContextLine label="Business overhead" value={-fleet.overhead} />
+            <ContextLine label={copy.thisUnitContribution} value={contribution.contribution} />
+            <ContextLine label={copy.allUnitsContribution} value={fleet.contribution} />
+            <ContextLine label={copy.businessOverhead} value={-fleet.overhead} />
             <div className="flex items-center justify-between border-t border-border pt-3 font-semibold">
-              <span>Company Operating Profit</span>
+              <span>{copy.companyProfit}</span>
               <span className={cn("tnum", fleet.operatingProfit >= 0 ? "text-pos" : "text-neg")}>
                 {formatMoney(fleet.operatingProfit)}
               </span>
             </div>
-            <ContextLine label="Debt Service (cash burden)" value={-contribution.debtService} />
+            <ContextLine label={copy.debtCashBurden} value={-contribution.debtService} />
             <p className="border-t border-border pt-3 text-2xs leading-relaxed text-muted-foreground">
-              Company overhead is shown here for reconciliation, but it is not assigned to this
-              truck. That keeps the unit result factual instead of inventing an allocation rule.
+              {copy.overheadExplanation}
             </p>
             <Button asChild variant="outline" size="sm" className="w-full print:hidden">
               <Link href={`/fleet?${periodQuery(period)}`}>
-                View fleet reconciliation
+                {copy.viewReconciliation}
                 <ExternalLink />
               </Link>
             </Button>
@@ -245,38 +259,40 @@ export default async function FleetUnitPage({
       <Card className="print-keep">
         <CardHeader>
           <div>
-            <CardTitle>Load drill-down</CardTitle>
+            <CardTitle>{copy.loadDrilldown}</CardTitle>
             <p className="mt-1 text-2xs text-muted-foreground">
-              Open a load to inspect its route, miles, rate and trip costs.
+              {copy.drilldownDescription}
             </p>
           </div>
           <Button asChild variant="ghost" size="sm" className="print:hidden">
-            <Link href={`/loads?${query}`}>All unit loads</Link>
+            <Link href={`/loads?${query}`}>{copy.allUnitLoads}</Link>
           </Button>
         </CardHeader>
         <CardContent className="p-0">
           {recentLoads.length === 0 ? (
             <p className="p-6 text-center text-sm text-muted-foreground">
-              No loads for {truck.name} in {period.label}.
+              {interpolate(copy.noUnitLoads, { truck: truck.name, period: periodLong })}
             </p>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Route</TableHead>
-                    <TableHead>Broker</TableHead>
-                    <TableHead className="text-right">Miles</TableHead>
-                    <TableHead className="text-right">Gross Rate</TableHead>
-                    <TableHead className="text-right">Contribution Profit</TableHead>
-                    <TableHead className="text-right print:hidden">Open</TableHead>
+                    <TableHead>{copy.date}</TableHead>
+                    <TableHead>{copy.route}</TableHead>
+                    <TableHead>{copy.broker}</TableHead>
+                    <TableHead className="text-right">{copy.miles}</TableHead>
+                    <TableHead className="text-right">{copy.grossRate}</TableHead>
+                    <TableHead className="text-right">{copy.contributionProfit}</TableHead>
+                    <TableHead className="text-right print:hidden">{copy.open}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {recentLoads.map((load) => (
                     <TableRow key={load.id}>
-                      <TableCell>{load.date}</TableCell>
+                      <TableCell>
+                        {formatLocaleDate(load.date, locale, { month: "short", day: "numeric" })}
+                      </TableCell>
                       <TableCell className="font-medium">
                         {load.originCity}, {load.originState} → {load.destinationCity},{" "}
                         {load.destinationState}
@@ -301,7 +317,7 @@ export default async function FleetUnitPage({
                           href={`/loads/${load.id}?${query}`}
                           className="text-xs font-medium text-primary hover:underline"
                         >
-                          Details
+                          {copy.details}
                         </Link>
                       </TableCell>
                     </TableRow>
@@ -315,16 +331,16 @@ export default async function FleetUnitPage({
 
       <div className="flex flex-wrap gap-2 print:hidden">
         <Button asChild variant="outline" size="sm">
-          <Link href={`/dashboard?${query}`}>Unit dashboard</Link>
+          <Link href={`/dashboard?${query}`}>{copy.unitDashboard}</Link>
         </Button>
         <Button asChild variant="outline" size="sm">
-          <Link href={`/expenses?${query}`}>Unit expenses</Link>
+          <Link href={`/expenses?${query}`}>{copy.unitExpenses}</Link>
         </Button>
         <Button asChild variant="outline" size="sm">
-          <Link href={`/fuel?${query}`}>Unit fuel</Link>
+          <Link href={`/fuel?${query}`}>{copy.unitFuel}</Link>
         </Button>
         <Button asChild variant="outline" size="sm">
-          <Link href={`/reports?${query}`}>Full unit report</Link>
+          <Link href={`/reports?${query}`}>{copy.fullUnitReport}</Link>
         </Button>
       </div>
     </div>

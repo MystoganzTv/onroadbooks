@@ -7,13 +7,17 @@ import { Loader2, XCircle } from "lucide-react";
 import { BrandLogo } from "@/components/shell/brand-logo";
 import { Button } from "@/components/ui/button";
 import { invitationSessionFromUrl } from "@/lib/invitation-session";
+import type { AppLocale } from "@/lib/i18n";
+import { getWebDictionary } from "@/lib/i18n/dictionaries";
+import { localizeError } from "@/lib/i18n/errors";
 
 type State = { kind: "working"; message: string } | { kind: "error"; message: string };
 
-export function InviteAcceptance() {
+export function InviteAcceptance({ locale }: { locale: AppLocale }) {
+  const copy = getWebDictionary(locale).auth;
   const [state, setState] = React.useState<State>({
     kind: "working",
-    message: "Verifying your invitation...",
+    message: copy.inviteVerifying,
   });
 
   React.useEffect(() => {
@@ -32,13 +36,13 @@ export function InviteAcceptance() {
           body: JSON.stringify(invitation.session),
         });
         const result = (await response.json().catch(() => null)) as { error?: string } | null;
-        if (!response.ok) throw new Error(result?.error ?? "The invitation could not be accepted.");
+        if (!response.ok) throw new Error(result?.error ? localizeError(result.error, locale) : copy.inviteFailed);
         window.location.replace("/dashboard?team=joined");
       } catch (error) {
         if (active) {
           setState({
             kind: "error",
-            message: error instanceof Error ? error.message : "The invitation could not be accepted.",
+            message: error instanceof Error ? localizeError(error.message, locale) : copy.inviteFailed,
           });
         }
       }
@@ -48,7 +52,7 @@ export function InviteAcceptance() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [copy.inviteFailed, locale]);
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-background p-4">
@@ -61,11 +65,11 @@ export function InviteAcceptance() {
             <XCircle className="size-6 text-neg" />
           )}
         </div>
-        <h1 className="mt-4 text-xl font-semibold">Join this OnRoad workspace</h1>
+        <h1 className="mt-4 text-xl font-semibold">{copy.joinWorkspace}</h1>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{state.message}</p>
         {state.kind === "error" ? (
           <Button asChild variant="outline" className="mt-5">
-            <Link href="/login">Return to sign in</Link>
+            <Link href="/login">{copy.returnSignIn}</Link>
           </Button>
         ) : null}
       </div>

@@ -1,14 +1,18 @@
+"use client";
+
 import { CalendarCheck } from "lucide-react";
 
-import { formatMiles, formatMoneyCompact, formatRateValue } from "@/lib/formatters";
+import { useLanguage } from "@/components/shell/language-provider";
+import { formatMiles, formatMoney, formatMoneyCompact, formatRateValue } from "@/lib/formatters";
 import type { DaySnapshot } from "@/lib/finance/goals";
+import { interpolate } from "@/lib/i18n/dictionaries";
 import { cn } from "@/lib/utils";
 
-const VERDICT: Record<DaySnapshot["verdict"], { label: string; chip: string }> = {
-  GOOD: { label: "Good day", chip: "border-pos/40 bg-pos-soft text-pos" },
-  ON_TRACK: { label: "On track", chip: "border-info/40 bg-info-soft text-info" },
-  BEHIND: { label: "Behind pace", chip: "border-warn/40 bg-warn-soft text-warn" },
-  NO_DATA: { label: "Nothing yet", chip: "border-border bg-surface-sunken text-muted-foreground" },
+const VERDICT: Record<DaySnapshot["verdict"], { chip: string }> = {
+  GOOD: { chip: "border-pos/40 bg-pos-soft text-pos" },
+  ON_TRACK: { chip: "border-info/40 bg-info-soft text-info" },
+  BEHIND: { chip: "border-warn/40 bg-warn-soft text-warn" },
+  NO_DATA: { chip: "border-border bg-surface-sunken text-muted-foreground" },
 };
 
 /**
@@ -19,7 +23,33 @@ const VERDICT: Record<DaySnapshot["verdict"], { label: string; chip: string }> =
  * the arithmetic does not support.
  */
 export function TodayCard({ day, className }: { day: DaySnapshot; className?: string }) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.dashboard;
   const verdict = VERDICT[day.verdict];
+  const verdictLabel = day.verdict === "GOOD"
+    ? copy.goodDay
+    : day.verdict === "ON_TRACK"
+      ? copy.onTrack
+      : day.verdict === "BEHIND"
+        ? copy.behindPace
+        : copy.nothingYet;
+  const statement = day.verdict === "NO_DATA"
+    ? copy.todayNothingRecorded
+    : day.target <= 0
+      ? interpolate(copy.todayProfitNoTarget, {
+          amount: formatMoney(Math.abs(day.profit)),
+          count: day.loadCount,
+          unit: day.loadCount === 1 ? copy.load : copy.loads,
+        })
+      : day.delta >= 0
+        ? interpolate(copy.aboveDailyTarget, {
+            amount: formatMoney(Math.abs(day.delta)),
+            target: formatMoney(Math.abs(day.target)),
+          })
+        : interpolate(copy.belowDailyTarget, {
+            amount: formatMoney(Math.abs(day.delta)),
+            target: formatMoney(Math.abs(day.target)),
+          });
 
   return (
     <div className={cn("overflow-hidden rounded-lg border border-border bg-card", className)}>
@@ -27,7 +57,7 @@ export function TodayCard({ day, className }: { day: DaySnapshot; className?: st
         <span className="flex items-center gap-2">
           <CalendarCheck className="size-3.5 text-muted-foreground" />
           <span className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            Today Operations
+            {copy.todayOperations}
           </span>
         </span>
         <span
@@ -36,24 +66,24 @@ export function TodayCard({ day, className }: { day: DaySnapshot; className?: st
             verdict.chip,
           )}
         >
-          {verdict.label}
+          {verdictLabel}
         </span>
       </div>
 
       <div className="grid grid-cols-3 gap-3 p-4 sm:grid-cols-5">
-        <Cell label="You earned" value={formatMoneyCompact(day.revenue)} />
-        <Cell label="Business expenses" value={formatMoneyCompact(day.expenses)} tone="text-neg" />
+        <Cell label={copy.youEarned} value={formatMoneyCompact(day.revenue)} />
+        <Cell label={copy.businessExpenses} value={formatMoneyCompact(day.expenses)} tone="text-neg" />
         <Cell
-          label="Your business made"
+          label={copy.businessMade}
           value={formatMoneyCompact(day.profit)}
           tone={day.profit >= 0 ? "text-pos" : "text-neg"}
         />
-        <Cell label="Miles" value={formatMiles(day.miles)} />
-        <Cell label="Profit / mi" value={`${formatRateValue(day.profitPerMile)}`} />
+        <Cell label={copy.miles} value={formatMiles(day.miles)} />
+        <Cell label={copy.profitPerMile} value={`${formatRateValue(day.profitPerMile)}`} />
       </div>
 
       <p className="border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
-        {day.statement}
+        {statement}
       </p>
     </div>
   );

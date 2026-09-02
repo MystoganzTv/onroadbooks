@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireSession } from "@/lib/auth";
 import { summarizePeriod } from "@/lib/calculations";
-import { categoryColor } from "@/lib/categories";
+import { categoryColor, categoryLabel } from "@/lib/categories";
 import { getRepository } from "@/lib/db";
 import { calculateTrueCostPerMile, trailingCostBasis } from "@/lib/finance/cost-per-mile";
 import {
@@ -27,8 +27,15 @@ import {
 import { todayISO } from "@/lib/periods";
 import type { CostLine } from "@/lib/finance/cost-per-mile";
 import { cn } from "@/lib/utils";
+import { getWebDictionary, interpolate, type WebDictionary } from "@/lib/i18n/dictionaries";
+import { getAppLocale } from "@/lib/i18n-server";
+import type { AppLocale } from "@/lib/i18n";
+import { formatLocalePeriod } from "@/lib/i18n-format";
 
-export const metadata: Metadata = { title: "Cost per Mile" };
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getAppLocale();
+  return { title: getWebDictionary(locale).analytics.costMetadata };
+}
 
 /**
  * Where every dollar of a mile goes.
@@ -43,8 +50,12 @@ export default async function CostPerMilePage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const params = await searchParams;
-  const session = await requireSession();
+  const [params, session, locale] = await Promise.all([
+    searchParams,
+    requireSession(),
+    getAppLocale(),
+  ]);
+  const copy = getWebDictionary(locale).analytics;
   const {
     trucks,
     loads: allLoads,
@@ -61,14 +72,20 @@ export default async function CostPerMilePage({
   const expenses = expensesForTruck(allExpenses, truckId);
 
   const summary = summarizePeriod(loads, expenses, period, settings, paymentEvents);
-  const cost = calculateTrueCostPerMile(loads, expenses, period, settings, period.label);
+  const cost = calculateTrueCostPerMile(
+    loads,
+    expenses,
+    period,
+    settings,
+    formatLocalePeriod(period, locale),
+  );
   const basis = trailingCostBasis(loads, expenses, settings, todayISO());
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <PageHeader
-        title="Actual Cost per Mile"
-        description="Actual operating expenses over actual miles, with Debt Service shown separately. Nothing prorated."
+        title={copy.actualCostTitle}
+        description={copy.actualCostDescription}
       />
       <AnalyticsTabs />
       <div className="flex flex-wrap items-center gap-2">
@@ -78,37 +95,37 @@ export default async function CostPerMilePage({
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <MiniStat
-          label="Fixed / Mile"
+          label={copy.fixedPerMile}
           value={cost.sufficient ? formatRateValue(cost.fixedCostPerMile) : "—"}
           sub={formatMoney(cost.fixedTotal)}
           tone="info"
         />
         <MiniStat
-          label="Variable / Mile"
+          label={copy.variablePerMile}
           value={cost.sufficient ? formatRateValue(cost.variableCostPerMile) : "—"}
           sub={formatMoney(cost.variableTotal)}
           tone="warning"
         />
         <MiniStat
-          label="Actual Cost / Mile"
+          label={copy.actualCostPerMile}
           value={cost.sufficient ? formatRateValue(cost.actualCostPerMile) : "—"}
           sub={formatMoney(cost.totalCost)}
           tone="negative"
         />
         <MiniStat
-          label="Debt Service / Mile"
+          label={copy.debtPerMile}
           value={cost.sufficient ? formatRateValue(cost.debtServicePerMile) : "—"}
           sub={formatMoney(cost.debtServiceTotal)}
           tone="warning"
         />
         <MiniStat
-          label="Revenue / Mile"
+          label={copy.revenuePerMile}
           value={formatRateValue(summary.revenuePerMile)}
-          sub="all miles"
+          sub={copy.allMiles}
           tone="info"
         />
         <MiniStat
-          label="Kept / Mile"
+          label={copy.keptPerMile}
           value={formatRateValue(summary.revenuePerMile - cost.actualCostPerMile)}
           sub={`${formatNumber(cost.totalMiles)} mi`}
           tone={summary.revenuePerMile - cost.actualCostPerMile >= 0 ? "positive" : "negative"}
@@ -118,20 +135,24 @@ export default async function CostPerMilePage({
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="min-w-0 space-y-4 xl:col-span-2">
           <CostBreakdownTable
-            title="Fixed costs"
-            description="Costs the truck carries whether or not it moves"
+            title={copy.fixedCosts}
+            description={copy.fixedDescription}
             lines={cost.fixed}
             totalMiles={cost.totalMiles}
             total={cost.fixedTotal}
             perMile={cost.fixedCostPerMile}
+            copy={copy}
+            locale={locale}
           />
           <CostBreakdownTable
-            title="Variable costs"
-            description="Costs that follow the miles"
+            title={copy.variableCosts}
+            description={copy.variableDescription}
             lines={cost.variable}
             totalMiles={cost.totalMiles}
             total={cost.variableTotal}
             perMile={cost.variableCostPerMile}
+            copy={copy}
+            locale={locale}
           />
         </div>
 
@@ -141,18 +162,14 @@ export default async function CostPerMilePage({
           <Card className="border-dashed">
             <CardContent className="space-y-2 p-4 text-2xs leading-relaxed text-muted-foreground">
               <p>
-                <span className="font-medium text-foreground">Why two numbers.</span> The period
-                figure is what this window actually cost to operate. Normalized Cost Per Mile is the stable number
-                the load calculator prices new work on, so one annual bill landing inside a
-                half-month does not make every quote wrong for two weeks.
+                <span className="font-medium text-foreground">{copy.whyTwo}</span>{" "}
+                {copy.whyTwoDescription}
               </p>
               <p>
-                Debt Service is a separate cash burden. It is excluded from Actual and Normalized
-                Cost Per Mile and never changes a load&apos;s profitability rating.
+                {copy.debtExplanation}
               </p>
               <p>
-                Fixed and variable follow your own classification. Change it under{" "}
-                <span className="text-foreground">Settings → Expense behaviour</span>.
+                {copy.classificationExplanation}
               </p>
             </CardContent>
           </Card>
@@ -169,6 +186,8 @@ function CostBreakdownTable({
   totalMiles,
   total,
   perMile,
+  copy,
+  locale,
 }: {
   title: string;
   description: string;
@@ -176,6 +195,8 @@ function CostBreakdownTable({
   totalMiles: number;
   total: number;
   perMile: number;
+  copy: WebDictionary["analytics"];
+  locale: AppLocale;
 }) {
   const max = lines.reduce((highest, line) => Math.max(highest, line.perMile), 0);
 
@@ -194,7 +215,7 @@ function CostBreakdownTable({
       <CardContent className="p-0">
         {lines.length === 0 || totalMiles === 0 ? (
           <p className="p-4 text-xs text-muted-foreground">
-            Nothing in this group for the selected period.
+            {copy.nothingInGroup}
           </p>
         ) : (
           <ul className="divide-y divide-border/70">
@@ -209,7 +230,7 @@ function CostBreakdownTable({
                     style={{ backgroundColor: categoryColor(line.category) }}
                     aria-hidden
                   />
-                  <span className="truncate text-xs text-foreground">{line.label}</span>
+                  <span className="truncate text-xs text-foreground">{categoryLabel(line.category, locale)}</span>
                 </span>
                 <span className="h-2 overflow-hidden rounded-full bg-surface-sunken">
                   <span
@@ -232,7 +253,9 @@ function CostBreakdownTable({
         )}
         {lines.length > 0 ? (
           <p className="border-t border-border px-4 py-2 text-2xs text-muted-foreground tnum">
-            {formatPercent(lines.reduce((sum, l) => sum + l.share, 0))} of every dollar spent
+            {interpolate(copy.shareSpent, {
+              percent: formatPercent(lines.reduce((sum, l) => sum + l.share, 0)),
+            })}
           </p>
         ) : null}
       </CardContent>

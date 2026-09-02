@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { Loader2, Save, X } from "lucide-react";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+import { useLanguage } from "@/components/shell/language-provider";
+
 import { Field } from "@/components/shared/field";
 import { fieldErrors, focusFirstError, validationMessage } from "@/lib/form";
 import { Button } from "@/components/ui/button";
@@ -78,6 +81,8 @@ export function TruckForm({
   onCancel?: () => void;
   onSaved?: () => void;
 }) {
+  const { dictionary, locale } = useLanguage();
+  const copy = dictionary.truck;
   const router = useRouter();
   const [values, setValues] = React.useState(() => initialState(truck));
   const [errors, setErrors] = React.useState<Record<string, string>>({});
@@ -130,7 +135,7 @@ export function TruckForm({
       payload.startingOdometer !== undefined &&
       payload.currentOdometer < payload.startingOdometer
     ) {
-      setErrors({ currentOdometer: "Current odometer cannot be below the starting reading" });
+      setErrors({ currentOdometer: copy.odometerBelow });
       return;
     }
 
@@ -138,12 +143,12 @@ export function TruckForm({
     startTransition(async () => {
       const result = await updateTruckAction(payload);
       if (result.ok) {
-        toast.success("Truck details saved");
+        toast.success(copy.detailsSaved);
         onSaved?.();
         router.refresh();
       } else {
         setErrors(result.fieldErrors ?? {});
-        toast.error(result.error);
+        toast.error(localizedClientError(result.error));
       }
     });
   }
@@ -167,11 +172,11 @@ export function TruckForm({
       className="rounded-lg border border-border bg-card text-card-foreground"
     >
         <CardHeader>
-          <CardTitle>Truck Details</CardTitle>
+          <CardTitle>{copy.details}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 p-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Field label="Truck name" htmlFor="truck-name" required error={errors.name} className="sm:col-span-2">
+            <Field label={copy.truckName} htmlFor="truck-name" required error={errors.name} className="sm:col-span-2">
               <Input
                 id="truck-name"
                 value={values.name}
@@ -180,7 +185,7 @@ export function TruckForm({
                 aria-invalid={Boolean(errors.name)}
               />
             </Field>
-            <Field label="Year" htmlFor="truck-year" error={errors.year}>
+            <Field label={copy.year} htmlFor="truck-year" error={errors.year}>
               <Input
                 id="truck-year"
                 type="number"
@@ -190,7 +195,7 @@ export function TruckForm({
                 onChange={(e) => set("year", e.target.value)}
               />
             </Field>
-            <Field label="Make" htmlFor="truck-make" error={errors.make}>
+            <Field label={copy.make} htmlFor="truck-make" error={errors.make}>
               <Input
                 id="truck-make"
                 maxLength={60}
@@ -200,7 +205,7 @@ export function TruckForm({
                 placeholder="Freightliner"
               />
             </Field>
-            <Field label="Model" htmlFor="truck-model" className="sm:col-span-2" error={errors.model}>
+            <Field label={copy.model} htmlFor="truck-model" className="sm:col-span-2" error={errors.model}>
               <Input
                 id="truck-model"
                 maxLength={80}
@@ -215,7 +220,7 @@ export function TruckForm({
                 id="truck-vin"
                 value={values.vin}
                 onChange={(e) => set("vin", e.target.value.toUpperCase())}
-                placeholder="Optional"
+                placeholder={copy.optional}
                 maxLength={24}
               />
             </Field>
@@ -223,14 +228,13 @@ export function TruckForm({
 
           <div className="space-y-3 rounded-lg border border-border bg-surface-sunken/40 p-3">
             <div>
-              <p className="text-xs font-semibold">IFTA qualification profile</p>
+              <p className="text-xs font-semibold">{copy.iftaQualification}</p>
               <p className="mt-0.5 text-2xs leading-relaxed text-muted-foreground">
-                These facts decide whether IFTA tools are relevant. Historical units remain
-                unknown until you confirm them.
+                {copy.iftaQualificationDescription}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Power-unit axles" htmlFor="truck-axles" error={errors.axleCount}>
+              <Field label={copy.powerAxles} htmlFor="truck-axles" error={errors.axleCount}>
                 <Input
                   id="truck-axles"
                   type="number"
@@ -243,7 +247,7 @@ export function TruckForm({
                 />
               </Field>
               <Field
-                label="Registered gross/combined weight"
+                label={copy.registeredWeight}
                 htmlFor="truck-registered-weight"
                 hint="lb"
                 error={errors.registeredGrossWeightLbs}
@@ -261,9 +265,9 @@ export function TruckForm({
               </Field>
             </div>
             <Field
-              label="Operating area"
+              label={copy.operatingArea}
               htmlFor="truck-ifta-jurisdictions"
-              hint="Will this unit operate in two or more IFTA states or Canadian provinces?"
+              hint={copy.operatingAreaHint}
             >
               <Select
                 value={values.operatesInMultipleIftaJurisdictions}
@@ -271,22 +275,22 @@ export function TruckForm({
               >
                 <SelectTrigger id="truck-ifta-jurisdictions"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="UNKNOWN">Not sure yet</SelectItem>
-                  <SelectItem value="YES">Two or more IFTA jurisdictions</SelectItem>
-                  <SelectItem value="NO">One jurisdiction only</SelectItem>
+                  <SelectItem value="UNKNOWN">{copy.unsure}</SelectItem>
+                  <SelectItem value="YES">{copy.multipleJurisdictions}</SelectItem>
+                  <SelectItem value="NO">{copy.oneJurisdiction}</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
             <p className="text-2xs leading-relaxed text-muted-foreground">
               <span className="font-semibold text-foreground">
-                {iftaApplicabilityLabel(iftaStatus)}.
+                {iftaApplicabilityLabel(iftaStatus, locale)}.
               </span>{" "}
-              Confirm exemptions and filing treatment with your base jurisdiction.
+              {copy.confirmBase}
             </p>
             <Field
-              label="Quarterly IFTA filing"
+              label={copy.quarterlyIfta}
               htmlFor="truck-ifta-reporting"
-              hint="This decision controls whether this truck's miles and fuel enter the fleet IFTA report."
+              hint={copy.quarterlyIftaHint}
             >
               <Select
                 value={values.iftaReportingEnabled}
@@ -294,16 +298,16 @@ export function TruckForm({
               >
                 <SelectTrigger id="truck-ifta-reporting"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="UNDECIDED">Decision needed</SelectItem>
-                  <SelectItem value="INCLUDED">Include this truck in IFTA filings</SelectItem>
-                  <SelectItem value="EXCLUDED">Do not include this truck</SelectItem>
+                  <SelectItem value="UNDECIDED">{copy.decisionNeeded}</SelectItem>
+                  <SelectItem value="INCLUDED">{copy.includeIfta}</SelectItem>
+                  <SelectItem value="EXCLUDED">{copy.excludeIfta}</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Field label="Purchase price" htmlFor="truck-price" error={errors.purchasePrice}>
+            <Field label={copy.purchasePrice} htmlFor="truck-price" error={errors.purchasePrice}>
               <Input
                 id="truck-price"
                 type="number"
@@ -313,7 +317,7 @@ export function TruckForm({
                 onChange={(e) => set("purchasePrice", e.target.value)}
               />
             </Field>
-            <Field label="Monthly payment" htmlFor="truck-payment" error={errors.monthlyPayment}>
+            <Field label={copy.monthlyPayment} htmlFor="truck-payment" error={errors.monthlyPayment}>
               <Input
                 id="truck-payment"
                 type="number"
@@ -323,7 +327,7 @@ export function TruckForm({
                 onChange={(e) => set("monthlyPayment", e.target.value)}
               />
             </Field>
-            <Field label="Monthly insurance" htmlFor="truck-insurance" error={errors.monthlyInsurance}>
+            <Field label={copy.monthlyInsurance} htmlFor="truck-insurance" error={errors.monthlyInsurance}>
               <Input
                 id="truck-insurance"
                 type="number"
@@ -337,10 +341,10 @@ export function TruckForm({
 
           <div className="grid grid-cols-2 gap-3">
             <Field
-              label="Starting odometer"
+              label={copy.startingOdometer}
               htmlFor="truck-start-odo"
               error={errors.startingOdometer}
-              hint="Reading when you took delivery"
+              hint={copy.startingHint}
             >
               <Input
                 id="truck-start-odo"
@@ -353,10 +357,10 @@ export function TruckForm({
               />
             </Field>
             <Field
-              label="Current odometer"
+              label={copy.currentOdometer}
               htmlFor="truck-current-odo"
               error={errors.currentOdometer}
-              hint="Updated automatically by fuel entries"
+              hint={copy.currentHint}
             >
               <Input
                 id="truck-current-odo"
@@ -374,12 +378,12 @@ export function TruckForm({
         {onCancel ? (
           <Button type="button" size="sm" variant="outline" disabled={pending} onClick={onCancel}>
             <X className="size-4" />
-            Cancel
+            {dictionary.common.cancel}
           </Button>
         ) : null}
         <Button type="submit" size="sm" disabled={pending}>
           {pending ? <Loader2 className="animate-spin" /> : <Save />}
-          Save truck
+          {copy.saveTruck}
         </Button>
       </CardFooter>
     </form>

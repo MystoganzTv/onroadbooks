@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+
 import { Field } from "@/components/shared/field";
+import { useLanguage } from "@/components/shell/language-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -31,17 +34,6 @@ import { truckSchema } from "@/lib/schemas";
 import { todayISO } from "@/lib/periods";
 import { toNumber, toRequiredNumber } from "@/lib/utils";
 
-const FIELD_LABELS: Record<string, string> = {
-  name: "Name",
-  year: "Year",
-  make: "Make",
-  model: "Model",
-  startingOdometer: "Starting odometer",
-  currentOdometer: "Current odometer",
-  axleCount: "Power-unit axles",
-  registeredGrossWeightLbs: "Registered gross/combined weight",
-};
-
 /** Adding a unit to the fleet. Refused server-side when the plan is full. */
 export function TruckDialog({
   canAdd,
@@ -51,6 +43,18 @@ export function TruckDialog({
   limitReason: string | null;
 }) {
   const router = useRouter();
+  const { dictionary } = useLanguage();
+  const copy = dictionary.fleet;
+  const fieldLabels: Record<string, string> = {
+    name: copy.name,
+    year: copy.year,
+    make: copy.make,
+    model: copy.model,
+    startingOdometer: copy.currentOdometer,
+    currentOdometer: copy.currentOdometer,
+    axleCount: copy.powerUnitAxles,
+    registeredGrossWeightLbs: copy.registeredWeight,
+  };
   const [open, setOpen] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
   const [errors, setErrors] = React.useState<Record<string, string>>({});
@@ -112,7 +116,7 @@ export function TruckDialog({
     if (!parsed.success) {
       const next = fieldErrors(parsed.error);
       setErrors(next);
-      toast.error(validationMessage(next, FIELD_LABELS));
+      toast.error(validationMessage(next, fieldLabels));
       requestAnimationFrame(() => focusFirstError("new-truck-form"));
       return;
     }
@@ -121,13 +125,13 @@ export function TruckDialog({
     startTransition(async () => {
       const result = await createTruckAction(payload);
       if (result.ok) {
-        toast.success(`${values.name} added to the fleet`);
+        toast.success(copy.truckAdded.replace("{truck}", values.name));
         setOpen(false);
         setValues((prev) => ({ ...prev, name: "", vin: "", odometer: "" }));
         router.refresh();
       } else {
         if (result.fieldErrors) setErrors(result.fieldErrors);
-        toast.error(result.error);
+        toast.error(localizedClientError(result.error));
       }
     });
   }
@@ -136,7 +140,7 @@ export function TruckDialog({
     return (
       <Button type="button" size="sm" variant="outline" disabled title={limitReason ?? undefined}>
         <Plus className="size-4" />
-        Add truck
+        {copy.addTruck}
       </Button>
     );
   }
@@ -146,21 +150,20 @@ export function TruckDialog({
       <DialogTrigger asChild>
         <Button type="button" size="sm">
           <Plus className="size-4" />
-          Add truck
+          {copy.addTruck}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg">
         <form id="new-truck-form" onSubmit={submit}>
           <DialogHeader>
-            <DialogTitle>Add a truck</DialogTitle>
+            <DialogTitle>{copy.addTruckTitle}</DialogTitle>
             <DialogDescription>
-              Its costs and revenue are tracked separately, so you can see which unit pays for
-              itself.
+              {copy.addTruckDescription}
             </DialogDescription>
           </DialogHeader>
 
           <DialogBody className="grid gap-3 sm:grid-cols-2">
-            <Field label="Name" htmlFor="new-truck-name" required error={errors.name}>
+            <Field label={copy.name} htmlFor="new-truck-name" required error={errors.name}>
               <Input
                 id="new-truck-name"
                 value={values.name}
@@ -171,7 +174,7 @@ export function TruckDialog({
               />
             </Field>
             <Field
-              label="Current odometer"
+              label={copy.currentOdometer}
               htmlFor="new-truck-odo"
               required
               error={errors.currentOdometer}
@@ -183,7 +186,7 @@ export function TruckDialog({
                 onChange={(e) => set("odometer", e.target.value)}
               />
             </Field>
-            <Field label="Year" htmlFor="new-truck-year" error={errors.year}>
+            <Field label={copy.year} htmlFor="new-truck-year" error={errors.year}>
               <Input
                 id="new-truck-year"
                 inputMode="numeric"
@@ -191,7 +194,7 @@ export function TruckDialog({
                 onChange={(e) => set("year", e.target.value)}
               />
             </Field>
-            <Field label="Make and model" htmlFor="new-truck-make">
+            <Field label={copy.makeModel} htmlFor="new-truck-make">
               <div className="flex gap-2">
                 <Input
                   id="new-truck-make"
@@ -200,14 +203,14 @@ export function TruckDialog({
                   placeholder="Freightliner"
                 />
                 <Input
-                  aria-label="Model"
+                  aria-label={copy.model}
                   value={values.model}
                   onChange={(e) => set("model", e.target.value)}
                   placeholder="M2 106"
                 />
               </div>
             </Field>
-            <Field label="Monthly payment" htmlFor="new-truck-payment">
+            <Field label={copy.monthlyPayment} htmlFor="new-truck-payment">
               <Input
                 id="new-truck-payment"
                 inputMode="decimal"
@@ -215,7 +218,7 @@ export function TruckDialog({
                 onChange={(e) => set("monthlyPayment", e.target.value)}
               />
             </Field>
-            <Field label="Monthly insurance" htmlFor="new-truck-ins">
+            <Field label={copy.monthlyInsurance} htmlFor="new-truck-ins">
               <Input
                 id="new-truck-ins"
                 inputMode="decimal"
@@ -223,7 +226,7 @@ export function TruckDialog({
                 onChange={(e) => set("monthlyInsurance", e.target.value)}
               />
             </Field>
-            <Field label="Power-unit axles" htmlFor="new-truck-axles" error={errors.axleCount}>
+            <Field label={copy.powerUnitAxles} htmlFor="new-truck-axles" error={errors.axleCount}>
               <Input
                 id="new-truck-axles"
                 inputMode="numeric"
@@ -233,7 +236,7 @@ export function TruckDialog({
               />
             </Field>
             <Field
-              label="Registered gross/combined weight"
+              label={copy.registeredWeight}
               htmlFor="new-truck-weight"
               hint="lb"
               error={errors.registeredGrossWeightLbs}
@@ -247,10 +250,10 @@ export function TruckDialog({
               />
             </Field>
             <Field
-              label="Operating area"
+              label={copy.operatingArea}
               htmlFor="new-truck-ifta-jurisdictions"
               className="sm:col-span-2"
-              hint="Will this unit operate in two or more IFTA jurisdictions?"
+              hint={copy.operatingAreaHint}
             >
               <Select
                 value={values.operatesInMultipleIftaJurisdictions}
@@ -258,17 +261,17 @@ export function TruckDialog({
               >
                 <SelectTrigger id="new-truck-ifta-jurisdictions"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="UNKNOWN">Not sure yet</SelectItem>
-                  <SelectItem value="YES">Two or more IFTA jurisdictions</SelectItem>
-                  <SelectItem value="NO">One jurisdiction only</SelectItem>
+                  <SelectItem value="UNKNOWN">{copy.notSure}</SelectItem>
+                  <SelectItem value="YES">{copy.multipleIfta}</SelectItem>
+                  <SelectItem value="NO">{copy.oneJurisdiction}</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
             <Field
-              label="Quarterly IFTA filing"
+              label={copy.quarterlyIfta}
               htmlFor="new-truck-ifta-reporting"
               className="sm:col-span-2"
-              hint="Choose per truck; this controls which miles and fuel enter the fleet report."
+              hint={copy.quarterlyIftaHint}
             >
               <Select
                 value={values.iftaReportingEnabled}
@@ -276,17 +279,17 @@ export function TruckDialog({
               >
                 <SelectTrigger id="new-truck-ifta-reporting"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="UNDECIDED">Decide after reviewing the profile</SelectItem>
-                  <SelectItem value="INCLUDED">Include this truck in IFTA filings</SelectItem>
-                  <SelectItem value="EXCLUDED">Do not include this truck</SelectItem>
+                  <SelectItem value="UNDECIDED">{copy.decideLater}</SelectItem>
+                  <SelectItem value="INCLUDED">{copy.includeIfta}</SelectItem>
+                  <SelectItem value="EXCLUDED">{copy.excludeIfta}</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
             <Field
-              label="In service since"
+              label={copy.inServiceSince}
               htmlFor="new-truck-acquired"
               className="sm:col-span-2"
-              hint="Used so reports know when it joined the fleet"
+              hint={copy.inServiceHint}
             >
               <Input
                 id="new-truck-acquired"
@@ -305,11 +308,11 @@ export function TruckDialog({
               onClick={() => setOpen(false)}
               disabled={pending}
             >
-              Cancel
+              {dictionary.common.cancel}
             </Button>
             <Button type="submit" size="sm" disabled={pending}>
               {pending ? <Loader2 className="animate-spin" /> : null}
-              Add truck
+              {copy.addTruck}
             </Button>
           </DialogFooter>
         </form>

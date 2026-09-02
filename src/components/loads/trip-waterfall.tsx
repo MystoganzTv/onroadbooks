@@ -1,9 +1,13 @@
+"use client";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLanguage } from "@/components/shell/language-provider";
 import { tripExpenseLines } from "@/lib/calculations";
 import { formatMiles, formatMoney, formatPercent, formatRateValue } from "@/lib/formatters";
 import type { Load, LoadMetrics } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { RatingVerdict } from "./rating-badge";
+import { interpolate } from "@/lib/i18n/dictionaries";
 
 /**
  * The trip cost waterfall: gross rate at the top, every cost taken off it in
@@ -24,6 +28,8 @@ export function TripWaterfall({
    */
   linkedFuelCost?: number;
 }) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.loads;
   const lines = tripExpenseLines(load, linkedFuelCost);
   const fuelFromFillUps = linkedFuelCost !== undefined;
   const scale = (value: number) =>
@@ -32,16 +38,16 @@ export function TripWaterfall({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Trip Cost Breakdown</CardTitle>
+        <CardTitle>{copy.tripCostBreakdown}</CardTitle>
         <span className="text-2xs text-muted-foreground">
-          {formatPercent(metrics.profitMargin)} margin
+          {interpolate(copy.margin, { percent: formatPercent(metrics.profitMargin) })}
         </span>
       </CardHeader>
 
       <CardContent className="space-y-4 p-4">
         <div>
           <Row
-            label="Gross Rate"
+            label={copy.grossRate}
             value={load.grossRate}
             width={100}
             barClass="bg-info"
@@ -53,7 +59,7 @@ export function TripWaterfall({
               <Row
                 key={line.key}
                 label={line.label}
-                hint={line.key === "fuel" && fuelFromFillUps ? "from linked fill-ups" : undefined}
+                hint={line.key === "fuel" && fuelFromFillUps ? copy.fromLinkedFillups : undefined}
                 value={-line.amount}
                 width={scale(line.amount)}
                 barClass="bg-neg"
@@ -65,7 +71,7 @@ export function TripWaterfall({
           <div className="my-2 border-t border-dashed border-border" />
 
           <Row
-            label="Direct Trip Costs"
+            label={copy.directTripCosts}
             value={-metrics.tripExpenses}
             width={scale(metrics.tripExpenses)}
             barClass="bg-neg"
@@ -74,7 +80,7 @@ export function TripWaterfall({
           <div className="my-2 border-t border-border" />
 
           <Row
-            label="Contribution Profit"
+            label={copy.contributionProfit}
             value={metrics.tripProfit}
             width={scale(metrics.tripProfit)}
             barClass={metrics.tripProfit >= 0 ? "bg-pos" : "bg-neg"}
@@ -83,13 +89,13 @@ export function TripWaterfall({
         </div>
 
         <div className="grid grid-cols-3 gap-3 rounded-md border border-border bg-surface-sunken px-3 py-2.5">
-          <Summary label="Total miles" value={formatMiles(metrics.totalMiles)} />
+          <Summary label={copy.totalMiles} value={formatMiles(metrics.totalMiles)} />
           <Summary
-            label="Contribution Profit / mile"
+            label={copy.contributionPerMile}
             value={`${formatRateValue(metrics.profitPerMile)}`}
             tone={metrics.profitPerMile >= 0 ? "pos" : "neg"}
           />
-          <Summary label="Contribution margin" value={formatPercent(metrics.profitMargin)} />
+          <Summary label={copy.contributionMargin} value={formatPercent(metrics.profitMargin)} />
         </div>
 
         <RatingVerdict rating={metrics.rating} profitPerMile={metrics.profitPerMile} />

@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+
 import { Field } from "@/components/shared/field";
+import { useLanguage } from "@/components/shell/language-provider";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -32,20 +35,6 @@ import { todayISO } from "@/lib/periods";
 import type { ReserveAccount, ReserveTransactionType } from "@/lib/types";
 import { toNumber } from "@/lib/utils";
 
-const FIELD_LABELS: Record<string, string> = {
-  accountId: "Bucket",
-  date: "Date",
-  type: "Movement",
-  amount: "Amount",
-  description: "Description",
-};
-
-const TYPES: { value: ReserveTransactionType; label: string; hint: string }[] = [
-  { value: "CONTRIBUTION", label: "Contribution", hint: "Money set aside into the bucket" },
-  { value: "WITHDRAWAL", label: "Withdrawal", hint: "Money taken out to pay for something" },
-  { value: "ADJUSTMENT", label: "Adjustment", hint: "A correction, either direction" },
-];
-
 /** Record a movement in a bucket by hand. Contributions also post automatically when a settlement closes. */
 export function ReserveTransactionDialog({
   accounts,
@@ -57,6 +46,20 @@ export function ReserveTransactionDialog({
   trigger?: React.ReactNode;
 }) {
   const router = useRouter();
+  const { dictionary } = useLanguage();
+  const copy = dictionary.reserves;
+  const fieldLabels: Record<string, string> = {
+    accountId: copy.bucket,
+    date: copy.date,
+    type: copy.movementType,
+    amount: copy.amount,
+    description: copy.movementDescription,
+  };
+  const types: { value: ReserveTransactionType; label: string; hint: string }[] = [
+    { value: "CONTRIBUTION", label: copy.contributionType, hint: copy.contributionTypeHint },
+    { value: "WITHDRAWAL", label: copy.withdrawalType, hint: copy.withdrawalTypeHint },
+    { value: "ADJUSTMENT", label: copy.adjustmentType, hint: copy.adjustmentTypeHint },
+  ];
   const [open, setOpen] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
   const [errors, setErrors] = React.useState<Record<string, string>>({});
@@ -94,7 +97,7 @@ export function ReserveTransactionDialog({
     if (!parsed.success) {
       const next = fieldErrors(parsed.error);
       setErrors(next);
-      toast.error(validationMessage(next, FIELD_LABELS));
+      toast.error(validationMessage(next, fieldLabels));
       requestAnimationFrame(() => focusFirstError("reserve-txn-form"));
       return;
     }
@@ -103,12 +106,12 @@ export function ReserveTransactionDialog({
     startTransition(async () => {
       const result = await createReserveTransactionAction(payload);
       if (result.ok) {
-        toast.success("Movement recorded");
+        toast.success(copy.movementRecorded);
         setOpen(false);
         router.refresh();
       } else {
         if (result.fieldErrors) setErrors(result.fieldErrors);
-        toast.error(result.error);
+        toast.error(localizedClientError(result.error));
       }
     });
   }
@@ -119,36 +122,40 @@ export function ReserveTransactionDialog({
         {trigger ?? (
           <Button size="sm">
             <Plus className="size-4" />
-            Record movement
+            {copy.recordMovement}
           </Button>
         )}
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <form id="reserve-txn-form" onSubmit={submit}>
           <DialogHeader>
-            <DialogTitle>Record a reserve movement</DialogTitle>
+            <DialogTitle>{copy.recordTitle}</DialogTitle>
             <DialogDescription>
-              These buckets are a planning ledger. Nothing here moves money in a bank account.
+              {copy.recordDescription}
             </DialogDescription>
           </DialogHeader>
 
           <DialogBody className="space-y-3">
-            <Field label="Bucket" htmlFor="txn-account" required error={errors.accountId}>
+            <Field label={copy.bucket} htmlFor="txn-account" required error={errors.accountId}>
               <Select value={accountId} onValueChange={setAccountId}>
                 <SelectTrigger id="txn-account">
-                  <SelectValue placeholder="Pick a bucket" />
+                  <SelectValue placeholder={copy.chooseBucket} />
                 </SelectTrigger>
                 <SelectContent>
                   {accounts.map((account) => (
                     <SelectItem key={account.id} value={account.id}>
-                      {account.name}
+                      {account.kind === "TAX"
+                        ? copy.taxReserve
+                        : account.kind === "MAINTENANCE"
+                          ? copy.maintenanceReserve
+                          : account.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </Field>
 
-            <Field label="Movement" htmlFor="txn-type" required error={errors.type}>
+            <Field label={copy.movementType} htmlFor="txn-type" required error={errors.type}>
               <Select
                 value={type}
                 onValueChange={(value) => setType(value as ReserveTransactionType)}
@@ -157,7 +164,7 @@ export function ReserveTransactionDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {TYPES.map((option) => (
+                  {types.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>
@@ -167,10 +174,10 @@ export function ReserveTransactionDialog({
             </Field>
 
             {type === "ADJUSTMENT" ? (
-              <div className="flex gap-2" role="group" aria-label="Adjustment direction">
+              <div className="flex gap-2" role="group" aria-label={copy.adjustmentDirection}>
                 {[
-                  { value: false, label: "Increase" },
-                  { value: true, label: "Decrease" },
+                  { value: false, label: copy.increase },
+                  { value: true, label: copy.decrease },
                 ].map((option) => (
                   <Button
                     key={String(option.value)}
@@ -187,7 +194,7 @@ export function ReserveTransactionDialog({
             ) : null}
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Date" htmlFor="txn-date" required error={errors.date}>
+              <Field label={copy.date} htmlFor="txn-date" required error={errors.date}>
                 <Input
                   id="txn-date"
                   type="date"
@@ -195,7 +202,7 @@ export function ReserveTransactionDialog({
                   onChange={(e) => setDate(e.target.value)}
                 />
               </Field>
-              <Field label="Amount" htmlFor="txn-amount" required error={errors.amount}>
+              <Field label={copy.amount} htmlFor="txn-amount" required error={errors.amount}>
                 <Input
                   id="txn-amount"
                   inputMode="decimal"
@@ -207,11 +214,11 @@ export function ReserveTransactionDialog({
             </div>
 
             <Field
-              label="Description"
+              label={copy.movementDescription}
               htmlFor="txn-description"
               required
               error={errors.description}
-              hint="What this covers, e.g. Oil change paid from reserve"
+              hint={copy.movementDescriptionHint}
             >
               <Input
                 id="txn-description"
@@ -230,11 +237,11 @@ export function ReserveTransactionDialog({
               onClick={() => setOpen(false)}
               disabled={pending}
             >
-              Cancel
+              {dictionary.common.cancel}
             </Button>
             <Button type="submit" size="sm" disabled={pending}>
               {pending ? <Loader2 className="animate-spin" /> : null}
-              Record movement
+              {copy.recordMovement}
             </Button>
           </DialogFooter>
         </form>

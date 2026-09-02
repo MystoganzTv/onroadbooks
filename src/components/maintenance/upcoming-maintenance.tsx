@@ -1,4 +1,8 @@
+"use client";
+
 import { CalendarClock, CircleAlert, CircleCheck, Clock, Wrench } from "lucide-react";
+import { useLanguage } from "@/components/shell/language-provider";
+import { interpolate } from "@/lib/i18n/dictionaries";
 
 import { EmptyState } from "@/components/shared/empty-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,6 +55,8 @@ export function UpcomingMaintenance({
   currentOdometer: number;
   thresholds: DueThresholds;
 }) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.maintenance;
   const overdue = items.filter((i) => i.status === "OVERDUE").length;
   const soon = items.filter((i) => i.status === "DUE_SOON").length;
 
@@ -59,15 +65,15 @@ export function UpcomingMaintenance({
       <CardHeader>
         <div className="flex items-center gap-2">
           <Wrench className="size-3.5 text-muted-foreground" />
-          <CardTitle>Upcoming Maintenance</CardTitle>
+          <CardTitle>{copy.upcoming}</CardTitle>
         </div>
         <span className="text-2xs text-muted-foreground tnum">
           {overdue > 0 ? (
-            <span className="text-neg">{overdue} overdue</span>
+            <span className="text-neg">{interpolate(copy.overdue, { count: overdue })}</span>
           ) : soon > 0 ? (
-            <span className="text-warn">{soon} approaching</span>
+            <span className="text-warn">{interpolate(copy.approaching, { count: soon })}</span>
           ) : (
-            <span className="text-pos">All clear</span>
+            <span className="text-pos">{copy.allClear}</span>
           )}
         </span>
       </CardHeader>
@@ -76,8 +82,8 @@ export function UpcomingMaintenance({
         {items.length === 0 ? (
           <EmptyState
             icon={Wrench}
-            title="Nothing scheduled"
-            description="Log a service with a next service date or odometer and it will be tracked here."
+            title={copy.nothingScheduled}
+            description={copy.scheduleDescription}
             compact
           />
         ) : (
@@ -101,7 +107,7 @@ export function UpcomingMaintenance({
                       style.chip,
                     )}
                   >
-                    {style.label}
+                    {item.status === "OK" ? copy.ok : item.status === "DUE_SOON" ? copy.approaching.replace("{count} ", "") : item.status === "OVERDUE" ? copy.overdue.replace("{count} ", "") : copy.unscheduled}
                   </span>
                 </li>
               );
@@ -111,7 +117,7 @@ export function UpcomingMaintenance({
       </CardContent>
 
       <div className="border-t border-border px-4 py-2 text-2xs text-muted-foreground tnum">
-        Approaching within {formatNumber(thresholds.warnMiles)} mi or {formatNumber(thresholds.warnDays)} days · odometer {formatNumber(currentOdometer)} mi.
+        {interpolate(copy.approachingRule, { miles: formatNumber(thresholds.warnMiles), days: formatNumber(thresholds.warnDays), odometer: formatNumber(currentOdometer) })}
       </div>
     </Card>
   );

@@ -4,6 +4,8 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Paperclip, Upload, X } from "lucide-react";
 import { toast } from "sonner";
+import { useLanguage } from "@/components/shell/language-provider";
+import { interpolate } from "@/lib/i18n/dictionaries";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -64,6 +66,8 @@ export function DocumentUploader({
   className,
   compact,
 }: DocumentUploaderProps) {
+  const { dictionary, locale } = useLanguage();
+  const copy = dictionary.documents;
   const router = useRouter();
   const options = DOCUMENT_TYPES_FOR[owner];
   const [type, setType] = React.useState<DocumentType>(options[0]);
@@ -82,21 +86,21 @@ export function DocumentUploader({
 
       for (const source of Array.from(files)) {
         if (source.size > MAX_DOCUMENT_SOURCE_BYTES) {
-          toast.error(`${source.name} is larger than ${Math.round(MAX_DOCUMENT_SOURCE_BYTES / 1024 / 1024)} MB.`);
+          toast.error(interpolate(copy.tooLarge, { name: source.name, size: Math.round(MAX_DOCUMENT_SOURCE_BYTES / 1024 / 1024) }));
           continue;
         }
         if (!isAcceptedType(source.type)) {
-          toast.error(`${source.name} is not an image or PDF.`);
+          toast.error(interpolate(copy.invalidType, { name: source.name }));
           continue;
         }
 
-        setProgress(source.type === "application/pdf" ? "Checking PDF..." : "Optimizing image...");
+        setProgress(source.type === "application/pdf" ? copy.checkingPdf : copy.optimizingImage);
         const file = await optimizeDocumentFile(source, (status) => {
-          setProgress(optimizationLabel(status));
+          setProgress(optimizationLabel(status, copy));
         });
         if (file.size > MAX_DOCUMENT_BYTES) {
           toast.error(
-            `${source.name} is still larger than ${Math.round(MAX_DOCUMENT_BYTES / 1024 / 1024)} MB after optimization.`,
+            interpolate(copy.stillTooLarge, { name: source.name, size: Math.round(MAX_DOCUMENT_BYTES / 1024 / 1024) }),
           );
           continue;
         }
@@ -114,14 +118,14 @@ export function DocumentUploader({
         return;
       }
 
-      setProgress("Uploading securely...");
+      setProgress(copy.uploading);
       await Promise.all(chosen.map((item) => uploadDocument(owner, entityId, item)))
         .then((results) => {
           const failures = results.filter((r) => !r.ok);
-          if (failures.length) toast.error(failures[0].error ?? "Upload failed.");
+          if (failures.length) toast.error(failures[0].error ?? copy.uploadFailed);
           const uploaded = results.length - failures.length;
           if (uploaded > 0) {
-            toast.success(`${uploaded} ${uploaded === 1 ? "document" : "documents"} attached`);
+            toast.success(interpolate(copy.attached, { count: uploaded, unit: uploaded === 1 ? copy.document : copy.documents }));
             router.refresh();
           }
         })
@@ -130,20 +134,20 @@ export function DocumentUploader({
           setProgress(null);
         });
     },
-    [entityId, onPendingChange, owner, router, staged, type],
+    [copy, entityId, onPendingChange, owner, router, staged, type],
   );
 
   return (
     <div className={cn("space-y-2", className)}>
       <div className="flex items-center gap-2">
         <Select value={type} onValueChange={(value) => setType(value as DocumentType)}>
-          <SelectTrigger className="w-[10.5rem]" aria-label="Document type">
+          <SelectTrigger className="w-[10.5rem]" aria-label={copy.documentType}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {options.map((option) => (
               <SelectItem key={option} value={option}>
-                {documentTypeLabel(option)}
+                {documentTypeLabel(option, locale)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -156,7 +160,7 @@ export function DocumentUploader({
           onClick={() => inputRef.current?.click()}
         >
           {busy ? <Loader2 className="animate-spin" /> : <Paperclip />}
-          {progress ?? "Attach file"}
+          {progress ?? copy.attachFile}
         </Button>
       </div>
 
@@ -180,8 +184,7 @@ export function DocumentUploader({
         )}
       >
         <Upload className="size-3.5" />
-        Drop an image or PDF here, or use Attach file. PDF scans are optimized automatically; max{" "}
-        {Math.round(MAX_DOCUMENT_BYTES / 1024 / 1024)} MB after optimization.
+        {interpolate(copy.dropZone, { size: Math.round(MAX_DOCUMENT_BYTES / 1024 / 1024) })}
       </div>
 
       {/* Driven entirely by the Attach file button; sr-only keeps it in the
@@ -213,11 +216,11 @@ export function DocumentUploader({
                 {formatBytes(item.file.size)}
               </span>
               <span className="shrink-0 text-muted-foreground">
-                {documentTypeLabel(item.type)}
+                {documentTypeLabel(item.type, locale)}
               </span>
               <button
                 type="button"
-                aria-label={`Remove ${item.file.name}`}
+                aria-label={interpolate(copy.remove, { name: item.file.name })}
                 className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-neg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 onClick={() =>
                   onPendingChange?.(staged.filter((_, i) => i !== index))
@@ -317,13 +320,13 @@ async function uploadDocument(
   }
 }
 
-function optimizationLabel(progress: DocumentOptimizationProgress): string {
+function optimizationLabel(progress: DocumentOptimizationProgress, copy: ReturnType<typeof useLanguage>["dictionary"]["documents"]): string {
   if (progress.stage === "page") {
-    return `Optimizing PDF ${progress.page ?? 0}/${progress.pages ?? 0}...`;
+    return interpolate(copy.optimizingPdf, { page: progress.page ?? 0, pages: progress.pages ?? 0 });
   }
-  if (progress.stage === "saving") return "Finishing PDF...";
-  if (progress.stage === "native-pdf") return "Keeping searchable PDF...";
-  return "Checking PDF...";
+  if (progress.stage === "saving") return copy.finishingPdf;
+  if (progress.stage === "native-pdf") return copy.keepingPdf;
+  return copy.checkingPdf;
 }
 
 export interface UploadOutcome {

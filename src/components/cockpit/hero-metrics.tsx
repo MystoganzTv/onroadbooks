@@ -1,3 +1,5 @@
+"use client";
+
 import {
   CircleDollarSign,
   TrendingDown,
@@ -13,7 +15,8 @@ import type {
 } from "@/lib/finance/presentation";
 import type { FinancialSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { appText, type AppLocale } from "@/lib/i18n";
+import { useLanguage } from "@/components/shell/language-provider";
+import { interpolate, type WebDictionary } from "@/lib/i18n/dictionaries";
 
 interface HeroMetricsProps {
   summary: FinancialSummary;
@@ -21,7 +24,6 @@ interface HeroMetricsProps {
   previousLabel: string;
   deltas: { revenue: number; profit: number; profitPerMile: number };
   showOwnerPlanning?: boolean;
-  locale?: AppLocale;
 }
 
 /** Profit and cash are peers, never one blended accounting conclusion. */
@@ -31,9 +33,9 @@ export function HeroMetrics({
   previousLabel,
   deltas,
   showOwnerPlanning = true,
-  locale = "en",
 }: HeroMetricsProps) {
-  const tx = (english: string, spanish: string) => appText(locale, english, spanish);
+  const { dictionary } = useLanguage();
+  const copy = dictionary.dashboard;
   const answers = presentation.answers;
   const profitable = summary.operatingProfit >= 0;
   const fundingGap = presentation.cashFundingGap.state === "KNOWN"
@@ -54,7 +56,7 @@ export function HeroMetrics({
           <div className="flex items-center gap-2">
             <CircleDollarSign className={cn("size-4", profitable ? "text-pos" : "text-neg")} />
             <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground">
-              {tx("Financial performance", "Rendimiento financiero")}
+              {copy.financialPerformance}
             </h2>
           </div>
           <span
@@ -66,13 +68,13 @@ export function HeroMetrics({
             )}
           >
             {profitable ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
-            {profitable ? tx("Profitable", "Rentable") : tx("Loss", "Pérdida")}
+            {profitable ? copy.profitable : copy.loss}
           </span>
         </header>
 
         <div className="px-5 py-6">
           <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-            {tx("Your business made", "Tu negocio produjo")}
+            {copy.businessMade}
           </p>
           <p
             className={cn(
@@ -88,9 +90,9 @@ export function HeroMetrics({
         </div>
 
         <dl className="grid gap-px border-t border-border/70 bg-border/70 sm:grid-cols-3">
-          <PerformanceFact label={tx("You earned", "Ganaste")} value={formatMoneyCompact(summary.bookedRevenue)} tone="info" />
-          <PerformanceFact label={tx("Business expenses", "Gastos del negocio")} value={`-${formatMoneyCompact(summary.operatingExpenses)}`} tone="negative" />
-          <PerformanceFact label={tx("Profit / mile", "Ganancia / milla")} value={formatRate(summary.profitPerMile)} tone={profitable ? "positive" : "negative"} />
+          <PerformanceFact label={copy.youEarned} value={formatMoneyCompact(summary.bookedRevenue)} tone="info" />
+          <PerformanceFact label={copy.businessExpenses} value={`-${formatMoneyCompact(summary.operatingExpenses)}`} tone="negative" />
+          <PerformanceFact label={copy.profitPerMile} value={formatRate(summary.profitPerMile)} tone={profitable ? "positive" : "negative"} />
         </dl>
       </section>
 
@@ -98,15 +100,15 @@ export function HeroMetrics({
         <header className="flex items-center gap-2 border-b border-border px-5 py-4">
           <WalletCards className="size-4 text-info" />
           <div>
-            <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground">{tx("Your cash", "Tu efectivo")}</h2>
-            <p className="mt-0.5 text-2xs text-muted-foreground">{tx("What came in and what had to go out", "Lo que entró y lo que tuvo que salir")}</p>
+            <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground">{copy.yourCash}</h2>
+            <p className="mt-0.5 text-2xs text-muted-foreground">{copy.cashDescription}</p>
           </div>
         </header>
 
         <dl className="divide-y divide-border/70 px-5">
-          <CashFact label={tx("Collected", "Cobrado")} value={answers.collected.value} tone="info" locale={locale} />
-          <CashFact label={tx("Business expenses", "Gastos del negocio")} value={answers.spent.value} tone="negative" negative locale={locale} />
-          <CashFact label={tx("Debt & financing payments", "Pagos de deuda y financiamiento")} value={answers.debtPayments.value} tone="negative" negative locale={locale} />
+          <CashFact label={copy.collectedLabel} value={answers.collected.value} tone="info" unknown={copy.notEnoughData} />
+          <CashFact label={copy.businessExpenses} value={answers.spent.value} tone="negative" negative unknown={copy.notEnoughData} />
+          <CashFact label={copy.debtPayments} value={answers.debtPayments.value} tone="negative" negative unknown={copy.notEnoughData} />
         </dl>
 
         {showOwnerPlanning ? (
@@ -114,19 +116,19 @@ export function HeroMetrics({
             <div className="flex items-end justify-between gap-4">
               <div>
                 <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  {tx("Available to you", "Disponible para ti")}
+                  {copy.availableToYou}
                 </p>
-                <p className="mt-1 text-2xs text-muted-foreground">{tx("How much can I take?", "¿Cuánto puedo retirar?")}</p>
+                <p className="mt-1 text-2xs text-muted-foreground">{copy.howMuchTake}</p>
               </div>
               <MoneyValueText
                 value={presentation.availableToYou}
                 className="text-4xl font-semibold leading-none tracking-[-0.045em] text-info"
-                locale={locale}
+                unknown={copy.notEnoughData}
               />
             </div>
             {fundingGap !== null && fundingGap > 0 ? (
               <p className="mt-3 border-t border-neg/20 pt-3 text-sm font-semibold text-neg tnum">
-                {tx("Cash still needed", "Efectivo que aún falta")}: {formatMoneyCompact(fundingGap)}
+                {copy.cashStillNeeded}: {formatMoneyCompact(fundingGap)}
               </p>
             ) : null}
           </div>
@@ -136,16 +138,16 @@ export function HeroMetrics({
           <div className="border-t border-border bg-surface-sunken/45 px-5 py-4">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                {tx("When cash is available", "Cuando haya efectivo disponible")}
+                {copy.whenCashAvailable}
               </p>
               <p className="text-xs font-semibold text-warn tnum">
-                {tx("Suggested set aside", "Reserva sugerida")}: {formatMoneyCompact(summary.reserveTotal)}
+                {copy.suggestedSetAside}: {formatMoneyCompact(summary.reserveTotal)}
               </p>
             </div>
             <dl className="mt-2 space-y-1.5">
               {summary.reserves.map((reserve) => (
                 <div key={reserve.accountId} className="flex items-baseline justify-between gap-3 text-2xs">
-                  <dt className="text-muted-foreground">{reserveLabel(reserve.kind, reserve.name, locale)}</dt>
+                  <dt className="text-muted-foreground">{reserveLabel(reserve.kind, reserve.name, copy)}</dt>
                   <dd className="font-medium text-foreground tnum">{formatMoneyCompact(reserve.amount)}</dd>
                 </div>
               ))}
@@ -180,13 +182,13 @@ function CashFact({
   value,
   tone,
   negative = false,
-  locale = "en",
+  unknown,
 }: {
   label: string;
   value: MoneyValue;
   tone: "info" | "negative";
   negative?: boolean;
-  locale?: AppLocale;
+  unknown: string;
 }) {
   const display = value.state === "KNOWN"
     ? `${negative && value.amount > 0 ? "-" : ""}${formatMoneyCompact(value.amount)}`
@@ -195,27 +197,25 @@ function CashFact({
     <div className="flex items-baseline justify-between gap-4 py-3">
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className={cn("text-base font-semibold tnum", tone === "negative" ? "text-neg" : "text-info")}>
-        {display ?? <span className="text-xs text-muted-foreground">{appText(locale, "Not enough data", "Datos insuficientes")}</span>}
+        {display ?? <span className="text-xs text-muted-foreground">{unknown}</span>}
       </dd>
     </div>
   );
 }
 
-function MoneyValueText({ value, className, locale = "en" }: { value: MoneyValue; className?: string; locale?: AppLocale }) {
+function MoneyValueText({ value, className, unknown }: { value: MoneyValue; className?: string; unknown: string }) {
   if (value.state === "UNKNOWN") {
     return (
       <p className={cn("text-sm text-muted-foreground", className)} title={value.reason}>
-        {appText(locale, "Not enough data", "Datos insuficientes")}
+        {unknown}
       </p>
     );
   }
   return <p className={cn("tnum", className)}>{formatMoneyCompact(value.amount)}</p>;
 }
 
-function reserveLabel(kind: string, name: string, locale: AppLocale): string {
-  if (kind === "TAX") return appText(locale, "Suggested tax set-aside", "Reserva sugerida para impuestos");
-  if (kind === "MAINTENANCE") return appText(locale, "Suggested maintenance set-aside", "Reserva sugerida para mantenimiento");
-  return locale === "es"
-    ? `Reserva sugerida para ${name.toLocaleLowerCase()}`
-    : `Suggested ${name.toLocaleLowerCase()} set-aside`;
+function reserveLabel(kind: string, name: string, copy: WebDictionary["dashboard"]): string {
+  if (kind === "TAX") return copy.taxSetAside;
+  if (kind === "MAINTENANCE") return copy.maintenanceSetAside;
+  return interpolate(copy.namedSetAside, { name: name.toLocaleLowerCase() });
 }

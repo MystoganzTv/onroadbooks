@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { Loader2, Plus, Settings2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { localizedClientError } from "@/lib/i18n/errors";
+import { useLanguage } from "@/components/shell/language-provider";
+import { interpolate } from "@/lib/i18n/dictionaries";
+
 import { saveIftaRatesAction } from "@/lib/actions/ifta";
 import { IFTA_JURISDICTIONS } from "@/lib/ifta";
 import { Button } from "@/components/ui/button";
@@ -20,6 +24,8 @@ export function IftaRateDialog({ quarter, initialRates, jurisdictions, canManage
   jurisdictions: string[];
   canManage: boolean;
 }) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.ifta;
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
@@ -37,30 +43,30 @@ export function IftaRateDialog({ quarter, initialRates, jurisdictions, canManage
     }
     startTransition(async () => {
       const result = await saveIftaRatesAction({ quarter, rates });
-      if (!result.ok) return void toast.error(result.error);
-      toast.success("IFTA rates saved");
+      if (!result.ok) return void toast.error(localizedClientError(result.error));
+      toast.success(copy.ratesSaved);
       setOpen(false);
       router.refresh();
     });
   }
 
   return <Dialog open={open} onOpenChange={(value) => { setOpen(value); if (value) setRows(makeRows()); }}>
-    <DialogTrigger asChild><Button size="sm" variant="outline" disabled={!canManage}><Settings2 /> Tax rates</Button></DialogTrigger>
+    <DialogTrigger asChild><Button size="sm" variant="outline" disabled={!canManage}><Settings2 /> {copy.taxRates}</Button></DialogTrigger>
     <DialogContent>
-      <DialogHeader><DialogTitle>{quarter} tax rates</DialogTitle><DialogDescription>Enter the official net fuel-tax rate per gallon for every jurisdiction used. Rates vary by quarter; verify them against your base jurisdiction&apos;s filing data.</DialogDescription></DialogHeader>
+      <DialogHeader><DialogTitle>{interpolate(copy.quarterRates, { quarter })}</DialogTitle><DialogDescription>{copy.rateDescription}</DialogDescription></DialogHeader>
       <DialogBody className="space-y-3">
-        {rows.length === 0 ? <p className="text-sm text-muted-foreground">Add the first jurisdiction for this quarter.</p> : null}
+        {rows.length === 0 ? <p className="text-sm text-muted-foreground">{copy.addFirstJurisdiction}</p> : null}
         {rows.map((row) => <div key={row.id} className="grid grid-cols-[1fr_1fr_auto] gap-2">
           <Select value={row.jurisdiction} onValueChange={(value) => setRows((current) => current.map((item) => item.id === row.id ? { ...item, jurisdiction: value } : item))}>
-            <SelectTrigger aria-label="IFTA jurisdiction"><SelectValue placeholder="State / province" /></SelectTrigger>
+            <SelectTrigger aria-label={copy.jurisdiction}><SelectValue placeholder={copy.stateProvince} /></SelectTrigger>
             <SelectContent>{IFTA_JURISDICTIONS.map((code) => <SelectItem key={code} value={code}>{code}</SelectItem>)}</SelectContent>
           </Select>
-          <Input aria-label={`Tax rate for ${row.jurisdiction || "jurisdiction"}`} type="number" min="0" max="5" step="0.0001" value={row.rate} placeholder="$ per gallon" onChange={(event) => setRows((current) => current.map((item) => item.id === row.id ? { ...item, rate: event.target.value } : item))} />
-          <Button type="button" size="icon" variant="ghost" aria-label="Remove rate" onClick={() => setRows((current) => current.filter((item) => item.id !== row.id))}><Trash2 /></Button>
+          <Input aria-label={interpolate(copy.taxRateFor, { jurisdiction: row.jurisdiction || copy.jurisdiction })} type="number" min="0" max="5" step="0.0001" value={row.rate} placeholder={copy.perGallon} onChange={(event) => setRows((current) => current.map((item) => item.id === row.id ? { ...item, rate: event.target.value } : item))} />
+          <Button type="button" size="icon" variant="ghost" aria-label={copy.removeRate} onClick={() => setRows((current) => current.filter((item) => item.id !== row.id))}><Trash2 /></Button>
         </div>)}
-        <Button type="button" size="sm" variant="outline" onClick={() => setRows((current) => [...current, { id: `new-${Date.now()}`, jurisdiction: "", rate: "" }])}><Plus /> Add jurisdiction</Button>
+        <Button type="button" size="sm" variant="outline" onClick={() => setRows((current) => [...current, { id: `new-${Date.now()}`, jurisdiction: "", rate: "" }])}><Plus /> {copy.addJurisdiction}</Button>
       </DialogBody>
-      <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button onClick={save} disabled={pending}>{pending ? <Loader2 className="animate-spin" /> : null} Save rates</Button></DialogFooter>
+      <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>{dictionary.common.cancel}</Button><Button onClick={save} disabled={pending}>{pending ? <Loader2 className="animate-spin" /> : null} {copy.saveRates}</Button></DialogFooter>
     </DialogContent>
   </Dialog>;
 }

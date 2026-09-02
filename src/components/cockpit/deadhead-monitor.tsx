@@ -1,8 +1,12 @@
+"use client";
+
 import { Route } from "lucide-react";
 
+import { useLanguage } from "@/components/shell/language-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney, formatNumber, formatPercent, formatRateValue } from "@/lib/formatters";
 import type { DeadheadReport } from "@/lib/finance/deadhead";
+import { interpolate } from "@/lib/i18n/dictionaries";
 import { cn } from "@/lib/utils";
 
 /**
@@ -20,6 +24,8 @@ export function DeadheadMonitor({
   report: DeadheadReport;
   className?: string;
 }) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.dashboard;
   const loadedShare = report.totalMiles > 0 ? (report.loadedMiles / report.totalMiles) * 100 : 0;
 
   return (
@@ -27,7 +33,7 @@ export function DeadheadMonitor({
       <CardHeader>
         <div className="flex items-center gap-2">
           <Route className="size-3.5 text-muted-foreground" />
-          <CardTitle>Deadhead</CardTitle>
+          <CardTitle>{copy.deadhead}</CardTitle>
         </div>
         <span
           className={cn(
@@ -37,7 +43,10 @@ export function DeadheadMonitor({
               : "border-pos/40 bg-pos-soft text-pos",
           )}
         >
-          {formatPercent(report.deadheadPct)} / {formatPercent(report.warnPct, 0)} warn
+          {interpolate(copy.warningThreshold, {
+            actual: formatPercent(report.deadheadPct),
+            threshold: formatPercent(report.warnPct, 0),
+          })}
         </span>
       </CardHeader>
 
@@ -48,40 +57,46 @@ export function DeadheadMonitor({
             <span className="h-full bg-warn" style={{ width: `${100 - loadedShare}%` }} />
           </div>
           <div className="mt-2 grid grid-cols-3 gap-2">
-            <Stat label="Loaded" value={`${formatNumber(report.loadedMiles)} mi`} tone="text-info" />
+            <Stat label={copy.loaded} value={`${formatNumber(report.loadedMiles)} mi`} tone="text-info" />
             <Stat
-              label="Deadhead"
+              label={copy.deadhead}
               value={`${formatNumber(report.deadheadMiles)} mi`}
               tone="text-warn"
             />
-            <Stat label="Total" value={`${formatNumber(report.totalMiles)} mi`} />
+            <Stat label={copy.total} value={`${formatNumber(report.totalMiles)} mi`} />
           </div>
         </div>
 
         <div className="rounded-md border border-border bg-surface-sunken/60 p-3">
           <div className="flex items-baseline justify-between gap-3">
             <span className="text-2xs uppercase tracking-wide text-muted-foreground">
-              Estimated deadhead cost
+              {copy.estimatedDeadheadCost}
             </span>
             <span className="tnum text-xl font-semibold tracking-tight text-warn">
               {formatMoney(report.cost)}
             </span>
           </div>
           <p className="mt-1 text-2xs text-muted-foreground tnum">
-            {formatNumber(report.deadheadMiles)} mi x {formatRateValue(report.costPerMile)} true
-            cost per mile
+            {interpolate(copy.trueCostFormula, {
+              miles: formatNumber(report.deadheadMiles),
+              rate: formatRateValue(report.costPerMile),
+            })}
           </p>
         </div>
 
-        <p className="text-xs leading-relaxed text-muted-foreground">{report.statement}</p>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          {report.deadheadMiles > 0
+            ? interpolate(copy.deadheadMilesStatement, { miles: formatNumber(report.deadheadMiles) })
+            : copy.allMilesLoaded}
+        </p>
 
         <dl className="grid grid-cols-2 gap-3 border-t border-border pt-3">
           <Pair
-            label="Revenue those miles could have earned"
+            label={copy.opportunityRevenue}
             value={formatMoney(report.opportunityRevenue)}
           />
           <Pair
-            label="Rate dilution"
+            label={copy.rateDilution}
             value={`${formatRateValue(report.rateDilution)}/mi`}
           />
         </dl>
@@ -89,8 +104,13 @@ export function DeadheadMonitor({
         {report.goalPct !== null ? (
           <p className="text-2xs text-muted-foreground">
             {report.deadheadPct <= report.goalPct
-              ? `Inside your ${formatPercent(report.goalPct, 0)} deadhead ceiling.`
-              : `${formatNumber(report.milesToGoal)} fewer empty miles would bring this to your ${formatPercent(report.goalPct, 0)} ceiling.`}
+              ? interpolate(copy.insideDeadheadCeiling, {
+                  percent: formatPercent(report.goalPct, 0),
+                })
+              : interpolate(copy.milesToDeadheadGoal, {
+                  miles: formatNumber(report.milesToGoal),
+                  percent: formatPercent(report.goalPct, 0),
+                })}
           </p>
         ) : null}
       </CardContent>

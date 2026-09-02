@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { useLanguage } from "@/components/shell/language-provider";
 import { statusLabel } from "@/lib/categories";
 import type { PaymentStatus } from "@/lib/types";
 
@@ -9,5 +10,6 @@ const VARIANT: Record<PaymentStatus, "warning" | "info" | "positive"> = {
 };
 
 export function StatusBadge({ status }: { status: PaymentStatus }) {
-  return <Badge variant={VARIANT[status]}>{statusLabel(status)}</Badge>;
+  const { locale } = useLanguage();
+  return <Badge variant={VARIANT[status]}>{statusLabel(status, locale)}</Badge>;
 }
