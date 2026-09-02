@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Landmark } from "lucide-react";
+import { Building2, Landmark, Truck as TruckIcon } from "lucide-react";
 
 import { ReserveAccountDialog } from "@/components/reserves/reserve-account-dialog";
 import {
@@ -15,7 +15,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireSession } from "@/lib/auth";
 import { summarizePeriod } from "@/lib/calculations";
 import { getRepository } from "@/lib/db";
-import { calculateReserveBalances, totalReserved } from "@/lib/finance/reserves";
+import { orderedTrucks } from "@/lib/fleet";
+import {
+  calculateReserveBalances,
+  calculateTruckMaintenanceReserves,
+  totalReserved,
+} from "@/lib/finance/reserves";
 import { calculateSafeOwnerPay, resolveReserveRules } from "@/lib/finance/owner-pay";
 import {
   formatDateShort,
@@ -56,8 +61,16 @@ export default async function ReservesPage({
       </div>
     );
   }
-  const { loads, expenses, settings, reserveAccounts, reserveTransactions, subscription, paymentEvents } =
-    await getRepository(session.businessId).getDataset();
+  const {
+    loads,
+    expenses,
+    settings,
+    reserveAccounts,
+    reserveTransactions,
+    subscription,
+    paymentEvents,
+    trucks,
+  } = await getRepository(session.businessId).getDataset();
 
   if (!planAllows(subscription, "cockpit")) {
     return (
@@ -81,6 +94,16 @@ export default async function ReservesPage({
     summarizePeriod(loads, expenses, period, settings, paymentEvents),
     rules,
   );
+  const maintenanceRule = rules.find((rule) => rule.kind === "MAINTENANCE");
+  const maintenanceByTruck =
+    maintenanceRule?.basis === "GROSS_REVENUE"
+      ? calculateTruckMaintenanceReserves(
+          orderedTrucks(trucks),
+          loads,
+          period,
+          maintenanceRule.pct,
+        )
+      : [];
   const total = totalReserved(balances);
   const periodIn = balances.reduce((sum, b) => sum + b.periodContributions, 0);
   const periodOut = balances.reduce((sum, b) => sum + b.periodWithdrawals, 0);
@@ -88,8 +111,8 @@ export default async function ReservesPage({
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <PageHeader
-        title="Reserve Buckets"
-        description="Virtual buckets for tax, maintenance and anything else you set aside. Planning ledgers, not bank accounts."
+        title="Company Reserves · Whole Fleet"
+        description="Company-level planning buckets. Tax stays consolidated; maintenance is explained by truck below. These are planning ledgers, not bank accounts."
         actions={
           <>
             <ReserveAccountDialog />
@@ -100,24 +123,45 @@ export default async function ReservesPage({
 
       <PeriodControls period={period} />
 
+      <div className="flex flex-wrap items-center justify-between gap-3 border-y border-border py-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-info-subtle text-info">
+            <Building2 className="size-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">Company reserve ledger</p>
+            <p className="text-2xs text-muted-foreground">
+              One consolidated balance across every reserve bucket
+            </p>
+          </div>
+        </div>
+        <span className="rounded-full border border-info/30 bg-info-subtle px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-info">
+          Whole fleet · {trucks.filter((truck) => truck.active).length} active trucks
+        </span>
+      </div>
+
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <MiniStat label="Total reserved" value={formatMoneyCompact(total)} sub="all buckets" />
         <MiniStat
-          label="Suggested"
+          label="Company balance"
+          value={formatMoneyCompact(total)}
+          sub="all reserve buckets"
+        />
+        <MiniStat
+          label="Suggested set-aside"
           value={formatMoneyCompact(ownerPay.reserveTotal)}
-          sub={period.shortLabel}
+          sub={`whole fleet · ${period.shortLabel}`}
           tone="warning"
         />
         <MiniStat
           label="Added"
           value={formatMoneyCompact(periodIn)}
-          sub={period.shortLabel}
+          sub={`company · ${period.shortLabel}`}
           tone="positive"
         />
         <MiniStat
           label="Taken out"
           value={formatMoneyCompact(periodOut)}
-          sub={period.shortLabel}
+          sub={`company · ${period.shortLabel}`}
           tone="warning"
         />
         <MiniStat
@@ -143,6 +187,9 @@ export default async function ReservesPage({
                   <div className="flex items-center gap-2">
                     <Landmark className="size-3.5 text-muted-foreground" />
                     <CardTitle>{balance.account.name}</CardTitle>
+                    <span className="rounded-full border border-border bg-surface-sunken px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {balance.account.kind === "MAINTENANCE" ? "Fleet total" : "Company-wide"}
+                    </span>
                   </div>
                   <p className="mt-0.5 text-2xs text-muted-foreground">
                     {rule && rule.pct > 0
@@ -203,11 +250,84 @@ export default async function ReservesPage({
                       </div>
                       <p className="mt-1 text-2xs text-muted-foreground tnum">
                         {Math.round(balance.targetProgress ?? 0)}% of a{" "}
-                        {formatMoneyCompact(balance.account.targetBalance)} target
+                        {formatMoneyCompact(balance.account.targetBalance)}{" "}
+                        {balance.account.kind === "MAINTENANCE" ? "fleet target" : "target"}
                       </p>
                     </div>
                   ) : null}
                 </div>
+
+                {balance.account.kind === "MAINTENANCE" && maintenanceByTruck.length > 0 ? (
+                  <div className="border-t border-border">
+                    <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <TruckIcon className="size-3.5 text-info" />
+                        <div>
+                          <p className="text-xs font-semibold text-foreground">
+                            Maintenance by truck
+                          </p>
+                          <p className="text-2xs text-muted-foreground">
+                            Each unit&apos;s share of this period&apos;s fleet recommendation
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-2xs font-medium text-muted-foreground tnum">
+                        {formatMoney(recommendation?.amount ?? 0)} fleet total
+                      </p>
+                    </div>
+
+                    <div className="divide-y divide-border/70 border-t border-border/70">
+                      {maintenanceByTruck.map((unit) => (
+                        <div
+                          key={unit.truckId}
+                          className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-3"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="truncate text-xs font-semibold text-foreground">
+                                {unit.truckName}
+                              </p>
+                              {!unit.active ? (
+                                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                  inactive
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="mt-1.5 flex items-center gap-2">
+                              <div className="h-1.5 min-w-16 flex-1 overflow-hidden rounded-full bg-surface-sunken">
+                                <div
+                                  className="h-full rounded-full bg-info"
+                                  style={{
+                                    width: `${Math.min(100, Math.max(0, unit.revenueSharePct))}%`,
+                                  }}
+                                />
+                              </div>
+                              <p className="shrink-0 text-2xs text-muted-foreground tnum">
+                                {formatMoney(unit.bookedRevenue)} earned
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-2xs uppercase tracking-wide text-muted-foreground">
+                              Set aside
+                            </p>
+                            <p className="text-sm font-semibold text-warn tnum">
+                              {formatMoney(unit.suggestedReserve)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <p className="border-t border-border/70 px-4 py-2.5 text-2xs leading-relaxed text-muted-foreground">
+                      Truck rows explain the suggested maintenance amount. The recorded balance and
+                      {balance.account.targetBalance
+                        ? ` ${formatMoneyCompact(balance.account.targetBalance)} target`
+                        : " target"}{" "}
+                      remain consolidated for the company.
+                    </p>
+                  </div>
+                ) : null}
 
                 <div className="border-t border-border">
                   <div className="flex items-center justify-between gap-2 px-4 py-2">

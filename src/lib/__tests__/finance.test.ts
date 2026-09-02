@@ -28,7 +28,10 @@ import {
   monthlyTargetShare,
   workingDaysIn,
 } from "../finance/goals";
-import { calculateReserveBalances } from "../finance/reserves";
+import {
+  calculateReserveBalances,
+  calculateTruckMaintenanceReserves,
+} from "../finance/reserves";
 import {
   buildSettlementSnapshot,
   settlementBounds,
@@ -1114,6 +1117,59 @@ describe("calculateReserveBalances", () => {
     const balances = calculateReserveBalances(accounts, transactions, august);
     assert.equal(balances.find((b) => b.account.kind === "TAX")!.targetProgress, null);
     assert.ok(balances.find((b) => b.account.kind === "MAINTENANCE")!.targetProgress! > 0);
+  });
+});
+
+describe("calculateTruckMaintenanceReserves", () => {
+  const fleet = [
+    { id: "t1", name: "TORO", active: true },
+    { id: "t2", name: "Unit 2", active: true },
+  ];
+
+  it("explains the fleet recommendation by truck without changing its total", () => {
+    const breakdown = calculateTruckMaintenanceReserves(
+      fleet,
+      [
+        load({ id: "a", truckId: "t1", grossRate: 5200, date: "2026-09-02" }),
+        load({ id: "b", truckId: "t2", grossRate: 1800, date: "2026-09-03" }),
+        load({ id: "old", truckId: "t2", grossRate: 900, date: "2026-08-31" }),
+      ],
+      { start: "2026-09-01", end: "2026-09-30" },
+      5,
+    );
+
+    assert.deepEqual(
+      breakdown.map((unit) => ({
+        truck: unit.truckName,
+        revenue: unit.bookedRevenue,
+        reserve: unit.suggestedReserve,
+      })),
+      [
+        { truck: "TORO", revenue: 5200, reserve: 260 },
+        { truck: "Unit 2", revenue: 1800, reserve: 90 },
+      ],
+    );
+    assert.equal(
+      breakdown.reduce((total, unit) => total + unit.suggestedReserve, 0),
+      350,
+    );
+  });
+
+  it("reconciles cent rounding back to the canonical fleet amount", () => {
+    const breakdown = calculateTruckMaintenanceReserves(
+      fleet,
+      [
+        load({ id: "a", truckId: "t1", grossRate: 0.1, date: "2026-09-02" }),
+        load({ id: "b", truckId: "t2", grossRate: 0.1, date: "2026-09-03" }),
+      ],
+      { start: "2026-09-01", end: "2026-09-30" },
+      5,
+    );
+
+    assert.equal(
+      breakdown.reduce((total, unit) => total + unit.suggestedReserve, 0),
+      0.01,
+    );
   });
 });
 
