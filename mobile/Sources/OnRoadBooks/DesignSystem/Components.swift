@@ -327,6 +327,9 @@ enum OBNumber {
 struct OBNumberRow: View {
     let label: String
     var prefix: String? = nil
+    /// A trailing unit -- "mi", "$/gal", "%". Optional so the eleven existing
+    /// call sites are untouched.
+    var suffix: String? = nil
     var placeholder: String = "0"
     @Binding var text: String
 
@@ -343,7 +346,15 @@ struct OBNumberRow: View {
                 .monospacedDigit()
                 .foregroundStyle(OBColor.foreground)
                 .frame(maxWidth: 140)
+            if let suffix {
+                Text(suffix)
+                    .font(.caption)
+                    .foregroundStyle(OBColor.mutedForeground)
+                    .frame(width: 42, alignment: .leading)
+            }
         }
+        // A row this thin is a miss with a gloved thumb.
+        .frame(minHeight: 44)
     }
 }
 

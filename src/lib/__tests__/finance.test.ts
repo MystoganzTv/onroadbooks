@@ -1485,6 +1485,33 @@ describe("buildCockpitInsights", () => {
     }
   });
 
+  it("says nothing a Solo plan is not paying for", () => {
+    // The panel used to restate in prose exactly what the plan gates on the
+    // screen above it -- including the Safe to Pay figure the hero tile blanks.
+    const brokers = calculateBrokerPerformance(
+      withMetricsAll(
+        [
+          load({ broker: "Alpha", grossRate: 5000, loadedMiles: 1800, deadheadMiles: 200 }),
+          load({ broker: "Alpha", grossRate: 4200, loadedMiles: 1500, deadheadMiles: 150 }),
+          load({ broker: "Beta", grossRate: 2200, loadedMiles: 1600, deadheadMiles: 900 }),
+          load({ broker: "Beta", grossRate: 2100, loadedMiles: 1500, deadheadMiles: 800 }),
+        ],
+        thresholds,
+      ),
+      thresholds,
+    );
+
+    const gated = ["deadhead-cost", "revenue-gap", "revenue-hit", "projection", "top-broker", "weak-broker", "lane-spread", "take-home"];
+    const withCockpit = build({ brokers }).map((i) => i.id);
+    const withoutCockpit = build({ brokers, includeCockpit: false }).map((i) => i.id);
+
+    assert.ok(gated.some((id) => withCockpit.includes(id)), "the fixture must produce gated lines");
+    for (const id of gated) {
+      assert.equal(withoutCockpit.includes(id), false, `${id} is part of OnRoad Pro`);
+    }
+    assert.ok(withoutCockpit.length > 0, "a Solo account still gets its ledger read back");
+  });
+
   it("produces no NaN or Infinity in any line", () => {
     for (const insight of build()) {
       assert.equal(insight.text.includes("NaN"), false, insight.text);

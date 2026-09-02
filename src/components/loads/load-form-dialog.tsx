@@ -588,7 +588,7 @@ export function LoadFormDialog({
 
             {scheduleConflicts.length > 0 ? (
               <div
-                className="flex gap-3 rounded-lg border border-warn/35 bg-warn-subtle p-3"
+                className="flex gap-3 rounded-lg border border-warn/35 bg-warn-soft/45 p-3"
                 role="status"
                 aria-live="polite"
               >

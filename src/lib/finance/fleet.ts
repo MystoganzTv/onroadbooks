@@ -36,7 +36,7 @@ import { expensesForTruck, loadsForTruck, overheadExpenses } from "../fleet";
 import { inRange, type DateRange } from "../periods";
 import type { Expense, FinancialSettings, Load, PaymentEvent, Truck } from "../types";
 import { calculateTrueCostPerMile, type CostPerMile } from "./cost-per-mile";
-import { isDebtServiceCategory, isOperatingExpenseCategory } from "./terminology";
+import { isDebtServiceExpense, isOperatingExpense } from "./terminology";
 
 export interface TruckContribution {
   truck: Truck;
@@ -95,13 +95,13 @@ function contributionFor(
   const revenue = roundMoney(sum(unitLoads, (l) => l.grossRate));
   const directCosts = roundMoney(
     sum(
-      unitExpenses.filter((expense) => isOperatingExpenseCategory(expense.category)),
+      unitExpenses.filter((expense) => isOperatingExpense(expense)),
       (expense) => expense.amount,
     ),
   );
   const debtService = roundMoney(
     sum(
-      unitExpenses.filter((expense) => isDebtServiceCategory(expense.category)),
+      unitExpenses.filter((expense) => isDebtServiceExpense(expense)),
       (expense) => expense.amount,
     ),
   );
@@ -143,7 +143,7 @@ export function calculateFleetSummary(
   const overhead = roundMoney(
     sum(
       overheadExpenses(expenses).filter(
-        (e) => inRange(e.date, range) && isOperatingExpenseCategory(e.category),
+        (e) => inRange(e.date, range) && isOperatingExpense(e),
       ),
       (e) => e.amount,
     ),

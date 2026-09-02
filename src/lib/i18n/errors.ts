@@ -23,6 +23,10 @@ const en = {
   resetConfirm: "Type RESET to confirm.",
   emailConfirm: "Type your email address exactly to confirm.",
   readonly: "This workspace is read-only until billing is active.",
+  mirrorFuel: "This row comes from a fuel entry. Change it on the Fuel page and the ledger follows.",
+  mirrorService:
+    "This row comes from a service record. Change it in the truck's service history and the ledger follows.",
+  mirrorLoad: "This row comes from a load's trip costs. Change it on that load and the ledger follows.",
 } as const;
 
 const es: { [K in keyof typeof en]: string } = {
@@ -48,6 +52,10 @@ const es: { [K in keyof typeof en]: string } = {
   resetConfirm: "Escribe RESET para confirmar.",
   emailConfirm: "Escribe tu correo exactamente para confirmar.",
   readonly: "Este espacio es de solo lectura hasta que la facturación esté activa.",
+  mirrorFuel: "Esta fila viene de una carga de diésel. Cámbiala en Combustible y el libro se actualiza solo.",
+  mirrorService:
+    "Esta fila viene de un registro de servicio. Cámbiala en el historial de servicio del camión y el libro se actualiza solo.",
+  mirrorLoad: "Esta fila viene de los costos de viaje de una carga. Cámbiala en esa carga y el libro se actualiza solo.",
 };
 
 const englishToKey = new Map<string, keyof typeof en>(

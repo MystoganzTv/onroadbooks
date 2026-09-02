@@ -112,7 +112,8 @@ export const PLANS: Record<PlanId, Plan> = {
       "Business overhead kept separate from truck costs",
       "Owner-only reserves, Safe to Pay and fleet-wide settlements",
     ],
-    note: "Fleet is in early access, and early access pricing is locked for life.",
+    note:
+      "Fleet runs on the web today; the fleet screens on the iPhone app are still on the way. The price you start on stays your price for as long as the subscription stays active.",
   },
 };
 
@@ -238,7 +239,7 @@ export function cheapestPlanWith(capability: PlanCapability): Plan {
 export function capabilityRefusal(capability: PlanCapability): string {
   const plan = cheapestPlanWith(capability);
   if (capability === "fleet") {
-    return `${plan.name} is a separate paid service, $${plan.priceMonthly} a month. Request Fleet access in Settings — nothing in your books moves either way.`;
+    return `${plan.name} is a separate paid service, $${plan.priceMonthly} a month. Switch plans in Settings — nothing in your books moves either way.`;
   }
   return `That is part of ${plan.name}, $${plan.priceMonthly} a month. Switch plans in Settings — nothing in your books moves either way.`;
 }
@@ -291,7 +292,11 @@ export function truckAllowance(
     reason: canAdd
       ? null
       : limit === 1
-        ? `${plan.name} covers one truck. ${PLANS.FLEET.name} is a separate paid service for up to ${PLANS.FLEET.truckLimit}.`
+        ? plan.id === "FLEET"
+          // A Fleet plan whose subscription is not active falls back to one
+          // truck. Naming Fleet as the upgrade here would be nonsense.
+          ? `${plan.name} covers up to ${plan.truckLimit} trucks while the subscription is active. Yours is not active right now, so the account is back to one truck.`
+          : `${plan.name} covers one truck. ${PLANS.FLEET.name} is a separate paid service for up to ${PLANS.FLEET.truckLimit}.`
         : `${plan.name} covers ${plan.truckLimit} trucks, and you are running ${activeTruckCount}. Get in touch and we will sort out a larger plan.`,
   };
 }

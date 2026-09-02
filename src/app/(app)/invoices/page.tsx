@@ -83,7 +83,7 @@ export default async function InvoicesPage() {
                       {load.invoiceDueDate ? formatLocaleDate(load.invoiceDueDate, locale) : "—"}
                       {age != null && age > 0 ? <span className="block text-2xs">{interpolate(copy.daysOverdue, { days: age })}</span> : null}
                     </TableCell>
-                    <TableCell><StatusBadge status={load.status} /></TableCell>
+                    <TableCell><StatusBadge status={load.status} locale={locale} /></TableCell>
                     <TableCell className="text-right font-medium tnum">
                       {formatMoney(load.grossRate)}
                       {payment.collected > 0 && payment.balance > 0 ? <span className="block text-2xs font-normal text-muted-foreground">{interpolate(copy.balanceDue, { amount: formatMoney(payment.balance) })}</span> : null}

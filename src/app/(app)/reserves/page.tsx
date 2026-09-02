@@ -134,7 +134,7 @@ export default async function ReservesPage({
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-y border-border py-3">
         <div className="flex min-w-0 items-center gap-2.5">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-info-subtle text-info">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-info-soft text-info">
             <Building2 className="size-4" />
           </div>
           <div className="min-w-0">
@@ -144,7 +144,7 @@ export default async function ReservesPage({
             </p>
           </div>
         </div>
-        <span className="rounded-full border border-info/30 bg-info-subtle px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-info">
+        <span className="rounded-full border border-info/30 bg-info-soft px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide text-info">
           {interpolate(copy.wholeFleetActive, {
             count: activeTruckCount,
             unit: activeTruckCount === 1 ? copy.truck : copy.trucks,

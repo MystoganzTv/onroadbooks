@@ -1073,7 +1073,8 @@ private struct DashboardDTO: Decodable {
     let bookedRevenueDeltaPct: Double
     let operatingProfitDeltaPct: Double
     let actualCostPerMile: Double
-    let safeToPay: Double
+    /// `null` when the plan or the role does not include owner planning.
+    let safeToPay: Double?
     let totalMiles: Double
     let deadheadPct: Double
     let today: Today

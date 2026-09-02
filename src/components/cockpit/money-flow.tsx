@@ -8,8 +8,7 @@ import { isOperatingExpenseCategory } from "@/lib/finance/terminology";
 import type { CategoryTotal } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import type { AppLocale } from "@/lib/i18n";
-import { useLanguage } from "@/components/shell/language-provider";
-import { interpolate } from "@/lib/i18n/dictionaries";
+import { interpolate, type WebDictionary } from "@/lib/i18n/dictionaries";
 
 interface MoneyFlowProps {
   ownerPay: OwnerPay;
@@ -19,6 +18,7 @@ interface MoneyFlowProps {
   className?: string;
   showOwnerPlanning?: boolean;
   locale?: AppLocale;
+  copy: WebDictionary["dashboard"];
 }
 
 /** The signature explanation of profit, cash, obligations, and availability. */
@@ -30,9 +30,8 @@ export function MoneyFlow({
   className,
   showOwnerPlanning = true,
   locale = "en",
+  copy,
 }: MoneyFlowProps) {
-  const { dictionary } = useLanguage();
-  const copy = dictionary.dashboard;
   const presentation = selectOwnerMoneyPresentation({
     ...ownerPay,
     safeToPay: ownerPay.safeToPay,

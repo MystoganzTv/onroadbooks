@@ -3,21 +3,20 @@ import { CategoryDonut } from "@/components/charts/category-donut";
 import { PrintDonut } from "@/components/print/print-charts";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PieChart } from "lucide-react";
-import { categoryColor } from "@/lib/categories";
+import { categoryColor, categoryLabel } from "@/lib/categories";
 import { formatMoney, formatPercent } from "@/lib/formatters";
+import type { AppLocale } from "@/lib/i18n";
+import { interpolate, type WebDictionary } from "@/lib/i18n/dictionaries";
 import type { CategoryTotal } from "@/lib/types";
-import { useLanguage } from "@/components/shell/language-provider";
-import { categoryLabel } from "@/lib/categories";
-import { interpolate } from "@/lib/i18n/dictionaries";
 
 interface CategoryBreakdownProps {
   categories: CategoryTotal[];
   total: number;
+  locale: AppLocale;
+  copy: WebDictionary["expenses"];
 }
 
-export function CategoryBreakdown({ categories, total }: CategoryBreakdownProps) {
-  const { locale, dictionary } = useLanguage();
-  const copy = dictionary.expenses;
+export function CategoryBreakdown({ categories, total, locale, copy }: CategoryBreakdownProps) {
   if (categories.length === 0) {
     return (
       <Card>

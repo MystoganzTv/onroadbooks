@@ -104,10 +104,21 @@ struct DashboardView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     LabelXS("Safe to Pay")
-                    MoneyText(amount: s.safeToPay, color: OBColor.primary)
-                    Text("after reserves")
-                        .font(.caption)
-                        .foregroundStyle(OBColor.mutedForeground)
+                    if let safeToPay = s.safeToPay {
+                        MoneyText(amount: safeToPay, color: OBColor.primary)
+                        Text("after reserves")
+                            .font(.caption)
+                            .foregroundStyle(OBColor.mutedForeground)
+                    } else {
+                        // A screen that refuses says why, completely.
+                        Text("--")
+                            .font(.title2.weight(.semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(OBColor.mutedForeground)
+                        Text("Included with OnRoad Pro")
+                            .font(.caption)
+                            .foregroundStyle(OBColor.mutedForeground)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(OBSpacing.md)

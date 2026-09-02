@@ -207,6 +207,26 @@ describe("fuel <-> expense mirror", () => {
     );
   });
 
+  it("refuses to edit or delete the mirrored row from the Expenses page", async () => {
+    // Deleting it here used to succeed: the diesel left the books while the
+    // fuel entry that paid for it stayed on the Fuel page, unchanged. The
+    // guard is server-side because hiding the button is only a suggestion.
+    const entry = await repo.createFuelEntry(fuel({ totalCost: 180, gallons: 50 }));
+    const mirrorId = entry.expenseId!;
+
+    await assert.rejects(() => repo.deleteExpense(mirrorId), /comes from a fuel entry/);
+    await assert.rejects(
+      () => repo.updateExpense(mirrorId, expense({ category: "FUEL", description: "hand edit", amount: 1 })),
+      /comes from a fuel entry/,
+    );
+
+    const dataset = await repo.getDataset();
+    const still = dataset.expenses.find((e) => e.id === mirrorId);
+    assert.equal(still?.amount, 180, "the ledger row must survive the refusal untouched");
+
+    await repo.deleteFuelEntry(entry.id);
+  });
+
   it("advances the odometer but never rolls it back", async () => {
     const start = (await repo.getDataset()).trucks[0].currentOdometer;
 
@@ -1302,5 +1322,34 @@ describe("financial review and customer cash events", () => {
       after.paymentEvents.filter((event) => event.loadId === load.id).reduce((total, event) => total + event.amount, 0),
       2500,
     );
+  });
+});
+
+describe("expense financial treatment", () => {
+  it("re-derives the treatment when the category changes", async () => {
+    // A stale treatment is how a row ends up counted as operating spend under
+    // a debt category -- and it made this store disagree with Postgres on the
+    // same edit, to the tune of the whole amount.
+    const truckId = (await repo.getDataset()).trucks[0].id;
+    const base = expense({ truckId, category: "FUEL", amount: 1_000, description: "treatment probe" });
+
+    const created = await repo.createExpense(base);
+    assert.equal(created.financialTreatment, "OPERATING");
+
+    const moved = await repo.updateExpense(created.id, { ...base, category: "INTEREST_EXPENSE" });
+    assert.equal(
+      moved.financialTreatment,
+      "INTEREST",
+      "a debt category must not keep an operating treatment",
+    );
+
+    const edited = await repo.updateExpense(created.id, {
+      ...base,
+      category: "INTEREST_EXPENSE",
+      description: "treatment probe, edited",
+    });
+    assert.equal(edited.financialTreatment, "INTEREST", "an ordinary edit must not reclassify");
+
+    await repo.deleteExpense(created.id);
   });
 });

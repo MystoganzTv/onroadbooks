@@ -42,6 +42,8 @@ import type {
 import { defaultCategoryBehavior } from "../categories";
 import { financialTreatmentForCategory } from "../finance/terminology";
 import { requireExactDebtPaymentSplit } from "../finance/debt-payment";
+import { isLoadExpenseId } from "../load-expenses";
+import { mirrorRefusal } from "../mirrored-expenses";
 import { defaultGoals, defaultReserveAccounts, defaultSubscription } from "../defaults";
 import { DEFAULT_PLAN, getPlan, isComplimentaryAccess, trialEndsOn } from "../plans";
 import {
@@ -1698,6 +1700,22 @@ export class PrismaRepository implements Repository {
     if (await client.driverSettlementLine.count({ where: { expenseId: id, settlement: { businessId: business.id } } })) {
       throw new Error("Driver Pay expenses are controlled by their paid statement and cannot be edited.");
     }
+    if (isLoadExpenseId(id)) throw new Error(mirrorRefusal("LOAD"));
+    if (await client.fuelEntry.count({ where: { expenseId: id, businessId: business.id } })) {
+      throw new Error(mirrorRefusal("FUEL"));
+    }
+    if (await client.maintenanceRecord.count({ where: { expenseId: id, businessId: business.id } })) {
+      throw new Error(mirrorRefusal("SERVICE"));
+    }
+    // A treatment set deliberately (a debt payment split writes one) survives
+    // an edit only while the category still matches it -- the JSON store does
+    // the same, and the two used to disagree on exactly this edit.
+    const previous = await client.expense.findFirst({
+      where: { id, businessId: business.id },
+      select: { category: true, financialTreatment: true },
+    });
+    const preservedTreatment =
+      previous && previous.category === input.category ? previous.financialTreatment : null;
     const scope = input.scope ?? "TRUCK";
     const truckId = scope === "BUSINESS" ? null : truckIdFor(business, input.truckId);
     const loadId = await ownedLoadId(client, business.id, input.loadId, truckId, scope);
@@ -1705,6 +1723,10 @@ export class PrismaRepository implements Repository {
       where: { id, businessId: business.id },
       data: {
         ...this.expenseData(input),
+        financialTreatment:
+          input.financialTreatment ??
+          preservedTreatment ??
+          financialTreatmentForCategory(input.category),
         loadId,
         scope,
         truckId,
@@ -1720,6 +1742,13 @@ export class PrismaRepository implements Repository {
     const business = await this.business(client);
     if (await client.driverSettlementLine.count({ where: { expenseId: id, settlement: { businessId: business.id } } })) {
       throw new Error("Driver Pay expenses are controlled by their paid statement and cannot be deleted.");
+    }
+    // A service record's row is an optional link and may be deleted here --
+    // `MaintenanceRecord.expenseId` is `onDelete: SetNull`, so the pointer
+    // clears itself. Fuel and load rows are not optional.
+    if (isLoadExpenseId(id)) throw new Error(mirrorRefusal("LOAD"));
+    if (await client.fuelEntry.count({ where: { expenseId: id, businessId: business.id } })) {
+      throw new Error(mirrorRefusal("FUEL"));
     }
     const deleted = await client.expense.deleteMany({ where: { id, businessId: business.id } });
     if (deleted.count !== 1) throw new Error("That expense does not belong to this workspace.");

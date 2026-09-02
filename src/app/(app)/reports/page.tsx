@@ -35,6 +35,7 @@ import {
 import { halfMonthComparison } from "@/lib/chart-data";
 import { buildFinancialSummary } from "@/lib/finance/financial-summary";
 import { requireSession } from "@/lib/auth";
+import { planAllows } from "@/lib/plans";
 import { getRepository } from "@/lib/db";
 import {
   activeTrucks,
@@ -87,7 +88,7 @@ export default async function ReportsPage({
     getAppLocale(),
   ]);
   const copy = getWebDictionary(locale).reports;
-  const { business, trucks, loads, expenses, fuelEntries, settings, paymentEvents, reserveAccounts } = await getRepository(
+  const { business, trucks, loads, expenses, fuelEntries, settings, paymentEvents, reserveAccounts, subscription } = await getRepository(
     session.businessId,
   ).getDataset();
   const period = periodFromSearchParams(params);
@@ -288,13 +289,22 @@ export default async function ReportsPage({
         </Card>
       </div>
 
-      <div className="print-break-before">
-        <BrokerTable brokers={brokers} deadheadWarnPct={settings.deadheadWarnPct} />
-      </div>
+      {/* The broker scorecard is a `cockpit` feature -- /analytics/brokers gates
+          the same data, and a print-ready copy of it is still that feature. */}
+      {planAllows(subscription, "cockpit") ? (
+        <div className="print-break-before">
+          <BrokerTable brokers={brokers} deadheadWarnPct={settings.deadheadWarnPct} />
+        </div>
+      ) : null}
 
       <div className="print-break-before grid gap-4 xl:grid-cols-3 print:gap-3">
         <div className="min-w-0 xl:col-span-1">
-          <CategoryBreakdown categories={categories} total={summary.operatingExpenses} />
+          <CategoryBreakdown
+            categories={categories}
+            total={summary.operatingExpenses}
+            locale={locale}
+            copy={getWebDictionary(locale).expenses}
+          />
         </div>
         <Card className="xl:col-span-2">
           <CardHeader>

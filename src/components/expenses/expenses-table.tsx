@@ -50,6 +50,7 @@ import { formatMoney } from "@/lib/formatters";
 import { formatLocaleDate } from "@/lib/i18n-format";
 import { interpolate } from "@/lib/i18n/dictionaries";
 import type { Expense, ExpenseBehavior, LoadWithMetrics, Truck } from "@/lib/types";
+import type { ExpenseMirrorSource } from "@/lib/mirrored-expenses";
 import { cn } from "@/lib/utils";
 import { ExpenseFormDialog } from "./expense-form-dialog";
 import { LoadExpenseFormDialog } from "./load-expense-form-dialog";
@@ -58,6 +59,12 @@ type SortKey = "date" | "category" | "description" | "vendor" | "amount";
 
 interface ExpensesTableProps {
   expenses: Expense[];
+  /**
+   * Which rows the app wrote, by relation. The id prefix only identifies a
+   * mirror in the JSON store -- on Postgres the database generates the id, so
+   * without this the table offered Edit and Delete on read-only rows.
+   */
+  mirrorSources?: Record<string, ExpenseMirrorSource>;
   documents: Document[];
   loads: LoadWithMetrics[];
   categoryBehavior: Record<string, ExpenseBehavior>;
@@ -68,6 +75,7 @@ interface ExpensesTableProps {
 
 export function ExpensesTable({
   expenses,
+  mirrorSources = {},
   documents,
   loads,
   categoryBehavior,
@@ -277,9 +285,10 @@ export function ExpensesTable({
                 // Rows the app writes for you must be changed at their source.
                 // Load costs have a focused editor here that updates that
                 // source; the other mirrors point to their owning workflow.
-                const mirroredFuel = expense.id.startsWith("expfuel_");
-                const mirroredService = expense.id.startsWith("expmaint_");
-                const mirroredLoad = expense.id.startsWith("expload_");
+                const mirrorSource = mirrorSources[expense.id];
+                const mirroredFuel = mirrorSource === "FUEL" || expense.id.startsWith("expfuel_");
+                const mirroredService = mirrorSource === "SERVICE" || expense.id.startsWith("expmaint_");
+                const mirroredLoad = mirrorSource === "LOAD" || expense.id.startsWith("expload_");
                 const mirroredDriver = expense.id.startsWith("expdriver_");
                 const mirrored = mirroredFuel || mirroredService || mirroredLoad || mirroredDriver;
                 return (

@@ -31,6 +31,7 @@ import {
 } from "../driver-pay";
 import { financialTreatmentForCategory } from "../finance/terminology";
 import { requireExactDebtPaymentSplit } from "../finance/debt-payment";
+import { expenseMirrorSource, mirrorRefusal } from "../mirrored-expenses";
 import type {
   Business,
   Dataset,
@@ -468,9 +469,16 @@ function expenseFromInput(
     description: input.description.trim(),
     vendor: input.vendor?.trim() || null,
     amount: roundMoney(input.amount),
+    // Keep a treatment that was set deliberately (a debt payment split
+    // writes one), but only while the category still matches it. Changing the
+    // category and keeping the old treatment is how a row ends up counted as
+    // operating spend under a debt category -- and it made this store disagree
+    // with Postgres on the same edit.
     financialTreatment:
       input.financialTreatment ??
-      existing?.financialTreatment ??
+      (existing && existing.category === input.category
+        ? existing.financialTreatment
+        : null) ??
       financialTreatmentForCategory(input.category),
     obligationId:
       input.obligationId === undefined ? (existing?.obligationId ?? null) : input.obligationId,
@@ -1331,6 +1339,8 @@ export class JsonRepository implements Repository {
       if (dataset.driverSettlements.some((settlement) => settlement.lines.some((line) => line.expenseId === id))) {
         throw new Error("Driver Pay expenses are controlled by their paid statement and cannot be edited.");
       }
+      const mirror = expenseMirrorSource(dataset, id);
+      if (mirror) throw new Error(mirrorRefusal(mirror));
       const index = dataset.expenses.findIndex((e) => e.id === id);
       if (index === -1) throw new Error(`Expense ${id} not found`);
       const updated = expenseFromInput(
@@ -1350,6 +1360,10 @@ export class JsonRepository implements Repository {
       if (dataset.driverSettlements.some((settlement) => settlement.lines.some((line) => line.expenseId === id))) {
         throw new Error("Driver Pay expenses are controlled by their paid statement and cannot be deleted.");
       }
+      // A service record's row is an optional link and may be deleted here
+      // (the pointer is cleared below). Fuel and load rows are not optional.
+      const mirror = expenseMirrorSource(dataset, id);
+      if (mirror && mirror !== "SERVICE") throw new Error(mirrorRefusal(mirror));
       dataset.expenses = dataset.expenses.filter((e) => e.id !== id);
       dataset.documents = dataset.documents.filter((d) => d.expenseId !== id);
       for (const record of dataset.maintenanceRecords) {

@@ -82,6 +82,24 @@ describe("web i18n regression guard", () => {
     assert.deepEqual(missing, [], `Authenticated pages without locale resolution:\n${missing.join("\n")}`);
   });
 
+  it("keeps useLanguage calls behind a client boundary", () => {
+    const roots = [join(root, "src/app"), join(root, "src/components")];
+    const violations = roots
+      .flatMap((dir) => filesUnder(dir, (path) => path.endsWith(".tsx")))
+      .filter((path) => {
+        const source = readFileSync(path, "utf8");
+        return /\buseLanguage\s*\(/.test(source)
+          && !/^\s*["']use client["'];?/m.test(source);
+      })
+      .map((path) => relative(root, path));
+
+    assert.deepEqual(
+      violations,
+      [],
+      `Components calling useLanguage without a client boundary:\n${violations.join("\n")}`,
+    );
+  });
+
   it("forbids legacy inline translation helpers and raw action-error rendering", () => {
     const roots = [join(root, "src/app"), join(root, "src/components")];
     const files = roots.flatMap((dir) => filesUnder(dir, (path) => /\.(ts|tsx)$/.test(path)))

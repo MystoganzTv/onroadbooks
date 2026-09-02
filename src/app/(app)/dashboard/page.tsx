@@ -280,6 +280,7 @@ export default async function DashboardPage({
     lanes,
     maintenance,
     includeOwnerPlanning: ownerPlanning,
+    includeCockpit: cockpit,
     locale,
   });
 
@@ -458,7 +459,7 @@ export default async function DashboardPage({
               className="min-w-0"
             />
           ) : null}
-          <DeadheadMonitor report={deadhead} className="min-w-0" />
+          {cockpit ? <DeadheadMonitor report={deadhead} className="min-w-0" /> : null}
           {cockpit ? <PlanningCard planning={planning} /> : null}
         </div>
       </Section>
@@ -472,6 +473,7 @@ export default async function DashboardPage({
             periodLabel={periodDisplayLabel}
             showOwnerPlanning={ownerPlanning}
             locale={locale}
+            copy={copy}
             className="min-w-0 xl:col-span-2"
           />
           <Card className="min-w-0">

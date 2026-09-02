@@ -74,6 +74,9 @@ export function LocationFields({
   const [loading, setLoading] = React.useState(false);
   const [results, setResults] = React.useState<LocationSuggestion[]>([]);
   const [review, setReview] = React.useState<LocationReview | null>(null);
+  // A failed lookup and an unknown city look identical in `results`, and the
+  // difference matters: one is our problem, the other is the driver's typo.
+  const [lookupFailed, setLookupFailed] = React.useState(false);
   const [activeIndex, setActiveIndex] = React.useState(-1);
 
   React.useEffect(() => {
@@ -95,6 +98,7 @@ export function LocationFields({
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       setLoading(true);
+      setLookupFailed(false);
       try {
         const params = new URLSearchParams({ q: city.trim(), limit: "8" });
         if (state.trim().length === 2) params.set("state", state.trim().toUpperCase());
@@ -111,6 +115,7 @@ export function LocationFields({
         if (!controller.signal.aborted) {
           setResults([]);
           setReview(null);
+          setLookupFailed(true);
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -241,7 +246,7 @@ export function LocationFields({
                 <p className="px-2.5 py-3 text-xs text-muted-foreground">{copy.searchingLocations}</p>
               ) : (
                 <p className="px-2.5 py-3 text-xs text-muted-foreground">
-                  {copy.noMatchingLocation}
+                  {lookupFailed ? dictionary.common.lookupOffline : copy.noMatchingLocation}
                 </p>
               )}
             </div>
@@ -262,7 +267,7 @@ export function LocationFields({
 
         {showWarning ? (
           <div
-            className="flex gap-2 rounded-md border border-warn/35 bg-warn-subtle px-2.5 py-2"
+            className="flex gap-2 rounded-md border border-warn/35 bg-warn-soft/45 px-2.5 py-2"
             role="status"
           >
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />

@@ -16,6 +16,7 @@ import { getRepository } from "@/lib/db";
 import { formatMiles, formatMoney, formatRateValue } from "@/lib/formatters";
 import { calculateIftaReport, currentIftaQuarter, iftaRateKey, normalizeJurisdictionMiles } from "@/lib/ifta";
 import { activeTrucks, orderedTrucks, truckById } from "@/lib/fleet";
+import { iftaPendingScopeTruckIds } from "@/lib/ifta";
 import {
   fleetIftaApplicability,
   iftaApplicability,
@@ -87,7 +88,12 @@ export default async function IftaPage({ searchParams }: { searchParams: Promise
   const selectedTruck = truckById(dataset.trucks, truckId);
   const runningTrucks = activeTrucks(dataset.trucks);
   const includedTruckIds = iftaReportingTruckIds(dataset.trucks);
-  const pendingTrucks = runningTrucks.filter((truck) => truck.iftaReportingEnabled == null);
+  // Every truck that ran this quarter, not just the ones still on the road.
+  const pendingTruckIds = new Set(iftaPendingScopeTruckIds(dataset, quarter));
+  const pendingTrucks = dataset.trucks.filter((truck) => pendingTruckIds.has(truck.id));
+  const scopeTrucks = orderedTrucks(
+    dataset.trucks.filter((truck) => truck.active || pendingTruckIds.has(truck.id)),
+  );
   const applicability = selectedTruck
     ? iftaApplicability(selectedTruck)
     : fleetIftaApplicability(runningTrucks);
@@ -124,7 +130,7 @@ export default async function IftaPage({ searchParams }: { searchParams: Promise
               {copy.standardExplanation}
             </p>
             <p><span className="font-semibold text-foreground">{copy.recommendation}</span> {iftaApplicabilityLabel(applicability, locale)}.</p>
-            <IftaTruckScope trucks={selectedTruck ? [selectedTruck] : runningTrucks} copy={copy} locale={locale} />
+            <IftaTruckScope trucks={selectedTruck ? [selectedTruck] : scopeTrucks} copy={copy} locale={locale} />
           </CardContent>
         </Card>
       </div>
@@ -184,7 +190,7 @@ export default async function IftaPage({ searchParams }: { searchParams: Promise
       <Button asChild size="sm" variant="outline"><a href={`/api/export/ifta?${baseQuery.toString()}&format=xlsx`}><Download /> XLSX</a></Button>
       <Button asChild size="sm" variant="outline"><a href={`/api/export/ifta?${baseQuery.toString()}&format=pdf`}><Download /> PDF</a></Button>
     </div>
-    {!truckId ? <Card><CardHeader><div className="flex items-center justify-between gap-3"><CardTitle>{copy.trucksInFiling}</CardTitle><Badge variant={pendingTrucks.length ? "warning" : "positive"}>{interpolate(copy.includedCount, { count: includedTruckIds.length })}</Badge></div></CardHeader><CardContent className="space-y-3"><p className="text-xs text-muted-foreground">{copy.includedExplanation}</p><IftaTruckScope trucks={runningTrucks} copy={copy} locale={locale} /></CardContent></Card> : null}
+    {!truckId ? <Card><CardHeader><div className="flex items-center justify-between gap-3"><CardTitle>{copy.trucksInFiling}</CardTitle><Badge variant={pendingTrucks.length ? "warning" : "positive"}>{interpolate(copy.includedCount, { count: includedTruckIds.length })}</Badge></div></CardHeader><CardContent className="space-y-3"><p className="text-xs text-muted-foreground">{copy.includedExplanation}</p><IftaTruckScope trucks={scopeTrucks} copy={copy} locale={locale} /></CardContent></Card> : null}
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       {/*
         Spelled out as a division on purpose. This is the IFTA method -- every

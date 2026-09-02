@@ -76,8 +76,9 @@ async function addLoad(
   },
 ): Promise<void> {
   await page.goto("/loads?month=2026-08&period=month");
-  await page.getByRole("button", { name: "Add Load", exact: true }).first().click();
-  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.getByRole("button", { name: /^Add load$/i }).first().click();
+  const dialog = page.getByRole("dialog", { name: "Add load" });
+  await expect(dialog).toBeVisible();
 
   if (assignDriver) {
     await page.locator("#load-driver").click();
@@ -105,7 +106,7 @@ async function addLoad(
   }
 
   await page.getByRole("button", { name: "Add load", exact: true }).last().click();
-  await expect(page.getByRole("dialog")).toBeHidden();
+  await expect(dialog).toBeHidden();
   await expect(page.getByText(origin).first()).toBeVisible();
 }
 
@@ -161,13 +162,18 @@ test.describe.serial("critical browser flows", () => {
     expect(datasetAfterLoad.documents).toHaveLength(1);
 
     await page.goto("/expenses?month=2026-08&period=month");
-    await page.getByRole("button", { name: "Add Expense", exact: true }).first().click();
+    await page.getByRole("button", { name: /^Add expense$/i }).first().click();
+    const expenseDialog = page.getByRole("dialog", { name: "Add expense" });
     await page.locator("#expense-date").fill("2026-08-31");
     await page.locator("#expense-amount").fill("125.50");
     await page.locator("#expense-description").fill("E2E parking and permits");
     await page.getByRole("button", { name: "Add expense", exact: true }).last().click();
-    await expect(page.getByRole("dialog")).toBeHidden();
+    await expect(expenseDialog).toBeHidden();
     await expect(page.getByText("E2E parking and permits").first()).toBeVisible();
+
+    await page.goto("/dashboard?month=2026-08&period=month");
+    await expect(page.getByRole("heading", { name: "Business overview" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Where is my money?" })).toBeVisible();
 
     await page.goto("/truck");
     await page.getByRole("button", { name: "Update truck" }).click();
@@ -302,7 +308,7 @@ test.describe.serial("critical browser flows", () => {
     await login(page, "viewer.e2e@example.com");
     await expect(page.getByText("Viewer access", { exact: true }).last()).toBeVisible();
     await page.goto("/expenses?month=2026-08&period=month");
-    await page.getByRole("button", { name: "Add Expense", exact: true }).first().click();
+    await page.getByRole("button", { name: /^Add expense$/i }).first().click();
     await page.locator("#expense-date").fill("2026-08-31");
     await page.locator("#expense-amount").fill("10");
     await page.locator("#expense-description").fill("Viewer must not create this");

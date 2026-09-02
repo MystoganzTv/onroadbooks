@@ -12,7 +12,7 @@ import { behaviorOf, EXPENSE_CATEGORIES, getCategory } from "./categories";
 import {
   FINANCIAL_MODEL_VERSION,
   financialTreatmentOf,
-  isDebtServiceCategory,
+  isDebtServiceExpense,
 } from "./finance/terminology";
 import { inRange, type DateRange, type Period } from "./periods";
 import type {
@@ -729,7 +729,7 @@ export function truckLifetime(dataset: Dataset, truck: Truck): TruckLifetime {
     sum(expenses.filter((expense) => financialTreatmentOf(expense) === "OPERATING"), (e) => e.amount),
   );
   const debtService = roundMoney(
-    sum(expenses.filter((expense) => isDebtServiceCategory(expense.category)), (e) => e.amount),
+    sum(expenses.filter((expense) => isDebtServiceExpense(expense)), (e) => e.amount),
   );
   const totalMiles = sum(loads, (l) => l.loadedMiles + l.deadheadMiles);
   const lifetimeProfit = roundMoney(totalRevenue - totalExpenses);

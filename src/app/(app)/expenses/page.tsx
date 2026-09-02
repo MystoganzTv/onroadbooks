@@ -19,6 +19,7 @@ import {
 } from "@/lib/calculations";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
+import { expenseMirrorSources } from "@/lib/mirrored-expenses";
 import { formatMoneyCompact, formatPercent, formatRate } from "@/lib/formatters";
 import { expensesForTruck, loadsForTruck, orderedTrucks } from "@/lib/fleet";
 import { isOperatingExpense } from "@/lib/finance/terminology";
@@ -43,7 +44,7 @@ export default async function ExpensesPage({
 }) {
   const [params, session, locale] = await Promise.all([searchParams, requireSession(), getAppLocale()]);
   const copy = getWebDictionary(locale).expenses;
-  const { trucks, loads, expenses, fuelEntries, documents, settings, financialObligations, paymentEvents } = await getRepository(
+  const { trucks, loads, expenses, fuelEntries, maintenanceRecords, documents, settings, financialObligations, paymentEvents } = await getRepository(
     session.businessId,
   ).getDataset();
   const period = periodFromSearchParams(params);
@@ -137,6 +138,7 @@ export default async function ExpensesPage({
         <div className="min-w-0 xl:col-span-2">
           <ExpensesTable
             expenses={periodExpenses}
+            mirrorSources={expenseMirrorSources({ expenses, fuelEntries, maintenanceRecords })}
             documents={documents}
             loads={periodLoads}
             categoryBehavior={settings.categoryBehavior}
@@ -145,7 +147,12 @@ export default async function ExpensesPage({
             defaultTruckId={scopeTruckId}
           />
         </div>
-        <CategoryBreakdown categories={categories} total={summary.operatingExpenses} />
+        <CategoryBreakdown
+          categories={categories}
+          total={summary.operatingExpenses}
+          locale={locale}
+          copy={copy}
+        />
       </div>
     </div>
   );

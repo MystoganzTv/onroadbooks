@@ -58,6 +58,13 @@ export interface InsightInput {
   maintenance: MaintenanceHealth;
   /** Owner-only planning language and reserve coverage. */
   includeOwnerPlanning?: boolean;
+  /**
+   * The `cockpit` capability. Without it the panel still explains the
+   * ledger, but it must not restate in prose what the plan gates on the
+   * screen above it: brokers, lanes, the projection, priced deadhead and
+   * Safe to Pay.
+   */
+  includeCockpit?: boolean;
   locale?: AppLocale;
 }
 
@@ -85,6 +92,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
     lanes,
     maintenance,
     includeOwnerPlanning = true,
+    includeCockpit = true,
     locale = "en",
   } = input;
   const copy = getWebDictionary(locale).dashboard;
@@ -131,7 +139,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
     }
   }
 
-  if (deadhead.elevated && deadhead.cost > 0) {
+  if (includeCockpit && deadhead.elevated && deadhead.cost > 0) {
     out.push({
       id: "deadhead-cost",
       tone: "warning",
@@ -161,7 +169,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
   }
 
   /* -- Goal progress and projection --------------------------------------- */
-  if (goals.monthlyRevenueTarget > 0 && projection.revenueTarget > 0) {
+  if (includeCockpit && goals.monthlyRevenueTarget > 0 && projection.revenueTarget > 0) {
     if (projection.revenueGap > 0) {
       out.push({
         id: "revenue-gap",
@@ -179,7 +187,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
     }
   }
 
-  if (projection.applicable && projection.workingDaysRemaining > 0) {
+  if (includeCockpit && projection.applicable && projection.workingDaysRemaining > 0) {
     out.push({
       id: "projection",
       tone: projection.projectedRevenue >= projection.revenueTarget ? "positive" : "warning",
@@ -190,7 +198,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
 
   /* -- Brokers and lanes --------------------------------------------------- */
   const rankedBrokers = brokers.filter((b) => b.qualified && b.broker !== "No broker");
-  if (rankedBrokers.length > 0) {
+  if (includeCockpit && rankedBrokers.length > 0) {
     const best = [...rankedBrokers].sort((a, b) => b.profitPerMile - a.profitPerMile)[0];
     out.push({
       id: "top-broker",
@@ -199,7 +207,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
       text: interpolate(copy.insightTopBroker, { broker: best.broker, rate: rate(best.profitPerMile), count: best.loadCount, profit: money(best.tripProfit) }),
     });
   }
-  if (rankedBrokers.length >= 2) {
+  if (includeCockpit && rankedBrokers.length >= 2) {
     const weakest = [...rankedBrokers].sort((a, b) => a.profitPerMile - b.profitPerMile)[0];
     const best = [...rankedBrokers].sort((a, b) => b.profitPerMile - a.profitPerMile)[0];
     if (best.broker !== weakest.broker && best.profitPerMile - weakest.profitPerMile > 0.2) {
@@ -213,7 +221,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
   }
 
   const qualifiedLanes = lanes.filter((l) => l.qualified);
-  if (qualifiedLanes.length >= 2) {
+  if (includeCockpit && qualifiedLanes.length >= 2) {
     const bestLane = qualifiedLanes[0];
     const worstLane = qualifiedLanes[qualifiedLanes.length - 1];
     out.push({
@@ -225,7 +233,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
   }
 
   /* -- Reserves and the truck ---------------------------------------------- */
-  if (includeOwnerPlanning && maintenance.coverage !== null && maintenance.upcomingCost > 0) {
+  if (includeCockpit && includeOwnerPlanning && maintenance.coverage !== null && maintenance.upcomingCost > 0) {
     out.push({
       id: "maintenance-coverage",
       tone: maintenance.coverage >= 1 ? "positive" : "warning",
@@ -242,7 +250,7 @@ export function buildCockpitInsights(input: InsightInput): RankedInsight[] {
     });
   }
 
-  if (includeOwnerPlanning && ownerPay.safeToPay > 0) {
+  if (includeCockpit && includeOwnerPlanning && ownerPay.safeToPay > 0) {
     out.push({
       id: "take-home",
       tone: ownerPay.takeHomeRate >= 30 ? "positive" : "neutral",

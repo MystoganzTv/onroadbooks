@@ -5,8 +5,7 @@ import { getRepository } from "@/lib/db";
 import type { ReportTable } from "@/lib/export";
 import { toPdf } from "@/lib/export-pdf";
 import { toXlsx } from "@/lib/export-xlsx";
-import { calculateIftaReport, currentIftaQuarter } from "@/lib/ifta";
-import { activeTrucks } from "@/lib/fleet";
+import { calculateIftaReport, currentIftaQuarter, iftaPendingScopeTruckIds } from "@/lib/ifta";
 import { iftaReportingTruckIds } from "@/lib/ifta-eligibility";
 import { truckFromSearchParams } from "@/lib/period-params";
 
@@ -35,7 +34,7 @@ export async function GET(request: Request) {
       { status: 409 },
     );
   }
-  const pendingScope = !truckId && activeTrucks(dataset.trucks).some((truck) => truck.iftaReportingEnabled == null);
+  const pendingScope = !truckId && iftaPendingScopeTruckIds(dataset, quarter).length > 0;
   const calculated = calculateIftaReport(dataset, quarter, truckId, truckId ? null : includedTruckIds);
   const report = {
     ...calculated,

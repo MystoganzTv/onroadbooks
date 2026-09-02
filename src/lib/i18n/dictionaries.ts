@@ -6,6 +6,11 @@ type DictionaryShape<T> = {
 
 const en = {
   common: {
+    lookupOffline: "We could not check locations right now. Type the city and the two-letter state and we will verify it when you save.",
+    errorTitle: "Something went wrong on this screen",
+    errorBody: "Your books were not changed. Try again, and if it keeps happening the details below help us fix it.",
+    errorRetry: "Try again",
+    errorHome: "Back to dashboard",
     cancel: "Cancel",
     close: "Close",
     save: "Save",
@@ -1429,7 +1434,8 @@ const en = {
     soloFeatures: "One truck, unlimited loads|Loads, expenses, fuel, receipts and documents|Contribution profit per load and per mile|Actual and normalized cost per mile|Print-ready reports and CSV export",
     proFeatures: "Everything in Solo Starter|Load calculator and target rate|Broker and lane scorecards|Deadhead analysis priced at your cost per mile|1–15 and 16–end settlements frozen when closed|Tax and maintenance reserves and Available to You|Monthly goals, pace and projection",
     fleetFeatures: "Everything in OnRoad Pro|Up to eight trucks on one account|Individual sign-ins with Owner, Admin, Bookkeeper and Dispatcher roles|Drivers stay operational records; adding one never creates app access|Load assignments and frozen driver-pay statements|Cost per mile and contribution per unit|Business overhead kept separate from truck costs|Owner-only reserves, availability and fleet-wide settlements",
-    fleetNote: "Fleet is in early access, and early-access pricing is locked for life.",
+    fleetNote:
+      "Fleet runs on the web today; the fleet screens on the iPhone app are still on the way. The price you start on stays your price for as long as the subscription stays active.",
   },
   team: {
     teamMember: "Team member",
@@ -1472,6 +1478,11 @@ const en = {
 
 const es: DictionaryShape<typeof en> = {
   common: {
+    lookupOffline: "No pudimos verificar ciudades ahora mismo. Escribe la ciudad y el estado de dos letras y lo verificamos al guardar.",
+    errorTitle: "Algo falló en esta pantalla",
+    errorBody: "Tus libros no cambiaron. Inténtalo otra vez; si sigue pasando, el detalle de abajo nos sirve para arreglarlo.",
+    errorRetry: "Intentar otra vez",
+    errorHome: "Volver al resumen",
     cancel: "Cancelar",
     close: "Cerrar",
     save: "Guardar",
@@ -2884,7 +2895,8 @@ const es: DictionaryShape<typeof en> = {
     soloFeatures: "Un camión, cargas ilimitadas|Cargas, gastos, combustible, recibos y documentos|Ganancia de contribución por carga y por milla|Costo real y normalizado por milla|Reportes listos para imprimir y exportación CSV",
     proFeatures: "Todo lo de Solo Starter|Calculadora de cargas y tarifa objetivo|Evaluación de brokers y rutas|Análisis de millas vacías con tu costo real|Liquidaciones 1–15 y 16–fin congeladas al cerrar|Reservas de impuestos y mantenimiento y Disponible para ti|Metas mensuales, ritmo y proyección",
     fleetFeatures: "Todo lo de OnRoad Pro|Hasta ocho camiones en una cuenta|Accesos individuales con roles Dueño, Admin, Contable y Despachador|Los choferes son registros operativos; agregarlos no crea acceso|Asignación de cargas y estados de pago congelados|Costo por milla y contribución por unidad|Gastos generales separados de costos de camiones|Reservas, disponibilidad y liquidaciones de flota solo para el dueño",
-    fleetNote: "Fleet está en acceso anticipado y su precio queda fijado de por vida.",
+    fleetNote:
+      "Fleet funciona hoy en la web; las pantallas de flota en la app de iPhone todavía están en camino. El precio con el que entras se mantiene mientras la suscripción siga activa.",
   },
   team: {
     teamMember: "Miembro del equipo",

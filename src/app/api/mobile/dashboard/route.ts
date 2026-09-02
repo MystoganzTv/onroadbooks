@@ -25,6 +25,7 @@ import {
 import { FINANCIAL_MODEL_VERSION, isOperatingExpense } from "@/lib/finance/terminology";
 import { periodFromSearchParams } from "@/lib/period-params";
 import { previousPeriod, todayISO } from "@/lib/periods";
+import { planAllows } from "@/lib/plans";
 import { roleCan } from "@/lib/roles";
 
 export const runtime = "nodejs";
@@ -52,8 +53,14 @@ export async function GET(request: NextRequest) {
   const dataset = await getRepository(session.businessId).getDataset();
   const { loads, expenses, settings, goals, reserveAccounts, reserveTransactions, fuelEntries, paymentEvents, financialObligations } = dataset;
 
+  // The web dashboard guards owner planning with `cockpit && ownerPlanning`
+  // (see the dashboard page). Role alone would hand a Solo account the
+  // reserves, Safe to Pay and the projection.
+  const cockpit = planAllows(dataset.subscription, "cockpit");
+  const ownerCockpit = cockpit && ownerPlanning;
+
   const thresholds = thresholdsFromSettings(settings);
-  const ownerReserveAccounts = ownerPlanning ? reserveAccounts : [];
+  const ownerReserveAccounts = ownerCockpit ? reserveAccounts : [];
   const summary = buildFinancialSummary(
     loads,
     expenses,
@@ -71,10 +78,10 @@ export async function GET(request: NextRequest) {
     ownerReserveAccounts,
   );
 
-  const reserveRules = ownerPlanning ? resolveReserveRules(settings, reserveAccounts) : [];
+  const reserveRules = ownerCockpit ? resolveReserveRules(settings, reserveAccounts) : [];
   const ownerPay = summary;
   const costBasis = calculateTrueCostPerMile(loads, expenses, period, settings, period.label);
-  const balances = ownerPlanning
+  const balances = ownerCockpit
     ? calculateReserveBalances(reserveAccounts, reserveTransactions, period)
     : [];
 
@@ -143,7 +150,7 @@ export async function GET(request: NextRequest) {
       revenueDeltaPct: pctChange(summary.bookedRevenue, priorSummary.bookedRevenue),
       netProfitDeltaPct: pctChange(summary.operatingProfit, priorSummary.operatingProfit),
       trueCostPerMile: costBasis.actualCostPerMile,
-      safeToPay: ownerPlanning ? ownerPay.safeToPay : null,
+      safeToPay: ownerCockpit ? ownerPay.safeToPay : null,
       totalMiles: summary.totalMiles,
       deadheadPct: summary.deadheadPct,
       today: {
@@ -156,7 +163,7 @@ export async function GET(request: NextRequest) {
         loadCount: day.loadCount,
         cashActivity: cashToday,
       },
-      planning,
+      planning: cockpit ? planning : null,
       expenseBreakdown: categories.map((c) => ({
         category: c.category,
         label: c.label,

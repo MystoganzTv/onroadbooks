@@ -2,8 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { getMobileSession } from "@/lib/auth/mobile";
 import { getRepository } from "@/lib/db";
-import { calculateIftaReport, currentIftaQuarter } from "@/lib/ifta";
-import { activeTrucks } from "@/lib/fleet";
+import { calculateIftaReport, currentIftaQuarter, iftaPendingScopeTruckIds } from "@/lib/ifta";
 import { iftaReportingTruckIds } from "@/lib/ifta-eligibility";
 
 export const runtime = "nodejs";
@@ -29,9 +28,7 @@ export async function GET(request: NextRequest) {
 
   const dataset = await getRepository(session.businessId).getDataset();
   const includedTruckIds = iftaReportingTruckIds(dataset.trucks);
-  const pendingTruckCount = activeTrucks(dataset.trucks).filter(
-    (truck) => truck.iftaReportingEnabled == null,
-  ).length;
+  const pendingTruckCount = iftaPendingScopeTruckIds(dataset, quarter).length;
   const calculated = calculateIftaReport(dataset, quarter, null, includedTruckIds);
   const report = {
     ...calculated,

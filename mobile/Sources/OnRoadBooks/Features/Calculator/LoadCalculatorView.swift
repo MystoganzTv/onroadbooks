@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// "What rate should I ask? Is this load worth it?" — the two questions the web
 /// app's Load Calculator answers.
@@ -20,19 +21,50 @@ struct LoadCalculatorView: View {
     @State private var isLoading = true
     @State private var refusal: String?
 
-    @State private var grossRate: Double = 0
-    @State private var loadedMiles: Double = 0
-    @State private var deadheadMiles: Double = 0
-    @State private var fuelPrice: Double = 0
-    @State private var mpg: Double = 0
-    @State private var tolls: Double = 0
+    /// Every input is held as TEXT, exactly like Add Load, Add Fuel and Add
+    /// Expense do through `OBNumberRow`. A `TextField(value:format:)` bound
+    /// straight to a Double fights the decimal pad: the leading zero cannot be
+    /// cleared, a half-typed "3." does not parse so the keystroke is reverted,
+    /// and nothing commits until the field loses focus -- which on a decimal
+    /// pad, with no Done key, may never happen. That is what made this screen
+    /// refuse to take new numbers.
+    @State private var grossRateText = ""
+    @State private var loadedMilesText = ""
+    @State private var deadheadMilesText = ""
+    @State private var fuelPriceText = ""
+    @State private var mpgText = ""
+    @State private var tollsText = ""
     @State private var dispatchMode: FeeMode = .percent
-    @State private var dispatchValue: Double = 0
+    @State private var dispatchValueText = ""
     @State private var factoringMode: FeeMode = .percent
-    @State private var factoringValue: Double = 0
-    @State private var otherCost: Double = 0
-    @State private var overheadPerMile: Double = 0
-    @State private var targetProfitPerMile: Double = 0
+    @State private var factoringValueText = ""
+    @State private var otherCostText = ""
+    @State private var overheadPerMileText = ""
+    @State private var targetProfitPerMileText = ""
+
+    private var grossRate: Double { OBNumber.parse(grossRateText) ?? 0 }
+    private var loadedMiles: Double { OBNumber.parse(loadedMilesText) ?? 0 }
+    private var deadheadMiles: Double { OBNumber.parse(deadheadMilesText) ?? 0 }
+    private var fuelPrice: Double { OBNumber.parse(fuelPriceText) ?? 0 }
+    private var mpg: Double { OBNumber.parse(mpgText) ?? 0 }
+    private var tolls: Double { OBNumber.parse(tollsText) ?? 0 }
+    private var dispatchValue: Double { OBNumber.parse(dispatchValueText) ?? 0 }
+    private var factoringValue: Double { OBNumber.parse(factoringValueText) ?? 0 }
+    private var otherCost: Double { OBNumber.parse(otherCostText) ?? 0 }
+    private var overheadPerMile: Double { OBNumber.parse(overheadPerMileText) ?? 0 }
+    private var targetProfitPerMile: Double { OBNumber.parse(targetProfitPerMileText) ?? 0 }
+
+    /// Seeded values go in as text a person would have typed: no trailing
+    /// zeros, and an empty field rather than a "0" that has to be deleted.
+    private static func seedText(_ value: Double?) -> String {
+        guard let value, value != 0 else { return "" }
+        if value == value.rounded() { return String(Int(value)) }
+        var text = String(format: "%.4f", value)
+        while text.contains(".") && (text.hasSuffix("0") || text.hasSuffix(".")) {
+            text.removeLast()
+        }
+        return text
+    }
 
     private var thresholds: RatingThresholds {
         defaults?.thresholds ?? RatingThresholds(great: 1.25, good: 0.75, marginal: 0.25)
@@ -86,6 +118,19 @@ struct LoadCalculatorView: View {
                     }
                     .padding(.vertical, OBSpacing.md)
                 }
+                .scrollDismissesKeyboard(.interactively)
+                .toolbar {
+                    ToolbarItemGroup(placement: .keyboard) {
+                        Spacer()
+                        Button("Listo") {
+                            UIApplication.shared.sendAction(
+                                #selector(UIResponder.resignFirstResponder),
+                                to: nil, from: nil, for: nil
+                            )
+                        }
+                        .foregroundStyle(OBColor.primary)
+                    }
+                }
             }
         }
         .background(OBColor.background)
@@ -100,12 +145,12 @@ struct LoadCalculatorView: View {
         do {
             let seeded = try await repository.fetchCalculatorDefaults()
             defaults = seeded
-            fuelPrice = seeded.fuelPrice ?? 0
-            mpg = seeded.mpg ?? 0
-            dispatchValue = seeded.dispatchPct
-            factoringValue = seeded.factoringPct
-            overheadPerMile = seeded.overheadPerMile
-            targetProfitPerMile = seeded.targetProfitPerMile
+            fuelPriceText = Self.seedText(seeded.fuelPrice)
+            mpgText = Self.seedText(seeded.mpg)
+            dispatchValueText = Self.seedText(seeded.dispatchPct)
+            factoringValueText = Self.seedText(seeded.factoringPct)
+            overheadPerMileText = Self.seedText(seeded.overheadPerMile)
+            targetProfitPerMileText = Self.seedText(seeded.targetProfitPerMile)
             refusal = nil
         } catch APIError.refused(let message) {
             refusal = message
@@ -210,20 +255,20 @@ struct LoadCalculatorView: View {
         VStack(alignment: .leading, spacing: 0) {
             PanelHeader(title: "Trip Details", trailing: nil)
             VStack(spacing: OBSpacing.md) {
-                numberRow("Gross rate", "$", value: $grossRate)
-                numberRow("Loaded miles", "mi", value: $loadedMiles)
-                numberRow("Deadhead miles", "mi", value: $deadheadMiles)
-                numberRow("Fuel price", "$/gal", value: $fuelPrice)
+                OBNumberRow(label: "Gross rate", prefix: "$", placeholder: "700", text: $grossRateText)
+                OBNumberRow(label: "Loaded miles", suffix: "mi", placeholder: "407", text: $loadedMilesText)
+                OBNumberRow(label: "Deadhead miles", suffix: "mi", text: $deadheadMilesText)
+                OBNumberRow(label: "Fuel price", prefix: "$", suffix: "/gal", placeholder: "3.85", text: $fuelPriceText)
                 VStack(alignment: .leading, spacing: 4) {
-                    numberRow("MPG", "mi/gal", value: $mpg)
+                    OBNumberRow(label: "MPG", suffix: "mi/gal", placeholder: "8.5", text: $mpgText)
                     mpgNote
                 }
-                numberRow("Tolls", "$", value: $tolls)
-                feeRow("Dispatch", mode: $dispatchMode, value: $dispatchValue)
-                feeRow("Factoring", mode: $factoringMode, value: $factoringValue)
-                numberRow("Other costs", "$", value: $otherCost)
+                OBNumberRow(label: "Tolls", prefix: "$", text: $tollsText)
+                feeRow("Dispatch", mode: $dispatchMode, text: $dispatchValueText)
+                feeRow("Factoring", mode: $factoringMode, text: $factoringValueText)
+                OBNumberRow(label: "Other costs", prefix: "$", text: $otherCostText)
                 VStack(alignment: .leading, spacing: 4) {
-                    numberRow("Overhead / mi", "$/mi", value: $overheadPerMile)
+                    OBNumberRow(label: "Overhead / mi", prefix: "$", suffix: "/mi", text: $overheadPerMileText)
                     Text(overheadNote)
                         .font(.caption2)
                         .foregroundStyle(defaults?.basisSufficient == false ? OBColor.warn : OBColor.mutedForeground)
@@ -235,36 +280,25 @@ struct LoadCalculatorView: View {
         .padding(.horizontal, OBSpacing.md)
     }
 
-    private func numberRow(_ label: String, _ unit: String, value: Binding<Double>) -> some View {
+    /// The one row `OBNumberRow` cannot cover, because a % / $ switch sits
+    /// between the label and the field. Same text binding, same decimal pad.
+    private func feeRow(_ label: String, mode: Binding<FeeMode>, text: Binding<String>) -> some View {
         HStack {
-            Text(label).font(.subheadline).foregroundStyle(OBColor.foreground)
-            Spacer()
-            TextField(label, value: value, format: .number)
-                .keyboardType(.decimalPad)
-                .multilineTextAlignment(.trailing)
-                .frame(width: 90)
-                .monospacedDigit()
-                .foregroundStyle(OBColor.foreground)
-            Text(unit).font(.caption).foregroundStyle(OBColor.mutedForeground).frame(width: 42, alignment: .leading)
-        }
-    }
-
-    private func feeRow(_ label: String, mode: Binding<FeeMode>, value: Binding<Double>) -> some View {
-        HStack {
-            Text(label).font(.subheadline).foregroundStyle(OBColor.foreground)
-            Spacer()
+            Text(label).foregroundStyle(OBColor.foreground)
+            Spacer(minLength: OBSpacing.sm)
             Picker("", selection: mode) {
                 ForEach(FeeMode.allCases) { m in Text(m.rawValue).tag(m) }
             }
             .pickerStyle(.segmented)
             .frame(width: 90)
-            TextField(label, value: value, format: .number)
+            TextField("0", text: text)
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.trailing)
-                .frame(width: 60)
+                .frame(width: 64)
                 .monospacedDigit()
                 .foregroundStyle(OBColor.foreground)
         }
+        .frame(minHeight: 44)
     }
 
     // MARK: Target rate
@@ -273,7 +307,7 @@ struct LoadCalculatorView: View {
         VStack(alignment: .leading, spacing: 0) {
             PanelHeader(title: "What Rate Should I Ask?", trailing: nil)
             VStack(alignment: .leading, spacing: OBSpacing.md) {
-                numberRow("Target profit / mi", "$/mi", value: $targetProfitPerMile)
+                OBNumberRow(label: "Target profit / mi", prefix: "$", suffix: "/mi", placeholder: "1.50", text: $targetProfitPerMileText)
                 if rates.impossible {
                     Text("Dispatch + factoring fees add up to 100% or more of the rate — no rate can clear a profit at these fee settings.")
                         .font(.caption)

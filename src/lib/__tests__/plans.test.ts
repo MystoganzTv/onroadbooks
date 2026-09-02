@@ -155,6 +155,14 @@ describe("truckAllowance", () => {
     const allowance = truckAllowance(sub({ plan: "FLEET" }), 1);
     assert.equal(allowance.limit, 1);
     assert.equal(allowance.canAdd, false);
+    // It must say why, and it must not sell Fleet to someone already on it.
+    assert.match(allowance.reason ?? "", /subscription is active/);
+    assert.doesNotMatch(allowance.reason ?? "", /separate paid service/);
+  });
+
+  it("still offers Fleet to a one-truck plan that is not Fleet", () => {
+    const allowance = truckAllowance(sub({ plan: "OWNER", status: "ACTIVE" }), 1);
+    assert.equal(allowance.canAdd, false);
     assert.match(allowance.reason ?? "", /separate paid service/);
   });
 });

@@ -485,7 +485,7 @@ export function LoadsTable({
                   </TableCell>
                   <TableCell>
                     <span className="flex items-center justify-between gap-2">
-                      <StatusBadge status={load.status} />
+                      <StatusBadge status={load.status} locale={locale} />
                       <ChevronRight
                         className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
                         aria-hidden

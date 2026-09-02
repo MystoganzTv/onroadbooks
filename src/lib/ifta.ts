@@ -105,6 +105,33 @@ export interface IftaReport {
   netTaxDue: number | null;
 }
 
+/**
+ * Trucks that ran inside the quarter and still have no filing decision.
+ *
+ * Scope is decided over EVERY truck, so the pending check has to be too. It
+ * used to count only ACTIVE trucks, and the two halves disagreed: a unit sold
+ * mid-quarter was dropped from `includedTruckIds` but never counted as
+ * pending, so its miles left the draft in silence and the report still
+ * called itself ready to file. A truck that is gone today still drove the
+ * miles it drove.
+ *
+ * A truck with no activity in the window is not pending — there is nothing to
+ * decide about it for this quarter.
+ */
+export function iftaPendingScopeTruckIds(dataset: Dataset, quarter: string): string[] {
+  const { start, end } = iftaQuarterBounds(quarter);
+  const ran = new Set<string>();
+  for (const load of dataset.loads) {
+    if (load.date >= start && load.date <= end && load.truckId) ran.add(load.truckId);
+  }
+  for (const entry of dataset.fuelEntries) {
+    if (entry.date >= start && entry.date <= end && entry.truckId) ran.add(entry.truckId);
+  }
+  return dataset.trucks
+    .filter((truck) => truck.iftaReportingEnabled == null && ran.has(truck.id))
+    .map((truck) => truck.id);
+}
+
 export function calculateIftaReport(
   dataset: Dataset,
   quarter: string,

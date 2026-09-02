@@ -507,7 +507,8 @@ struct DashboardSnapshot {
     let operatingProfitDelta: (text: String, direction: PerformanceDirection)
 
     let actualCostPerMile: Double
-    let safeToPay: Double
+    /// `nil` when the plan or the role does not include owner planning.
+    let safeToPay: Double?
     let totalMiles: Double
     let deadheadPct: Double            // 0...1
 

@@ -5,6 +5,7 @@ import { getRepository } from "@/lib/db";
 import { calculateSettlement, settlementId, settlementWindows } from "@/lib/finance/settlement";
 import { currentMonth, shiftMonth, todayISO } from "@/lib/periods";
 import { financialModelVersionOf } from "@/lib/finance/terminology";
+import { capabilityRefusal, planAllows } from "@/lib/plans";
 import { roleCan } from "@/lib/roles";
 
 export const runtime = "nodejs";
@@ -28,6 +29,12 @@ export async function GET(request: NextRequest) {
   const fromMonth = shiftMonth(toMonth, -(monthsBack - 1));
 
   const dataset = await getRepository(session.businessId).getDataset();
+  // Settlements are a `cockpit` capability on the web (see the settlements
+  // page), so they are one here too. Role alone is not the gate: on a
+  // single-user account the sole user IS the owner.
+  if (!planAllows(dataset.subscription, "cockpit")) {
+    return NextResponse.json({ error: capabilityRefusal("cockpit") }, { status: 403 });
+  }
   const { loads, expenses, settings, reserveAccounts, settlements } = dataset;
   const today = todayISO();
 
