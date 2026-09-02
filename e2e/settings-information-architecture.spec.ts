@@ -59,6 +59,14 @@ test("permanent account actions live in their proper settings sections", async (
   await expect(page.getByText("Ingresos registrados", { exact: true })).toBeVisible();
   await expect(page.getByText("Booked revenue", { exact: true })).toHaveCount(0);
 
+  // Billing explains access and ownership without sending an established
+  // business back into onboarding. A direct visit still has a safe exit.
+  await page.goto("/plans");
+  await expect(page.getByRole("link", { name: "Repetir configuración" })).toHaveCount(0);
+  await page.goto("/welcome");
+  await page.getByRole("link", { name: "Salir de la configuración" }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+
   // An incomplete selected unit is itself the shortcut to the form that
   // resolves the warning, and the normal Update button receives a quiet nudge.
   await page.goto("/truck");

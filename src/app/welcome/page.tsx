@@ -19,9 +19,8 @@ export async function generateMetadata(): Promise<Metadata> {
  * Deliberately outside the app shell: on a first run the sidebar offers
  * Settlements, Reserves and Analytics before the owner has entered anything,
  * which is noise at exactly the moment they should be answering three
- * questions. Reachable again at any time from Settings, because someone who
- * skipped it should be able to come back rather than hunt for the same fields
- * spread across two pages.
+ * questions. Existing businesses that reach this route directly can leave it
+ * without changing anything; normal edits belong on Settings and Truck.
  */
 export const dynamic = "force-dynamic";
 

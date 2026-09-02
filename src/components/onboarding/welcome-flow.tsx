@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Building2, Check, Loader2, Target, TruckIcon } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, Check, Loader2, Target, TruckIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { localizedClientError } from "@/lib/i18n/errors";
@@ -56,7 +57,8 @@ export function WelcomeFlow({ business, truck, settings, goals, planName, locale
   const steps = [copy.businessStep, copy.truckStep, copy.runStep, copy.doneStep] as const;
   const [step, setStep] = React.useState(0);
   const [pending, startTransition] = React.useTransition();
-  const [businessName, setBusinessName] = React.useState(initialBusinessName(business.name));
+  const existingBusinessName = initialBusinessName(business.name);
+  const [businessName, setBusinessName] = React.useState(existingBusinessName);
 
   const [truckValues, setTruckValues] = React.useState({
     name: truck.name,
@@ -211,6 +213,16 @@ export function WelcomeFlow({ business, truck, settings, goals, planName, locale
 
   return (
     <div className="mx-auto w-full max-w-2xl p-4 py-8 lg:py-12">
+      {existingBusinessName ? (
+        <div className="mb-4 flex justify-end">
+          <Button asChild type="button" variant="ghost" size="sm">
+            <Link href="/dashboard">
+              <ArrowLeft className="size-4" />
+              {copy.exitSetup}
+            </Link>
+          </Button>
+        </div>
+      ) : null}
       <ol className="mb-6 flex items-center gap-2" aria-label={copy.progress}>
         {steps.map((label, index) => (
           <li key={label} className="flex flex-1 items-center gap-2">

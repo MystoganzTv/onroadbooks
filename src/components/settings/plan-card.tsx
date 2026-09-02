@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import {
@@ -381,11 +380,7 @@ export function PlanCard({
           {billingReady
             ? `${copy.billingReady} `
             : `${copy.billingConfiguring} `}
-          {copy.booksRemain}{" "}
-          <Link href="/welcome" className="text-primary underline-offset-2 hover:underline">
-            {copy.runSetupAgain}
-          </Link>
-          .
+          {copy.booksRemain}
         </p>
       </CardContent>
     </Card>
