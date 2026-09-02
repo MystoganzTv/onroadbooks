@@ -57,21 +57,6 @@ function initialState(truck: Truck) {
   };
 }
 
-const FIELD_LABELS: Record<string, string> = {
-  name: "Truck name",
-  year: "Year",
-  make: "Make",
-  model: "Model",
-  vin: "VIN",
-  purchasePrice: "Purchase price",
-  monthlyPayment: "Monthly payment",
-  monthlyInsurance: "Monthly insurance",
-  axleCount: "Power-unit axles",
-  registeredGrossWeightLbs: "Registered gross/combined weight",
-  startingOdometer: "Starting odometer",
-  currentOdometer: "Current odometer",
-};
-
 export function TruckForm({
   truck,
   onCancel,
@@ -83,6 +68,20 @@ export function TruckForm({
 }) {
   const { dictionary, locale } = useLanguage();
   const copy = dictionary.truck;
+  const fieldLabels: Record<string, string> = {
+    name: copy.truckName,
+    year: copy.year,
+    make: copy.make,
+    model: copy.model,
+    vin: "VIN",
+    purchasePrice: copy.purchasePrice,
+    monthlyPayment: copy.monthlyPayment,
+    monthlyInsurance: copy.monthlyInsurance,
+    axleCount: copy.powerAxles,
+    registeredGrossWeightLbs: copy.registeredWeight,
+    startingOdometer: copy.startingOdometer,
+    currentOdometer: copy.currentOdometer,
+  };
   const router = useRouter();
   const [values, setValues] = React.useState(() => initialState(truck));
   const [errors, setErrors] = React.useState<Record<string, string>>({});
@@ -125,7 +124,7 @@ export function TruckForm({
       setErrors(next);
       // A failure the user cannot see is a dead button: announce it, name the
       // fields, and move focus to the first one.
-      toast.error(validationMessage(next, FIELD_LABELS));
+      toast.error(validationMessage(next, fieldLabels));
       requestAnimationFrame(() => focusFirstError("truck-form"));
       return;
     }
@@ -144,8 +143,8 @@ export function TruckForm({
       const result = await updateTruckAction(payload);
       if (result.ok) {
         toast.success(copy.detailsSaved);
-        onSaved?.();
-        router.refresh();
+        if (onSaved) onSaved();
+        else router.refresh();
       } else {
         setErrors(result.fieldErrors ?? {});
         toast.error(localizedClientError(result.error));

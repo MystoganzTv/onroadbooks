@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Gauge, Pencil, ShieldCheck, TruckIcon } from "lucide-react";
 
 import { Metric } from "@/components/shared/metric";
@@ -18,6 +19,7 @@ import {
 import type { Truck } from "@/lib/types";
 import { useLanguage } from "@/components/shell/language-provider";
 import { interpolate } from "@/lib/i18n/dictionaries";
+import { cn } from "@/lib/utils";
 
 interface TruckOverviewProps {
   truck: Truck;
@@ -27,6 +29,7 @@ interface TruckOverviewProps {
   activeTruckCount: number;
   canRestore: boolean;
   profileIncomplete: boolean;
+  initialEditing?: boolean;
 }
 
 /** Read-first truck profile. Editing is an explicit, temporary mode. */
@@ -38,25 +41,47 @@ export function TruckOverview({
   activeTruckCount,
   canRestore,
   profileIncomplete,
+  initialEditing = false,
 }: TruckOverviewProps) {
   const { dictionary, locale } = useLanguage();
   const copy = dictionary.truck;
-  const [editing, setEditing] = React.useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [editing, setEditing] = React.useState(initialEditing);
   const iftaStatus = iftaApplicability(truck);
   const identityIncomplete = ![truck.year, truck.make, truck.model].some(Boolean);
 
+  React.useEffect(() => {
+    if (initialEditing) setEditing(true);
+  }, [initialEditing]);
+
+  const finishEditing = React.useCallback((saved = false) => {
+    setEditing(false);
+    if (searchParams.get("edit") === "truck") {
+      const next = new URLSearchParams(searchParams.toString());
+      next.delete("edit");
+      const query = next.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    } else if (saved) {
+      router.refresh();
+    }
+  }, [pathname, router, searchParams]);
+
   if (editing) {
     return (
-      <TruckForm
-        truck={truck}
-        onCancel={() => setEditing(false)}
-        onSaved={() => setEditing(false)}
-      />
+      <section id="truck-information" aria-label={copy.truckInformation}>
+        <TruckForm
+          truck={truck}
+          onCancel={() => finishEditing(false)}
+          onSaved={() => finishEditing(true)}
+        />
+      </section>
     );
   }
 
   return (
-    <section aria-labelledby="truck-information-title" className="space-y-3">
+    <section id="truck-information" aria-labelledby="truck-information-title" className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 id="truck-information-title" className="text-sm font-semibold">
@@ -66,7 +91,14 @@ export function TruckOverview({
             {copy.informationDescription}
           </p>
         </div>
-        <Button type="button" size="sm" variant="outline" onClick={() => setEditing(true)}>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          title={profileIncomplete ? copy.completeTruckSetup : undefined}
+          className={cn(profileIncomplete && "setup-attention")}
+          onClick={() => setEditing(true)}
+        >
           <Pencil className="size-4" />
           {copy.updateTruck}
         </Button>
@@ -176,10 +208,10 @@ export function TruckOverview({
                 <p className="text-2xs leading-relaxed text-muted-foreground">
                   {profileIncomplete
                     ? identityIncomplete
-                      ? "Skipping truck details kept this starter unit available because every load, expense, fuel purchase and service record must belong to a truck. Use Update truck when you are ready to complete it."
+                      ? copy.starterUnitKept
                       : iftaStatus === "UNKNOWN"
-                        ? "This unit stays active, but its IFTA assessment is still unknown. Add axles, registered weight and operating area under Update truck."
-                        : "This unit stays active, but its IFTA filing decision is still pending. Confirm whether to include or exclude it under Update truck."
+                        ? copy.iftaAssessmentUnknown
+                        : copy.iftaDecisionPending
                     : copy.onlyActive}
                 </p>
               </div>

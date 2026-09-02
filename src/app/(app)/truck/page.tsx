@@ -38,6 +38,7 @@ import { todayISO } from "@/lib/periods";
 import { formatMoneyCompact, formatNumber, formatRate } from "@/lib/formatters";
 import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
 import { getAppLocale } from "@/lib/i18n-server";
+import { cn } from "@/lib/utils";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getAppLocale();
@@ -93,6 +94,8 @@ export default async function TruckPage({
     !description ||
     iftaApplicability(truck) === "UNKNOWN" ||
     truck.iftaReportingEnabled == null;
+  const editTruckHref = `/truck?truck=${encodeURIComponent(truck.id)}&edit=truck#truck-information`;
+  const editRequested = params.edit === "truck" && profileIncomplete;
   const hasLifetimeActivity =
     lifetime.loadCount > 0 ||
     lifetime.bookedRevenue !== 0 ||
@@ -210,32 +213,37 @@ export default async function TruckPage({
               selectedId={truck.id}
               includeAll={false}
               variant="cards"
+              selectedActionHref={profileIncomplete ? editTruckHref : undefined}
             />
           ) : (
             <div className="max-w-2xl">
-              <div className="flex items-center gap-3 rounded-lg border border-primary bg-primary/10 p-3 shadow-sm">
-                <span
-                  className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"
-                  aria-hidden
+              {profileIncomplete ? (
+                <Link
+                  href={editTruckHref}
+                  aria-label={copy.completeTruckSetup}
+                  title={copy.completeTruckSetup}
+                  className={cn(
+                    "group flex items-center gap-3 rounded-lg border border-primary bg-primary/10 p-3 text-left shadow-sm transition-colors focus-ring",
+                    "hover:border-primary/80 hover:bg-primary/15",
+                  )}
                 >
-                  <TruckIcon className="size-4" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{truck.name}</p>
-                  <p className="mt-0.5 truncate text-2xs text-muted-foreground">
-                    {description || copy.detailsNotAdded}
-                  </p>
+                  <CurrentTruckCardContent
+                    truckName={truck.name}
+                    description={description || copy.detailsNotAdded}
+                    badge={copy.selectedIncomplete}
+                    badgeVariant="warning"
+                  />
+                </Link>
+              ) : (
+                <div className="flex items-center gap-3 rounded-lg border border-primary bg-primary/10 p-3 shadow-sm">
+                  <CurrentTruckCardContent
+                    truckName={truck.name}
+                    description={description || copy.detailsNotAdded}
+                    badge={!truck.active ? copy.selectedRetired : copy.selectedActive}
+                    badgeVariant={!truck.active ? "outline" : "positive"}
+                  />
                 </div>
-                <Badge
-                  variant={!truck.active ? "outline" : profileIncomplete ? "warning" : "positive"}
-                >
-                  {!truck.active
-                    ? copy.selectedRetired
-                    : profileIncomplete
-                      ? copy.selectedIncomplete
-                      : copy.selectedActive}
-                </Badge>
-              </div>
+              )}
             </div>
           )}
         </div>
@@ -371,9 +379,38 @@ export default async function TruckPage({
             activeTruckCount={running}
             canRestore={allowance.canAdd}
             profileIncomplete={profileIncomplete}
+            initialEditing={editRequested}
           />
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function CurrentTruckCardContent({
+  truckName,
+  description,
+  badge,
+  badgeVariant,
+}: {
+  truckName: string;
+  description: string;
+  badge: string;
+  badgeVariant: "outline" | "warning" | "positive";
+}) {
+  return (
+    <>
+      <span
+        className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground"
+        aria-hidden
+      >
+        <TruckIcon className="size-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold">{truckName}</span>
+        <span className="mt-0.5 block truncate text-2xs text-muted-foreground">{description}</span>
+      </span>
+      <Badge variant={badgeVariant}>{badge}</Badge>
+    </>
   );
 }

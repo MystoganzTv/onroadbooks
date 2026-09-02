@@ -162,6 +162,35 @@
   }
 }
 
+/* A short, infrequent nudge for the action that resolves incomplete truck setup. */
+@keyframes setup-attention {
+  0%, 72%, 100% {
+    border-color: hsl(var(--border));
+    background-color: transparent;
+    box-shadow: 0 0 0 0 hsl(var(--warn) / 0);
+  }
+  76%, 84% {
+    border-color: hsl(var(--warn));
+    background-color: hsl(var(--warn-soft));
+    box-shadow: 0 0 0 4px hsl(var(--warn) / 0.14);
+  }
+  80%, 88% {
+    border-color: hsl(var(--warn) / 0.55);
+    background-color: hsl(var(--warn-soft) / 0.45);
+    box-shadow: 0 0 0 1px hsl(var(--warn) / 0.05);
+  }
+}
+
+.setup-attention {
+  animation: setup-attention 8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .setup-attention {
+    animation: none;
+  }
+}
+
 @media print {
   /*
    * PRINT

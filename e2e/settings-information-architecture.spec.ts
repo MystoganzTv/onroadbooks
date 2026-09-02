@@ -58,4 +58,14 @@ test("permanent account actions live in their proper settings sections", async (
   await expect(page.getByRole("heading", { name: "Cargas" })).toBeVisible();
   await expect(page.getByText("Ingresos registrados", { exact: true })).toBeVisible();
   await expect(page.getByText("Booked revenue", { exact: true })).toHaveCount(0);
+
+  // An incomplete selected unit is itself the shortcut to the form that
+  // resolves the warning, and the normal Update button receives a quiet nudge.
+  await page.goto("/truck");
+  const updateTruck = page.getByRole("button", { name: "Actualizar camión" });
+  await expect(updateTruck).toBeVisible();
+  await expect(updateTruck).toHaveClass(/setup-attention/);
+  await page.getByRole("link", { name: "Completar configuración del camión" }).click();
+  await expect(page.locator("#truck-form")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Datos del camión" })).toBeVisible();
 });

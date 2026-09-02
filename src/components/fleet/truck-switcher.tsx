@@ -22,6 +22,7 @@ export function TruckSwitcher({
   allLabel,
   includeAll = true,
   variant = "compact",
+  selectedActionHref,
   className,
 }: {
   trucks: Truck[];
@@ -35,6 +36,8 @@ export function TruckSwitcher({
   includeAll?: boolean;
   /** Cards make the current unit unmistakable on the truck workspace. */
   variant?: "compact" | "cards";
+  /** Optional action for the already-selected card, such as completing setup. */
+  selectedActionHref?: string;
   className?: string;
 }) {
   const pathname = usePathname();
@@ -87,7 +90,7 @@ export function TruckSwitcher({
           return (
             <Link
               key={truck.id}
-              href={href(truck.id)}
+              href={active && selectedActionHref ? selectedActionHref : href(truck.id)}
               aria-current={active ? "page" : undefined}
               className={cn(
                 "group flex min-w-0 items-center gap-3 rounded-lg border p-3 text-left transition-colors focus-ring",
