@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { roleCan } from "../roles";
-import { expenseSchema, fuelSchema, invoiceSchema, loadSchema, memberInviteSchema, memberRoleSchema } from "../schemas";
+import { expenseSchema, fuelSchema, invoiceSchema, loadSchema, memberInviteSchema, memberRoleSchema, truckSchema } from "../schemas";
 
 /**
  * The iOS app posts JSON straight at `/api/mobile/loads` and
@@ -173,5 +173,55 @@ describe("the permission each mobile write asks for", () => {
     assert.equal(roleCan("BOOKKEEPER", "manage_fuel"), true);
     assert.equal(roleCan("DISPATCHER", "manage_fuel"), true);
     assert.equal(roleCan("VIEWER", "manage_fuel"), false);
+  });
+});
+
+describe("what the iOS app PATCHes to /api/mobile/truck for the IFTA filing decision", () => {
+  /**
+   * The route loads the truck's existing fields and merges in only
+   * `iftaReportingEnabled` before validating -- this is that merged shape,
+   * the same one `updateTruckByIdAction` would receive from the web form.
+   */
+  const mergedFromPhone = {
+    name: "Freightliner 12",
+    acquiredOn: null,
+    year: 2019,
+    make: "Freightliner",
+    model: "Cascadia",
+    vin: null,
+    purchasePrice: null,
+    monthlyPayment: null,
+    monthlyInsurance: null,
+    axleCount: null,
+    registeredGrossWeightLbs: null,
+    operatesInMultipleIftaJurisdictions: null,
+    iftaReportingEnabled: true,
+    startingOdometer: 100000,
+    currentOdometer: 210500,
+  };
+
+  it("is accepted by the same truckSchema the web truck form uses, for true, false, and null", () => {
+    assert.equal(truckSchema.safeParse(mergedFromPhone).success, true);
+    assert.equal(
+      truckSchema.safeParse({ ...mergedFromPhone, iftaReportingEnabled: false }).success,
+      true,
+    );
+    assert.equal(
+      truckSchema.safeParse({ ...mergedFromPhone, iftaReportingEnabled: null }).success,
+      true,
+    );
+  });
+
+  it("still refuses what the web form would refuse -- this isn't a looser truck editor", () => {
+    assert.equal(truckSchema.safeParse({ ...mergedFromPhone, name: "" }).success, false);
+    assert.equal(
+      truckSchema.safeParse({ ...mergedFromPhone, currentOdometer: -1 }).success,
+      false,
+    );
+  });
+
+  it("gates on manage_fleet, same as createTruckAction/updateTruckByIdAction", () => {
+    assert.equal(roleCan("OWNER", "manage_fleet"), true);
+    assert.equal(roleCan("VIEWER", "manage_fleet"), false);
   });
 });

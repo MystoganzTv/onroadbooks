@@ -50,4 +50,13 @@ protocol LedgerRepository {
     @discardableResult func inviteTeamMember(email: String, name: String?, role: AssignableRole) async throws -> String
     @discardableResult func updateTeamMemberRole(userId: String, role: AssignableRole) async throws -> String
     func removeTeamMember(userId: String) async throws
+
+    /// The truck-level IFTA filing decision (`Truck.iftaReportingEnabled` on
+    /// the web) -- Included / Excluded / no decision yet. Same full-replace
+    /// `truckSchema` write the web's Truck form and fleet dialog make; see
+    /// `PATCH /api/mobile/truck`. Never queued, like a team change: it is a
+    /// deliberate settings decision, not a record from the road, and holding
+    /// it silently offline would leave the IFTA report looking wrong for no
+    /// reason the owner could see.
+    @discardableResult func updateTruckIftaFilingScope(truckId: String, iftaReportingEnabled: Bool?) async throws -> String
 }

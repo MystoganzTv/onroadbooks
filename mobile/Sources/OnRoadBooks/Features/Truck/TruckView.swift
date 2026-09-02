@@ -13,6 +13,10 @@ struct TruckView: View {
     @State private var isLoading = true
     @State private var failure: String?
 
+    @State private var filingScope: FilingScope = .undecided
+    @State private var isSavingFilingScope = false
+    @State private var filingScopeSaveFailed = false
+
     var body: some View {
         Group {
             if isLoading {
@@ -64,6 +68,8 @@ struct TruckView: View {
                 .padding(OBSpacing.md)
                 .obPanel()
                 .padding(.horizontal, OBSpacing.md)
+
+                iftaFilingScopeCard(truck)
 
                 // Per mile is how a truck is judged: the totals below are the
                 // same numbers, but nobody compares two trucks by revenue.
@@ -145,6 +151,58 @@ struct TruckView: View {
         Rectangle().fill(OBColor.border).frame(height: 1).padding(.leading, OBSpacing.md)
     }
 
+    /// The per-truck IFTA filing decision (`Truck.iftaReportingEnabled` on the
+    /// web) -- Included / Excluded / no decision yet. Same three states the
+    /// web's Truck form and fleet dialog offer; see `iftaReportingLabel` in
+    /// `lib/ifta-eligibility.ts`. Settable from the phone now instead of only
+    /// from the web, so a truck IFTA is still waiting on doesn't have to sit
+    /// there until someone opens a laptop.
+    @ViewBuilder
+    private func iftaFilingScopeCard(_ truck: TruckSummary) -> some View {
+        VStack(alignment: .leading, spacing: OBSpacing.sm) {
+            LabelXS("Declaración trimestral de IFTA")
+            Picker("Declaración trimestral de IFTA", selection: $filingScope) {
+                Text("Sin decidir").tag(FilingScope.undecided)
+                Text("Incluido").tag(FilingScope.included)
+                Text("Excluido").tag(FilingScope.excluded)
+            }
+            .pickerStyle(.segmented)
+            .disabled(isSavingFilingScope)
+            Text(filingScope == .undecided
+                 ? "Sin esta decisión, el reporte de IFTA no puede completarse."
+                 : "Puedes cambiarlo cuando quieras — afecta el próximo reporte de IFTA.")
+                .font(.caption)
+                .foregroundStyle(OBColor.mutedForeground)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(OBSpacing.md)
+        .obPanel()
+        .padding(.horizontal, OBSpacing.md)
+        .onChange(of: filingScope) { newValue in
+            guard newValue.value != truck.iftaReportingEnabled else { return }
+            Task { await saveFilingScope(truckId: truck.id, newValue: newValue) }
+        }
+        .alert("No se pudo guardar", isPresented: $filingScopeSaveFailed) {
+            Button("Entendido") {}
+        } message: {
+            Text("No se pudo guardar la decisión de IFTA. Inténtalo de nuevo.")
+        }
+    }
+
+    private func saveFilingScope(truckId: String, newValue: FilingScope) async {
+        isSavingFilingScope = true
+        do {
+            try await repository.updateTruckIftaFilingScope(truckId: truckId, iftaReportingEnabled: newValue.value)
+            await reload()
+        } catch {
+            filingScopeSaveFailed = true
+            // Snap the control back to what the server actually has, rather
+            // than showing a choice that didn't take.
+            filingScope = FilingScope(truck?.iftaReportingEnabled)
+        }
+        isSavingFilingScope = false
+    }
+
     private func rateTile(_ label: String, _ value: Double, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             LabelXS(label)
@@ -173,12 +231,39 @@ struct TruckView: View {
 
     private func reload() async {
         do {
-            truck = try await repository.fetchTruck()
+            let fetched = try await repository.fetchTruck()
+            truck = fetched
+            filingScope = FilingScope(fetched.iftaReportingEnabled)
             failure = nil
         } catch {
             failure = (error as? LocalizedError)?.errorDescription
         }
         isLoading = false
+    }
+}
+
+/// Three states, same as `Truck.iftaReportingEnabled: boolean | null` on the
+/// web -- `.undecided` is the initial state a truck starts in, not a fourth
+/// option a user can pick their way back to once they've decided.
+private enum FilingScope: Hashable {
+    case undecided
+    case included
+    case excluded
+
+    init(_ enabled: Bool?) {
+        switch enabled {
+        case true: self = .included
+        case false: self = .excluded
+        case nil: self = .undecided
+        }
+    }
+
+    var value: Bool? {
+        switch self {
+        case .included: return true
+        case .excluded: return false
+        case .undecided: return nil
+        }
     }
 }
 

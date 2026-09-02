@@ -292,11 +292,15 @@ struct MaintenanceDueItem: Identifiable, Hashable {
 
 struct TruckSummary {
     let periodLabel: String
+    let id: String
     let name: String
     let detail: String?
     let vin: String?
     let odometer: Int
     let truckCount: Int
+    /// Owner's per-truck IFTA filing decision. Nil = no decision made yet,
+    /// same three states as the web's Included/Excluded/"Decision needed".
+    let iftaReportingEnabled: Bool?
 
     let revenue: Double
     let expenses: Double

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getMobileSession } from "@/lib/auth/mobile";
+import { getMobileSession, requireMobileWrite } from "@/lib/auth/mobile";
 import { fuelInPeriod, summarizeFuel, truckLifetime } from "@/lib/calculations";
 import { getRepository } from "@/lib/db";
 import { orderedTrucks, primaryTruck, truckById } from "@/lib/fleet";
@@ -8,6 +8,9 @@ import { thresholdsFrom, upcomingMaintenance } from "@/lib/maintenance";
 import { periodFromSearchParams } from "@/lib/period-params";
 import { todayISO } from "@/lib/periods";
 import { FINANCIAL_MODEL_VERSION } from "@/lib/finance/terminology";
+import { truckSchema } from "@/lib/schemas";
+import { fieldErrorsFrom } from "@/lib/actions/types";
+import { revalidatePath } from "next/cache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,6 +58,10 @@ export async function GET(request: NextRequest) {
           .join(" ") || null,
         vin: truck.vin ?? null,
         odometer: truck.currentOdometer,
+        // Owner's per-truck IFTA filing decision -- same field the web's
+        // Truck form and fleet dialog write, surfaced here so the phone can
+        // show and, below, change it. Null = no decision made yet.
+        iftaReportingEnabled: truck.iftaReportingEnabled ?? null,
       },
       truckCount: trucks.length,
       lifetime: {
@@ -95,4 +102,82 @@ export async function GET(request: NextRequest) {
     },
     { headers: { "Cache-Control": "no-store, max-age=0" } },
   );
+}
+/**
+ * Set this truck's per-truck IFTA filing decision from the phone.
+ *
+ * `truckSchema.updateTruck` is a full replace of the truck row (see
+ * `updateTruckByIdAction` in `lib/actions/trucks.ts`) -- fields the web form
+ * would have resubmitted unchanged get wiped to null if we don't send them
+ * too. So this loads the truck exactly as the web form would have, merges in
+ * only `iftaReportingEnabled`, and validates + saves through the same
+ * `truckSchema` and `repository.updateTruck` the web action uses. No
+ * mobile-only truck-edit logic; this is the one field IFTA needs from a
+ * truck screen, not a truck editor.
+ */
+export async function PATCH(request: NextRequest) {
+  const gate = await requireMobileWrite(request, "manage_fleet");
+  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Expected a JSON body." }, { status: 400 });
+  }
+
+  const { truckId, iftaReportingEnabled } = (body ?? {}) as {
+    truckId?: unknown;
+    iftaReportingEnabled?: unknown;
+  };
+  if (typeof truckId !== "string" || !truckId) {
+    return NextResponse.json({ error: "truckId is required." }, { status: 422 });
+  }
+  if (iftaReportingEnabled !== null && typeof iftaReportingEnabled !== "boolean") {
+    return NextResponse.json(
+      { error: "iftaReportingEnabled must be true, false, or null." },
+      { status: 422 },
+    );
+  }
+
+  const dataset = await gate.repository.getDataset();
+  const truck = truckById(dataset.trucks, truckId);
+  if (!truck) {
+    return NextResponse.json({ error: "That truck does not belong to this workspace." }, { status: 404 });
+  }
+
+  const parsed = truckSchema.safeParse({
+    name: truck.name,
+    acquiredOn: truck.acquiredOn,
+    year: truck.year,
+    make: truck.make,
+    model: truck.model,
+    vin: truck.vin,
+    purchasePrice: truck.purchasePrice,
+    monthlyPayment: truck.monthlyPayment,
+    monthlyInsurance: truck.monthlyInsurance,
+    axleCount: truck.axleCount ?? null,
+    registeredGrossWeightLbs: truck.registeredGrossWeightLbs ?? null,
+    operatesInMultipleIftaJurisdictions: truck.operatesInMultipleIftaJurisdictions ?? null,
+    iftaReportingEnabled,
+    startingOdometer: truck.startingOdometer,
+    currentOdometer: truck.currentOdometer,
+  });
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Check the highlighted fields.", fieldErrors: fieldErrorsFrom(parsed.error.issues) },
+      { status: 422 },
+    );
+  }
+
+  try {
+    await gate.repository.updateTruck(parsed.data, truckId);
+    for (const path of ["/truck", "/ifta", "/dashboard"]) revalidatePath(path);
+    return NextResponse.json({ id: truckId }, { status: 200 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Could not save the truck." },
+      { status: 400 },
+    );
+  }
 }

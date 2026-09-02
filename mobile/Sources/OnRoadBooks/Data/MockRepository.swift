@@ -160,11 +160,13 @@ final class MockRepository: LedgerRepository {
         // out, 3,339 miles. Change one, check the others still add up.
         TruckSummary(
             periodLabel: "August 2026 · Full Month",
+            id: "truck_demo_1",
             name: "Unit 1",
             detail: "2021 Freightliner Cascadia",
             vin: nil,
             odometer: 268_412,
             truckCount: 1,
+            iftaReportingEnabled: mockTruckIftaReportingEnabled,
             revenue: 9795.00,
             expenses: 6143.90,
             profit: 3651.10,
@@ -254,6 +256,10 @@ final class MockRepository: LedgerRepository {
     /// Two members: the demo "owner" and a Bookkeeper, the exact shape of the
     /// workflow this screen exists for -- inviting an outside accountant
     /// without giving them the keys to billing or the account itself.
+    /// Mutable so the Truck screen's IFTA filing picker actually does
+    /// something in demo mode, same reasoning as `teamMembers` below.
+    private var mockTruckIftaReportingEnabled: Bool? = true
+
     private var teamMembers: [TeamMember] = [
         TeamMember(id: "owner", email: "propietario@ejemplo.com", name: nil,
                    role: .owner, joinedAt: mockDate(2026, 1, 6), invitedAt: nil),
@@ -289,6 +295,12 @@ final class MockRepository: LedgerRepository {
 
     func removeTeamMember(userId: String) async throws {
         teamMembers.removeAll { $0.id == userId }
+    }
+
+    @discardableResult
+    func updateTruckIftaFilingScope(truckId: String, iftaReportingEnabled: Bool?) async throws -> String {
+        mockTruckIftaReportingEnabled = iftaReportingEnabled
+        return truckId
     }
 
     func fetchInvoices() async throws -> InvoiceLedger {

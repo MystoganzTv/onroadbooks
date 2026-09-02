@@ -234,6 +234,14 @@ final class APIRepository: LedgerRepository {
         try await get("api/mobile/truck", as: TruckResponseDTO.self).toDomain()
     }
 
+    @discardableResult
+    func updateTruckIftaFilingScope(truckId: String, iftaReportingEnabled: Bool?) async throws -> String {
+        try await directWrite(
+            "api/mobile/truck", method: "PATCH",
+            body: UpdateTruckIftaScopeDTO(truckId: truckId, iftaReportingEnabled: iftaReportingEnabled)
+        )
+    }
+
     func fetchAnalytics() async throws -> AnalyticsSnapshot {
         try await get("api/mobile/analytics", as: AnalyticsResponseDTO.self).toDomain()
     }
@@ -641,6 +649,29 @@ private struct IftaResponseDTO: Decodable {
     }
 }
 
+private struct UpdateTruckIftaScopeDTO: Encodable {
+    let truckId: String
+    let iftaReportingEnabled: Bool?
+
+    // Swift's synthesized Encodable OMITS an optional key entirely when it's
+    // nil; the server needs the key present with a JSON `null` to tell "no
+    // decision yet" apart from "field not sent" (see `PATCH` in
+    // `api/mobile/truck/route.ts`), so this encodes it explicitly.
+    private enum CodingKeys: String, CodingKey {
+        case truckId, iftaReportingEnabled
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(truckId, forKey: .truckId)
+        if let iftaReportingEnabled {
+            try container.encode(iftaReportingEnabled, forKey: .iftaReportingEnabled)
+        } else {
+            try container.encodeNil(forKey: .iftaReportingEnabled)
+        }
+    }
+}
+
 private struct TruckResponseDTO: Decodable {
     struct Truck: Decodable {
         let id: String
@@ -648,6 +679,7 @@ private struct TruckResponseDTO: Decodable {
         let detail: String?
         let vin: String?
         let odometer: Int
+        let iftaReportingEnabled: Bool?
     }
 
     struct Lifetime: Decodable {
@@ -682,11 +714,13 @@ private struct TruckResponseDTO: Decodable {
     func toDomain() -> TruckSummary {
         TruckSummary(
             periodLabel: periodLabel,
+            id: truck.id,
             name: truck.name,
             detail: truck.detail,
             vin: truck.vin,
             odometer: truck.odometer,
             truckCount: truckCount,
+            iftaReportingEnabled: truck.iftaReportingEnabled,
             revenue: lifetime.revenue,
             expenses: lifetime.expenses,
             profit: lifetime.profit,
