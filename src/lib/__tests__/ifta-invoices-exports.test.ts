@@ -204,10 +204,27 @@ describe("native exports", () => {
     assert.deepEqual(workbook.worksheets.map((sheet) => sheet.name), packet.sheetNames);
     const summary = workbook.getWorksheet("Summary")!;
     assert.match(String(summary.getCell("A1").value), /EPS Logistics LLC.*2026 YEAR-END REPORT/);
+    assert.equal(summary.getCell("A5").value, "YOU EARNED");
+    assert.equal(summary.getCell("D5").value, "YOUR BUSINESS MADE");
+    assert.equal(summary.getCell("G5").value, "YOU COLLECTED");
+    assert.equal(summary.getCell("J5").value, "STILL OWED");
     assert.equal(summary.getCell("A6").value, 37_570);
     assert.equal(summary.getCell("A6").numFmt, '$#,##0.00;[Red]($#,##0.00);-');
+    assert.equal(summary.getCell("A10").value, "YOUR YEAR BY MONTH");
+    assert.equal(summary.getCell("A11").value, "Month");
+    assert.equal(summary.getCell("A12").value, "You earned");
     assert.equal(summary.views[0]?.showGridLines, false);
-    assert.match(String(summary.pageSetup.printArea), /^A1:H/);
+    assert.match(String(summary.pageSetup.printArea), /^A1:M/);
+
+    const monthly = workbook.getWorksheet("Monthly Trends")!;
+    assert.equal(monthly.getCell("A10").value, "Month");
+    assert.equal(monthly.getCell("A11").value, "Jan");
+    assert.equal(monthly.getCell("A22").value, "Dec");
+
+    const review = workbook.getWorksheet("Review & Checks")!;
+    assert.equal(review.getCell("A10").value, "Status");
+    assert.equal(review.getCell("B10").value, "What happened");
+    assert.equal(review.getCell("F10").value, "What to do");
 
     const loads = workbook.getWorksheet("Loads")!;
     assert.equal(loads.getCell("A4").value, "LOADS MOVED");
