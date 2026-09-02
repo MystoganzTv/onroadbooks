@@ -97,24 +97,28 @@ export default async function LoadsPage({
           label="Loads"
           value={formatNumber(summary.loadCount)}
           sub="in period"
+          help="Records whose pickup date falls inside the selected period."
           wrapText
         />
         <MiniStat
           label="Booked Revenue"
           value={formatMoneyCompact(summary.bookedRevenue)}
           tone="info"
+          help="Gross amount earned on these loads, whether customers have paid yet or not."
           wrapText
         />
         <MiniStat
           label="Total Miles"
           value={formatNumber(summary.totalMiles)}
           sub="mi"
+          help="Loaded miles plus deadhead miles across the selected loads."
           wrapText
         />
         <MiniStat
           label="Deadhead %"
           value={formatPercent(summary.deadheadPct)}
           tone={isDeadheadElevated(summary.deadheadPct, settings.deadheadWarnPct) ? "warning" : "positive"}
+          help="Share of total miles driven empty. Lower is generally better."
           wrapText
         />
         <MiniStat
@@ -122,6 +126,7 @@ export default async function LoadsPage({
           value={formatMoneyCompact(tripExpenses)}
           tone="negative"
           sub="trip costs + paid driver"
+          help="Fuel, tolls, dispatch, factoring, other trip costs and paid driver amounts attached directly to these loads."
           wrapText
         />
         <MiniStat
@@ -129,6 +134,7 @@ export default async function LoadsPage({
           value={formatRate(summary.revenuePerMile)}
           tone="info"
           sub={`Contribution Profit ${formatMoneyCompact(tripProfit)}`}
+          help="Gross load revenue divided by every loaded and deadhead mile driven."
           wrapText
         />
         <MiniStat
@@ -136,6 +142,7 @@ export default async function LoadsPage({
           value={formatMoneyCompact(allocatedOperatingCosts)}
           tone="negative"
           sub={`${costBasis.basisLabel} estimate`}
+          help="Estimated share of recurring business overhead, using the trailing cost per mile. These are not direct trip costs."
           wrapText
         />
         <MiniStat
@@ -143,6 +150,7 @@ export default async function LoadsPage({
           value={formatMoneyCompact(fullyLoadedOperatingProfit)}
           tone={fullyLoadedOperatingProfit >= 0 ? "positive" : "negative"}
           sub="does not change rating"
+          help="Contribution profit after estimated operating overhead. It does not change individual load ratings."
           wrapText
         />
         <MiniStat
@@ -150,6 +158,7 @@ export default async function LoadsPage({
           value={formatMoneyCompact(debtCashBurden)}
           tone="warning"
           sub="separate from profitability"
+          help="Debt payments allocated by mileage. This affects cash, but is kept separate from operating profitability."
           wrapText
         />
       </section>
