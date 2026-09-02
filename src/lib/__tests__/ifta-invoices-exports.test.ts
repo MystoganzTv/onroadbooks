@@ -225,6 +225,7 @@ describe("native exports", () => {
     assert.equal(review.getCell("A10").value, "Status");
     assert.equal(review.getCell("B10").value, "What happened");
     assert.equal(review.getCell("F10").value, "What to do");
+    assert.equal(review.getCell("C11").numFmt, '#,##0;[Red](#,##0);-');
 
     const loads = workbook.getWorksheet("Loads")!;
     assert.equal(loads.getCell("A4").value, "LOADS MOVED");
@@ -241,12 +242,51 @@ describe("native exports", () => {
     assert.equal((loads.views[0] as ExcelJS.WorksheetViewFrozen | undefined)?.ySplit, 10);
     assert.equal(loads.pageSetup.fitToWidth, 3);
 
+    const loadHeaders = loads.getRow(10).values as ExcelJS.CellValue[];
+    const deadheadMilesColumn = loadHeaders.findIndex((value) => value === "Deadhead Miles");
+    const deadheadPercentColumn = loadHeaders.findIndex((value) => value === "Deadhead %");
+    assert.equal(loads.getCell(11, deadheadMilesColumn).numFmt, '#,##0;[Red](#,##0);-');
+    assert.equal(loads.getCell(11, deadheadPercentColumn).numFmt, '0.0"%";[Red](0.0"%");-');
+
+    const profitLoss = workbook.getWorksheet("Profit Loss")!;
+    const profitLossHeaders = profitLoss.getRow(10).values as ExcelJS.CellValue[];
+    const perMileColumn = profitLossHeaders.findIndex((value) => value === "Per Total Mile");
+    assert.equal(profitLoss.getCell(15, perMileColumn).numFmt, '$0.00;[Red]($0.00);-');
+    assert.notEqual((profitLoss.getCell("E10").fill as ExcelJS.FillPattern | undefined)?.pattern, "solid");
+
+    const expenses = workbook.getWorksheet("Expenses")!;
+    assert.ok(
+      Array.from({ length: Math.max(0, expenses.rowCount - 10) }, (_, index) => expenses.getRow(index + 11).height ?? 0)
+        .some((height) => height > 21),
+      "wrapped expense notes should receive enough row height",
+    );
+
     for (const sheetName of packet.sheetNames.slice(1)) {
       const detail = workbook.getWorksheet(sheetName)!;
       assert.ok(detail.getCell("A4").value, `${sheetName} should have a report summary`);
       assert.ok(detail.getCell("A10").value, `${sheetName} should have a visible table header`);
       assert.equal(detail.views[0]?.showGridLines, false);
     }
+  });
+
+  it("presents a negative cash position as a positive, explained funding gap", async () => {
+    const table = {
+      title: "Financial Summary — Whole fleet — 2026",
+      columns: ["Line", "Amount", "Per Total Mile", "Notes"],
+      rows: [
+        ["Booked Revenue", 5_200, 3.64, "3 loads"],
+        ["Total operating expenses", 2_381.69, 1.67, "Operating costs"],
+        ["Operating Profit", 2_818.31, 1.97, "54.2% margin"],
+        ["Cash After Debt Service", -2_695.69, -1.89, "Collected cash less outflows"],
+      ],
+    };
+    const bytes = await toXlsxWorkbook([table], ["Profit Loss"]);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(bytes.buffer as ArrayBuffer);
+    const sheet = workbook.getWorksheet("Profit Loss")!;
+    assert.equal(sheet.getCell("G4").value, "CASH GAP AFTER DEBT");
+    assert.equal(sheet.getCell("G5").value, 2_695.69);
+    assert.equal(sheet.getCell("G7").value, "Cash out + debt exceeded collections");
   });
   it("creates a real PDF document", async () => {
     const bytes = await toPdf(table);

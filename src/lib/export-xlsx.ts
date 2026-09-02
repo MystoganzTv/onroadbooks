@@ -46,8 +46,19 @@ function safeCell(value: string | number): string | number | null {
 function numberFormat(column: string): string {
   const name = column.toLowerCase();
   if (name.includes("date")) return "yyyy-mm-dd";
-  if (name.includes("%") || name.includes("margin") || name.includes("deadhead")) return PERCENT_FORMAT;
-  if (name.includes("per mile") || name.includes("/mile") || name.includes("price/gallon")) return RATE_FORMAT;
+  if (name.includes("%") || name.includes("margin") || name === "deadhead rate") return PERCENT_FORMAT;
+  if (
+    name.includes("price/gallon") ||
+    (name.includes("mile") && (
+      name.includes("rate") ||
+      name.includes("per ") ||
+      name.includes("/mile") ||
+      name.includes("cost") ||
+      name.includes("profit") ||
+      name.includes("revenue") ||
+      name.includes("contribution")
+    ))
+  ) return RATE_FORMAT;
   if (
     name.includes("amount") ||
     name.includes("cost") ||
@@ -69,7 +80,11 @@ function numberFormat(column: string): string {
     name.includes("odometer") ||
     name.includes("weight") ||
     name.includes("length") ||
-    name.includes("loads")
+    name.includes("loads") ||
+    name.includes("records") ||
+    name.includes("transactions") ||
+    name.includes("trips") ||
+    name.includes("stops")
   ) return INTEGER_FORMAT;
   if (name.includes("gallon")) return DECIMAL_FORMAT;
   return DECIMAL_FORMAT;
@@ -192,10 +207,13 @@ function writeDetailSheet(workbook: ExcelJS.Workbook, table: ReportTable, name: 
 
   const header = sheet.getRow(10);
   header.values = table.columns;
-  header.font = { name: "Aptos", bold: true, size: 10, color: { argb: COLORS.white } };
-  header.fill = solid(COLORS.navyMid);
-  header.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
-  header.height = 32;
+  for (let columnNumber = 1; columnNumber <= columnCount; columnNumber += 1) {
+    const cell = header.getCell(columnNumber);
+    cell.font = { name: "Aptos", bold: true, size: 9, color: { argb: COLORS.white } };
+    cell.fill = solid(COLORS.navyMid);
+    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+  }
+  header.height = 38;
 
   if (table.rows.length === 0) {
     sheet.mergeCells(`A11:${lastColumn}13`);
@@ -214,6 +232,7 @@ function writeDetailSheet(workbook: ExcelJS.Workbook, table: ReportTable, name: 
   if (name === "Review & Checks") styleReviewChecks(sheet, table);
 
   setColumnWidths(sheet, table);
+  setReadableRowHeights(sheet, table, 11);
   for (let column = columnCount + 1; column <= presentationColumnCount; column += 1) {
     sheet.getColumn(column).width = 12;
   }
@@ -268,7 +287,7 @@ function detailKpis(table: ReportTable, sheetName: string): DetailKpi[] {
     return [
       { label: "YOU EARNED", value: earned, format: "money", accent: COLORS.blue, note: "Revenue booked across 12 months" },
       { label: "YOUR BUSINESS MADE", value: profit, format: "money", accent: profit >= 0 ? COLORS.green : COLORS.red, note: "After business expenses" },
-      { label: "CASH AFTER DEBT", value: cashAfterDebt, format: "money", accent: cashAfterDebt >= 0 ? COLORS.green : COLORS.red, note: "Collected cash less outflows" },
+      cashPositionKpi(cashAfterDebt),
       { label: "PROFIT / MILE", value: miles ? profit / miles : 0, format: "rate", accent: COLORS.green, note: `Across ${Math.round(miles).toLocaleString("en-US")} miles` },
     ];
   }
@@ -323,7 +342,7 @@ function detailKpis(table: ReportTable, sheetName: string): DetailKpi[] {
       { label: "YOU EARNED", value: statementValue(table, "Booked Revenue"), format: "money", accent: COLORS.blue, note: "Revenue booked in the period" },
       { label: "BUSINESS EXPENSES", value: statementValue(table, "Total operating expenses"), format: "money", accent: COLORS.red, note: "Operating costs" },
       { label: "YOUR BUSINESS MADE", value: profit, format: "money", accent: profit >= 0 ? COLORS.green : COLORS.red, note: "Revenue less operating costs" },
-      { label: "CASH AFTER DEBT", value: cashAfterDebt, format: "money", accent: cashAfterDebt >= 0 ? COLORS.green : COLORS.red, note: "Collected cash less outflows" },
+      cashPositionKpi(cashAfterDebt),
     ];
   }
 
@@ -358,6 +377,24 @@ function detailKpis(table: ReportTable, sheetName: string): DetailKpi[] {
   return [
     { label: "RECORDS", value: table.rows.length, format: "integer", accent: COLORS.blue, note: "Rows included in this report" },
   ];
+}
+
+function cashPositionKpi(cashAfterDebt: number): DetailKpi {
+  return cashAfterDebt < 0
+    ? {
+      label: "CASH GAP AFTER DEBT",
+      value: Math.abs(cashAfterDebt),
+      format: "money",
+      accent: COLORS.red,
+      note: "Cash out + debt exceeded collections",
+    }
+    : {
+      label: "CASH AFTER DEBT",
+      value: cashAfterDebt,
+      format: "money",
+      accent: COLORS.green,
+      note: "Collected cash less business cash out + debt",
+    };
 }
 
 function writeDetailKpis(sheet: ExcelJS.Worksheet, kpis: DetailKpi[], availableColumns: number): void {
@@ -571,7 +608,33 @@ function setColumnWidths(sheet: ExcelJS.Worksheet, table: ReportTable): void {
     const numeric = /amount|cost|revenue|profit|rate|mile|gallon|odometer|weight|length|%/.test(lower);
     const date = lower.includes("date");
     const longText = /notes|description|origin|destination|linked load|financial treatment|what happened|why it matters|what to do/.test(lower);
-    column.width = longText ? Math.min(34, Math.max(18, natural)) : date ? 13 : numeric ? Math.min(16, Math.max(11, natural)) : Math.min(24, Math.max(12, natural));
+    column.width = longText
+      ? Math.min(38, Math.max(20, natural))
+      : date
+        ? 15
+        : numeric
+          ? Math.min(18, Math.max(13, natural))
+          : Math.min(26, Math.max(13, natural));
+  });
+}
+
+function setReadableRowHeights(sheet: ExcelJS.Worksheet, table: ReportTable, firstDataRow: number): void {
+  const wrappedColumns = table.columns
+    .map((header, index) => ({ header: header.toLowerCase(), index }))
+    .filter(({ header }) => /notes|description|what happened|why it matters|what to do/.test(header));
+
+  table.rows.forEach((values, rowIndex) => {
+    const row = sheet.getRow(firstDataRow + rowIndex);
+    let requiredHeight = Number(row.height) || 21;
+    for (const { index } of wrappedColumns) {
+      const text = String(values[index] ?? "").trim();
+      if (!text) continue;
+      const width = Number(sheet.getColumn(index + 1).width) || 20;
+      const lines = Math.max(1, Math.ceil(text.length / Math.max(8, width - 2)));
+      requiredHeight = Math.max(requiredHeight, Math.min(66, lines * 15 + 6));
+      row.getCell(index + 1).alignment = { vertical: "middle", horizontal: "left", wrapText: true };
+    }
+    row.height = requiredHeight;
   });
 }
 
