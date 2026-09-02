@@ -37,6 +37,7 @@ import type {
   LoadInput,
   MaintenanceInput,
 } from "../db/repository";
+import { BusinessNotFoundError } from "../db/repository";
 import { loadExpenseId } from "../load-expenses";
 
 const SANDBOX = mkdtempSync(path.join(tmpdir(), "onroad-books-store-"));
@@ -162,7 +163,10 @@ describe("business scoping", () => {
   });
 
   it("refuses to read another business's dataset", async () => {
-    await assert.rejects(() => intruder.getDataset(), /does not have access/);
+    await assert.rejects(
+      () => intruder.getDataset(),
+      (error: unknown) => error instanceof BusinessNotFoundError,
+    );
   });
 
   it("refuses to write to another business's dataset", async () => {

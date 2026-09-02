@@ -81,7 +81,7 @@ import type {
   SubscriptionInput,
   TruckInput,
 } from "./repository";
-import { newId } from "./repository";
+import { BusinessNotFoundError, newId } from "./repository";
 
 /**
  * Prisma + PostgreSQL implementation.
@@ -733,7 +733,7 @@ export class PrismaRepository implements Repository {
 
     // The session names a business that does not exist. That is not a state
     // to recover from silently -- it means a stale or forged cookie.
-    throw new Error("This session does not have access to that business.");
+    throw new BusinessNotFoundError();
   }
 
   async getDataset(): Promise<Dataset> {

@@ -49,6 +49,19 @@ import type {
   Truck,
 } from "../types";
 
+/**
+ * The requested workspace no longer exists in the configured data store.
+ *
+ * Keeping this as a distinct error lets trusted integrations acknowledge
+ * events for deleted workspaces without swallowing transient database errors.
+ */
+export class BusinessNotFoundError extends Error {
+  constructor() {
+    super("This session does not have access to that business.");
+    this.name = "BusinessNotFoundError";
+  }
+}
+
 export interface LoadInput {
   /** Which unit ran it. Optional only while the workspace has one active truck. */
   truckId?: string | null;

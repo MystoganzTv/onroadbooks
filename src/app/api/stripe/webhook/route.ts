@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 
 import { syncStripeSubscription } from "@/lib/billing";
+import { BusinessNotFoundError } from "@/lib/db/repository";
 import { operationalLog, reportOperationalError } from "@/lib/operations";
 import { getStripe, stripeWebhookSecret } from "@/lib/stripe";
 
@@ -57,6 +58,17 @@ export async function POST(request: Request) {
         break;
     }
   } catch (error) {
+    if (error instanceof BusinessNotFoundError) {
+      operationalLog("warning", "Stripe webhook ignored for deleted business", {
+        route: "/api/stripe/webhook",
+        requestId,
+        eventId: event.id,
+        eventType: event.type,
+        durationMs: Date.now() - startedAt,
+      });
+      return NextResponse.json({ received: true });
+    }
+
     await reportOperationalError("Stripe webhook synchronization failed", error, {
       route: "/api/stripe/webhook",
       requestId,

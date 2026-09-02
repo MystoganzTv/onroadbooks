@@ -59,6 +59,7 @@ import type {
   Truck,
 } from "../types";
 import {
+  BusinessNotFoundError,
   newId,
   type AdminAccountSummary,
   type AuthStore,
@@ -351,7 +352,7 @@ async function mutate<T>(
   return serialise(async () => {
     const dataset = await readDataset();
     if (businessId && dataset.business.id !== businessId) {
-      throw new Error("This session does not have access to that business.");
+      throw new BusinessNotFoundError();
     }
     const result = await fn(dataset);
     dataset.loads.sort(byDateDesc);
@@ -1010,7 +1011,7 @@ export class JsonRepository implements Repository {
 
   private assertScope(dataset: Dataset): Dataset {
     if (dataset.business.id !== this.businessId) {
-      throw new Error("This session does not have access to that business.");
+      throw new BusinessNotFoundError();
     }
     return dataset;
   }
