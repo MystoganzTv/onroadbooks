@@ -6,26 +6,32 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { planOf, trialState } from "@/lib/plans";
 import type { Subscription } from "@/lib/types";
+import { appText, type AppLocale } from "@/lib/i18n";
 
 /** Account status belongs in the cockpit, where owners begin their day. */
 export function DashboardSubscriptionStatus({
   subscription,
   today,
   canManage = true,
+  locale = "en",
 }: {
   subscription: Subscription;
   today: string;
   canManage?: boolean;
+  locale?: AppLocale;
 }) {
+  const tx = (english: string, spanish: string) => appText(locale, english, spanish);
   const plan = planOf(subscription);
   const trial = trialState(subscription, today);
 
   if (trial) {
     const timeLabel = trial.expired
-      ? "Trial ended"
+      ? tx("Trial ended", "Prueba terminada")
       : trial.daysRemaining === 0
-        ? "Ends today"
-        : `${trial.daysRemaining} ${trial.daysRemaining === 1 ? "day" : "days"} left`;
+        ? tx("Ends today", "Termina hoy")
+        : locale === "es"
+          ? `${trial.daysRemaining} ${trial.daysRemaining === 1 ? "día restante" : "días restantes"}`
+          : `${trial.daysRemaining} ${trial.daysRemaining === 1 ? "day" : "days"} left`;
 
     return (
       <Card className="overflow-hidden border-primary/30 bg-primary/5">
@@ -36,18 +42,18 @@ export function DashboardSubscriptionStatus({
             </span>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-semibold">Your OnRoad Pro trial</p>
+                <p className="text-sm font-semibold">{tx("Your OnRoad Pro trial", "Tu prueba de OnRoad Pro")}</p>
                 <Badge variant="info">{timeLabel}</Badge>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                You have every Pro tool for one truck during the 7-day trial.
+                {tx("You have every Pro tool for one truck during the 7-day trial.", "Tienes todas las herramientas Pro para un camión durante la prueba de 7 días.")}
               </p>
             </div>
           </div>
           {canManage ? (
             <Button asChild size="sm" className="shrink-0">
               <Link href="/plans">
-                Keep OnRoad Pro
+                {tx("Keep OnRoad Pro", "Conservar OnRoad Pro")}
                 <ArrowRight className="size-4" />
               </Link>
             </Button>
@@ -61,21 +67,21 @@ export function DashboardSubscriptionStatus({
   const pastDue = subscription.status === "PAST_DUE";
   const canceled = subscription.status === "CANCELED";
   const message = pastDue
-    ? "Your payment needs attention. Your books stay available to read and export, but new entries are paused."
+    ? tx("Your payment needs attention. Your books stay available to read and export, but new entries are paused.", "Tu pago necesita atención. Tus libros siguen disponibles para consulta y exportación, pero no se permiten nuevas entradas.")
     : canceled
-      ? "This subscription has ended. Your books stay available to read and export whenever you need them."
+      ? tx("This subscription has ended. Your books stay available to read and export whenever you need them.", "Esta suscripción terminó. Tus libros siguen disponibles para consulta y exportación.")
       : plan.id === "OWNER"
-        ? "Your Pro subscription is active for one truck."
+        ? tx("Your Pro subscription is active for one truck.", "Tu suscripción Pro está activa para un camión.")
         : plan.id === "FLEET"
-          ? `Your paid Fleet workspace covers up to ${plan.truckLimit} trucks.`
-          : "Your one-truck ledger plan is active.";
+          ? locale === "es" ? `Tu espacio Fleet cubre hasta ${plan.truckLimit} camiones.` : `Your paid Fleet workspace covers up to ${plan.truckLimit} trucks.`
+          : tx("Your one-truck ledger plan is active.", "Tu plan de contabilidad para un camión está activo.");
   const actionLabel = pastDue
-    ? "Fix billing"
+    ? tx("Fix billing", "Corregir facturación")
     : canceled
-      ? "Choose a plan"
+      ? tx("Choose a plan", "Elegir plan")
       : plan.id === "SOLO"
-        ? "Upgrade to Pro"
-        : "Manage plan";
+        ? tx("Upgrade to Pro", "Mejorar a Pro")
+        : tx("Manage plan", "Administrar plan");
 
   return (
     <Card className={pastDue ? "overflow-hidden border-warn/40 bg-warn-soft" : "overflow-hidden"}>
@@ -98,7 +104,7 @@ export function DashboardSubscriptionStatus({
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-semibold">{plan.name}</p>
               <Badge variant={active ? "positive" : "warning"}>
-                {active ? "Active" : subscription.status.replace("_", " ")}
+                {active ? tx("Active", "Activo") : subscription.status.replace("_", " ")}
               </Badge>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">

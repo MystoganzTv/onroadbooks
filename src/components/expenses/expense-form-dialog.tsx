@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { useLanguage } from "@/components/shell/language-provider";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -117,6 +118,7 @@ export function ExpenseFormDialog({
   trigger,
 }: ExpenseFormDialogProps) {
   const router = useRouter();
+  const { locale } = useLanguage();
   const isEdit = Boolean(expense);
 
   /**
@@ -269,14 +271,18 @@ export function ExpenseFormDialog({
         {trigger ?? (
           <Button size="sm" variant="outline">
             <Plus />
-            Add Expense
+            {locale === "es" ? "Agregar gasto" : "Add Expense"}
           </Button>
         )}
       </DialogTrigger>
 
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit expense" : "Add expense"}</DialogTitle>
+          <DialogTitle>
+            {isEdit
+              ? locale === "es" ? "Editar gasto" : "Edit expense"
+              : locale === "es" ? "Agregar gasto" : "Add expense"}
+          </DialogTitle>
           <DialogDescription>
             Category drives the fixed / variable split used across reports.
           </DialogDescription>

@@ -9,6 +9,7 @@ import { addMonthlyExpensesAction } from "@/lib/actions/bookkeeping";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/components/shell/language-provider";
 
 interface BookkeepingAlertsProps {
   /** Fixed costs whose date has passed and that are still not in the books. */
@@ -43,6 +44,8 @@ export function BookkeepingAlerts({
   truckId,
 }: BookkeepingAlertsProps) {
   const router = useRouter();
+  const { locale } = useLanguage();
+  const spanish = locale === "es";
   const [pending, startTransition] = React.useTransition();
 
   if (dueCount === 0 && scheduledCount === 0) return null;
@@ -53,7 +56,7 @@ export function BookkeepingAlerts({
     startTransition(async () => {
       const result = await addMonthlyExpensesAction(month, truckId);
       if (result.ok) {
-        toast.success("Monthly expenses added");
+        toast.success(spanish ? "Gastos mensuales agregados" : "Monthly expenses added");
         router.refresh();
       } else {
         toast.error(result.error);
@@ -66,10 +69,9 @@ export function BookkeepingAlerts({
       <section className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-4 py-2.5">
         <CalendarClock className="size-4 shrink-0 text-muted-foreground" />
         <p className="text-2xs text-muted-foreground">
-          {formatMoney(scheduledTotal)} of fixed costs
-          {scheduledCount === 1 ? " is" : " are"} scheduled later in {monthLabel} —{" "}
-          {scheduledCount === 1 ? "it posts" : "they post"} automatically on{" "}
-          {scheduledCount === 1 ? "its date" : "their dates"}.
+          {spanish
+            ? `${formatMoney(scheduledTotal)} de costos fijos están programados para más adelante en ${monthLabel}; se registrarán automáticamente en su fecha.`
+            : `${formatMoney(scheduledTotal)} of fixed costs${scheduledCount === 1 ? " is" : " are"} scheduled later in ${monthLabel} — ${scheduledCount === 1 ? "it posts" : "they post"} automatically on ${scheduledCount === 1 ? "its date" : "their dates"}.`}
         </p>
       </section>
     );
@@ -78,9 +80,11 @@ export function BookkeepingAlerts({
   return (
     <section className="overflow-hidden rounded-lg border border-warn/30 bg-warn-soft/40">
       <div className="border-b border-warn/20 px-4 py-2.5">
-        <p className="text-xs font-semibold text-foreground">Bookkeeping check</p>
+        <p className="text-xs font-semibold text-foreground">{spanish ? "Revisión de contabilidad" : "Bookkeeping check"}</p>
         <p className="mt-0.5 text-2xs text-muted-foreground">
-          Complete these items so Operating Profit and Actual Cost / Mile use all known costs.
+          {spanish
+            ? "Completa estos datos para que la ganancia operativa y el costo real por milla incluyan todos los costos conocidos."
+            : "Complete these items so Operating Profit and Actual Cost / Mile use all known costs."}
         </p>
       </div>
       <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -88,20 +92,20 @@ export function BookkeepingAlerts({
           <Repeat2 className="mt-0.5 size-4 shrink-0 text-warn" />
           <div>
             <p className="text-sm font-medium">
-              {dueCount} monthly expense{dueCount === 1 ? " is" : "s are"} missing for{" "}
-              {monthLabel}
+              {spanish
+                ? `Faltan ${dueCount} ${dueCount === 1 ? "gasto mensual" : "gastos mensuales"} de ${monthLabel}`
+                : `${dueCount} monthly expense${dueCount === 1 ? " is" : "s are"} missing for ${monthLabel}`}
             </p>
             <p className={cn("mt-0.5 text-2xs text-muted-foreground")}>
-              Add {formatMoney(dueTotal)} from truck payment, insurance or recurring templates.
-              {scheduledCount > 0
-                ? ` ${formatMoney(scheduledTotal)} more is dated later this month and posts on its own.`
-                : ""}
+              {spanish
+                ? `Agrega ${formatMoney(dueTotal)} de pagos de camión, seguro o plantillas recurrentes.${scheduledCount > 0 ? ` Otros ${formatMoney(scheduledTotal)} tienen fecha posterior y se registrarán automáticamente.` : ""}`
+                : `Add ${formatMoney(dueTotal)} from truck payment, insurance or recurring templates.${scheduledCount > 0 ? ` ${formatMoney(scheduledTotal)} more is dated later this month and posts on its own.` : ""}`}
             </p>
           </div>
         </div>
         <Button size="sm" variant="outline" onClick={run} disabled={pending}>
           {pending ? <Loader2 className="animate-spin" /> : null}
-          Add them now
+          {spanish ? "Agregar ahora" : "Add them now"}
         </Button>
       </div>
     </section>

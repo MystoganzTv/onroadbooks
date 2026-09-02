@@ -78,6 +78,7 @@ import {
   selectActionableFinancialProblems,
   selectOwnerMoneyPresentation,
 } from "@/lib/finance";
+import type { ActionableProblem } from "@/lib/finance/presentation";
 import {
   formatMiles,
   formatMoneyCompact,
@@ -93,7 +94,7 @@ import {
   truckFromSearchParams,
   type SearchParams,
 } from "@/lib/period-params";
-import { defaultEntryDate, monthLabel, previousPeriod, todayISO } from "@/lib/periods";
+import { defaultEntryDate, monthLabel, previousPeriod, todayISO, type Period } from "@/lib/periods";
 import { recurringExpenseSuggestions } from "@/lib/recurring-expenses";
 import { roleCan } from "@/lib/roles";
 import { cn } from "@/lib/utils";
@@ -133,6 +134,7 @@ export default async function DashboardPage({
   const ownerPlanning = roleCan(role, "manage_owner_finances");
   const dataset = await getRepository(session.businessId).getDataset();
   const period = periodFromSearchParams(params);
+  const periodDisplayLabel = localizedPeriodLabel(period, locale);
   const prior = previousPeriod(period);
 
   const {
@@ -245,8 +247,11 @@ export default async function DashboardPage({
     unallocatedDebtService: ownerPlanning ? summary.unallocatedDebtService : 0,
     reserveFundingGap: cockpit && ownerPlanning ? reserveFundingGap : 0,
   });
-  const paymentDateProblem = actionableProblems.find((problem) => problem.id === "payment-dates");
-  const secondaryProblems = actionableProblems.filter((problem) => problem.id !== "payment-dates");
+  const displayedProblems = locale === "es"
+    ? actionableProblems.map(localizeActionableProblem)
+    : actionableProblems;
+  const paymentDateProblem = displayedProblems.find((problem) => problem.id === "payment-dates");
+  const secondaryProblems = displayedProblems.filter((problem) => problem.id !== "payment-dates");
   const maintenanceReserve = reserveBalanceFor(balances, "MAINTENANCE");
   // Health is reported for one unit at a time, because "miles remaining" is a
   // fact about a specific odometer.
@@ -305,6 +310,7 @@ export default async function DashboardPage({
       subscription={dataset.subscription}
       today={today}
       canManage={role === "OWNER"}
+      locale={locale}
     />
   );
 
@@ -369,7 +375,7 @@ export default async function DashboardPage({
       {/* ---- The bottom line ------------------------------------------- */}
       <Section
         title={tx("The bottom line", "El resultado")}
-        description={`${period.label} · ${summary.loadCount} ${summary.loadCount === 1 ? tx("load", "carga") : tx("loads", "cargas")} · ${formatMiles(summary.totalMiles)}`}
+        description={`${periodDisplayLabel} · ${summary.loadCount} ${summary.loadCount === 1 ? tx("load", "carga") : tx("loads", "cargas")} · ${formatMiles(summary.totalMiles)}`}
       >
         <HeroMetrics
           summary={summary}
@@ -397,7 +403,7 @@ export default async function DashboardPage({
         scheduledCount={monthlyScheduled.length}
         scheduledTotal={monthlyScheduled.reduce((total, expense) => total + expense.amount, 0)}
         month={period.month}
-        monthLabel={monthLabel(period.month)}
+        monthLabel={locale === "es" ? localizedMonthName(period.month) : monthLabel(period.month)}
         truckId={truckId}
       />
       <ActionableProblemList problems={secondaryProblems} />
@@ -453,7 +459,7 @@ export default async function DashboardPage({
             <GoalProgressCard
               goals={goalProgress}
               projection={projection}
-              periodLabel={period.label}
+              periodLabel={periodDisplayLabel}
               className="min-w-0"
             />
           ) : null}
@@ -463,12 +469,12 @@ export default async function DashboardPage({
       </Section>
 
       {/* ---- Money flow -------------------------------------------------- */}
-      <Section title={tx("Where the money went", "A dónde se fue el dinero")} description={period.label}>
+      <Section title={tx("Where the money went", "A dónde se fue el dinero")} description={periodDisplayLabel}>
         <div className="grid gap-3 xl:grid-cols-3">
           <MoneyFlow
             ownerPay={ownerPay}
             categories={categories}
-            periodLabel={period.label}
+            periodLabel={periodDisplayLabel}
             showOwnerPlanning={ownerPlanning}
             locale={locale}
             className="min-w-0 xl:col-span-2"
@@ -499,7 +505,7 @@ export default async function DashboardPage({
           best={best}
           worst={worst}
           periodQuery={query}
-          periodLabel={period.label}
+          periodLabel={periodDisplayLabel}
         />
         <RecentLoads loads={periodLoads.slice(0, 8)} />
       </Section>
@@ -533,7 +539,7 @@ export default async function DashboardPage({
             <ReservesPanel
               balances={balances}
               planned={ownerPay.reserves}
-              periodLabel={period.label}
+              periodLabel={periodDisplayLabel}
               className="min-w-0"
             />
           ) : null}
@@ -554,4 +560,93 @@ export default async function DashboardPage({
       </Section>
     </div>
   );
+}
+
+function localizedPeriodLabel(period: Period, locale: "en" | "es"): string {
+  if (locale === "en") return period.label;
+  const [year, month] = period.month.split("-").map(Number);
+  const monthYear = new Intl.DateTimeFormat("es-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  })
+    .format(new Date(Date.UTC(year, month - 1, 1)))
+    .replace(/^./, (character) => character.toUpperCase());
+  if (period.key === "first") return `1–15 de ${monthYear}`;
+  if (period.key === "second") return `16–fin de ${monthYear}`;
+  if (period.key === "quarter") return `Trimestre de ${monthYear}`;
+  if (period.key === "ytd") return `${year} hasta hoy`;
+  if (period.key === "today") return `Hoy · ${period.start}`;
+  if (period.key === "week") return `Esta semana · ${period.start}–${period.end}`;
+  if (period.key === "custom") return `${period.start}–${period.end}`;
+  return monthYear;
+}
+
+function localizedMonthName(monthValue: string): string {
+  const [year, month] = monthValue.split("-").map(Number);
+  return new Intl.DateTimeFormat("es-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  })
+    .format(new Date(Date.UTC(year, month - 1, 1)))
+    .replace(/^./, (character) => character.toUpperCase());
+}
+
+function localizeActionableProblem(problem: ActionableProblem): ActionableProblem {
+  const count = problem.count ?? 0;
+  const copy: Record<ActionableProblem["id"], Pick<ActionableProblem, "headline" | "what" | "why"> & { actionLabel: string }> = {
+    "payment-dates": {
+      headline: "Pendiente de registrar",
+      what: count > 0
+        ? `Agrega las fechas de pago de ${count} ${count === 1 ? "carga pagada" : "cargas pagadas"}.`
+        : "Estas cargas aparecen pagadas, pero OnRoad no sabe cuándo llegó el efectivo.",
+      why: "OnRoad necesita las fechas antes de incluir este dinero en tu efectivo.",
+      actionLabel: "Corregir ahora",
+    },
+    "unclassified-debt": {
+      headline: "Pagos de deuda sin clasificar",
+      what: "Algunos pagos no están divididos entre intereses y principal.",
+      why: "El efectivo que salió se conoce, pero los reportes no pueden explicar el costo financiero.",
+      actionLabel: "Clasificar deuda",
+    },
+    "missing-fuel-details": {
+      headline: "Faltan detalles de combustible",
+      what: "El costo de combustible proviene de estimados y no de cargas reales en la bomba.",
+      why: "El MPG, precio por galón e información de IFTA permanecen incompletos.",
+      actionLabel: "Agregar combustible",
+    },
+    "missing-broker-customer": {
+      headline: "Falta broker o cliente",
+      what: "Algunas cargas no identifican quién debe el dinero.",
+      why: "Sin pagador no se pueden seguir correctamente los cobros ni el rendimiento del cliente.",
+      actionLabel: "Completar clientes",
+    },
+    "missing-invoice": {
+      headline: "Faltan facturas",
+      what: "Algunas cargas completadas todavía no se han facturado.",
+      why: "El cliente no puede pagar una factura que aún no se ha emitido.",
+      actionLabel: "Crear facturas",
+    },
+    "missing-ifta-records": {
+      headline: "Faltan millas para IFTA",
+      what: "Algunos viajes no tienen las millas por jurisdicción necesarias para IFTA.",
+      why: "El reporte trimestral seguirá incompleto hasta revisar esos viajes.",
+      actionLabel: "Completar millas IFTA",
+    },
+    "reserve-funding-gap": {
+      headline: "Reservas por debajo de la meta",
+      what: "Los saldos de reserva están por debajo de las metas configuradas para el negocio.",
+      why: "Hay menos dinero protegido para impuestos, mantenimiento o emergencias de lo planificado.",
+      actionLabel: "Financiar reservas",
+    },
+  };
+  const localized = copy[problem.id];
+  return {
+    ...problem,
+    headline: localized.headline,
+    what: localized.what,
+    why: localized.why,
+    action: { ...problem.action, label: localized.actionLabel },
+  };
 }

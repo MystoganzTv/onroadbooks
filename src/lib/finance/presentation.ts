@@ -232,11 +232,11 @@ export function selectActionableFinancialProblems(
       id: "payment-dates",
       amount: input.unallocatedCollectedRevenue!,
       count: count > 0 ? count : null,
-      headline: "Needs a payment date",
+      headline: "Waiting to be recorded",
       what: count > 0
-        ? `${count} paid ${count === 1 ? "load is" : "loads are"} missing the date the money arrived.`
-        : "These loads are marked Paid, but OnRoad does not know when the money arrived.",
-      why: "This affects your available cash because OnRoad cannot assign the money to the right period.",
+        ? `Add payment dates for ${count} paid ${count === 1 ? "load" : "loads"}.`
+        : "These loads are marked Paid, but OnRoad does not know when the cash arrived.",
+      why: "OnRoad needs the payment dates before it can include this money in your cash.",
       action: { label: "Fix now", href: "/invoices?needs=payment-date" },
       severity: "warning",
     });

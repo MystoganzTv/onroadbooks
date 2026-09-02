@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowUpRight, Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { useLanguage } from "@/components/shell/language-provider";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -252,6 +253,7 @@ export function LoadFormDialog({
   prefill,
 }: LoadFormDialogProps) {
   const router = useRouter();
+  const { locale } = useLanguage();
   const isEdit = Boolean(load);
   const prefillKey = JSON.stringify(prefill ?? null);
 
@@ -426,14 +428,18 @@ export function LoadFormDialog({
         {trigger ?? (
           <Button size="sm">
             <Plus />
-            Add Load
+            {locale === "es" ? "Agregar carga" : "Add Load"}
           </Button>
         )}
       </DialogTrigger>
 
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit load" : "Add load"}</DialogTitle>
+          <DialogTitle>
+            {isEdit
+              ? locale === "es" ? "Editar carga" : "Edit load"
+              : locale === "es" ? "Agregar carga" : "Add load"}
+          </DialogTitle>
           <DialogDescription>
             Six required fields. Everything else is calculated for you.
           </DialogDescription>
