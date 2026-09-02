@@ -35,6 +35,7 @@ import {
   TableWrapper,
 } from "@/components/ui/table";
 import { div, isDeadheadElevated, type RatingThresholds } from "@/lib/calculations";
+import type { DriverScheduleEntry } from "@/lib/driver-availability";
 import {
   formatDateShort,
   formatMoney,
@@ -126,6 +127,7 @@ interface LoadsTableProps {
   brokers: string[];
   trucks?: Truck[];
   drivers?: Driver[];
+  driverSchedule?: DriverScheduleEntry[];
   defaultTruckId?: string | null;
   /** Same default the page header uses, so both entry points agree. */
   defaultDate?: string;
@@ -140,6 +142,7 @@ export function LoadsTable({
   brokers,
   trucks = [],
   drivers = [],
+  driverSchedule = [],
   defaultTruckId,
   defaultDate,
   ratingThresholds,
@@ -345,6 +348,7 @@ export function LoadsTable({
                 brokers={brokers}
                 trucks={trucks}
                 drivers={drivers}
+                driverSchedule={driverSchedule}
                 defaultTruckId={defaultTruckId}
                 defaultDate={defaultDate}
                 ratingThresholds={ratingThresholds}

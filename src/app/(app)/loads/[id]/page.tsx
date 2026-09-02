@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
+import { driverScheduleFromLoads } from "@/lib/driver-availability";
 import { hasFleetAccess } from "@/lib/plans";
 import {
   isDeadheadElevated,
@@ -117,6 +118,7 @@ export default async function LoadDetailPage({
             brokers={brokers}
             trucks={dataset.trucks}
             drivers={hasFleetAccess(dataset.subscription) ? dataset.drivers : []}
+            driverSchedule={driverScheduleFromLoads(dataset.loads)}
             ratingThresholds={thresholdsFromSettings(dataset.settings)}
             trigger={
               <Button variant="outline" size="sm">

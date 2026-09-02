@@ -17,6 +17,7 @@ import {
 } from "@/lib/calculations";
 import { requireSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
+import { driverScheduleFromLoads } from "@/lib/driver-availability";
 import {
   formatMoneyCompact,
   formatNumber,
@@ -56,6 +57,7 @@ export default async function LoadsPage({
   const periodLoads = withMetricsAll(loadsInPeriod(scopedLoads, period), ratingThresholds, linkedFuel);
   const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings, paymentEvents);
   const brokers = [...new Set(loads.map((l) => l.broker).filter(Boolean))].sort() as string[];
+  const driverSchedule = driverScheduleFromLoads(loads);
 
   const tripExpenses = periodLoads.reduce((sum, load) => sum + load.metrics.tripExpenses, 0);
   const tripProfit = periodLoads.reduce((sum, load) => sum + load.metrics.tripProfit, 0);
@@ -78,6 +80,7 @@ export default async function LoadsPage({
             defaultTruckId={scopeTruckId}
             defaultDate={defaultEntryDate(period)}
             ratingThresholds={ratingThresholds}
+            driverSchedule={driverSchedule}
           />}
       />
 
@@ -156,6 +159,7 @@ export default async function LoadsPage({
         brokers={brokers}
         trucks={trucks}
         drivers={hasFleetAccess(subscription) ? drivers : []}
+        driverSchedule={driverSchedule}
         defaultTruckId={scopeTruckId}
         defaultDate={defaultEntryDate(period)}
         ratingThresholds={ratingThresholds}
