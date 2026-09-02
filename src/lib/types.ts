@@ -131,6 +131,8 @@ export interface Truck {
   registeredGrossWeightLbs?: number | null;
   /** Whether this unit operates in two or more IFTA member jurisdictions. */
   operatesInMultipleIftaJurisdictions?: boolean | null;
+  /** Owner-confirmed inclusion in quarterly IFTA reports; null means undecided. */
+  iftaReportingEnabled?: boolean | null;
   startingOdometer: number;
   currentOdometer: number;
   active: boolean;

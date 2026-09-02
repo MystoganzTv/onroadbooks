@@ -213,6 +213,7 @@ export interface TruckInput {
   axleCount?: number | null;
   registeredGrossWeightLbs?: number | null;
   operatesInMultipleIftaJurisdictions?: boolean | null;
+  iftaReportingEnabled?: boolean | null;
   startingOdometer: number;
   currentOdometer: number;
 }

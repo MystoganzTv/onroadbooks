@@ -20,7 +20,10 @@ import {
   fleetIftaApplicability,
   iftaApplicability,
   iftaApplicabilityLabel,
+  iftaReportingLabel,
+  iftaReportingTruckIds,
 } from "@/lib/ifta-eligibility";
+import type { Truck } from "@/lib/types";
 import { param, truckFromSearchParams, type SearchParams } from "@/lib/period-params";
 import { roleCan } from "@/lib/roles";
 
@@ -36,6 +39,38 @@ function quarterOptions(current: string): string[] {
   });
 }
 
+function IftaTruckScope({ trucks }: { trucks: Truck[] }) {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <Table>
+        <TableHeader><TableRow>
+          <TableHead>Truck</TableHead>
+          <TableHead>Standard test</TableHead>
+          <TableHead>Filing decision</TableHead>
+          <TableHead className="text-right">Action</TableHead>
+        </TableRow></TableHeader>
+        <TableBody>{trucks.map((truck) => {
+          const decision = iftaReportingLabel(truck.iftaReportingEnabled);
+          return <TableRow key={truck.id}>
+            <TableCell className="font-medium">{truck.name}</TableCell>
+            <TableCell>{iftaApplicabilityLabel(iftaApplicability(truck))}</TableCell>
+            <TableCell>
+              <Badge variant={decision === "Included" ? "positive" : decision === "Excluded" ? "outline" : "warning"}>
+                {decision}
+              </Badge>
+            </TableCell>
+            <TableCell className="text-right">
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/truck?truck=${encodeURIComponent(truck.id)}`}>Review truck</Link>
+              </Button>
+            </TableCell>
+          </TableRow>;
+        })}</TableBody>
+      </Table>
+    </div>
+  );
+}
+
 export default async function IftaPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams;
   const session = await requireSession();
@@ -44,62 +79,74 @@ export default async function IftaPage({ searchParams }: { searchParams: Promise
   const quarter = /^\d{4}-Q[1-4]$/.test(requested) ? requested : currentIftaQuarter();
   const truckId = truckFromSearchParams(params, dataset.trucks);
   const selectedTruck = truckById(dataset.trucks, truckId);
+  const runningTrucks = activeTrucks(dataset.trucks);
+  const includedTruckIds = iftaReportingTruckIds(dataset.trucks);
+  const pendingTrucks = runningTrucks.filter((truck) => truck.iftaReportingEnabled == null);
   const applicability = selectedTruck
     ? iftaApplicability(selectedTruck)
-    : fleetIftaApplicability(activeTrucks(dataset.trucks));
-  const hasIftaHistory =
-    dataset.loads.some(
-      (load) => (!truckId || load.truckId === truckId) && load.jurisdictionMiles.length > 0,
-    ) ||
-    dataset.fuelEntries.some(
-      (entry) => (!truckId || entry.truckId === truckId) && Boolean(entry.jurisdiction),
-    );
+    : fleetIftaApplicability(runningTrucks);
 
-  if (applicability !== "LIKELY_REQUIRED" && !hasIftaHistory) {
-    const unknown = applicability === "UNKNOWN";
+  const needsScopeDecision = selectedTruck
+    ? selectedTruck.iftaReportingEnabled !== true
+    : includedTruckIds.length === 0;
+  if (needsScopeDecision) {
+    const decision = selectedTruck
+      ? iftaReportingLabel(selectedTruck.iftaReportingEnabled)
+      : pendingTrucks.length > 0
+        ? "Decision needed"
+        : "Excluded";
     return (
       <div className="space-y-4 p-4 lg:p-6">
         <PageHeader
           title="IFTA"
-          description="IFTA tools appear only when the vehicle and operating profile make them relevant."
+          description="Decide truck by truck which units belong in the quarterly IFTA filing."
         />
-        <Card className="mx-auto max-w-2xl">
+        <Card>
           <CardHeader>
             <div className="flex items-center justify-between gap-3">
-              <CardTitle>{iftaApplicabilityLabel(applicability)}</CardTitle>
-              <Badge variant={unknown ? "warning" : "outline"}>
-                {unknown ? "Setup needed" : "Not indicated"}
+              <CardTitle>{selectedTruck ? selectedTruck.name : "IFTA filing scope"}</CardTitle>
+              <Badge variant={decision === "Decision needed" ? "warning" : "outline"}>
+                {decision}
               </Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-4 text-sm leading-relaxed text-muted-foreground">
             <p>
-              {unknown
-                ? "Add the power-unit axle count, registered gross or combined weight, and whether the truck operates in two or more IFTA jurisdictions. OnRoad will not guess this for an existing vehicle."
-                : "Based on the current vehicle and operating profile, this unit does not appear to need IFTA tracking. The filing workspace stays inactive so an irrelevant zero report does not become part of your normal workflow."}
+              OnRoad can recommend a result from the standard test, but it does not make the
+              filing decision for you. Confirm each truck as included or excluded; an exclusion
+              may reflect a non-qualifying vehicle, a jurisdiction exemption, or trip permits.
             </p>
             <p>
-              The standard qualification test covers cross-jurisdiction operation with more than
-              26,000 lb, three or more power-unit axles, or a combination above 26,000 lb. Local
-              exemptions can differ, so confirm the result with your base jurisdiction.
+              Standard test: operation in two or more IFTA jurisdictions with more than 26,000 lb
+              registered gross or combined weight, three or more power-unit axles, or a qualifying
+              combination above 26,000 lb. Confirm exemptions with your base jurisdiction.
             </p>
-            <Button asChild size="sm">
-              <Link href={selectedTruck ? `/truck?truck=${selectedTruck.id}` : "/truck"}>
-                {unknown ? "Complete truck profile" : "Review truck profile"}
-              </Link>
-            </Button>
+            <p><span className="font-semibold text-foreground">Recommendation:</span> {iftaApplicabilityLabel(applicability)}.</p>
+            <IftaTruckScope trucks={selectedTruck ? [selectedTruck] : runningTrucks} />
           </CardContent>
         </Card>
       </div>
     );
   }
-  const report = calculateIftaReport(dataset, quarter, truckId);
+  const calculated = calculateIftaReport(
+    dataset,
+    quarter,
+    truckId,
+    truckId ? null : includedTruckIds,
+  );
+  const scopeComplete = Boolean(truckId) || pendingTrucks.length === 0;
+  const report = {
+    ...calculated,
+    complete: calculated.complete && scopeComplete,
+    netTaxDue: scopeComplete ? calculated.netTaxDue : null,
+  };
   const canManage = roleCan(session.role ?? "VIEWER", "manage_ifta");
   const rates = Object.fromEntries(report.jurisdictions.flatMap((row) => {
     const rate = dataset.settings.iftaTaxRates[iftaRateKey(quarter, row.jurisdiction)];
     return Number.isFinite(rate) ? [[row.jurisdiction, rate]] : [];
   }));
-  const relevantLoads = dataset.loads.filter((load) => load.date >= report.start && load.date <= report.end && (!truckId || load.truckId === truckId));
+  const reportingTruckIds = new Set(truckId ? [truckId] : includedTruckIds);
+  const relevantLoads = dataset.loads.filter((load) => load.date >= report.start && load.date <= report.end && reportingTruckIds.has(load.truckId));
   const missingLoads = relevantLoads.flatMap((load) => {
     const totalMiles = load.loadedMiles + load.deadheadMiles;
     const assignedMiles = normalizeJurisdictionMiles(load.jurisdictionMiles).reduce((sum, row) => sum + row.totalMiles, 0);
@@ -122,7 +169,7 @@ export default async function IftaPage({ searchParams }: { searchParams: Promise
           unassignedMiles: Math.max(0, totalMiles - assignedMiles),
         }];
   });
-  const missingFuel = dataset.fuelEntries.filter((entry) => entry.date >= report.start && entry.date <= report.end && (!truckId || entry.truckId === truckId) && !entry.jurisdiction);
+  const missingFuel = dataset.fuelEntries.filter((entry) => entry.date >= report.start && entry.date <= report.end && reportingTruckIds.has(entry.truckId) && !entry.jurisdiction);
   const baseQuery = new URLSearchParams({ quarter }); if (truckId) baseQuery.set("truck", truckId);
   const fuelQuery = new URLSearchParams({ month: report.start.slice(0, 7), period: "quarter" }); if (truckId) fuelQuery.set("truck", truckId);
 
@@ -135,6 +182,7 @@ export default async function IftaPage({ searchParams }: { searchParams: Promise
       <Button asChild size="sm" variant="outline"><a href={`/api/export/ifta?${baseQuery.toString()}&format=xlsx`}><Download /> XLSX</a></Button>
       <Button asChild size="sm" variant="outline"><a href={`/api/export/ifta?${baseQuery.toString()}&format=pdf`}><Download /> PDF</a></Button>
     </div>
+    {!truckId ? <Card><CardHeader><div className="flex items-center justify-between gap-3"><CardTitle>Trucks in this filing</CardTitle><Badge variant={pendingTrucks.length ? "warning" : "positive"}>{includedTruckIds.length} included</Badge></div></CardHeader><CardContent className="space-y-3"><p className="text-xs text-muted-foreground">Only units marked Included contribute miles and fuel to this fleet report.</p><IftaTruckScope trucks={runningTrucks} /></CardContent></Card> : null}
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       {/*
         Spelled out as a division on purpose. This is the IFTA method -- every
@@ -153,6 +201,7 @@ export default async function IftaPage({ searchParams }: { searchParams: Promise
       {report.totalFleetMiles > 0 && report.totalGallons === 0 ? <p>{formatMiles(report.totalFleetMiles)} are recorded, but there are no detailed fuel purchases in this quarter. <Link href={`/fuel?${fuelQuery.toString()}`} className="text-primary underline underline-offset-2">Add actual gallons on the Fuel page.</Link></p> : null}
       {report.unassignedGallons ? <p>{report.unassignedGallons.toFixed(2)} gallons are missing a jurisdiction across {missingFuel.length} fuel purchase(s).</p> : null}
       {report.missingRateJurisdictions.length ? <p>Missing {quarter} rates: {report.missingRateJurisdictions.join(", ")}.</p> : null}
+      {!scopeComplete ? <p>{pendingTrucks.length} active truck(s) still need an include/exclude decision before this fleet filing can be ready.</p> : null}
     </CardContent></Card> : null}
     {missingLoads.length ? <Card><CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle>Loads needing jurisdiction miles</CardTitle><p className="mt-1 text-xs text-muted-foreground">Trip totals arrive here automatically. Assign the actual route miles before filing.</p></div><Badge variant="warning">{formatMiles(report.unassignedMiles)} unassigned</Badge></div></CardHeader><CardContent className="p-0"><div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Load</TableHead><TableHead>Route</TableHead><TableHead className="text-right">Trip miles</TableHead><TableHead className="text-right">Assigned</TableHead><TableHead className="text-right">Unassigned</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader><TableBody>{missingLoads.map(({ load, loadNumber, totalMiles, assignedMiles, unassignedMiles }) => <TableRow key={load.id}><TableCell><Link href={`/loads/${load.id}`} className="font-medium text-primary hover:underline">{loadNumber ? `#${loadNumber}` : `${load.originCity}–${load.destinationCity}`}</Link></TableCell><TableCell>{load.originState} → {load.destinationState}</TableCell><TableCell className="text-right tnum">{formatMiles(totalMiles)}</TableCell><TableCell className="text-right tnum">{formatMiles(assignedMiles)}</TableCell><TableCell className="text-right tnum text-warn">{formatMiles(unassignedMiles)}</TableCell><TableCell className="text-right">{canManage ? <LoadMileageDialog load={load} trigger={<Button size="sm" variant="outline">Assign miles</Button>} /> : <Button asChild size="sm" variant="outline"><Link href={`/loads/${load.id}`}>View load</Link></Button>}</TableCell></TableRow>)}</TableBody></Table></div></CardContent></Card> : null}
     <Card><CardHeader><div className="flex items-center justify-between"><CardTitle>Jurisdiction detail</CardTitle><Badge variant={report.complete ? "positive" : "warning"}>{report.complete ? "Ready to file" : "Draft"}</Badge></div></CardHeader><CardContent className="p-0">

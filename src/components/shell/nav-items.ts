@@ -27,6 +27,7 @@ export interface NavigationReadiness {
   hasFinancialActivity: boolean;
   hasDriverPayActivity: boolean;
   hasIftaActivity: boolean;
+  hasIftaDecisionPending: boolean;
   iftaApplicability: IftaApplicability;
 }
 
@@ -161,6 +162,13 @@ export function navAvailability(
     };
   }
   if (item.requires === "IFTA" && !readiness.hasIftaActivity) {
+    if (readiness.hasIftaDecisionPending) {
+      return {
+        enabled: true,
+        badge: "Review",
+        reason: "Confirm each active truck as included or excluded from IFTA filings.",
+      };
+    }
     if (readiness.iftaApplicability === "UNKNOWN") {
       return {
         enabled: false,

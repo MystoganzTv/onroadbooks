@@ -917,6 +917,7 @@ export class PrismaRepository implements Repository {
       axleCount: row.axleCount,
       registeredGrossWeightLbs: row.registeredGrossWeightLbs,
       operatesInMultipleIftaJurisdictions: row.operatesInMultipleIftaJurisdictions,
+      iftaReportingEnabled: row.iftaReportingEnabled,
       startingOdometer: row.startingOdometer,
       currentOdometer: row.currentOdometer,
       active: row.active,
@@ -2293,6 +2294,7 @@ export class PrismaRepository implements Repository {
         registeredGrossWeightLbs: input.registeredGrossWeightLbs ?? null,
         operatesInMultipleIftaJurisdictions:
           input.operatesInMultipleIftaJurisdictions ?? null,
+        iftaReportingEnabled: input.iftaReportingEnabled ?? null,
         startingOdometer: input.startingOdometer,
         currentOdometer: input.currentOdometer,
       },
@@ -2332,6 +2334,9 @@ export class PrismaRepository implements Repository {
               operatesInMultipleIftaJurisdictions:
                 input.operatesInMultipleIftaJurisdictions,
             }),
+        ...(input.iftaReportingEnabled === undefined
+          ? {}
+          : { iftaReportingEnabled: input.iftaReportingEnabled }),
         startingOdometer: input.startingOdometer,
         currentOdometer: input.currentOdometer,
       },

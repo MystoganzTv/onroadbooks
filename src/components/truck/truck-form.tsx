@@ -43,6 +43,12 @@ function initialState(truck: Truck) {
         : truck.operatesInMultipleIftaJurisdictions
           ? "YES"
           : "NO",
+    iftaReportingEnabled:
+      truck.iftaReportingEnabled == null
+        ? "UNDECIDED"
+        : truck.iftaReportingEnabled
+          ? "INCLUDED"
+          : "EXCLUDED",
     startingOdometer: String(truck.startingOdometer),
     currentOdometer: String(truck.currentOdometer),
   };
@@ -100,6 +106,10 @@ export function TruckForm({
         values.operatesInMultipleIftaJurisdictions === "UNKNOWN"
           ? null
           : values.operatesInMultipleIftaJurisdictions === "YES",
+      iftaReportingEnabled:
+        values.iftaReportingEnabled === "UNDECIDED"
+          ? null
+          : values.iftaReportingEnabled === "INCLUDED",
       startingOdometer: toRequiredNumber(values.startingOdometer),
       currentOdometer: toRequiredNumber(values.currentOdometer),
     };
@@ -273,6 +283,23 @@ export function TruckForm({
               </span>{" "}
               Confirm exemptions and filing treatment with your base jurisdiction.
             </p>
+            <Field
+              label="Quarterly IFTA filing"
+              htmlFor="truck-ifta-reporting"
+              hint="This decision controls whether this truck's miles and fuel enter the fleet IFTA report."
+            >
+              <Select
+                value={values.iftaReportingEnabled}
+                onValueChange={(value) => set("iftaReportingEnabled", value)}
+              >
+                <SelectTrigger id="truck-ifta-reporting"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="UNDECIDED">Decision needed</SelectItem>
+                  <SelectItem value="INCLUDED">Include this truck in IFTA filings</SelectItem>
+                  <SelectItem value="EXCLUDED">Do not include this truck</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">

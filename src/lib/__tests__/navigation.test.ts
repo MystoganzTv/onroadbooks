@@ -13,6 +13,7 @@ const empty: NavigationReadiness = {
   hasFinancialActivity: false,
   hasDriverPayActivity: false,
   hasIftaActivity: false,
+  hasIftaDecisionPending: false,
   iftaApplicability: "UNKNOWN",
 };
 

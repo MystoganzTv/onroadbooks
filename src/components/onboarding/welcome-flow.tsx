@@ -68,6 +68,12 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
         : truck.operatesInMultipleIftaJurisdictions
           ? "YES"
           : "NO",
+    iftaReportingEnabled:
+      truck.iftaReportingEnabled == null
+        ? "UNDECIDED"
+        : truck.iftaReportingEnabled
+          ? "INCLUDED"
+          : "EXCLUDED",
   });
 
   const [runValues, setRunValues] = React.useState({
@@ -126,6 +132,10 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
           truckValues.operatesInMultipleIftaJurisdictions === "UNKNOWN"
             ? null
             : truckValues.operatesInMultipleIftaJurisdictions === "YES",
+        iftaReportingEnabled:
+          truckValues.iftaReportingEnabled === "UNDECIDED"
+            ? null
+            : truckValues.iftaReportingEnabled === "INCLUDED",
         startingOdometer: truck.startingOdometer,
         currentOdometer:
           toRequiredNumber(truckValues.currentOdometer) ?? truck.currentOdometer,
@@ -363,6 +373,24 @@ export function WelcomeFlow({ business, truck, settings, goals, planName }: Welc
                   <SelectItem value="UNKNOWN">Not sure yet</SelectItem>
                   <SelectItem value="YES">Two or more IFTA jurisdictions</SelectItem>
                   <SelectItem value="NO">One jurisdiction only</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field
+              label="Quarterly IFTA filing"
+              htmlFor="w-ifta-reporting"
+              hint="The profile gives a recommendation; you decide whether this truck enters the filing."
+              className="sm:col-span-2"
+            >
+              <Select
+                value={truckValues.iftaReportingEnabled}
+                onValueChange={(value) => setTruckValue("iftaReportingEnabled", value)}
+              >
+                <SelectTrigger id="w-ifta-reporting"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="UNDECIDED">Decide later</SelectItem>
+                  <SelectItem value="INCLUDED">Include this truck in IFTA filings</SelectItem>
+                  <SelectItem value="EXCLUDED">Do not include this truck</SelectItem>
                 </SelectContent>
               </Select>
             </Field>

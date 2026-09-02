@@ -83,7 +83,10 @@ export default async function TruckPage({
   );
 
   const description = [truck.year, truck.make, truck.model].filter(Boolean).join(" ");
-  const profileIncomplete = !description || iftaApplicability(truck) === "UNKNOWN";
+  const profileIncomplete =
+    !description ||
+    iftaApplicability(truck) === "UNKNOWN" ||
+    truck.iftaReportingEnabled == null;
   const hasLifetimeActivity =
     lifetime.loadCount > 0 ||
     lifetime.bookedRevenue !== 0 ||

@@ -429,6 +429,9 @@ model Truck {
   axleCount                           Int?
   registeredGrossWeightLbs            Int?
   operatesInMultipleIftaJurisdictions Boolean?
+  /// Owner-confirmed filing treatment. True includes this unit in quarterly
+  /// IFTA reports; false excludes it; null means the decision is still pending.
+  iftaReportingEnabled                Boolean?
   startingOdometer                    Int      @default(0)
   currentOdometer                     Int      @default(0)
   active                              Boolean  @default(true)

@@ -67,6 +67,7 @@ export function TruckDialog({
     axleCount: "",
     registeredGrossWeightLbs: "",
     operatesInMultipleIftaJurisdictions: "UNKNOWN",
+    iftaReportingEnabled: "UNDECIDED",
     acquiredOn: todayISO(),
   });
 
@@ -97,6 +98,10 @@ export function TruckDialog({
         values.operatesInMultipleIftaJurisdictions === "UNKNOWN"
           ? null
           : values.operatesInMultipleIftaJurisdictions === "YES",
+      iftaReportingEnabled:
+        values.iftaReportingEnabled === "UNDECIDED"
+          ? null
+          : values.iftaReportingEnabled === "INCLUDED",
       // A truck joins the fleet at the odometer it is on; that reading is both
       // where its history starts and where it is right now.
       startingOdometer: odometer,
@@ -256,6 +261,24 @@ export function TruckDialog({
                   <SelectItem value="UNKNOWN">Not sure yet</SelectItem>
                   <SelectItem value="YES">Two or more IFTA jurisdictions</SelectItem>
                   <SelectItem value="NO">One jurisdiction only</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field
+              label="Quarterly IFTA filing"
+              htmlFor="new-truck-ifta-reporting"
+              className="sm:col-span-2"
+              hint="Choose per truck; this controls which miles and fuel enter the fleet report."
+            >
+              <Select
+                value={values.iftaReportingEnabled}
+                onValueChange={(value) => set("iftaReportingEnabled", value)}
+              >
+                <SelectTrigger id="new-truck-ifta-reporting"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="UNDECIDED">Decide after reviewing the profile</SelectItem>
+                  <SelectItem value="INCLUDED">Include this truck in IFTA filings</SelectItem>
+                  <SelectItem value="EXCLUDED">Do not include this truck</SelectItem>
                 </SelectContent>
               </Select>
             </Field>

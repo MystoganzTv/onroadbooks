@@ -3,7 +3,12 @@ import { describe, it } from "node:test";
 import ExcelJS from "exceljs";
 
 import { calculateIftaReport, iftaRateKey, IFTA_JURISDICTIONS } from "../ifta";
-import { fleetIftaApplicability, iftaApplicability } from "../ifta-eligibility";
+import {
+  fleetIftaApplicability,
+  iftaApplicability,
+  iftaReportingLabel,
+  iftaReportingTruckIds,
+} from "../ifta-eligibility";
 import {
   duplicateInvoiceNumber,
   invoiceIssueOutcome,
@@ -36,6 +41,47 @@ describe("IFTA reporting", () => {
     assert.equal(report.netTaxDue, 0.8);
     dataset.fuelEntries[0].jurisdiction = null;
     assert.equal(calculateIftaReport(dataset, "2026-Q3").complete, false);
+  });
+
+  it("keeps excluded trucks out of a fleet filing", () => {
+    const dataset = buildSeedDataset();
+    const includedTruck = { ...dataset.trucks[0], iftaReportingEnabled: true };
+    const excludedTruck = {
+      ...dataset.trucks[0],
+      id: "truck-excluded",
+      name: "Local unit",
+      iftaReportingEnabled: false,
+    };
+    dataset.trucks = [includedTruck, excludedTruck];
+    const load = {
+      ...dataset.loads[0],
+      truckId: includedTruck.id,
+      date: "2026-07-10",
+      loadedMiles: 90,
+      deadheadMiles: 10,
+      jurisdictionMiles: [{ jurisdiction: "VA", totalMiles: 100, nonTaxableMiles: 0 }],
+    };
+    dataset.loads = [load, { ...load, id: "excluded-load", truckId: excludedTruck.id }];
+    const fuel = {
+      ...dataset.fuelEntries[0],
+      truckId: includedTruck.id,
+      date: "2026-07-10",
+      gallons: 20,
+      totalCost: 80,
+      jurisdiction: "VA",
+    };
+    dataset.fuelEntries = [fuel, { ...fuel, id: "excluded-fuel", truckId: excludedTruck.id }];
+    dataset.settings.iftaTaxRates = { [iftaRateKey("2026-Q3", "VA")]: 0.3 };
+
+    const includedIds = iftaReportingTruckIds(dataset.trucks);
+    const report = calculateIftaReport(dataset, "2026-Q3", null, includedIds);
+
+    assert.deepEqual(includedIds, [includedTruck.id]);
+    assert.equal(report.totalFleetMiles, 100);
+    assert.equal(report.totalGallons, 20);
+    assert.equal(report.complete, true);
+    assert.equal(iftaReportingLabel(null), "Decision needed");
+    assert.equal(iftaReportingLabel(false), "Excluded");
   });
 });
 

@@ -37,3 +37,18 @@ export function iftaApplicabilityLabel(status: IftaApplicability): string {
   if (status === "LIKELY_NOT_REQUIRED") return "IFTA not indicated by this profile";
   return "IFTA status needs vehicle details";
 }
+
+/** Explicit owner decisions, kept separate from the product's recommendation. */
+export function iftaReportingTruckIds(
+  trucks: Pick<Truck, "id" | "iftaReportingEnabled">[],
+): string[] {
+  return trucks.filter((truck) => truck.iftaReportingEnabled === true).map((truck) => truck.id);
+}
+
+export function iftaReportingLabel(
+  enabled: boolean | null | undefined,
+): "Included" | "Excluded" | "Decision needed" {
+  if (enabled === true) return "Included";
+  if (enabled === false) return "Excluded";
+  return "Decision needed";
+}

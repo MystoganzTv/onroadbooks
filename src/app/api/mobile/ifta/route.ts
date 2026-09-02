@@ -3,6 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getMobileSession } from "@/lib/auth/mobile";
 import { getRepository } from "@/lib/db";
 import { calculateIftaReport, currentIftaQuarter } from "@/lib/ifta";
+import { activeTrucks } from "@/lib/fleet";
+import { iftaReportingTruckIds } from "@/lib/ifta-eligibility";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +28,16 @@ export async function GET(request: NextRequest) {
   const quarter = QUARTER.test(requested) ? requested : currentIftaQuarter();
 
   const dataset = await getRepository(session.businessId).getDataset();
-  const report = calculateIftaReport(dataset, quarter);
+  const includedTruckIds = iftaReportingTruckIds(dataset.trucks);
+  const pendingTruckCount = activeTrucks(dataset.trucks).filter(
+    (truck) => truck.iftaReportingEnabled == null,
+  ).length;
+  const calculated = calculateIftaReport(dataset, quarter, null, includedTruckIds);
+  const report = {
+    ...calculated,
+    complete: calculated.complete && pendingTruckCount === 0,
+    netTaxDue: pendingTruckCount === 0 ? calculated.netTaxDue : null,
+  };
 
   return NextResponse.json(
     {
@@ -34,6 +45,9 @@ export async function GET(request: NextRequest) {
       start: report.start,
       end: report.end,
       complete: report.complete,
+      filingScopeComplete: pendingTruckCount === 0,
+      includedTruckCount: includedTruckIds.length,
+      pendingTruckCount,
       totalFleetMiles: report.totalFleetMiles,
       assignedMiles: report.assignedMiles,
       unassignedMiles: report.unassignedMiles,

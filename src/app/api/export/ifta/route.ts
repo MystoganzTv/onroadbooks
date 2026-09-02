@@ -6,6 +6,8 @@ import type { ReportTable } from "@/lib/export";
 import { toPdf } from "@/lib/export-pdf";
 import { toXlsx } from "@/lib/export-xlsx";
 import { calculateIftaReport, currentIftaQuarter } from "@/lib/ifta";
+import { activeTrucks } from "@/lib/fleet";
+import { iftaReportingTruckIds } from "@/lib/ifta-eligibility";
 import { truckFromSearchParams } from "@/lib/period-params";
 
 export const runtime = "nodejs";
@@ -19,7 +21,27 @@ export async function GET(request: Request) {
   const requested = url.searchParams.get("quarter") ?? currentIftaQuarter();
   const quarter = /^\d{4}-Q[1-4]$/.test(requested) ? requested : currentIftaQuarter();
   const truckId = truckFromSearchParams(params, dataset.trucks);
-  const report = calculateIftaReport(dataset, quarter, truckId);
+  const selectedTruck = truckId ? dataset.trucks.find((truck) => truck.id === truckId) : null;
+  const includedTruckIds = iftaReportingTruckIds(dataset.trucks);
+  if (selectedTruck && selectedTruck.iftaReportingEnabled !== true) {
+    return NextResponse.json(
+      { error: "Confirm this truck as included in IFTA filings before exporting." },
+      { status: 409 },
+    );
+  }
+  if (!truckId && includedTruckIds.length === 0) {
+    return NextResponse.json(
+      { error: "Confirm at least one truck as included in IFTA filings before exporting." },
+      { status: 409 },
+    );
+  }
+  const pendingScope = !truckId && activeTrucks(dataset.trucks).some((truck) => truck.iftaReportingEnabled == null);
+  const calculated = calculateIftaReport(dataset, quarter, truckId, truckId ? null : includedTruckIds);
+  const report = {
+    ...calculated,
+    complete: calculated.complete && !pendingScope,
+    netTaxDue: pendingScope ? null : calculated.netTaxDue,
+  };
   const table: ReportTable = {
     title: `IFTA - ${quarter}${report.complete ? " - Ready to file" : " - INCOMPLETE DRAFT"}`,
     columns: ["Jurisdiction", "Total Miles", "Non-taxable Miles", "Taxable Miles", "Tax-paid Gallons", "Taxable Gallons", "Net Gallons", "Tax Rate", "Tax Due"],

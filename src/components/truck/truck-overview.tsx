@@ -10,7 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TruckForm } from "@/components/truck/truck-form";
 import { formatMoney, formatNumber, formatOdometer } from "@/lib/formatters";
-import { iftaApplicability, iftaApplicabilityLabel } from "@/lib/ifta-eligibility";
+import {
+  iftaApplicability,
+  iftaApplicabilityLabel,
+  iftaReportingLabel,
+} from "@/lib/ifta-eligibility";
 import type { Truck } from "@/lib/types";
 
 interface TruckOverviewProps {
@@ -148,6 +152,10 @@ export function TruckOverview({
                     ? " Update the vehicle if its weight, axles or operating area changes."
                     : " Add axles, registered weight and operating area under Update truck."}
               </p>
+              <p className="mt-2 text-2xs leading-relaxed text-muted-foreground">
+                <span className="font-semibold text-foreground">Quarterly filing:</span>{" "}
+                {iftaReportingLabel(truck.iftaReportingEnabled)}.
+              </p>
             </div>
             {activeTruckCount > 1 || !truck.active ? (
               <div className="rounded-lg border border-border bg-surface-sunken/60 p-3">
@@ -165,7 +173,9 @@ export function TruckOverview({
                   {profileIncomplete
                     ? identityIncomplete
                       ? "Skipping truck details kept this starter unit available because every load, expense, fuel purchase and service record must belong to a truck. Use Update truck when you are ready to complete it."
-                      : "This unit stays active, but its IFTA assessment is still unknown. Add axles, registered weight and operating area under Update truck."
+                      : iftaStatus === "UNKNOWN"
+                        ? "This unit stays active, but its IFTA assessment is still unknown. Add axles, registered weight and operating area under Update truck."
+                        : "This unit stays active, but its IFTA filing decision is still pending. Confirm whether to include or exclude it under Update truck."
                     : "This is your only active truck, so it stays in service. Add another active unit before taking this one out of service."}
                 </p>
               </div>

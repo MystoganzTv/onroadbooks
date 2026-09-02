@@ -109,13 +109,17 @@ export function calculateIftaReport(
   dataset: Dataset,
   quarter: string,
   truckId: string | null = null,
+  includedTruckIds: readonly string[] | null = null,
 ): IftaReport {
   const { start, end } = iftaQuarterBounds(quarter);
+  const included = includedTruckIds == null ? null : new Set(includedTruckIds);
+  const truckIsInScope = (candidateId: string) =>
+    truckId ? candidateId === truckId : included == null || included.has(candidateId);
   const loads = dataset.loads.filter(
-    (load) => load.date >= start && load.date <= end && (!truckId || load.truckId === truckId),
+    (load) => load.date >= start && load.date <= end && truckIsInScope(load.truckId),
   );
   const fuel = dataset.fuelEntries.filter(
-    (entry) => entry.date >= start && entry.date <= end && (!truckId || entry.truckId === truckId),
+    (entry) => entry.date >= start && entry.date <= end && truckIsInScope(entry.truckId),
   );
   const totalFleetMiles = sum(loads, (load) => load.loadedMiles + load.deadheadMiles);
   const buckets = new Map<string, { totalMiles: number; nonTaxableMiles: number; gallons: number }>();

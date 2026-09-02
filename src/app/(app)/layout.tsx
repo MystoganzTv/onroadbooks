@@ -50,7 +50,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             dataset.drivers.length > 0 && loads.some((load) => Boolean(load.driverId)),
           hasIftaActivity:
             loads.some((load) => load.jurisdictionMiles.length > 0) ||
-            fuelEntries.some((entry) => Boolean(entry.jurisdiction)),
+            fuelEntries.some((entry) => Boolean(entry.jurisdiction)) ||
+            running.some((truck) => truck.iftaReportingEnabled === true),
+          hasIftaDecisionPending: running.some(
+            (truck) => truck.iftaReportingEnabled == null,
+          ),
           iftaApplicability: fleetIftaApplicability(running),
         }}
       >

@@ -190,6 +190,7 @@ async function seedFresh(): Promise<Dataset> {
       axleCount: null,
       registeredGrossWeightLbs: null,
       operatesInMultipleIftaJurisdictions: null,
+      iftaReportingEnabled: null,
       startingOdometer: 0,
       currentOdometer: 0,
       active: true,
@@ -940,6 +941,7 @@ export class JsonAuthStore implements AuthStore {
           axleCount: null,
           registeredGrossWeightLbs: null,
           operatesInMultipleIftaJurisdictions: null,
+          iftaReportingEnabled: null,
           startingOdometer: 0,
           currentOdometer: 0,
           active: true,
@@ -1697,6 +1699,7 @@ export class JsonRepository implements Repository {
         registeredGrossWeightLbs: input.registeredGrossWeightLbs ?? null,
         operatesInMultipleIftaJurisdictions:
           input.operatesInMultipleIftaJurisdictions ?? null,
+        iftaReportingEnabled: input.iftaReportingEnabled ?? null,
         startingOdometer: input.startingOdometer,
         currentOdometer: input.currentOdometer,
         active: true,
@@ -1733,6 +1736,10 @@ export class JsonRepository implements Repository {
           input.operatesInMultipleIftaJurisdictions === undefined
             ? target.operatesInMultipleIftaJurisdictions ?? null
             : input.operatesInMultipleIftaJurisdictions,
+        iftaReportingEnabled:
+          input.iftaReportingEnabled === undefined
+            ? target.iftaReportingEnabled ?? null
+            : input.iftaReportingEnabled,
         startingOdometer: input.startingOdometer,
         currentOdometer: input.currentOdometer,
       });

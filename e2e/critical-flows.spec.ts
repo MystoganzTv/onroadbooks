@@ -87,8 +87,8 @@ async function addLoad(
   await page.locator("#load-date").fill("2026-08-31");
   await page.locator("#load-origin-city").fill(origin);
   await page.locator("#load-origin-state").fill("VA");
-  await page.locator("#load-dest-city").fill(destination);
-  await page.locator("#load-dest-state").fill("MD");
+  await page.locator("#load-destination-city").fill(destination);
+  await page.locator("#load-destination-state").fill("MD");
   await page.locator("#load-loaded").fill("120");
   await page.locator("#load-deadhead").fill("20");
   await page.locator("#load-rate").fill("700");
@@ -175,6 +175,8 @@ test.describe.serial("critical browser flows", () => {
     await page.locator("#truck-registered-weight").fill("33000");
     await page.locator("#truck-ifta-jurisdictions").click();
     await page.getByRole("option", { name: "Two or more IFTA jurisdictions" }).click();
+    await page.locator("#truck-ifta-reporting").click();
+    await page.getByRole("option", { name: "Include this truck in IFTA filings" }).click();
     await page.getByRole("button", { name: "Save truck" }).click();
     await expect(page.getByText("IFTA tracking recommended")).toBeVisible();
 
@@ -198,6 +200,8 @@ test.describe.serial("critical browser flows", () => {
     expect(download.suggestedFilename()).toMatch(/^inv-2026-.*\.pdf$/);
 
     await page.goto("/ifta?quarter=2026-Q3");
+    await expect(page.getByRole("heading", { name: "Trucks in this filing" })).toBeVisible();
+    await expect(page.getByText("1 included", { exact: true })).toBeVisible();
     await expect(page.getByText("Filing is incomplete")).toBeVisible();
     await expect(page.getByText(/not assigned to a jurisdiction/)).toBeVisible();
 
