@@ -189,10 +189,11 @@ describe("native exports", () => {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(bytes.buffer as ArrayBuffer);
     const sheet = workbook.getWorksheet("Report")!;
-    assert.equal(sheet.getCell("A4").value, "Name");
-    assert.equal(sheet.getCell("A5").value, "'=unsafe");
+    assert.equal(sheet.getCell("A4").value, "RECORDS");
+    assert.equal(sheet.getCell("A10").value, "Name");
+    assert.equal(sheet.getCell("A11").value, "'=unsafe");
     assert.equal(sheet.views[0]?.showGridLines, false);
-    assert.equal((sheet.views[0] as ExcelJS.WorksheetViewFrozen | undefined)?.ySplit, 4);
+    assert.equal((sheet.views[0] as ExcelJS.WorksheetViewFrozen | undefined)?.ySplit, 10);
   });
   it("turns the year-end packet into an executive workbook", async () => {
     const packet = buildYearEndPacket(buildSeedDataset(), 2026, "EPS Logistics LLC");
@@ -209,16 +210,26 @@ describe("native exports", () => {
     assert.match(String(summary.pageSetup.printArea), /^A1:H/);
 
     const loads = workbook.getWorksheet("Loads")!;
-    assert.equal(loads.getCell("A3").value, "LOAD & ROUTE");
-    assert.equal(loads.getCell("A4").value, "Truck");
-    assert.equal(loads.getCell("N3").value, "MILEAGE");
+    assert.equal(loads.getCell("A4").value, "LOADS MOVED");
+    assert.equal(loads.getCell("D4").value, "HOW MUCH YOU EARNED");
+    assert.equal(loads.getCell("A9").value, "LOAD & ROUTE");
+    assert.equal(loads.getCell("A10").value, "Truck");
+    assert.equal(loads.getCell("N9").value, "MILEAGE");
     assert.ok(loads.autoFilter);
     if (typeof loads.autoFilter === "string") {
-      assert.equal(loads.autoFilter, "A4:AG4");
+      assert.equal(loads.autoFilter, "A10:AG10");
     } else {
-      assert.deepEqual(loads.autoFilter.from, { row: 4, column: 1 });
+      assert.deepEqual(loads.autoFilter.from, { row: 10, column: 1 });
     }
-    assert.equal((loads.views[0] as ExcelJS.WorksheetViewFrozen | undefined)?.ySplit, 4);
+    assert.equal((loads.views[0] as ExcelJS.WorksheetViewFrozen | undefined)?.ySplit, 10);
+    assert.equal(loads.pageSetup.fitToWidth, 3);
+
+    for (const sheetName of packet.sheetNames.slice(1)) {
+      const detail = workbook.getWorksheet(sheetName)!;
+      assert.ok(detail.getCell("A4").value, `${sheetName} should have a report summary`);
+      assert.ok(detail.getCell("A10").value, `${sheetName} should have a visible table header`);
+      assert.equal(detail.views[0]?.showGridLines, false);
+    }
   });
   it("creates a real PDF document", async () => {
     const bytes = await toPdf(table);

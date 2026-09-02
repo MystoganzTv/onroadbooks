@@ -28,6 +28,16 @@ const DECIMAL_FORMAT = '#,##0.00;[Red](#,##0.00);-';
 const PERCENT_FORMAT = '0.0"%";[Red](0.0"%");-';
 const FORMULA_TRIGGER = /^[=+\-@\t\r]/;
 
+type DetailKpiFormat = "money" | "integer" | "decimal" | "percent" | "rate";
+
+interface DetailKpi {
+  label: string;
+  value: number;
+  format: DetailKpiFormat;
+  accent: string;
+  note: string;
+}
+
 function safeCell(value: string | number): string | number | null {
   if (value === "") return null;
   return typeof value === "string" && FORMULA_TRIGGER.test(value) ? `'${value}` : value;
@@ -71,6 +81,15 @@ function newWorkbook(): ExcelJS.Workbook {
   return workbook;
 }
 
+function reportDate(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 /** Native Excel export with frozen headers, filters, print setup, and typed numeric cells. */
 export async function toXlsx(table: ReportTable): Promise<Uint8Array> {
   const workbook = newWorkbook();
@@ -112,7 +131,7 @@ function addWorksheet(
 ): ExcelJS.Worksheet {
   return workbook.addWorksheet(name, {
     properties: { defaultRowHeight: 18 },
-    views: [{ state: "frozen", xSplit: orientation === "landscape" ? 2 : 1, ySplit: 4, showGridLines: false, zoomScale: 90 }],
+    views: [{ state: "frozen", xSplit: orientation === "landscape" ? 2 : 1, ySplit: 10, showGridLines: false, zoomScale: 90 }],
     pageSetup: {
       orientation,
       paperSize: 9,
@@ -127,10 +146,15 @@ function addWorksheet(
 
 function writeDetailSheet(workbook: ExcelJS.Workbook, table: ReportTable, name: string): void {
   const columnCount = Math.max(1, table.columns.length);
+  const presentationColumnCount = Math.max(8, Math.min(columnCount, 12));
   const sheet = addWorksheet(workbook, name, columnCount > 7 ? "landscape" : "portrait");
   const lastColumn = sheet.getColumn(columnCount).letter;
+  const reportLastColumn = sheet.getColumn(Math.max(columnCount, presentationColumnCount)).letter;
+  const generatedDate = reportDate();
 
-  sheet.mergeCells(`A1:${lastColumn}1`);
+  sheet.properties.tabColor = { argb: tabColor(name) };
+
+  sheet.mergeCells(`A1:${reportLastColumn}1`);
   const title = sheet.getCell("A1");
   title.value = table.title;
   title.font = { name: "Aptos Display", size: 18, bold: true, color: { argb: COLORS.white } };
@@ -138,16 +162,20 @@ function writeDetailSheet(workbook: ExcelJS.Workbook, table: ReportTable, name: 
   title.alignment = { vertical: "middle", horizontal: "left" };
   sheet.getRow(1).height = 38;
 
-  sheet.mergeCells(`A2:${lastColumn}2`);
+  sheet.mergeCells(`A2:${reportLastColumn}2`);
   const generated = sheet.getCell("A2");
-  generated.value = `ONROAD BOOKS  /  ${new Date().toISOString().slice(0, 10)}  /  FINANCIAL MODEL v${table.calculationVersion ?? "—"}`;
+  generated.value = `ONROAD BOOKS  /  ${generatedDate}  /  FINANCIAL MODEL v${table.calculationVersion ?? "—"}`;
   generated.font = { name: "Aptos", bold: true, size: 9, color: { argb: COLORS.muted } };
   generated.alignment = { vertical: "middle" };
   sheet.getRow(2).height = 22;
 
-  writeColumnGroups(sheet, table.columns, name);
+  sheet.getRow(3).height = 8;
+  writeDetailKpis(sheet, detailKpis(table, name), presentationColumnCount);
+  sheet.getRow(8).height = 10;
 
-  const header = sheet.getRow(4);
+  writeColumnGroups(sheet, table.columns, name, 9);
+
+  const header = sheet.getRow(10);
   header.values = table.columns;
   header.font = { name: "Aptos", bold: true, size: 10, color: { argb: COLORS.white } };
   header.fill = solid(COLORS.navyMid);
@@ -155,33 +183,171 @@ function writeDetailSheet(workbook: ExcelJS.Workbook, table: ReportTable, name: 
   header.height = 32;
 
   if (table.rows.length === 0) {
-    sheet.mergeCells(`A5:${lastColumn}7`);
-    const empty = sheet.getCell("A5");
+    sheet.mergeCells(`A11:${lastColumn}13`);
+    const empty = sheet.getCell("A11");
     empty.value = "No records for this period";
     empty.font = { name: "Aptos", size: 12, italic: true, color: { argb: COLORS.muted } };
     empty.fill = solid(COLORS.surface);
     empty.alignment = { horizontal: "center", vertical: "middle" };
   } else {
     for (const values of table.rows) sheet.addRow(values.map(safeCell));
-    styleDetailRows(sheet, table);
-    sheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4, column: columnCount } };
+    styleDetailRows(sheet, table, 11);
+    sheet.autoFilter = { from: { row: 10, column: 1 }, to: { row: 10, column: columnCount } };
   }
 
   setColumnWidths(sheet, table);
-  sheet.pageSetup.printArea = `A1:${lastColumn}${Math.max(sheet.rowCount, 7)}`;
-  sheet.headerFooter.oddFooter = "OnRoad Books  •  Confidential  |  &P of &N";
+  for (let column = columnCount + 1; column <= presentationColumnCount; column += 1) {
+    sheet.getColumn(column).width = 12;
+  }
+  sheet.pageSetup.fitToWidth = columnCount > 24 ? 3 : columnCount > 14 ? 2 : 1;
+  sheet.pageSetup.printTitlesRow = "9:10";
+  sheet.pageSetup.printArea = `A1:${reportLastColumn}${Math.max(sheet.rowCount, 13)}`;
+  sheet.headerFooter.oddHeader = `&L${table.title}&ROnRoad Books`;
+  sheet.headerFooter.oddFooter = "Confidential  •  Prepared from the business ledger  |  &P of &N";
 }
 
-function writeColumnGroups(sheet: ExcelJS.Worksheet, columns: string[], sheetName: string): void {
+function tabColor(sheetName: string): string {
+  if (sheetName === "Profit Loss") return COLORS.green;
+  if (sheetName === "Expenses") return COLORS.red;
+  if (sheetName === "Fuel" || sheetName === "Maintenance") return COLORS.amber;
+  return COLORS.blue;
+}
+
+function columnIndex(table: ReportTable, label: string): number {
+  return table.columns.findIndex((column) => column.toLowerCase() === label.toLowerCase());
+}
+
+function numericValue(row: Array<string | number>, index: number): number {
+  return index >= 0 && typeof row[index] === "number" ? Number(row[index]) : 0;
+}
+
+function recordRows(table: ReportTable, dateColumn: string): Array<Array<string | number>> {
+  const dateIndex = columnIndex(table, dateColumn);
+  return table.rows.filter((row) => dateIndex >= 0 && String(row[dateIndex] ?? "").trim() !== "");
+}
+
+function sumRows(
+  rows: Array<Array<string | number>>,
+  table: ReportTable,
+  column: string,
+  predicate: (row: Array<string | number>) => boolean = () => true,
+): number {
+  const index = columnIndex(table, column);
+  return rows.reduce((total, row) => total + (predicate(row) ? numericValue(row, index) : 0), 0);
+}
+
+function statementValue(table: ReportTable, label: string): number {
+  const row = table.rows.find((candidate) => String(candidate[0] ?? "").trim().toLowerCase() === label.toLowerCase());
+  return row && typeof row[1] === "number" ? Number(row[1]) : 0;
+}
+
+function detailKpis(table: ReportTable, sheetName: string): DetailKpi[] {
+  if (sheetName === "Loads") {
+    return [
+      { label: "LOADS MOVED", value: table.rows.length, format: "integer", accent: COLORS.navyMid, note: "Loads in this report" },
+      { label: "HOW MUCH YOU EARNED", value: sumRows(table.rows, table, "Gross Rate"), format: "money", accent: COLORS.blue, note: "Booked load revenue" },
+      { label: "MILES RUN", value: sumRows(table.rows, table, "Total Miles"), format: "integer", accent: COLORS.navyMid, note: "Loaded + deadhead" },
+      { label: "AFTER DIRECT TRIP COSTS", value: sumRows(table.rows, table, "Contribution Profit"), format: "money", accent: COLORS.green, note: "Before shared operating costs" },
+    ];
+  }
+
+  if (sheetName === "Expenses") {
+    const treatmentIndex = columnIndex(table, "Financial Treatment");
+    const amount = (treatment: RegExp) => sumRows(table.rows, table, "Amount", (row) => treatment.test(String(row[treatmentIndex] ?? "")));
+    return [
+      { label: "HOW MUCH WENT OUT", value: sumRows(table.rows, table, "Amount"), format: "money", accent: COLORS.red, note: "All recorded cash activity" },
+      { label: "BUSINESS EXPENSES", value: amount(/^Operating Expense$/i), format: "money", accent: COLORS.red, note: "Costs used in operating profit" },
+      { label: "DEBT PAYMENTS", value: amount(/Interest Expense|Principal Payment|Debt Service/i), format: "money", accent: COLORS.amber, note: "Interest + principal" },
+      { label: "TRANSACTIONS", value: table.rows.length, format: "integer", accent: COLORS.navyMid, note: "Rows included below" },
+    ];
+  }
+
+  if (sheetName === "Fuel") {
+    const rows = recordRows(table, "Date");
+    const gallons = sumRows(rows, table, "Gallons");
+    const spend = sumRows(rows, table, "Total Cost");
+    return [
+      { label: "HOW MUCH YOU SPENT", value: spend, format: "money", accent: COLORS.red, note: "Recorded fuel purchases" },
+      { label: "GALLONS PURCHASED", value: gallons, format: "decimal", accent: COLORS.blue, note: "Fuel volume recorded" },
+      { label: "AVERAGE PRICE", value: gallons ? spend / gallons : 0, format: "rate", accent: COLORS.amber, note: "Weighted price per gallon" },
+      { label: "FUEL STOPS", value: rows.length, format: "integer", accent: COLORS.navyMid, note: "Purchases in this period" },
+    ];
+  }
+
+  if (sheetName === "Profit Loss") {
+    const profit = statementValue(table, "Operating Profit");
+    const cashAfterDebt = statementValue(table, "Cash After Debt Service");
+    return [
+      { label: "YOU EARNED", value: statementValue(table, "Booked Revenue"), format: "money", accent: COLORS.blue, note: "Revenue booked in the period" },
+      { label: "BUSINESS EXPENSES", value: statementValue(table, "Total operating expenses"), format: "money", accent: COLORS.red, note: "Operating costs" },
+      { label: "YOUR BUSINESS MADE", value: profit, format: "money", accent: profit >= 0 ? COLORS.green : COLORS.red, note: "Revenue less operating costs" },
+      { label: "CASH AFTER DEBT", value: cashAfterDebt, format: "money", accent: cashAfterDebt >= 0 ? COLORS.green : COLORS.red, note: "Collected cash less outflows" },
+    ];
+  }
+
+  if (sheetName === "Mileage") {
+    const rows = recordRows(table, "Pickup Date");
+    const loaded = sumRows(rows, table, "Loaded Miles");
+    const deadhead = sumRows(rows, table, "Deadhead Miles");
+    const total = loaded + deadhead;
+    return [
+      { label: "TRIPS", value: rows.length, format: "integer", accent: COLORS.navyMid, note: "Loads with mileage" },
+      { label: "LOADED MILES", value: loaded, format: "integer", accent: COLORS.blue, note: "Revenue-producing miles" },
+      { label: "DEADHEAD MILES", value: deadhead, format: "integer", accent: COLORS.amber, note: "Miles without freight" },
+      { label: "DEADHEAD RATE", value: total ? deadhead / total * 100 : 0, format: "percent", accent: COLORS.green, note: "Share of total miles" },
+    ];
+  }
+
+  if (sheetName === "Maintenance") {
+    const rows = recordRows(table, "Service Date");
+    const truckIndex = columnIndex(table, "Truck");
+    const nextDateIndex = columnIndex(table, "Next Service Date");
+    const nextOdometerIndex = columnIndex(table, "Next Service Odometer");
+    const trucks = new Set(rows.map((row) => String(row[truckIndex] ?? "")).filter(Boolean));
+    const scheduled = rows.filter((row) => row[nextDateIndex] || row[nextOdometerIndex]).length;
+    return [
+      { label: "HOW MUCH YOU SPENT", value: sumRows(rows, table, "Cost"), format: "money", accent: COLORS.red, note: "Recorded maintenance cost" },
+      { label: "SERVICE RECORDS", value: rows.length, format: "integer", accent: COLORS.navyMid, note: "Completed work below" },
+      { label: "TRUCKS SERVICED", value: trucks.size, format: "integer", accent: COLORS.blue, note: "Distinct units" },
+      { label: "NEXT SERVICE SET", value: scheduled, format: "integer", accent: COLORS.green, note: "Records with a due trigger" },
+    ];
+  }
+
+  return [
+    { label: "RECORDS", value: table.rows.length, format: "integer", accent: COLORS.blue, note: "Rows included in this report" },
+  ];
+}
+
+function writeDetailKpis(sheet: ExcelJS.Worksheet, kpis: DetailKpi[], availableColumns: number): void {
+  const count = Math.max(1, Math.min(kpis.length, availableColumns));
+  const baseWidth = Math.floor(availableColumns / count);
+  let startColumn = 1;
+
+  kpis.slice(0, count).forEach((kpi, index) => {
+    const width = baseWidth + (index < availableColumns % count ? 1 : 0);
+    const endColumn = startColumn + width - 1;
+    const start = `${sheet.getColumn(startColumn).letter}4`;
+    const end = `${sheet.getColumn(endColumn).letter}7`;
+    writeKpiCard(sheet, `${start}:${end}`, kpi.label, kpi.value, kpi.format, kpi.accent, kpi.note);
+    startColumn = endColumn + 1;
+  });
+
+  sheet.getRow(4).height = 26;
+  sheet.getRow(5).height = 22;
+  sheet.getRow(6).height = 22;
+  sheet.getRow(7).height = 24;
+}
+
+function writeColumnGroups(sheet: ExcelJS.Worksheet, columns: string[], sheetName: string, rowNumber: number): void {
   const groups = columnGroups(sheetName, columns.length);
-  const row = sheet.getRow(3);
+  const row = sheet.getRow(rowNumber);
   row.height = 22;
 
   for (const [index, group] of groups.entries()) {
     const start = sheet.getColumn(group.start).letter;
     const end = sheet.getColumn(group.end).letter;
-    if (group.end > group.start) sheet.mergeCells(`${start}3:${end}3`);
-    const cell = sheet.getCell(`${start}3`);
+    if (group.end > group.start) sheet.mergeCells(`${start}${rowNumber}:${end}${rowNumber}`);
+    const cell = sheet.getCell(`${start}${rowNumber}`);
     cell.value = group.label;
     cell.font = { name: "Aptos", bold: true, size: 9, color: { argb: index % 2 ? COLORS.blue : COLORS.navyMid } };
     cell.fill = solid(index % 2 ? "FFF0F6FA" : COLORS.blueSoft);
@@ -221,13 +387,13 @@ function columnGroups(sheetName: string, count: number): Array<{ label: string; 
   return [{ label: "REPORT DETAIL", start: 1, end: count }];
 }
 
-function styleDetailRows(sheet: ExcelJS.Worksheet, table: ReportTable): void {
+function styleDetailRows(sheet: ExcelJS.Worksheet, table: ReportTable, firstDataRow: number): void {
   const columnCount = table.columns.length;
   const statement = table.columns[0] === "Line";
 
-  for (let rowNumber = 5; rowNumber <= sheet.rowCount; rowNumber += 1) {
+  for (let rowNumber = firstDataRow; rowNumber <= sheet.rowCount; rowNumber += 1) {
     const row = sheet.getRow(rowNumber);
-    const source = table.rows[rowNumber - 5] ?? [];
+    const source = table.rows[rowNumber - firstDataRow] ?? [];
     const first = String(source[0] ?? "").trim();
     const blank = source.every((value) => value === "" || value === undefined);
     const section = statement && /^[A-Z][A-Z &]+$/.test(first);
@@ -310,7 +476,7 @@ function writeSummarySheet(
   const business = String(value("Business"));
   const year = String(value("Year"));
   const model = String(value("Calculation model"));
-  const generatedDate = new Date().toISOString().slice(0, 10);
+  const generatedDate = reportDate();
 
   const widths = [3, 21, 16, 3, 21, 16, 3, 23];
   widths.forEach((width, index) => { sheet.getColumn(index + 1).width = width; });
@@ -422,7 +588,7 @@ function writeKpiCard(
   range: string,
   label: string,
   value: number,
-  format: "money" | "integer",
+  format: DetailKpiFormat,
   accent: string,
   note: string,
 ): void {
@@ -452,16 +618,24 @@ function writeKpiCard(
   const labelCell = sheet.getCell(startRow, startColumn);
   labelCell.value = label;
   labelCell.font = { name: "Aptos", bold: true, size: 9, color: { argb: COLORS.muted } };
-  labelCell.alignment = { horizontal: "left", vertical: "middle" };
+  labelCell.alignment = { horizontal: "left", vertical: "middle", wrapText: true };
   const valueCell = sheet.getCell(startRow + 1, startColumn);
   valueCell.value = value;
-  valueCell.numFmt = format === "money" ? MONEY_FORMAT : INTEGER_FORMAT;
+  valueCell.numFmt = kpiNumberFormat(format);
   valueCell.font = { name: "Aptos Display", bold: true, size: 20, color: { argb: accent } };
   valueCell.alignment = { horizontal: "left", vertical: "middle" };
   const noteCell = sheet.getCell(endRow, startColumn);
   noteCell.value = note;
   noteCell.font = { name: "Aptos", italic: true, size: 8, color: { argb: COLORS.muted } };
-  noteCell.alignment = { horizontal: "left", vertical: "middle" };
+  noteCell.alignment = { horizontal: "left", vertical: "middle", wrapText: true };
+}
+
+function kpiNumberFormat(format: DetailKpiFormat): string {
+  if (format === "money") return MONEY_FORMAT;
+  if (format === "rate") return RATE_FORMAT;
+  if (format === "percent") return PERCENT_FORMAT;
+  if (format === "decimal") return DECIMAL_FORMAT;
+  return INTEGER_FORMAT;
 }
 
 function writeSectionBand(sheet: ExcelJS.Worksheet, row: number, label: string): void {
