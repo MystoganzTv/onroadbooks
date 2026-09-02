@@ -201,7 +201,7 @@ private struct MemberRow: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(OBColor.foreground)
                     if member.role != .owner {
-                        StatusPill(active: member.joinedAt != nil)
+                        StatusPill(text: member.joinedAt != nil ? "Activo" : "Invitación pendiente", isActive: member.joinedAt != nil)
                     }
                 }
                 Text(member.email)
@@ -247,19 +247,6 @@ private struct MemberRow: View {
                 }
             }
         }
-    }
-}
-
-private struct StatusPill: View {
-    let active: Bool
-
-    var body: some View {
-        Text(active ? "Activo" : "Invitación pendiente")
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(active ? OBColor.pos : OBColor.warn)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 2)
-            .background(active ? OBColor.posSoft : OBColor.warnSoft, in: Capsule())
     }
 }
 
