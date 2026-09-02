@@ -108,8 +108,8 @@ export function SettlementDetail({ view }: { view: SettlementView }) {
           </div>
 
           <div className="grid gap-px border-t border-border bg-border sm:grid-cols-3">
-            <CompactAnswer label="Business cash out" question={answers.spent.question} value={answers.spent.value} negative />
-            <CompactAnswer label="Debt payments" question={answers.debtPayments.question} value={answers.debtPayments.value} negative />
+            <CompactAnswer label="Business expenses" question={answers.spent.question} value={answers.spent.value} negative />
+            <CompactAnswer label="Debt & financing payments" question={answers.debtPayments.question} value={answers.debtPayments.value} negative />
             <CompactAnswer label="Set aside" question={answers.setAside.question} value={answers.setAside.value} />
           </div>
 
@@ -127,7 +127,7 @@ export function SettlementDetail({ view }: { view: SettlementView }) {
                   Available to pay yourself
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  After business costs, debt payments, and planned reserves.
+                  After business expenses, debt and financing payments, and planned reserves.
                 </p>
               </div>
               <MoneyValueText

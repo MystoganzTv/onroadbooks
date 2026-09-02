@@ -13,8 +13,8 @@ export function TodayCashCard({ cash, className }: { cash: CashActivity; classNa
       </div>
       <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
         <Cell label="Collected" value={formatMoneyCompact(cash.collectedRevenue)} />
-        <Cell label="Business cash out" value={formatMoneyCompact(cash.operatingCashOutflows)} negative />
-        <Cell label="Debt payments" value={formatMoneyCompact(cash.debtService)} negative />
+        <Cell label="Business expenses" value={formatMoneyCompact(cash.operatingCashOutflows)} negative />
+        <Cell label="Debt & financing payments" value={formatMoneyCompact(cash.debtService)} negative />
         <Cell label="Cash change" value={formatMoneyCompact(cash.netCashActivity)} negative={cash.netCashActivity < 0} />
       </div>
     </div>

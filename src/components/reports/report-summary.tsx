@@ -57,7 +57,7 @@ export function ReportSummary({
       higherIsBetter: false,
     },
     {
-      label: "Operating Expenses",
+      label: "Business Expenses",
       current: formatMoney(current.operatingExpenses),
       previous: formatMoney(previous.operatingExpenses),
       delta: pctChange(current.operatingExpenses, previous.operatingExpenses),
@@ -73,7 +73,7 @@ export function ReportSummary({
       tone: current.operatingProfit >= 0 ? "pos" : "neg",
     },
     {
-      label: "Debt Service",
+      label: "Debt & Financing Payments",
       current: formatMoney(current.debtService),
       previous: formatMoney(previous.debtService),
       delta: pctChange(current.debtService, previous.debtService),

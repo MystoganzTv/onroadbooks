@@ -137,8 +137,8 @@ export function MoneyFlow({
               note={tx("Not counted as available cash", "No se cuenta como efectivo disponible")}
             />
           ) : null}
-          <FlowRow label={tx("Business cash out", "Efectivo que salió del negocio")} question={tx("How much did I spend?", "¿Cuánto gasté?")} value={-ownerPay.operatingExpenses} tone="negative" width={width(ownerPay.operatingExpenses)} />
-          <FlowRow label={tx("Debt payments", "Pagos de deuda")} question={tx("How much went to debt?", "¿Cuánto fue a deuda?")} value={-ownerPay.debtService} tone="negative" width={width(ownerPay.debtService)} />
+          <FlowRow label={tx("Business expenses", "Gastos del negocio")} question={tx("How much did I spend running the business?", "¿Cuánto gasté operando el negocio?")} value={-ownerPay.operatingExpenses} tone="negative" width={width(ownerPay.operatingExpenses)} />
+          <FlowRow label={tx("Debt & financing payments", "Pagos de deuda y financiamiento")} question={tx("How much went to debt and financing?", "¿Cuánto fue a deuda y financiamiento?")} value={-ownerPay.debtService} tone="negative" width={width(ownerPay.debtService)} />
 
           {showOwnerPlanning ? (
             <div className={cn("border-t-2 px-4 py-4", (available ?? 0) > 0 ? "border-pos/40 bg-pos-soft/40" : "border-info/35 bg-info-soft/30")}>

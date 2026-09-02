@@ -318,7 +318,7 @@ function detailKpis(table: ReportTable, sheetName: string): DetailKpi[] {
     return [
       { label: "HOW MUCH WENT OUT", value: sumRows(table.rows, table, "Amount"), format: "money", accent: COLORS.red, note: "All recorded cash activity" },
       { label: "BUSINESS EXPENSES", value: amount(/^Operating Expense$/i), format: "money", accent: COLORS.red, note: "Costs used in operating profit" },
-      { label: "DEBT PAYMENTS", value: amount(/Interest Expense|Principal Payment|Debt Service/i), format: "money", accent: COLORS.amber, note: "Interest + principal" },
+      { label: "DEBT & FINANCING PAYMENTS", value: amount(/Interest Expense|Principal Payment|Debt Service/i), format: "money", accent: COLORS.amber, note: "Interest + principal" },
       { label: "TRANSACTIONS", value: table.rows.length, format: "integer", accent: COLORS.navyMid, note: "Rows included below" },
     ];
   }
@@ -692,7 +692,7 @@ function writeSummarySheet(
   ]> = [
     [["You earned", value("Booked Revenue"), "money"], ["You collected", value("Collected Revenue"), "money"]],
     [["Business expenses", value("Operating expenses"), "money"], ["Still owed", value("Accounts Receivable"), "money"]],
-    [["Your business made", value("Operating Profit"), "money"], ["Debt payments", value("Debt Service"), "money"]],
+    [["Your business made", value("Operating Profit"), "money"], ["Debt & financing payments", value("Debt Service"), "money"]],
     [["Profit / mile", Number(value("Operating Profit")) / Math.max(1, Number(value("Total miles"))), "rate"], ["Cash after debt", value("Cash After Debt Service"), "money"]],
   ];
   financialPairs.forEach((pair, index) => writeWideSummaryPair(sheet, 19 + index, pair[0], pair[1]));

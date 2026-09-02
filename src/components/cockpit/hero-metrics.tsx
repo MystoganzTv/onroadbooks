@@ -105,8 +105,8 @@ export function HeroMetrics({
 
         <dl className="divide-y divide-border/70 px-5">
           <CashFact label={tx("Collected", "Cobrado")} value={answers.collected.value} tone="info" locale={locale} />
-          <CashFact label={tx("Business cash out", "Efectivo que salió del negocio")} value={answers.spent.value} tone="negative" negative locale={locale} />
-          <CashFact label={tx("Debt payments", "Pagos de deuda")} value={answers.debtPayments.value} tone="negative" negative locale={locale} />
+          <CashFact label={tx("Business expenses", "Gastos del negocio")} value={answers.spent.value} tone="negative" negative locale={locale} />
+          <CashFact label={tx("Debt & financing payments", "Pagos de deuda y financiamiento")} value={answers.debtPayments.value} tone="negative" negative locale={locale} />
         </dl>
 
         {showOwnerPlanning ? (

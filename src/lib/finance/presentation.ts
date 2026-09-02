@@ -148,15 +148,15 @@ export function selectOwnerMoneyPresentation(facts: OwnerMoneyFacts): OwnerMoney
       label: "Business expenses",
       canonicalTerm: "operatingExpenses",
       value: money(facts.operatingExpenses, "Business spending is not known for this period."),
-      explanation: "Operating costs only; debt is shown separately",
+      explanation: "Operating costs only; debt and financing are shown separately",
       tone: "negative",
     },
     debtPayments: {
       id: "debtPayments",
-      question: "How much went to debt?",
-      label: "Debt payments",
+      question: "How much went to debt and financing?",
+      label: "Debt & financing payments",
       canonicalTerm: "debtService",
-      value: money(facts.debtService, "Debt payments are not known for this period."),
+      value: money(facts.debtService, "Debt and financing payments are not known for this period."),
       explanation: "Interest, principal, and any payment still needing a split",
       tone: "negative",
     },
@@ -178,7 +178,7 @@ export function selectOwnerMoneyPresentation(facts: OwnerMoneyFacts): OwnerMoney
       explanation:
         amountOf(cashFundingGap) && amountOf(cashFundingGap)! > 0
           ? "Recorded collections do not yet cover current cash obligations"
-          : "After business costs, debt payments, and recommended set-asides",
+          : "After business expenses, debt and financing payments, and recommended set-asides",
       tone: amountOf(availableToYou) && amountOf(availableToYou)! > 0 ? "positive" : "neutral",
     },
   };
@@ -246,7 +246,7 @@ export function selectActionableFinancialProblems(
       id: "unclassified-debt",
       amount: input.unallocatedDebtService!,
       count: null,
-      headline: "Debt payments need a split",
+      headline: "Debt & financing payments need a split",
       what: "Some financing payments are not classified between interest and principal.",
       why: "The total cash out is known, but reports cannot explain financing cost versus balance reduction.",
       action: { label: "Classify debt payments", href: "/expenses?review=debt" },

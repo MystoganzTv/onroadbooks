@@ -28,6 +28,8 @@ describe("owner financial presentation", () => {
     assert.deepEqual(view.answers.businessProfit.value, { state: "KNOWN", amount: 2_818.31 });
     assert.deepEqual(view.answers.collected.value, { state: "KNOWN", amount: 1_200 });
     assert.deepEqual(view.answers.stillWaiting.value, { state: "KNOWN", amount: 4_000 });
+    assert.equal(view.answers.spent.label, "Business expenses");
+    assert.equal(view.answers.debtPayments.label, "Debt & financing payments");
     assert.deepEqual(view.availableToYou, { state: "KNOWN", amount: 0 });
     assert.deepEqual(view.cashFundingGap, { state: "KNOWN", amount: 2_695.69 });
   });

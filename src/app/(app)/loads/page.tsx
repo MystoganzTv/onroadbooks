@@ -158,7 +158,7 @@ export default async function LoadsPage({
           value={formatMoneyCompact(debtCashBurden)}
           tone="warning"
           sub="separate from profitability"
-          help="Debt payments allocated by mileage. This affects cash, but is kept separate from operating profitability."
+          help="Debt and financing payments allocated by mileage. This affects cash, but is kept separate from operating profitability."
           wrapText
         />
       </section>
