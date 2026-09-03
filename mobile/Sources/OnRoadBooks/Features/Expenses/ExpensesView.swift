@@ -7,6 +7,7 @@ struct ExpensesView: View {
     @State private var isLoading = true
     @State private var isAdding = false
     @State private var editing: ExpenseEntry?
+    @State private var editingDebtPayment: ExpenseEntry?
     @State private var pendingDelete: ExpenseEntry?
     @State private var deleteFailure: String?
 
@@ -40,14 +41,22 @@ struct ExpensesView: View {
                             ForEach(expenses) { expense in
                                 ExpenseRow(expense: expense)
                                     .contentShape(Rectangle())
-                                    .onTapGesture { editing = expense }
+                                    .onTapGesture {
+                                        if expense.editor == .debtPayment {
+                                            editingDebtPayment = expense
+                                        } else {
+                                            editing = expense
+                                        }
+                                    }
                                     .listRowBackground(OBColor.card)
                                     .listRowSeparatorTint(OBColor.border)
                                     .swipeActions(edge: .trailing) {
-                                        Button(role: .destructive) {
-                                            pendingDelete = expense
-                                        } label: {
-                                            Label("Borrar", systemImage: "trash")
+                                        if expense.editor == .expense {
+                                            Button(role: .destructive) {
+                                                pendingDelete = expense
+                                            } label: {
+                                                Label("Borrar", systemImage: "trash")
+                                            }
                                         }
                                     }
                             }
@@ -66,6 +75,13 @@ struct ExpensesView: View {
                     repository: repository,
                     expenseId: expense.id,
                     categories: categories,
+                    onSaved: { Task { await reload() } }
+                )
+            }
+            .sheet(item: $editingDebtPayment) { payment in
+                DebtPaymentEditorView(
+                    repository: repository,
+                    paymentId: payment.id,
                     onSaved: { Task { await reload() } }
                 )
             }
@@ -136,6 +152,17 @@ private struct ExpenseRow: View {
                 Text(expense.category)
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(OBColor.foreground)
+                if expense.editor == .debtPayment,
+                   let principal = expense.principalAmount,
+                   let interest = expense.interestAmount {
+                    HStack(spacing: OBSpacing.sm) {
+                        Label("Principal \(principal, format: .currency(code: "USD").precision(.fractionLength(2)))", systemImage: "lock.shield")
+                        Text("Interés \(interest, format: .currency(code: "USD").precision(.fractionLength(2)))")
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(OBColor.mutedForeground)
+                    .lineLimit(1)
+                }
                 Text(expense.note)
                     .font(.caption)
                     .foregroundStyle(OBColor.mutedForeground)
@@ -148,5 +175,10 @@ private struct ExpenseRow: View {
                 .foregroundStyle(OBColor.foreground)
         }
         .padding(.vertical, 4)
+        .accessibilityHint(
+            expense.editor == .debtPayment
+                ? "Abre el editor protegido del pago completo."
+                : "Abre el editor del gasto."
+        )
     }
 }

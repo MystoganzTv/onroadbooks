@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import { roleCan } from "../roles";
 import {
+  debtPaymentClassificationSchema,
   driverSchema,
   expenseSchema,
   fuelSchema,
@@ -53,6 +54,18 @@ const expenseFromPhone = {
   vendor: "Pilot",
   amount: 412.6,
   recurring: false,
+};
+
+/** From `DebtPaymentEditDTO`; the route fixes treatment and obligation id. */
+const debtPaymentEditFromPhone = {
+  date: "2026-09-01",
+  description: "BIZON payment",
+  vendor: "American Express",
+  paymentAmount: 513,
+  principalAmount: 513,
+  interestAmount: 0,
+  recurring: true,
+  notes: "Automatic bank payment",
 };
 
 const fuelFromPhone = {
@@ -132,6 +145,31 @@ describe("what the iOS app posts", () => {
     assert.equal(expenseSchema.safeParse({ ...expenseFromPhone, amount: 0 }).success, false);
     assert.equal(expenseSchema.safeParse({ ...expenseFromPhone, description: "" }).success, false);
     assert.equal(expenseSchema.safeParse({ ...expenseFromPhone, category: "NOT_A_CATEGORY" }).success, false);
+  });
+});
+
+describe("what the protected iOS financing editor posts", () => {
+  it("accepts the full zero-interest payment contract", () => {
+    assert.equal(
+      debtPaymentClassificationSchema.safeParse({
+        ...debtPaymentEditFromPhone,
+        treatment: "LOAN_SPLIT",
+        obligationId: "obligation-amex",
+      }).success,
+      true,
+    );
+  });
+
+  it("does not make a negative split valid", () => {
+    assert.equal(
+      debtPaymentClassificationSchema.safeParse({
+        ...debtPaymentEditFromPhone,
+        treatment: "LOAN_SPLIT",
+        obligationId: "obligation-amex",
+        interestAmount: -1,
+      }).success,
+      false,
+    );
   });
 });
 

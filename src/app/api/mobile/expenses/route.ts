@@ -9,6 +9,7 @@ import { getRepository } from "@/lib/db";
 import { expensesInPeriod } from "@/lib/calculations";
 import { EXPENSE_CATEGORIES, getCategory } from "@/lib/categories";
 import { periodFromSearchParams } from "@/lib/period-params";
+import { mobileExpenseRows } from "@/lib/finance/mobile-expense-ledger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,18 +22,11 @@ export async function GET(request: NextRequest) {
   const period = periodFromSearchParams(Object.fromEntries(request.nextUrl.searchParams));
   const dataset = await getRepository(session.businessId).getDataset();
 
-  const results = expensesInPeriod(dataset.expenses, period)
-    .slice()
-    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
-    .map((expense) => ({
-      id: expense.id,
-      date: expense.date,
-      category: expense.category,
-      categoryLabel: getCategory(expense.category).label,
-      description: expense.description,
-      vendor: expense.vendor,
-      amount: expense.amount,
-    }));
+  const results = mobileExpenseRows(
+    expensesInPeriod(dataset.expenses, period),
+    dataset.financialObligations,
+    (category) => getCategory(category).label,
+  );
 
   return NextResponse.json(
     {

@@ -7,6 +7,7 @@ import { getRepository } from "@/lib/db";
 import { expenseMirrorSource, mirrorRefusal } from "@/lib/mirrored-expenses";
 import { expenseSchema } from "@/lib/schemas";
 import type { ExpenseCategoryId } from "@/lib/types";
+import { isReviewedLoanPayment } from "@/lib/finance/mobile-expense-ledger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,6 +24,12 @@ export async function GET(
   const dataset = await getRepository(session.businessId).getDataset();
   const expense = dataset.expenses.find((row) => row.id === id);
   if (!expense) return NextResponse.json({ error: "Expense not found." }, { status: 404 });
+  if (isReviewedLoanPayment(expense)) {
+    return NextResponse.json(
+      { error: "Use the financing payment editor to keep principal and interest balanced." },
+      { status: 409 },
+    );
+  }
 
   // A row the app wrote for you is read-only here, and the phone is told so
   // before the owner types anything rather than after they press save.
@@ -80,6 +87,12 @@ export async function PATCH(
   const repository = getRepository(gate.session.businessId);
   const current = (await repository.getDataset()).expenses.find((row) => row.id === id);
   if (!current) return NextResponse.json({ error: "Expense not found." }, { status: 404 });
+  if (isReviewedLoanPayment(current)) {
+    return NextResponse.json(
+      { error: "Use the financing payment editor to keep principal and interest balanced." },
+      { status: 409 },
+    );
+  }
 
   // Merged, then validated -- the phone does not show scope, the load link or
   // the receipt number, and a partial replace would erase them.
@@ -128,8 +141,18 @@ export async function DELETE(
 
   const { id } = await params;
 
+  const repository = getRepository(gate.session.businessId);
+  const current = (await repository.getDataset()).expenses.find((row) => row.id === id);
+  if (!current) return NextResponse.json({ error: "Expense not found." }, { status: 404 });
+  if (isReviewedLoanPayment(current)) {
+    return NextResponse.json(
+      { error: "Delete this transaction from the financing payment editor." },
+      { status: 409 },
+    );
+  }
+
   try {
-    await getRepository(gate.session.businessId).deleteExpense(id);
+    await repository.deleteExpense(id);
     for (const path of TOUCHED) revalidatePath(path);
     return NextResponse.json({ id });
   } catch (error) {

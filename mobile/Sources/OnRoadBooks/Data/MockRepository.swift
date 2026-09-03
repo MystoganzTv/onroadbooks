@@ -47,7 +47,11 @@ final class MockRepository: LedgerRepository {
     private var expenses: [ExpenseEntry] = [
             ExpenseEntry(id: "e1", date: mockDate(2026, 8, 27), category: "Fuel", note: "Pilot #442 — Joplin, MO", amount: 412.60),
             ExpenseEntry(id: "e2", date: mockDate(2026, 8, 20), category: "Fuel", note: "Loves — Amarillo, TX", amount: 388.10),
-            ExpenseEntry(id: "e3", date: mockDate(2026, 8, 15), category: "Truck Payment", note: "Freightliner Cascadia — monthly note", amount: 1284.08),
+            ExpenseEntry(
+                id: "e3", date: mockDate(2026, 8, 15), category: "Amex",
+                note: "BIZON payment", amount: 1284.08, editor: .debtPayment,
+                principalAmount: 1200, interestAmount: 84.08
+            ),
             ExpenseEntry(id: "e4", date: mockDate(2026, 8, 12), category: "Maintenance & Repairs", note: "Oil change + DOT inspection", amount: 340.00),
             ExpenseEntry(id: "e5", date: mockDate(2026, 8, 9), category: "Insurance", note: "Progressive Commercial — monthly premium", amount: 681.97),
             ExpenseEntry(id: "e6", date: mockDate(2026, 8, 5), category: "Other", note: "ELD subscription + phone plan", amount: 214.50),
@@ -436,6 +440,47 @@ final class MockRepository: LedgerRepository {
             )
         }
         return id
+    }
+
+    func fetchDebtPaymentDetail(id: String) async throws -> DebtPaymentDetail {
+        guard let row = expenses.first(where: { $0.id == id && $0.editor == .debtPayment }) else {
+            throw APIError.requestFailed
+        }
+        return DebtPaymentDetail(
+            id: row.id,
+            date: row.date,
+            description: row.note,
+            vendor: "American Express",
+            paymentAmount: row.amount,
+            principalAmount: row.principalAmount ?? row.amount,
+            interestAmount: row.interestAmount ?? 0,
+            recurring: true,
+            notes: "Pago automático desde la cuenta bancaria.",
+            obligationName: row.category
+        )
+    }
+
+    @discardableResult
+    func updateDebtPayment(id: String, _ change: DebtPaymentEdit) async throws -> String {
+        guard let index = expenses.firstIndex(where: { $0.id == id && $0.editor == .debtPayment }) else {
+            throw APIError.requestFailed
+        }
+        let existing = expenses[index]
+        expenses[index] = ExpenseEntry(
+            id: id,
+            date: change.date,
+            category: existing.category,
+            note: change.description,
+            amount: change.paymentAmount,
+            editor: .debtPayment,
+            principalAmount: change.principalAmount,
+            interestAmount: change.interestAmount
+        )
+        return id
+    }
+
+    func deleteDebtPayment(id: String) async throws {
+        expenses.removeAll { $0.id == id && $0.editor == .debtPayment }
     }
 
     func fetchFuelDetail(id: String) async throws -> FuelDetail {

@@ -85,6 +85,11 @@ protocol LedgerRepository {
     /// as a load: the phone sends what it shows, the rest is preserved.
     func fetchExpenseDetail(id: String) async throws -> ExpenseDetail
     @discardableResult func updateExpense(id: String, _ change: NewExpense) async throws -> String
+    /// A reviewed loan payment is always fetched, changed and deleted as one
+    /// transaction. No mobile method exposes either accounting row alone.
+    func fetchDebtPaymentDetail(id: String) async throws -> DebtPaymentDetail
+    @discardableResult func updateDebtPayment(id: String, _ change: DebtPaymentEdit) async throws -> String
+    func deleteDebtPayment(id: String) async throws
     func fetchFuelDetail(id: String) async throws -> FuelDetail
     @discardableResult func updateFuelStop(id: String, _ change: NewFuelStop) async throws -> String
 

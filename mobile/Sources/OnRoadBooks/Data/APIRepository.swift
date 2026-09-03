@@ -390,6 +390,26 @@ final class APIRepository: LedgerRepository {
         try await directWrite("api/mobile/expenses/\(id)", method: "PATCH", body: NewExpenseDTO(change))
     }
 
+    func fetchDebtPaymentDetail(id: String) async throws -> DebtPaymentDetail {
+        try await get(
+            "api/mobile/expenses/\(id)/debt-payment",
+            as: DebtPaymentResponseDTO.self
+        ).payment.toDomain()
+    }
+
+    @discardableResult
+    func updateDebtPayment(id: String, _ change: DebtPaymentEdit) async throws -> String {
+        try await directWrite(
+            "api/mobile/expenses/\(id)/debt-payment",
+            method: "PATCH",
+            body: DebtPaymentEditDTO(change)
+        )
+    }
+
+    func deleteDebtPayment(id: String) async throws {
+        try await directDelete("api/mobile/expenses/\(id)/debt-payment")
+    }
+
     func fetchFuelDetail(id: String) async throws -> FuelDetail {
         try await get("api/mobile/fuel/\(id)", as: FuelDetailResponseDTO.self).entry.toDomain()
     }
@@ -497,11 +517,22 @@ private struct ExpenseDTO: Decodable {
     let description: String
     let vendor: String?
     let amount: Double
+    let editor: String?
+    let principalAmount: Double?
+    let interestAmount: Double?
 
     func toDomain() -> ExpenseEntry {
         let note = [description, vendor].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " — ")
-        return ExpenseEntry(id: id, date: ISODate.parse(date), category: categoryLabel,
-                             note: note.isEmpty ? categoryLabel : note, amount: amount)
+        return ExpenseEntry(
+            id: id,
+            date: ISODate.parse(date),
+            category: categoryLabel,
+            note: note.isEmpty ? categoryLabel : note,
+            amount: amount,
+            editor: ExpenseEditor(rawValue: editor ?? "") ?? .expense,
+            principalAmount: principalAmount,
+            interestAmount: interestAmount
+        )
     }
 }
 
@@ -1125,6 +1156,28 @@ private struct NewExpenseDTO: Encodable {
     }
 }
 
+private struct DebtPaymentEditDTO: Encodable {
+    let date: String
+    let description: String
+    let vendor: String?
+    let paymentAmount: Double
+    let principalAmount: Double
+    let interestAmount: Double
+    let recurring: Bool
+    let notes: String?
+
+    init(_ payment: DebtPaymentEdit) {
+        date = ISODate.day(payment.date)
+        description = payment.description
+        vendor = payment.vendor.isEmpty ? nil : payment.vendor
+        paymentAmount = payment.paymentAmount
+        principalAmount = payment.principalAmount
+        interestAmount = payment.interestAmount
+        recurring = payment.recurring
+        notes = payment.notes.isEmpty ? nil : payment.notes
+    }
+}
+
 private struct SettlementDTO: Decodable {
     let id: String
     let label: String
@@ -1492,6 +1545,44 @@ private struct ExpenseDetailResponseDTO: Decodable {
             readOnlyReason: readOnlyReason
         )
     }
+}
+
+private struct DebtPaymentResponseDTO: Decodable {
+    struct Obligation: Decodable {
+        let id: String
+        let name: String
+        let counterparty: String?
+    }
+
+    struct Payment: Decodable {
+        let id: String
+        let date: String
+        let description: String
+        let vendor: String?
+        let recurring: Bool
+        let notes: String?
+        let paymentAmount: Double
+        let principalAmount: Double
+        let interestAmount: Double
+        let obligation: Obligation?
+
+        func toDomain() -> DebtPaymentDetail {
+            DebtPaymentDetail(
+                id: id,
+                date: ISODate.parse(date),
+                description: description,
+                vendor: vendor ?? obligation?.counterparty ?? "",
+                paymentAmount: paymentAmount,
+                principalAmount: principalAmount,
+                interestAmount: interestAmount,
+                recurring: recurring,
+                notes: notes ?? "",
+                obligationName: obligation?.name
+            )
+        }
+    }
+
+    let payment: Payment
 }
 
 private struct FuelDetailResponseDTO: Decodable {

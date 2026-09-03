@@ -107,12 +107,36 @@ struct CategoryTotal: Identifiable {
     let amount: Double
 }
 
+enum ExpenseEditor: String, Hashable {
+    case expense = "EXPENSE"
+    case debtPayment = "DEBT_PAYMENT"
+}
+
 struct ExpenseEntry: Identifiable, Hashable {
     let id: String
     let date: Date
     let category: String
     let note: String
     let amount: Double
+    let editor: ExpenseEditor
+    let principalAmount: Double?
+    let interestAmount: Double?
+
+    init(
+        id: String, date: Date, category: String, note: String, amount: Double,
+        editor: ExpenseEditor = .expense,
+        principalAmount: Double? = nil,
+        interestAmount: Double? = nil
+    ) {
+        self.id = id
+        self.date = date
+        self.category = category
+        self.note = note
+        self.amount = amount
+        self.editor = editor
+        self.principalAmount = principalAmount
+        self.interestAmount = interestAmount
+    }
 }
 
 /// One option in the category picker. The list is served by the backend
@@ -596,6 +620,32 @@ struct ExpenseDetail: Equatable {
     /// which source.
     let readOnly: Bool
     let readOnlyReason: String?
+}
+
+/// One reviewed financing transaction. Accounting may persist principal and
+/// interest in separate rows, but the phone never exposes either row alone.
+struct DebtPaymentDetail: Identifiable, Equatable {
+    let id: String
+    var date: Date
+    var description: String
+    var vendor: String
+    var paymentAmount: Double
+    var principalAmount: Double
+    var interestAmount: Double
+    var recurring: Bool
+    var notes: String
+    let obligationName: String?
+}
+
+struct DebtPaymentEdit: Equatable {
+    var date: Date
+    var description: String
+    var vendor: String
+    var paymentAmount: Double
+    var principalAmount: Double
+    var interestAmount: Double
+    var recurring: Bool
+    var notes: String
 }
 
 /// A correction to a fill-up. Editing the entry is what keeps its mirrored
