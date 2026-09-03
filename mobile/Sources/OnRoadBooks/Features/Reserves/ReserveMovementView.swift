@@ -75,7 +75,12 @@ struct ReserveMovementView: View {
                 Section {
                     TextField("Para qué", text: $reason)
                 } footer: {
-                    Text("Dentro de seis meses esta línea es lo único que explica por qué salió ese dinero.")
+                    // "por qué salió ese dinero" only makes sense for a
+                    // withdrawal -- a contribution needs the mirror sentence,
+                    // not a line that describes money leaving the bucket.
+                    Text(type == "WITHDRAWAL"
+                        ? "Dentro de seis meses esta línea es lo único que explica por qué salió ese dinero."
+                        : "Dentro de seis meses esta línea es lo único que explica de dónde salió este dinero.")
                         .foregroundStyle(OBColor.mutedForeground)
                 }
                 .listRowBackground(OBColor.card)

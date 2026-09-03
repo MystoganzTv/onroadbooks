@@ -244,12 +244,16 @@ private struct InvoiceRow: View {
                         .foregroundStyle(OBColor.mutedForeground)
                 }
                 if let actionTitle {
+                    // Sin facturar vs. facturada needs to read at a glance,
+                    // not just from the pill's word -- same soft-badge
+                    // language as StatusPill: amber for "not billed yet",
+                    // blue for "billed, now collect it."
                     Button(actionTitle, action: onAction)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(OBColor.primary)
+                        .foregroundStyle(invoice.isIssued ? OBColor.info : OBColor.warn)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
-                        .background(OBColor.surfaceRaised, in: Capsule())
+                        .background(invoice.isIssued ? OBColor.infoSoft : OBColor.warnSoft, in: Capsule())
                         .buttonStyle(.plain)
                 }
             }

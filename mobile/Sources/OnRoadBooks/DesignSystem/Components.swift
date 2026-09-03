@@ -346,12 +346,14 @@ struct OBNumberRow: View {
                 .monospacedDigit()
                 .foregroundStyle(OBColor.foreground)
                 .frame(maxWidth: 140)
-            if let suffix {
-                Text(suffix)
-                    .font(.caption)
-                    .foregroundStyle(OBColor.mutedForeground)
-                    .frame(width: 42, alignment: .leading)
-            }
+            // Reserve the suffix's width even when there is none, so the
+            // value column lines up whether or not a given row has a unit --
+            // "Oferta del broker" (no suffix) next to "Fuel price" (has one)
+            // was landing on two different right edges otherwise.
+            Text(suffix ?? "")
+                .font(.caption)
+                .foregroundStyle(OBColor.mutedForeground)
+                .frame(width: 42, alignment: .leading)
         }
         // A row this thin is a miss with a gloved thumb.
         .frame(minHeight: 44)

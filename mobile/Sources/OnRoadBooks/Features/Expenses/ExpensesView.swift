@@ -57,6 +57,12 @@ struct ExpensesView: View {
                                             } label: {
                                                 Label("Borrar", systemImage: "trash")
                                             }
+                                            // The ambient .tint(OBColor.primary) on
+                                            // RootTabView's TabView reaches into
+                                            // swipeActions and repaints even a
+                                            // .destructive button blue -- pin it back
+                                            // to red explicitly.
+                                            .tint(.red)
                                         }
                                     }
                             }
