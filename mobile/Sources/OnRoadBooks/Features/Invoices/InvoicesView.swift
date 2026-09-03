@@ -90,6 +90,9 @@ struct InvoicesView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: OBSpacing.lg) {
 
+                // The web's invoices page carries four: receivable, overdue,
+                // cash collected, uninvoiced loads. The phone had the first
+                // two and was already decoding the other two.
                 HStack(spacing: OBSpacing.sm) {
                     tile("Por cobrar",
                          ledger.summary.outstandingAmount,
@@ -99,6 +102,20 @@ struct InvoicesView: View {
                          ledger.summary.overdueAmount,
                          ledger.summary.overdueCount == 0 ? "nada vencido" : "\(ledger.summary.overdueCount) facturas",
                          color: ledger.summary.overdueCount > 0 ? OBColor.neg : OBColor.foreground)
+                }
+                .padding(.horizontal, OBSpacing.md)
+
+                HStack(spacing: OBSpacing.sm) {
+                    tile("Efectivo cobrado",
+                         ledger.summary.collectedAmount,
+                         "\(ledger.summary.collectedCount) facturas",
+                         color: OBColor.pos)
+                    tile("Sin facturar",
+                         nil,
+                         ledger.summary.uninvoicedCount == 1
+                            ? "1 carga entregada" : "\(ledger.summary.uninvoicedCount) cargas entregadas",
+                         count: ledger.summary.uninvoicedCount,
+                         color: ledger.summary.uninvoicedCount > 0 ? OBColor.warn : OBColor.foreground)
                 }
                 .padding(.horizontal, OBSpacing.md)
 
@@ -155,10 +172,24 @@ struct InvoicesView: View {
         }
     }
 
-    private func tile(_ label: String, _ amount: Double, _ footnote: String, color: Color) -> some View {
+    /// `count` is for the one tile the web states as a number of loads rather
+    /// than an amount -- "Uninvoiced loads" is work to do, not money held.
+    private func tile(
+        _ label: String,
+        _ amount: Double?,
+        _ footnote: String,
+        count: Int? = nil,
+        color: Color
+    ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             LabelXS(label)
-            Text(amount, format: .currency(code: "USD").precision(.fractionLength(0)))
+            Group {
+                if let amount {
+                    Text(amount, format: .currency(code: "USD").precision(.fractionLength(0)))
+                } else {
+                    Text("\(count ?? 0)")
+                }
+            }
                 .font(.title2.weight(.semibold))
                 .monospacedDigit()
                 .foregroundStyle(color)

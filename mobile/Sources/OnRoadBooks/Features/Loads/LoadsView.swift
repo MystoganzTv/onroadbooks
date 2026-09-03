@@ -68,9 +68,15 @@ private struct LoadDetailRow: View {
                 Spacer()
                 RatingChip(rating: load.rating)
             }
-            Text(load.broker)
-                .font(.caption)
-                .foregroundStyle(OBColor.mutedForeground)
+            HStack(spacing: 6) {
+                Text(load.broker)
+                Text("·")
+                Text(load.date, format: .dateTime.month(.abbreviated).day())
+                Text("·")
+                Text("\(Int(load.deadheadMiles)) mi vacías")
+            }
+            .font(.caption)
+            .foregroundStyle(OBColor.mutedForeground)
             HStack(spacing: OBSpacing.lg) {
                 metric("Rate", load.rate.formatted(.currency(code: "USD").precision(.fractionLength(0))))
                 metric("Miles", "\(Int(load.miles))")
@@ -82,7 +88,10 @@ private struct LoadDetailRow: View {
                 metric("Est. operating", load.estimatedFullyLoadedOperatingProfit.formatted(.currency(code: "USD").precision(.fractionLength(0))))
                 metric("Debt burden", load.debtCashBurden.formatted(.currency(code: "USD").precision(.fractionLength(0))))
             }
-            Text("Allocated operating costs and debt are separate; rating uses Contribution only.")
+            // The server sends the basis it actually allocated on. Printing a
+            // sentence of our own here was the phone telling the owner where a
+            // number came from without asking the thing that produced it.
+            Text(load.allocationBasisLabel)
                 .font(.system(size: 9))
                 .foregroundStyle(OBColor.mutedForeground)
         }

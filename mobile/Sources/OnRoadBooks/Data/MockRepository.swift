@@ -181,6 +181,8 @@ final class MockRepository: LedgerRepository {
             revenuePerMile: 2.93,
             profitPerMile: 1.09,
             loadCount: 5,
+            collectedRevenue: 7395.00, accountsReceivable: 2400.00,
+            debtService: 513.00, cashAfterDebtService: 738.10,
             milesPerGallon: 7.0,
             fuelCostPerMile: 0.40,
             due: [
@@ -410,6 +412,8 @@ final class MockRepository: LedgerRepository {
             revenue: 9795, directCosts: 3180.40, contribution: 6614.60,
             overhead: 1678.50, operatingProfit: 4936.10, totalMiles: 5240,
             overheadPerMile: 0.32,
+            collectedRevenue: 7395, debtService: 513, cashAfterDebtService: 3702.10,
+            fullyLoadedProfitPerMile: 0.94,
             units: [
                 FleetUnit(truckId: "truck-1", truckName: "Truck 1", active: true, loadCount: 9,
                           revenue: 9795, directCosts: 3180.40, contribution: 6614.60,

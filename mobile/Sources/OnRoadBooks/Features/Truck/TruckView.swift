@@ -111,6 +111,19 @@ struct TruckView: View {
                         divider
                         totalRow("Ganancia", truck.profit, color: truck.profit >= 0 ? OBColor.pos : OBColor.neg)
                         divider
+                        // Booked is not banked. These four came in the same
+                        // JSON as the three above and the DTO declared none of
+                        // them.
+                        totalRow("Cobrado", truck.collectedRevenue)
+                        divider
+                        totalRow("Por cobrar", truck.accountsReceivable,
+                                 color: truck.accountsReceivable > 0 ? OBColor.warn : OBColor.foreground)
+                        divider
+                        totalRow("Servicio de deuda", truck.debtService)
+                        divider
+                        totalRow("Efectivo después de deuda", truck.cashAfterDebtService,
+                                 color: truck.cashAfterDebtService >= 0 ? OBColor.pos : OBColor.neg)
+                        divider
                         HStack {
                             Text("Millas").font(.subheadline).foregroundStyle(OBColor.foreground)
                             Spacer()

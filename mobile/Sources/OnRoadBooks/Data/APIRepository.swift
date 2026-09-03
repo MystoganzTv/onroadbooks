@@ -821,13 +821,25 @@ private struct TruckResponseDTO: Decodable {
     }
 
     struct Lifetime: Decodable {
-        let revenue: Double
-        let expenses: Double
-        let profit: Double
-        let miles: Double
-        let costPerMile: Double
+        // Canonical names. The route also emits `revenue` / `expenses` /
+        // `profit` / `costPerMile` / `profitPerMile` under a header that calls
+        // them "compatibility aliases for older mobile builds" -- and this DTO
+        // was reading only those. They carry the same values today, so nothing
+        // was wrong on screen; what was wrong is that the phone had pinned
+        // itself to the names the server keeps for builds it no longer means
+        // to serve. The day the canonical figures change, the aliases are
+        // exactly where the phone would not follow.
+        let bookedRevenue: Double
+        let collectedRevenue: Double
+        let accountsReceivable: Double
+        let operatingExpenses: Double
+        let operatingProfit: Double
+        let debtService: Double
+        let cashAfterDebtService: Double
+        let actualCostPerMile: Double
+        let operatingProfitPerMile: Double
         let revenuePerMile: Double
-        let profitPerMile: Double
+        let miles: Double
         let loadCount: Int
     }
 
@@ -859,14 +871,18 @@ private struct TruckResponseDTO: Decodable {
             odometer: truck.odometer,
             truckCount: truckCount,
             iftaReportingEnabled: truck.iftaReportingEnabled,
-            revenue: lifetime.revenue,
-            expenses: lifetime.expenses,
-            profit: lifetime.profit,
+            revenue: lifetime.bookedRevenue,
+            expenses: lifetime.operatingExpenses,
+            profit: lifetime.operatingProfit,
             miles: lifetime.miles,
-            costPerMile: lifetime.costPerMile,
+            costPerMile: lifetime.actualCostPerMile,
             revenuePerMile: lifetime.revenuePerMile,
-            profitPerMile: lifetime.profitPerMile,
+            profitPerMile: lifetime.operatingProfitPerMile,
             loadCount: lifetime.loadCount,
+            collectedRevenue: lifetime.collectedRevenue,
+            accountsReceivable: lifetime.accountsReceivable,
+            debtService: lifetime.debtService,
+            cashAfterDebtService: lifetime.cashAfterDebtService,
             milesPerGallon: milesPerGallon,
             fuelCostPerMile: fuelCostPerMile,
             due: due.map { item in
@@ -1529,6 +1545,10 @@ private struct FleetResponseDTO: Decodable {
     let operatingProfit: Double
     let totalMiles: Double
     let overheadPerMile: Double
+    let collectedRevenue: Double
+    let debtService: Double
+    let cashAfterDebtService: Double
+    let fullyLoadedProfitPerMile: Double
     let units: [Unit]
 
     func toDomain() -> FleetOverview {
@@ -1541,6 +1561,10 @@ private struct FleetResponseDTO: Decodable {
             operatingProfit: operatingProfit,
             totalMiles: totalMiles,
             overheadPerMile: overheadPerMile,
+            collectedRevenue: collectedRevenue,
+            debtService: debtService,
+            cashAfterDebtService: cashAfterDebtService,
+            fullyLoadedProfitPerMile: fullyLoadedProfitPerMile,
             units: units.map {
                 FleetUnit(
                     truckId: $0.truckId, truckName: $0.truckName, active: $0.active,

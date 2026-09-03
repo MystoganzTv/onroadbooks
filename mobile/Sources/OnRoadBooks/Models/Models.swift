@@ -385,6 +385,12 @@ struct TruckSummary {
     let revenuePerMile: Double
     let profitPerMile: Double
     let loadCount: Int
+    /// Lifetime cash for this unit. Sent by `/api/mobile/truck` from the
+    /// start; the DTO never declared any of the four.
+    let collectedRevenue: Double
+    let accountsReceivable: Double
+    let debtService: Double
+    let cashAfterDebtService: Double
 
     /// Nil until the odometer proves it — same rule as the Fuel screen.
     let milesPerGallon: Double?
@@ -814,6 +820,12 @@ struct FleetOverview {
     let totalMiles: Double
     /// An ALLOCATION, not a cost any one truck incurred.
     let overheadPerMile: Double
+    /// Fleet cash and debt. Sent by `/api/mobile/fleet` from the start; the
+    /// DTO never declared them.
+    let collectedRevenue: Double
+    let debtService: Double
+    let cashAfterDebtService: Double
+    let fullyLoadedProfitPerMile: Double
     let units: [FleetUnit]
 }
 

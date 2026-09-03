@@ -61,6 +61,13 @@ struct FleetView: View {
                 row("Gastos del negocio", -overview.overhead, color: OBColor.neg)
                 row("Ganancia operativa", overview.operatingProfit, strong: true,
                     color: overview.operatingProfit >= 0 ? OBColor.pos : OBColor.neg)
+                Divider().overlay(OBColor.border)
+                // Cash, arriving in this route's JSON since it was written and
+                // declared by nothing.
+                row("Cobrado", overview.collectedRevenue)
+                row("Servicio de deuda", -overview.debtService, color: OBColor.neg)
+                row("Efectivo después de deuda", overview.cashAfterDebtService, strong: true,
+                    color: overview.cashAfterDebtService >= 0 ? OBColor.pos : OBColor.neg)
                 HStack {
                     Text("Gasto del negocio por milla")
                         .font(.caption)
@@ -70,6 +77,16 @@ struct FleetView: View {
                         .font(.caption.weight(.semibold))
                         .monospacedDigit()
                         .foregroundStyle(OBColor.foreground)
+                }
+                HStack {
+                    Text("Ganancia cargada por milla")
+                        .font(.caption)
+                        .foregroundStyle(OBColor.mutedForeground)
+                    Spacer()
+                    Text(overview.fullyLoadedProfitPerMile, format: .currency(code: "USD").precision(.fractionLength(2)))
+                        .font(.caption.weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(overview.fullyLoadedProfitPerMile >= 0 ? OBColor.pos : OBColor.neg)
                 }
                 Text("Repartido entre todas las millas. Es una asignación para poner precio al trabajo, no un costo de un camión.")
                     .font(.caption2)
@@ -99,9 +116,19 @@ struct FleetView: View {
                                 color: unit.contribution >= 0 ? OBColor.pos : OBColor.neg
                             )
                         }
+                        // The web's fleet table columns: loads, miles,
+                        // deadhead, booked revenue, own costs, contribution,
+                        // $/mi. Revenue, own costs, deadhead and revenue/mi
+                        // were decoded per unit and never drawn.
                         HStack(spacing: OBSpacing.lg) {
                             metric("Cargas", "\(unit.loadCount)")
                             metric("Millas", "\(Int(unit.totalMiles))")
+                            metric("Vacías", "\(Int(unit.deadheadPct * 100))%")
+                            metric("Ingresos", unit.revenue.formatted(.currency(code: "USD").precision(.fractionLength(0))))
+                        }
+                        HStack(spacing: OBSpacing.lg) {
+                            metric("Costos propios", unit.directCosts.formatted(.currency(code: "USD").precision(.fractionLength(0))))
+                            metric("Ingreso/mi", unit.revenuePerMile.formatted(.currency(code: "USD").precision(.fractionLength(2))))
                             metric("Contrib./mi", unit.contributionPerMile.formatted(.currency(code: "USD").precision(.fractionLength(2))))
                             metric("Costo/mi", unit.actualCostPerMile.formatted(.currency(code: "USD").precision(.fractionLength(2))))
                         }
