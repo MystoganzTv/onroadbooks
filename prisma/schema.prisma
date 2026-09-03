@@ -593,6 +593,9 @@ model FinancialObligation {
   counterparty           String?
   startedOn              DateTime?               @db.Date
   endedOn                DateTime?               @db.Date
+  startingBalance        Decimal?                @db.Decimal(12, 2)
+  aprPercent             Decimal?                @db.Decimal(5, 2)
+  paymentDueDay          Int?
   expectedMonthlyPayment Decimal?                @db.Decimal(12, 2)
   active                 Boolean                 @default(true)
 

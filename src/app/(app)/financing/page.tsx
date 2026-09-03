@@ -15,9 +15,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireSession } from "@/lib/auth";
 import { getDataset } from "@/lib/db";
 import { formatMoney, formatMoneyCompact } from "@/lib/formatters";
-import { formatLocaleDate } from "@/lib/i18n-format";
+import { summarizeDebtBalance, nextScheduledPaymentDate } from "@/lib/finance/debt-obligation";
+import { formatLocaleDate, formatLocaleNumber } from "@/lib/i18n-format";
 import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
 import { getAppLocale } from "@/lib/i18n-server";
+import { todayISO } from "@/lib/periods";
 import { roleCan } from "@/lib/roles";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -30,6 +32,7 @@ export default async function FinancingPage() {
   const copy = getWebDictionary(locale).financing;
   const { financialObligations, expenses, trucks } = await getDataset(session.businessId);
   const canManage = roleCan(session.role ?? "VIEWER", "manage_finances");
+  const today = todayISO();
   const active = financialObligations.filter((obligation) => obligation.active);
   const monthlyCommitment = active.reduce(
     (total, obligation) => total + (obligation.expectedMonthlyPayment ?? 0),
@@ -109,6 +112,14 @@ export default async function FinancingPage() {
                   (total, expense) => total + expense.amount,
                   0,
                 );
+                const balance = summarizeDebtBalance(obligation, obligationExpenses, today);
+                const nextPaymentDate = obligation.active
+                  ? nextScheduledPaymentDate(
+                      obligation.paymentDueDay,
+                      today,
+                      obligationExpenses.map((expense) => expense.date),
+                    )
+                  : null;
                 const typeLabel = obligation.kind === "LOAN"
                   ? copy.loan
                   : obligation.kind === "OPERATING_LEASE"
@@ -143,30 +154,72 @@ export default async function FinancingPage() {
                         ) : null}
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 text-xs lg:block lg:space-y-1">
-                      <div>
-                        <p className="font-semibold tnum">
-                          {obligation.expectedMonthlyPayment != null
-                            ? formatMoney(obligation.expectedMonthlyPayment)
-                            : "—"}
-                        </p>
-                        <p className="text-2xs text-muted-foreground">
-                          {obligation.expectedMonthlyPayment != null
-                            ? interpolate(copy.monthlyExpected, { amount: formatMoney(obligation.expectedMonthlyPayment) })
-                            : copy.noMonthlyAmount}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="font-semibold tnum">
-                          {interpolate(copy.linkedTransactions, {
-                            count: transactionCount,
-                            unit: transactionCount === 1 ? copy.transaction : copy.transactions,
-                          })}
-                        </p>
-                        <p className="text-2xs text-muted-foreground">
-                          {interpolate(copy.paidToDate, { amount: formatMoney(paidToDate) })}
-                        </p>
-                      </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs xl:grid-cols-3">
+                      {obligation.kind === "LOAN" ? (
+                        <>
+                          <ObligationDetail
+                            label={copy.startingBalance}
+                            value={obligation.startingBalance != null
+                              ? formatMoney(obligation.startingBalance)
+                              : "—"}
+                            hint={obligation.startingBalance != null
+                              ? copy.startingBalanceHint
+                              : copy.balanceUnavailable}
+                          />
+                          <ObligationDetail
+                            label={copy.currentBalance}
+                            value={balance.currentBalance != null
+                              ? formatMoney(balance.currentBalance)
+                              : "—"}
+                            hint={balance.currentBalance != null && balance.startingBalance != null
+                              ? interpolate(copy.balanceFormula, {
+                                  starting: formatMoney(balance.startingBalance),
+                                  principal: formatMoney(balance.principalPaid),
+                                })
+                              : copy.balanceUnavailable}
+                          />
+                          <ObligationDetail
+                            label={copy.apr}
+                            value={obligation.aprPercent != null
+                              ? `${formatLocaleNumber(obligation.aprPercent, locale, { maximumFractionDigits: 2 })}%`
+                              : "—"}
+                            hint={copy.aprHint}
+                          />
+                        </>
+                      ) : null}
+                      <ObligationDetail
+                        label={copy.nextPayment}
+                        value={nextPaymentDate
+                          ? formatLocaleDate(nextPaymentDate, locale, "medium")
+                          : "—"}
+                        hint={nextPaymentDate && obligation.paymentDueDay
+                          ? obligation.expectedMonthlyPayment != null
+                            ? interpolate(copy.nextPaymentDetail, {
+                                amount: formatMoney(obligation.expectedMonthlyPayment),
+                                day: obligation.paymentDueDay,
+                              })
+                            : copy.noMonthlyAmount
+                          : obligation.active
+                            ? copy.nextPaymentUnavailable
+                            : copy.closed}
+                      />
+                      <ObligationDetail
+                        label={copy.expectedMonthlyPayment}
+                        value={obligation.expectedMonthlyPayment != null
+                          ? formatMoney(obligation.expectedMonthlyPayment)
+                          : "—"}
+                        hint={obligation.expectedMonthlyPayment != null
+                          ? interpolate(copy.monthlyExpected, { amount: formatMoney(obligation.expectedMonthlyPayment) })
+                          : copy.noMonthlyAmount}
+                      />
+                      <ObligationDetail
+                        label={copy.recordedPayments}
+                        value={interpolate(copy.linkedTransactions, {
+                          count: transactionCount,
+                          unit: transactionCount === 1 ? copy.transaction : copy.transactions,
+                        })}
+                        hint={interpolate(copy.paidToDate, { amount: formatMoney(paidToDate) })}
+                      />
                     </div>
                     {canManage ? (
                       <div className="justify-self-end">
@@ -184,6 +237,16 @@ export default async function FinancingPage() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function ObligationDetail({ label, value, hint }: { label: string; value: string; hint: string }) {
+  return (
+    <div>
+      <p className="label-xs">{label}</p>
+      <p className="mt-0.5 font-semibold tnum">{value}</p>
+      <p className="mt-0.5 text-2xs leading-relaxed text-muted-foreground">{hint}</p>
     </div>
   );
 }

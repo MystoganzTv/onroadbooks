@@ -60,6 +60,15 @@ export function FinancialObligationDialog({
   const [name, setName] = React.useState(obligation?.name ?? "");
   const [kind, setKind] = React.useState<FinancialObligationKind>(obligation?.kind ?? "LOAN");
   const [counterparty, setCounterparty] = React.useState(obligation?.counterparty ?? "");
+  const [startingBalance, setStartingBalance] = React.useState(
+    obligation?.startingBalance != null ? String(obligation.startingBalance) : "",
+  );
+  const [aprPercent, setAprPercent] = React.useState(
+    obligation?.aprPercent != null ? String(obligation.aprPercent) : "",
+  );
+  const [paymentDueDay, setPaymentDueDay] = React.useState(
+    obligation?.paymentDueDay != null ? String(obligation.paymentDueDay) : "",
+  );
   const [monthlyPayment, setMonthlyPayment] = React.useState(
     obligation?.expectedMonthlyPayment != null ? String(obligation.expectedMonthlyPayment) : "",
   );
@@ -73,6 +82,13 @@ export function FinancialObligationDialog({
     setName(obligation?.name ?? "");
     setKind(obligation?.kind ?? "LOAN");
     setCounterparty(obligation?.counterparty ?? "");
+    setStartingBalance(
+      obligation?.startingBalance != null ? String(obligation.startingBalance) : "",
+    );
+    setAprPercent(obligation?.aprPercent != null ? String(obligation.aprPercent) : "");
+    setPaymentDueDay(
+      obligation?.paymentDueDay != null ? String(obligation.paymentDueDay) : "",
+    );
     setMonthlyPayment(
       obligation?.expectedMonthlyPayment != null ? String(obligation.expectedMonthlyPayment) : "",
     );
@@ -87,6 +103,9 @@ export function FinancialObligationDialog({
     name: copy.name,
     kind: copy.type,
     counterparty: copy.lender,
+    startingBalance: copy.startingBalance,
+    aprPercent: copy.apr,
+    paymentDueDay: copy.paymentDueDay,
     expectedMonthlyPayment: copy.expectedMonthlyPayment,
     truckId: copy.associatedTruck,
     startedOn: copy.startedOn,
@@ -99,6 +118,10 @@ export function FinancialObligationDialog({
       name,
       kind,
       counterparty: counterparty.trim() || null,
+      startingBalance:
+        kind === "LOAN" && startingBalance !== "" ? toNumber(startingBalance) : null,
+      aprPercent: kind === "LOAN" && aprPercent !== "" ? toNumber(aprPercent) : null,
+      paymentDueDay: paymentDueDay === "" ? null : toNumber(paymentDueDay),
       expectedMonthlyPayment: monthlyPayment === "" ? null : toNumber(monthlyPayment),
       truckId: truckId === "none" ? null : truckId,
       startedOn: startedOn || null,
@@ -140,7 +163,7 @@ export function FinancialObligationDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-xl">
         <form id={formId} onSubmit={submit} className="contents">
           <DialogHeader>
             <DialogTitle>{obligation ? copy.editObligation : copy.addObligation}</DialogTitle>
@@ -206,6 +229,45 @@ export function FinancialObligationDialog({
                 />
               </Field>
             </div>
+            {kind === "LOAN" ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field
+                  label={copy.startingBalance}
+                  htmlFor={`${formId}-starting-balance`}
+                  error={errors.startingBalance}
+                  hint={copy.startingBalanceHint}
+                >
+                  <Input
+                    id={`${formId}-starting-balance`}
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.01"
+                    value={startingBalance}
+                    onChange={(event) => setStartingBalance(event.target.value)}
+                    placeholder="25000"
+                  />
+                </Field>
+                <Field
+                  label={copy.apr}
+                  htmlFor={`${formId}-apr`}
+                  error={errors.aprPercent}
+                  hint={copy.aprHint}
+                >
+                  <Input
+                    id={`${formId}-apr`}
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={aprPercent}
+                    onChange={(event) => setAprPercent(event.target.value)}
+                    placeholder="8.25"
+                  />
+                </Field>
+              </div>
+            ) : null}
             <Field label={copy.associatedTruck} htmlFor={`${formId}-truck`} error={errors.truckId}>
               <Select value={truckId} onValueChange={setTruckId}>
                 <SelectTrigger id={`${formId}-truck`}><SelectValue /></SelectTrigger>
@@ -219,7 +281,25 @@ export function FinancialObligationDialog({
                 </SelectContent>
               </Select>
             </Field>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field
+                label={copy.paymentDueDay}
+                htmlFor={`${formId}-due-day`}
+                error={errors.paymentDueDay}
+                hint={copy.paymentDueDayHint}
+              >
+                <Input
+                  id={`${formId}-due-day`}
+                  type="number"
+                  inputMode="numeric"
+                  min="1"
+                  max="31"
+                  step="1"
+                  value={paymentDueDay}
+                  onChange={(event) => setPaymentDueDay(event.target.value)}
+                  placeholder="15"
+                />
+              </Field>
               <Field label={copy.startedOn} htmlFor={`${formId}-start`} error={errors.startedOn}>
                 <Input
                   id={`${formId}-start`}

@@ -180,6 +180,20 @@ export const financialObligationSchema = z
     counterparty: z.string().trim().max(120).optional().nullable(),
     startedOn: isoDate.optional().nullable(),
     endedOn: isoDate.optional().nullable(),
+    startingBalance: money.optional().nullable(),
+    aprPercent: z
+      .number({ invalid_type_error: "Enter a number" })
+      .min(0, "Cannot be negative")
+      .max(100, "APR cannot exceed 100%")
+      .optional()
+      .nullable(),
+    paymentDueDay: z
+      .number({ invalid_type_error: "Enter a whole-number due day" })
+      .int("Use a whole-number due day")
+      .min(1, "Due day must be between 1 and 31")
+      .max(31, "Due day must be between 1 and 31")
+      .optional()
+      .nullable(),
     expectedMonthlyPayment: money.optional().nullable(),
     active: z.boolean().optional(),
   })
@@ -195,6 +209,9 @@ export const debtPaymentClassificationSchema = z
     obligationUpdate: z.object({
       truckId: z.string().trim().optional().nullable(),
       name: z.string().trim().min(1, "Name the obligation").max(120),
+      startingBalance: money.optional().nullable(),
+      aprPercent: z.number().min(0).max(100).optional().nullable(),
+      paymentDueDay: z.number().int().min(1).max(31).optional().nullable(),
       expectedMonthlyPayment: money.optional().nullable(),
       active: z.boolean(),
     }).optional(),

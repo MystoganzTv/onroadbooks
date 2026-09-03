@@ -103,6 +103,7 @@ export function DebtClassificationDialog({
   const router = useRouter();
   const { dictionary } = useLanguage();
   const copy = dictionary.expenses;
+  const financingCopy = dictionary.financing;
   const common = dictionary.common;
   const editingSplit = Boolean(expense.splitGroupId);
   const rows = React.useMemo(
@@ -125,6 +126,15 @@ export function DebtClassificationDialog({
   const [obligationId, setObligationId] = React.useState(initialObligationId);
   const [obligationName, setObligationName] = React.useState(initialObligation?.name ?? expense.vendor ?? "");
   const [monthlyPayment, setMonthlyPayment] = React.useState(String(initialObligation?.expectedMonthlyPayment ?? storedPaymentAmount));
+  const [startingBalance, setStartingBalance] = React.useState(
+    initialObligation?.startingBalance != null ? String(initialObligation.startingBalance) : "",
+  );
+  const [aprPercent, setAprPercent] = React.useState(
+    initialObligation?.aprPercent != null ? String(initialObligation.aprPercent) : "",
+  );
+  const [paymentDueDay, setPaymentDueDay] = React.useState(
+    initialObligation?.paymentDueDay != null ? String(initialObligation.paymentDueDay) : "",
+  );
   const [obligationTruckId, setObligationTruckId] = React.useState(initialObligation?.truckId ?? expense.truckId ?? "none");
   const [obligationActive, setObligationActive] = React.useState(initialObligation?.active ?? true);
   const [paymentTotal, setPaymentTotal] = React.useState(String(storedPaymentAmount));
@@ -142,6 +152,13 @@ export function DebtClassificationDialog({
     setObligationId(initialObligationId);
     setObligationName(initialObligation?.name ?? expense.vendor ?? "");
     setMonthlyPayment(String(initialObligation?.expectedMonthlyPayment ?? storedPaymentAmount));
+    setStartingBalance(
+      initialObligation?.startingBalance != null ? String(initialObligation.startingBalance) : "",
+    );
+    setAprPercent(initialObligation?.aprPercent != null ? String(initialObligation.aprPercent) : "");
+    setPaymentDueDay(
+      initialObligation?.paymentDueDay != null ? String(initialObligation.paymentDueDay) : "",
+    );
     setObligationTruckId(initialObligation?.truckId ?? expense.truckId ?? "none");
     setObligationActive(initialObligation?.active ?? true);
     setPaymentTotal(String(storedPaymentAmount));
@@ -204,6 +221,9 @@ export function DebtClassificationDialog({
     const selected = obligations.find((obligation) => obligation.id === nextId);
     setObligationName(selected?.name ?? expense.vendor ?? "");
     setMonthlyPayment(String(selected?.expectedMonthlyPayment ?? storedPaymentAmount));
+    setStartingBalance(selected?.startingBalance != null ? String(selected.startingBalance) : "");
+    setAprPercent(selected?.aprPercent != null ? String(selected.aprPercent) : "");
+    setPaymentDueDay(selected?.paymentDueDay != null ? String(selected.paymentDueDay) : "");
     setObligationTruckId(selected?.truckId ?? expense.truckId ?? "none");
     setObligationActive(selected?.active ?? true);
   }
@@ -251,6 +271,15 @@ export function DebtClassificationDialog({
                     ? "OPERATING_LEASE"
                     : "UNKNOWN",
               counterparty: editingSplit ? vendor.trim() || null : expense.vendor,
+              startingBalance:
+                treatment === "LOAN_SPLIT" && startingBalance.trim() !== ""
+                  ? Number(startingBalance)
+                  : null,
+              aprPercent:
+                treatment === "LOAN_SPLIT" && aprPercent.trim() !== ""
+                  ? Number(aprPercent)
+                  : null,
+              paymentDueDay: paymentDueDay.trim() === "" ? null : Number(paymentDueDay),
               expectedMonthlyPayment: Number(monthlyPayment) || null,
               active: obligationActive,
             }
@@ -259,6 +288,15 @@ export function DebtClassificationDialog({
           ? {
               truckId: obligationTruckId === "none" ? null : obligationTruckId,
               name: obligationName,
+              startingBalance:
+                treatment === "LOAN_SPLIT" && startingBalance.trim() !== ""
+                  ? Number(startingBalance)
+                  : null,
+              aprPercent:
+                treatment === "LOAN_SPLIT" && aprPercent.trim() !== ""
+                  ? Number(aprPercent)
+                  : null,
+              paymentDueDay: paymentDueDay.trim() === "" ? null : Number(paymentDueDay),
               expectedMonthlyPayment: Number(monthlyPayment) || null,
               active: obligationActive,
             }
@@ -410,6 +448,57 @@ export function DebtClassificationDialog({
                     />
                   </Field>
                 </div>
+                {treatment === "LOAN_SPLIT" ? (
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <Field
+                      label={financingCopy.startingBalance}
+                      htmlFor={`starting-balance-${expense.id}`}
+                      hint={financingCopy.startingBalanceHint}
+                    >
+                      <Input
+                        id={`starting-balance-${expense.id}`}
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.01"
+                        value={startingBalance}
+                        onChange={(event) => setStartingBalance(event.target.value)}
+                      />
+                    </Field>
+                    <Field
+                      label={financingCopy.apr}
+                      htmlFor={`apr-${expense.id}`}
+                      hint={financingCopy.aprHint}
+                    >
+                      <Input
+                        id={`apr-${expense.id}`}
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={aprPercent}
+                        onChange={(event) => setAprPercent(event.target.value)}
+                      />
+                    </Field>
+                    <Field
+                      label={financingCopy.paymentDueDay}
+                      htmlFor={`due-day-${expense.id}`}
+                      hint={financingCopy.paymentDueDayHint}
+                    >
+                      <Input
+                        id={`due-day-${expense.id}`}
+                        type="number"
+                        inputMode="numeric"
+                        min="1"
+                        max="31"
+                        step="1"
+                        value={paymentDueDay}
+                        onChange={(event) => setPaymentDueDay(event.target.value)}
+                      />
+                    </Field>
+                  </div>
+                ) : null}
                 <Field label={copy.associatedTruck} htmlFor={`obligation-truck-${expense.id}`}>
                   <Select value={obligationTruckId} onValueChange={setObligationTruckId}>
                     <SelectTrigger id={`obligation-truck-${expense.id}`}><SelectValue /></SelectTrigger>

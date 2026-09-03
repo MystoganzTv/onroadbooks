@@ -1299,6 +1299,9 @@ describe("financial review and customer cash events", () => {
       name: "Original truck note",
       kind: "LOAN",
       counterparty: "Original Bank",
+      startingBalance: 25_000,
+      aprPercent: 8.25,
+      paymentDueDay: 15,
       expectedMonthlyPayment: 500,
       active: true,
     });
@@ -1310,6 +1313,9 @@ describe("financial review and customer cash events", () => {
       counterparty: "American Express",
       startedOn: "2025-01-01",
       endedOn: "2026-09-02",
+      startingBalance: 24_000,
+      aprPercent: 7.5,
+      paymentDueDay: 20,
       expectedMonthlyPayment: 513,
       active: false,
     });
@@ -1317,6 +1323,9 @@ describe("financial review and customer cash events", () => {
     assert.equal(updated.name, "Closed Amex note");
     assert.equal(updated.counterparty, "American Express");
     assert.equal(updated.truckId, null);
+    assert.equal(updated.startingBalance, 24_000);
+    assert.equal(updated.aprPercent, 7.5);
+    assert.equal(updated.paymentDueDay, 20);
     assert.equal(updated.expectedMonthlyPayment, 513);
     assert.equal(updated.active, false);
     assert.equal(updated.endedOn, "2026-09-02");

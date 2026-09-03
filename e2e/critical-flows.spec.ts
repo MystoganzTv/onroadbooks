@@ -243,6 +243,9 @@ test.describe.serial("critical browser flows", () => {
     await expect(classifyDialog.getByLabel("Loan principal")).toHaveValue("513");
     await expect(classifyDialog.getByLabel("Loan interest")).toHaveValue("0");
     await expect(classifyDialog.getByLabel("Notes")).toHaveValue("ACH payment from operating account");
+    await classifyDialog.getByLabel("Starting principal balance").fill("10000");
+    await classifyDialog.getByLabel("APR").fill("12");
+    await classifyDialog.getByLabel("Payment due day").fill("5");
     await classifyDialog.getByRole("button", { name: "Confirm classification" }).click();
     await expect(classifyDialog).toBeHidden();
 
@@ -260,6 +263,9 @@ test.describe.serial("critical browser flows", () => {
     await expect(editDialog.getByLabel("Bank or lender")).toHaveValue("Amex");
     await expect(editDialog.getByLabel("Loan principal")).toHaveValue("513");
     await expect(editDialog.getByLabel("Loan interest")).toHaveValue("0");
+    await expect(editDialog.getByLabel("Starting principal balance")).toHaveValue("10000");
+    await expect(editDialog.getByLabel("APR")).toHaveValue("12");
+    await expect(editDialog.getByLabel("Payment due day")).toHaveValue("5");
     await editDialog.getByLabel("Loan interest").fill("25");
     await editDialog.getByLabel("Total payment").fill("525");
     await expect(editDialog.getByLabel("Loan principal")).toHaveValue("500");
@@ -299,6 +305,15 @@ test.describe.serial("critical browser flows", () => {
     await expect(updatedDialog.getByLabel("Notes")).toHaveValue("September Amex autopay");
     await updatedDialog.getByRole("button", { name: "Cancel" }).click();
 
+    await page.goto("/financing");
+    const financing = page.locator("article").filter({ hasText: "Amex Business Card" });
+    await expect(financing).toContainText("$10,000.00");
+    await expect(financing).toContainText("$9,500.00");
+    await expect(financing).toContainText("12%");
+    await expect(financing).toContainText("$500.00 principal recorded");
+
+    await page.goto("/expenses?month=2026-09&period=month");
+
     await paymentRow.getByRole("button", { name: "Delete complete loan payment" }).click();
     const deleteDialog = page.getByRole("dialog", { name: "Delete this payment?" });
     await expect(deleteDialog.getByText("The complete principal and interest breakdown")).toBeVisible();
@@ -328,6 +343,9 @@ test.describe.serial("critical browser flows", () => {
     const createDialog = page.getByRole("dialog", { name: "Add financing" });
     await createDialog.getByLabel("Obligation name").fill("AMEX equipment note");
     await createDialog.getByLabel("Bank or lender").fill("American Express");
+    await createDialog.getByLabel("Starting principal balance").fill("15000");
+    await createDialog.getByLabel("APR").fill("8.25");
+    await createDialog.getByLabel("Payment due day").fill("15");
     await createDialog.getByLabel("Expected monthly payment").fill("513");
     await createDialog.getByLabel("Associated truck").click();
     await page.getByRole("option", { name: truckName!, exact: true }).click();
@@ -338,11 +356,21 @@ test.describe.serial("critical browser flows", () => {
     const obligation = page.locator("article").filter({ hasText: "AMEX equipment note" });
     await expect(obligation).toContainText("Active");
     await expect(obligation).toContainText("$513.00");
+    await expect(obligation).toContainText("$15,000.00");
+    await expect(obligation).toContainText("8.25%");
+    await expect(obligation).toContainText("Next scheduled payment");
+    await expect(obligation).toContainText("due day 15");
     await expect(obligation).toContainText(truckName!);
     await obligation.getByRole("button", { name: "Edit financing: AMEX equipment note" }).click();
 
     const editDialog = page.getByRole("dialog", { name: "Edit financing" });
     await editDialog.getByLabel("Obligation name").fill("AMEX equipment financing");
+    await expect(editDialog.getByLabel("Starting principal balance")).toHaveValue("15000");
+    await expect(editDialog.getByLabel("APR")).toHaveValue("8.25");
+    await expect(editDialog.getByLabel("Payment due day")).toHaveValue("15");
+    await editDialog.getByLabel("Starting principal balance").fill("14000");
+    await editDialog.getByLabel("APR").fill("7.5");
+    await editDialog.getByLabel("Payment due day").fill("20");
     await editDialog.getByLabel("Expected monthly payment").fill("525");
     await editDialog.getByLabel("Closed date").fill("2026-09-02");
     await editDialog.getByRole("switch", { name: "Active financing" }).uncheck();
@@ -356,6 +384,9 @@ test.describe.serial("critical browser flows", () => {
       financialObligations: Array<{
         name: string;
         counterparty: string | null;
+        startingBalance: number | null;
+        aprPercent: number | null;
+        paymentDueDay: number | null;
         expectedMonthlyPayment: number | null;
         active: boolean;
         endedOn: string | null;
@@ -364,6 +395,9 @@ test.describe.serial("critical browser flows", () => {
     expect(datasetAfterEdit.financialObligations.some((item) =>
       item.name === "AMEX equipment financing"
       && item.counterparty === "American Express"
+      && item.startingBalance === 14000
+      && item.aprPercent === 7.5
+      && item.paymentDueDay === 20
       && item.expectedMonthlyPayment === 525
       && item.active === false
       && item.endedOn === "2026-09-02"

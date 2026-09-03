@@ -134,6 +134,9 @@ export interface FinancialObligationInput {
   counterparty?: string | null;
   startedOn?: string | null;
   endedOn?: string | null;
+  startingBalance?: number | null;
+  aprPercent?: number | null;
+  paymentDueDay?: number | null;
   expectedMonthlyPayment?: number | null;
   active?: boolean;
 }
@@ -144,6 +147,9 @@ export interface DebtPaymentClassificationInput {
   obligationUpdate?: {
     truckId?: string | null;
     name: string;
+    startingBalance?: number | null;
+    aprPercent?: number | null;
+    paymentDueDay?: number | null;
     expectedMonthlyPayment?: number | null;
     active: boolean;
   };

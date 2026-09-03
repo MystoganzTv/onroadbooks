@@ -274,6 +274,12 @@ export interface FinancialObligation {
   counterparty: string | null;
   startedOn: string | null;
   endedOn: string | null;
+  /** Principal balance before the payments recorded in OnRoad. */
+  startingBalance: number | null;
+  /** Annual percentage rate as entered by the owner, e.g. 8.25 means 8.25%. */
+  aprPercent: number | null;
+  /** Contractual calendar day, 1-31. Short months use their final day. */
+  paymentDueDay: number | null;
   expectedMonthlyPayment: number | null;
   active: boolean;
   createdAt: string;

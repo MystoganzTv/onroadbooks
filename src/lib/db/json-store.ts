@@ -246,6 +246,12 @@ function migrate(dataset: Dataset): Dataset {
   dataset.loads ??= [];
   dataset.expenses ??= [];
   dataset.financialObligations ??= [];
+  dataset.financialObligations = dataset.financialObligations.map((obligation) => ({
+    ...obligation,
+    startingBalance: obligation.startingBalance ?? null,
+    aprPercent: obligation.aprPercent ?? null,
+    paymentDueDay: obligation.paymentDueDay ?? null,
+  }));
   dataset.paymentEvents ??= [];
   dataset.fuelEntries ??= [];
   dataset.documents ??= [];
@@ -516,6 +522,10 @@ function financialObligationFromInput(
     counterparty: input.counterparty?.trim() || null,
     startedOn: input.startedOn || null,
     endedOn: input.endedOn || null,
+    startingBalance:
+      input.startingBalance == null ? null : roundMoney(input.startingBalance),
+    aprPercent: input.aprPercent ?? null,
+    paymentDueDay: input.paymentDueDay ?? null,
     expectedMonthlyPayment:
       input.expectedMonthlyPayment == null ? null : roundMoney(input.expectedMonthlyPayment),
     active: input.active ?? true,
@@ -1434,6 +1444,11 @@ export class JsonRepository implements Repository {
       obligation.counterparty = input.counterparty?.trim() || null;
       obligation.startedOn = input.startedOn ?? null;
       obligation.endedOn = input.endedOn ?? null;
+      obligation.startingBalance = input.startingBalance == null
+        ? null
+        : roundMoney(input.startingBalance);
+      obligation.aprPercent = input.aprPercent ?? null;
+      obligation.paymentDueDay = input.paymentDueDay ?? null;
       obligation.expectedMonthlyPayment = input.expectedMonthlyPayment ?? null;
       obligation.active = input.active ?? true;
       if (obligation.active && truckId) {
@@ -1486,6 +1501,17 @@ export class JsonRepository implements Repository {
         }
         obligation.name = input.obligationUpdate.name.trim();
         obligation.truckId = truckId;
+        if (input.obligationUpdate.startingBalance !== undefined) {
+          obligation.startingBalance = input.obligationUpdate.startingBalance == null
+            ? null
+            : roundMoney(input.obligationUpdate.startingBalance);
+        }
+        if (input.obligationUpdate.aprPercent !== undefined) {
+          obligation.aprPercent = input.obligationUpdate.aprPercent;
+        }
+        if (input.obligationUpdate.paymentDueDay !== undefined) {
+          obligation.paymentDueDay = input.obligationUpdate.paymentDueDay;
+        }
         obligation.expectedMonthlyPayment = input.obligationUpdate.expectedMonthlyPayment ?? null;
         obligation.active = input.obligationUpdate.active;
         if (obligation.active && truckId) {
