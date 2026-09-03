@@ -1321,6 +1321,64 @@ describe("financial review and customer cash events", () => {
     assert.ok(rows.every((row) => row.obligationId && row.splitGroupId));
   });
 
+  it("lets a classified loan payment be corrected without changing its total", async () => {
+    const dataset = await repo.getDataset();
+    const original = await repo.createExpense(expense({
+      truckId: dataset.trucks[0].id,
+      category: "TRUCK_PAYMENT",
+      description: "Amex payment",
+      amount: 513,
+    }));
+    const [principalOnly] = await repo.classifyDebtPayment(original.id, {
+      treatment: "LOAN_SPLIT",
+      principalAmount: 513,
+      interestAmount: 0,
+      newObligation: {
+        truckId: dataset.trucks[0].id,
+        name: "Amex",
+        kind: "LOAN",
+        expectedMonthlyPayment: 513,
+      },
+    });
+
+    const corrected = await repo.classifyDebtPayment(principalOnly.id, {
+      treatment: "LOAN_SPLIT",
+      obligationId: principalOnly.obligationId,
+      principalAmount: 475,
+      interestAmount: 38,
+    });
+    assert.equal(corrected.reduce((total, row) => total + row.amount, 0), 513);
+    assert.deepEqual(
+      corrected.map((row) => [row.financialTreatment, row.amount]).sort(),
+      [["INTEREST", 38], ["PRINCIPAL", 475]],
+    );
+    assert.ok(corrected.every((row) => row.splitGroupId === principalOnly.splitGroupId));
+
+    const interestRow = corrected.find((row) => row.financialTreatment === "INTEREST")!;
+    const correctedFromInterest = await repo.classifyDebtPayment(interestRow.id, {
+      treatment: "LOAN_SPLIT",
+      obligationId: principalOnly.obligationId,
+      principalAmount: 500,
+      interestAmount: 13,
+    });
+    assert.equal(correctedFromInterest.reduce((total, row) => total + row.amount, 0), 513);
+    assert.deepEqual(
+      correctedFromInterest.map((row) => [row.financialTreatment, row.amount]).sort(),
+      [["INTEREST", 13], ["PRINCIPAL", 500]],
+    );
+
+    const principalRow = correctedFromInterest.find((row) => row.financialTreatment === "PRINCIPAL")!;
+    const principalAgain = await repo.classifyDebtPayment(principalRow.id, {
+      treatment: "LOAN_SPLIT",
+      obligationId: principalOnly.obligationId,
+      principalAmount: 513,
+      interestAmount: 0,
+    });
+    assert.equal(principalAgain.length, 1);
+    assert.equal(principalAgain[0].financialTreatment, "PRINCIPAL");
+    assert.equal(principalAgain[0].amount, 513);
+  });
+
   it("rejects loan splits that are over or under the original payment", async () => {
     const dataset = await repo.getDataset();
     const over = await repo.createExpense(expense({

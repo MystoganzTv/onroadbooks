@@ -1719,8 +1719,11 @@ export class PrismaRepository implements Repository {
     // the same, and the two used to disagree on exactly this edit.
     const previous = await client.expense.findFirst({
       where: { id, businessId: business.id },
-      select: { category: true, financialTreatment: true },
+      select: { category: true, financialTreatment: true, splitGroupId: true },
     });
+    if (previous?.splitGroupId) {
+      throw new Error("Use the loan payment editor to keep principal and interest balanced.");
+    }
     const preservedTreatment =
       previous && previous.category === input.category ? previous.financialTreatment : null;
     const scope = input.scope ?? "TRUCK";
@@ -1805,8 +1808,15 @@ export class PrismaRepository implements Repository {
     const affectedIds = await client.$transaction(async (tx) => {
       const expense = await tx.expense.findFirst({ where: { id, businessId: business.id } });
       if (!expense) throw new Error("That payment does not belong to this workspace.");
-      if (expense.category !== "TRUCK_PAYMENT") {
+      const editingSplit = Boolean(
+        expense.splitGroupId &&
+        ["PRINCIPAL_PAYMENT", "INTEREST_EXPENSE"].includes(expense.category),
+      );
+      if (expense.category !== "TRUCK_PAYMENT" && !editingSplit) {
         throw new Error("Only unallocated truck payments can be classified here.");
+      }
+      if (editingSplit && input.treatment !== "LOAN_SPLIT") {
+        throw new Error("An existing loan split can only be updated as principal and interest.");
       }
 
       let obligationId = input.obligationId?.trim() || null;
@@ -1871,11 +1881,103 @@ export class PrismaRepository implements Repository {
       if (obligation && obligation.kind !== "LOAN") {
         throw new Error("Choose a loan obligation before recording principal and interest.");
       }
+      const existingRows = editingSplit
+        ? await tx.expense.findMany({
+            where: { businessId: business.id, splitGroupId: expense.splitGroupId },
+          })
+        : [expense];
+      const paymentAmount = roundMoney(
+        existingRows.reduce((total, row) => total + num(row.amount), 0),
+      );
       const { principal, interest } = requireExactDebtPaymentSplit(
-        num(expense.amount),
+        paymentAmount,
         input.principalAmount ?? 0,
         input.interestAmount ?? 0,
       );
+
+      if (editingSplit) {
+        const splitGroupId = expense.splitGroupId!;
+        const principalRow = existingRows.find((row) => row.financialTreatment === "PRINCIPAL");
+        const baseRow = principalRow ?? existingRows[0];
+        const baseDescription = (principalRow?.description ?? baseRow.description)
+          .replace(/ · interest$/u, "");
+        const keptIds: string[] = [];
+
+        if (principal > 0) {
+          await tx.expense.update({
+            where: { id: baseRow.id },
+            data: {
+              category: "PRINCIPAL_PAYMENT",
+              financialTreatment: "PRINCIPAL",
+              amount: principal,
+              obligationId,
+              description: baseDescription,
+            },
+          });
+          keptIds.push(baseRow.id);
+
+          if (interest > 0) {
+            const existingInterest = existingRows.find(
+              (row) => row.id !== baseRow.id && row.financialTreatment === "INTEREST",
+            );
+            if (existingInterest) {
+              await tx.expense.update({
+                where: { id: existingInterest.id },
+                data: {
+                  category: "INTEREST_EXPENSE",
+                  financialTreatment: "INTEREST",
+                  amount: interest,
+                  obligationId,
+                  description: `${baseDescription} · interest`,
+                },
+              });
+              keptIds.push(existingInterest.id);
+            } else {
+              const interestRow = await tx.expense.create({
+                data: {
+                  businessId: business.id,
+                  truckId: baseRow.truckId,
+                  scope: baseRow.scope,
+                  loadId: baseRow.loadId,
+                  date: baseRow.date,
+                  category: "INTEREST_EXPENSE",
+                  financialTreatment: "INTEREST",
+                  obligationId,
+                  splitGroupId,
+                  description: `${baseDescription} · interest`,
+                  vendor: baseRow.vendor,
+                  amount: interest,
+                  recurring: baseRow.recurring,
+                  notes: baseRow.notes,
+                },
+              });
+              keptIds.push(interestRow.id);
+            }
+          }
+        } else {
+          await tx.expense.update({
+            where: { id: baseRow.id },
+            data: {
+              category: "INTEREST_EXPENSE",
+              financialTreatment: "INTEREST",
+              amount: interest,
+              obligationId,
+              description: `${baseDescription} · interest`,
+            },
+          });
+          keptIds.push(baseRow.id);
+        }
+
+        await tx.expense.deleteMany({
+          where: {
+            businessId: business.id,
+            splitGroupId,
+            id: { notIn: keptIds },
+          },
+        });
+        return keptIds;
+      }
+
       const splitGroupId = newId("split");
       if (principal <= 0) {
         await tx.expense.update({

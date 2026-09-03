@@ -49,11 +49,12 @@ import { behaviorOf, categoryColor, categoryLabel, EXPENSE_CATEGORIES } from "@/
 import { formatMoney } from "@/lib/formatters";
 import { formatLocaleDate } from "@/lib/i18n-format";
 import { interpolate } from "@/lib/i18n/dictionaries";
-import type { Expense, ExpenseBehavior, LoadWithMetrics, Truck } from "@/lib/types";
+import type { Expense, ExpenseBehavior, FinancialObligation, LoadWithMetrics, Truck } from "@/lib/types";
 import type { ExpenseMirrorSource } from "@/lib/mirrored-expenses";
 import { cn } from "@/lib/utils";
 import { ExpenseFormDialog } from "./expense-form-dialog";
 import { LoadExpenseFormDialog } from "./load-expense-form-dialog";
+import { DebtClassificationDialog } from "./debt-review-panel";
 
 type SortKey = "date" | "category" | "description" | "vendor" | "amount";
 
@@ -71,6 +72,7 @@ interface ExpensesTableProps {
   defaultDate: string;
   trucks?: Truck[];
   defaultTruckId?: string | null;
+  obligations?: FinancialObligation[];
 }
 
 export function ExpensesTable({
@@ -82,6 +84,7 @@ export function ExpensesTable({
   defaultDate,
   trucks = [],
   defaultTruckId,
+  obligations = [],
 }: ExpensesTableProps) {
   const router = useRouter();
   const { locale, dictionary } = useLanguage();
@@ -122,6 +125,16 @@ export function ExpensesTable({
   }, [expenses, search, category, behavior, sort, categoryBehavior, locale]);
 
   const total = filtered.reduce((sum, expense) => sum + expense.amount, 0);
+  const splitRowsByGroup = React.useMemo(() => {
+    const groups = new Map<string, Expense[]>();
+    for (const expense of expenses) {
+      if (!expense.splitGroupId) continue;
+      const rows = groups.get(expense.splitGroupId) ?? [];
+      rows.push(expense);
+      groups.set(expense.splitGroupId, rows);
+    }
+    return groups;
+  }, [expenses]);
   // With one truck every cost is that truck's, so saying so on every row is
   // noise. With a fleet it is the first thing you need to know.
   const showCharge = trucks.length > 1;
@@ -291,6 +304,12 @@ export function ExpensesTable({
                 const mirroredLoad = mirrorSource === "LOAD" || expense.id.startsWith("expload_");
                 const mirroredDriver = expense.id.startsWith("expdriver_");
                 const mirrored = mirroredFuel || mirroredService || mirroredLoad || mirroredDriver;
+                const paymentRows = expense.splitGroupId
+                  ? splitRowsByGroup.get(expense.splitGroupId) ?? []
+                  : [];
+                const paymentExpense = paymentRows.find(
+                  (row) => row.financialTreatment === "PRINCIPAL",
+                ) ?? paymentRows[0];
                 return (
                   <TableRow key={expense.id}>
                     <TableCell className="text-muted-foreground">
@@ -369,7 +388,23 @@ export function ExpensesTable({
                               </Button>
                             }
                           />
-                        ) : mirrored ? null : (
+                        ) : mirrored ? null : paymentExpense ? (
+                          <DebtClassificationDialog
+                            expense={paymentExpense}
+                            paymentRows={paymentRows}
+                            obligations={obligations}
+                            trigger={
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label={copy.editLoanPaymentSplit}
+                                title={copy.editLoanPaymentSplit}
+                              >
+                                <Pencil />
+                              </Button>
+                            }
+                          />
+                        ) : (
                           <ExpenseFormDialog
                             expense={expense}
                             documents={documents.filter((d) => d.expenseId === expense.id)}

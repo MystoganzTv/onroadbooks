@@ -83,25 +83,58 @@ export function DebtReviewPanel({
   );
 }
 
-function DebtClassificationDialog({
+export function DebtClassificationDialog({
   expense,
   obligations,
+  paymentRows,
+  trigger,
 }: {
   expense: Expense;
   obligations: FinancialObligation[];
+  paymentRows?: Expense[];
+  trigger?: React.ReactNode;
 }) {
   const router = useRouter();
   const { dictionary } = useLanguage();
   const copy = dictionary.expenses;
   const common = dictionary.common;
+  const editingSplit = Boolean(expense.splitGroupId);
+  const rows = React.useMemo(
+    () => paymentRows?.filter((row) => row.splitGroupId === expense.splitGroupId) ?? [expense],
+    [expense, paymentRows],
+  );
+  const paymentAmount = rows.reduce((total, row) => total + row.amount, 0);
+  const currentPrincipal = rows.find((row) => row.financialTreatment === "PRINCIPAL")?.amount ?? 0;
+  const currentInterest = rows.find((row) => row.financialTreatment === "INTEREST")?.amount ?? 0;
+  const initialObligationId = expense.obligationId ?? (editingSplit ? "none" : "new");
+
   const [open, setOpen] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
   const [treatment, setTreatment] = React.useState<Treatment>("LOAN_SPLIT");
-  const [obligationId, setObligationId] = React.useState("new");
+  const [obligationId, setObligationId] = React.useState(initialObligationId);
   const [name, setName] = React.useState(expense.vendor ?? "");
-  const [monthlyPayment, setMonthlyPayment] = React.useState(String(expense.amount));
-  const [principal, setPrincipal] = React.useState(String(expense.amount));
-  const [interest, setInterest] = React.useState("0");
+  const [monthlyPayment, setMonthlyPayment] = React.useState(String(paymentAmount));
+  const [principal, setPrincipal] = React.useState(String(editingSplit ? currentPrincipal : expense.amount));
+  const [interest, setInterest] = React.useState(String(editingSplit ? currentInterest : 0));
+
+  React.useEffect(() => {
+    if (!open) return;
+    setTreatment("LOAN_SPLIT");
+    setObligationId(initialObligationId);
+    setName(expense.vendor ?? "");
+    setMonthlyPayment(String(paymentAmount));
+    setPrincipal(String(editingSplit ? currentPrincipal : expense.amount));
+    setInterest(String(editingSplit ? currentInterest : 0));
+  }, [
+    currentInterest,
+    currentPrincipal,
+    editingSplit,
+    expense.amount,
+    expense.vendor,
+    initialObligationId,
+    open,
+    paymentAmount,
+  ]);
   const principalValue = Number(principal);
   const interestValue = Number(interest);
   const splitInputsValid = principal.trim() !== ""
@@ -111,7 +144,7 @@ function DebtClassificationDialog({
     && principalValue >= 0
     && interestValue >= 0;
   const reconciliation = reconcileDebtPaymentSplit(
-    expense.amount,
+    paymentAmount,
     principalValue,
     interestValue,
   );
@@ -130,7 +163,7 @@ function DebtClassificationDialog({
     event.preventDefault();
     if (!splitBalanced) {
       toast.error(copy.exactRequired, {
-        description: splitMessage(reconciliation, expense.amount, copy),
+        description: splitMessage(reconciliation, paymentAmount, copy),
       });
       return;
     }
@@ -161,7 +194,9 @@ function DebtClassificationDialog({
         toast.error(localizedClientError(result.error));
         return;
       }
-      toast.success(copy.paymentClassified, { description: copy.totalPreserved });
+      toast.success(editingSplit ? copy.paymentSplitUpdated : copy.paymentClassified, {
+        description: copy.totalPreserved,
+      });
       setOpen(false);
       router.refresh();
     });
@@ -169,17 +204,23 @@ function DebtClassificationDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button size="sm" variant="outline">{copy.review}</Button></DialogTrigger>
+      <DialogTrigger asChild>
+        {trigger ?? <Button size="sm" variant="outline">{copy.review}</Button>}
+      </DialogTrigger>
       <DialogContent>
         <form onSubmit={submit} className="contents">
           <DialogHeader>
-            <DialogTitle>{interpolate(copy.classifyPayment, { amount: formatMoney(expense.amount) })}</DialogTitle>
+            <DialogTitle>
+              {editingSplit
+                ? interpolate(copy.editLoanPayment, { amount: formatMoney(paymentAmount) })
+                : interpolate(copy.classifyPayment, { amount: formatMoney(paymentAmount) })}
+            </DialogTitle>
             <DialogDescription>
-              {copy.classifyDescription}
+              {editingSplit ? copy.editLoanPaymentDescription : copy.classifyDescription}
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
-            <Field label={copy.treatment} htmlFor={`treatment-${expense.id}`} required>
+            {!editingSplit ? <Field label={copy.treatment} htmlFor={`treatment-${expense.id}`} required>
               <Select value={treatment} onValueChange={(value) => { setTreatment(value as Treatment); setObligationId("new"); }}>
                 <SelectTrigger id={`treatment-${expense.id}`}><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -188,7 +229,7 @@ function DebtClassificationDialog({
                   <SelectItem value="DEBT_UNALLOCATED">{copy.keepUnknown}</SelectItem>
                 </SelectContent>
               </Select>
-            </Field>
+            </Field> : null}
 
             <Field label={copy.obligation} htmlFor={`obligation-${expense.id}`}>
               <Select value={obligationId} onValueChange={setObligationId}>
@@ -221,7 +262,7 @@ function DebtClassificationDialog({
                       type="number"
                       inputMode="decimal"
                       min="0"
-                      max={expense.amount}
+                      max={paymentAmount}
                       step="0.01"
                       value={principal}
                       aria-invalid={!splitInputsValid || reconciliation.state === "OVER"}
@@ -234,7 +275,7 @@ function DebtClassificationDialog({
                       type="number"
                       inputMode="decimal"
                       min="0"
-                      max={expense.amount}
+                      max={paymentAmount}
                       step="0.01"
                       value={interest}
                       aria-invalid={!splitInputsValid || reconciliation.state === "OVER"}
@@ -255,7 +296,7 @@ function DebtClassificationDialog({
                 >
                   <div className="flex items-center justify-between gap-3 text-xs">
                     <span className="text-muted-foreground">{copy.paymentToClassify}</span>
-                    <span className="font-semibold tnum">{formatMoney(expense.amount)}</span>
+                    <span className="font-semibold tnum">{formatMoney(paymentAmount)}</span>
                   </div>
                   <div className="mt-1 flex items-center justify-between gap-3 text-xs">
                     <span className="text-muted-foreground">{copy.principalPlusInterest}</span>
@@ -272,7 +313,7 @@ function DebtClassificationDialog({
                     )}
                   >
                     {splitInputsValid
-                      ? splitMessage(reconciliation, expense.amount, copy)
+                      ? splitMessage(reconciliation, paymentAmount, copy)
                       : copy.validAmounts}
                   </p>
                 </div>
@@ -281,7 +322,10 @@ function DebtClassificationDialog({
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>{common.cancel}</Button>
-            <Button type="submit" disabled={pending || !splitBalanced}>{pending ? <Loader2 className="animate-spin" /> : null} {copy.confirmClassification}</Button>
+            <Button type="submit" disabled={pending || !splitBalanced}>
+              {pending ? <Loader2 className="animate-spin" /> : null}
+              {editingSplit ? copy.saveLoanPaymentSplit : copy.confirmClassification}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

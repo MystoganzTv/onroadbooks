@@ -1354,6 +1354,9 @@ export class JsonRepository implements Repository {
       if (mirror) throw new Error(mirrorRefusal(mirror));
       const index = dataset.expenses.findIndex((e) => e.id === id);
       if (index === -1) throw new Error(`Expense ${id} not found`);
+      if (dataset.expenses[index].splitGroupId) {
+        throw new Error("Use the loan payment editor to keep principal and interest balanced.");
+      }
       const updated = expenseFromInput(
         input,
         dataset,
@@ -1404,8 +1407,15 @@ export class JsonRepository implements Repository {
     return mutate((dataset) => {
       const expense = dataset.expenses.find((row) => row.id === id);
       if (!expense) throw new Error("That payment does not belong to this workspace.");
-      if (expense.category !== "TRUCK_PAYMENT") {
+      const editingSplit = Boolean(
+        expense.splitGroupId &&
+        ["PRINCIPAL_PAYMENT", "INTEREST_EXPENSE"].includes(expense.category),
+      );
+      if (expense.category !== "TRUCK_PAYMENT" && !editingSplit) {
         throw new Error("Only unallocated truck payments can be classified here.");
+      }
+      if (editingSplit && input.treatment !== "LOAN_SPLIT") {
+        throw new Error("An existing loan split can only be updated as principal and interest.");
       }
 
       let obligationId = input.obligationId?.trim() || null;
@@ -1444,11 +1454,76 @@ export class JsonRepository implements Repository {
       if (obligation && obligation.kind !== "LOAN") {
         throw new Error("Choose a loan obligation before recording principal and interest.");
       }
+      const existingRows = editingSplit
+        ? dataset.expenses.filter((row) => row.splitGroupId === expense.splitGroupId)
+        : [expense];
+      const paymentAmount = roundMoney(
+        existingRows.reduce((total, row) => total + row.amount, 0),
+      );
       const { principal, interest } = requireExactDebtPaymentSplit(
-        expense.amount,
+        paymentAmount,
         input.principalAmount ?? 0,
         input.interestAmount ?? 0,
       );
+
+      if (editingSplit) {
+        const splitGroupId = expense.splitGroupId!;
+        const principalRow = existingRows.find((row) => row.financialTreatment === "PRINCIPAL");
+        const baseRow = principalRow ?? existingRows[0];
+        const baseDescription = (principalRow?.description ?? baseRow.description)
+          .replace(/ · interest$/u, "");
+        const kept: Expense[] = [];
+
+        if (principal > 0) {
+          baseRow.category = "PRINCIPAL_PAYMENT";
+          baseRow.financialTreatment = "PRINCIPAL";
+          baseRow.amount = principal;
+          baseRow.obligationId = obligationId;
+          baseRow.description = baseDescription;
+          kept.push(baseRow);
+
+          if (interest > 0) {
+            const existingInterest = existingRows.find(
+              (row) => row.id !== baseRow.id && row.financialTreatment === "INTEREST",
+            );
+            if (existingInterest) {
+              existingInterest.category = "INTEREST_EXPENSE";
+              existingInterest.financialTreatment = "INTEREST";
+              existingInterest.amount = interest;
+              existingInterest.obligationId = obligationId;
+              existingInterest.description = `${baseDescription} · interest`;
+              kept.push(existingInterest);
+            } else {
+              const interestRow: Expense = {
+                ...baseRow,
+                id: newId("exp"),
+                category: "INTEREST_EXPENSE",
+                financialTreatment: "INTEREST",
+                amount: interest,
+                description: `${baseDescription} · interest`,
+                receiptNumber: null,
+                createdAt: new Date().toISOString(),
+              };
+              dataset.expenses.push(interestRow);
+              kept.push(interestRow);
+            }
+          }
+        } else {
+          baseRow.category = "INTEREST_EXPENSE";
+          baseRow.financialTreatment = "INTEREST";
+          baseRow.amount = interest;
+          baseRow.obligationId = obligationId;
+          baseRow.description = `${baseDescription} · interest`;
+          kept.push(baseRow);
+        }
+
+        const keptIds = new Set(kept.map((row) => row.id));
+        dataset.expenses = dataset.expenses.filter(
+          (row) => row.splitGroupId !== splitGroupId || keptIds.has(row.id),
+        );
+        return kept;
+      }
+
       const splitGroupId = newId("split");
       if (principal <= 0) {
         expense.category = "INTEREST_EXPENSE";

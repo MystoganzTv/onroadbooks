@@ -145,6 +145,7 @@ export default async function ExpensesPage({
             defaultDate={defaultEntryDate(period)}
             trucks={trucks}
             defaultTruckId={scopeTruckId}
+            obligations={financialObligations}
           />
         </div>
         <CategoryBreakdown

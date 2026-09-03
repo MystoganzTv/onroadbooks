@@ -218,6 +218,58 @@ test.describe.serial("critical browser flows", () => {
     await expect(page.getByText(/Online billing is being configured/).first()).toBeVisible();
   });
 
+  test("owner can correct a zero-interest loan payment split without changing its total", async ({ page }) => {
+    const datasetBeforeTest = await readDataset();
+    await login(page);
+    await page.goto("/expenses?month=2026-09&period=month");
+
+    await page.getByRole("button", { name: /^Add expense$/i }).first().click();
+    const expenseDialog = page.getByRole("dialog", { name: "Add expense" });
+    await page.locator("#expense-date").fill("2026-09-01");
+    await page.locator("#expense-amount").fill("513");
+    await page.locator("#expense-category").click();
+    await page.getByRole("option", { name: "Truck Payment (Unallocated)" }).click();
+    await page.locator("#expense-description").fill("AMEX payment");
+    await page.locator("#expense-vendor").fill("Amex");
+    await page.getByRole("button", { name: "Add expense", exact: true }).last().click();
+    await expect(expenseDialog).toBeHidden();
+
+    await page.getByRole("button", { name: "Review", exact: true }).last().click();
+    const classifyDialog = page.getByRole("dialog", { name: "Classify $513.00 payment" });
+    await expect(classifyDialog.getByLabel("Loan principal")).toHaveValue("513");
+    await expect(classifyDialog.getByLabel("Loan interest")).toHaveValue("0");
+    await classifyDialog.getByRole("button", { name: "Confirm classification" }).click();
+    await expect(classifyDialog).toBeHidden();
+
+    const principalRow = page.getByRole("row").filter({
+      has: page.getByText("AMEX payment", { exact: true }),
+    });
+    await expect(principalRow).toContainText("Loan Principal Payment");
+    await expect(principalRow).toContainText("$513.00");
+    await principalRow.getByRole("button", { name: "Edit principal and interest" }).click();
+
+    const editDialog = page.getByRole("dialog", { name: "Edit $513.00 loan payment" });
+    await expect(editDialog.getByLabel("Loan principal")).toHaveValue("513");
+    await expect(editDialog.getByLabel("Loan interest")).toHaveValue("0");
+    await editDialog.getByLabel("Loan principal").fill("475");
+    await editDialog.getByLabel("Loan interest").fill("38");
+    await editDialog.getByRole("button", { name: "Save payment split" }).click();
+    await expect(editDialog).toBeHidden();
+
+    await expect(principalRow).toContainText("$475.00");
+    const interestRow = page.getByRole("row").filter({
+      has: page.getByText("AMEX payment · interest", { exact: true }),
+    });
+    await expect(interestRow).toContainText("Loan Interest Payment");
+    await expect(interestRow).toContainText("$38.00");
+
+    await principalRow.getByRole("button", { name: "Edit principal and interest" }).click();
+    await expect(editDialog.getByLabel("Loan principal")).toHaveValue("475");
+    await expect(editDialog.getByLabel("Loan interest")).toHaveValue("38");
+
+    await writeDataset(datasetBeforeTest);
+  });
+
   test("load calculator compares an existing offer and never counters downward", async ({ page }) => {
     await login(page);
     await page.goto("/calculator");
