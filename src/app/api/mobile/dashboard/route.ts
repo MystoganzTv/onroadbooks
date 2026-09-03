@@ -8,6 +8,7 @@ import {
   linkedFuelByLoad,
   loadsInPeriod,
   pctChange,
+  roundMoney,
   thresholdsFromSettings,
   withMetricsAll,
 } from "@/lib/calculations";
@@ -17,6 +18,7 @@ import {
   calculateFinancialPlanning,
   calculateReserveBalances,
   calculateTrueCostPerMile,
+  overheadCostPerMile,
   trailingCostBasis,
   buildFinancialSummary,
   resolveReserveRules,
@@ -98,30 +100,52 @@ export async function GET(request: NextRequest) {
   );
   const day = calculateDaySnapshot(loads, expenses, today, goals);
   const cashToday = calculateCashActivity(loads, expenses, paymentEvents, { start: today, end: today });
-  const planning = calculateFinancialPlanning(
-    goals,
-    trailingCostBasis(loads, expenses, settings, today),
-    financialObligations,
-  );
+  // The same trailing basis /api/mobile/loads allocates with. Computed once
+  // here and shared with `recentLoads` below so a load cannot show one
+  // contribution on the dashboard and a different one on the Loads tab.
+  const tripCostBasis = trailingCostBasis(loads, expenses, settings, today);
+  const allocatedOperatingCostPerMile = overheadCostPerMile(tripCostBasis);
+  const planning = calculateFinancialPlanning(goals, tripCostBasis, financialObligations);
 
   const recentLoads = [...periodLoads]
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
     .slice(0, 8)
-    .map((load) => ({
-      id: load.id,
-      date: load.date,
-      broker: load.broker,
-      originCity: load.originCity,
-      originState: load.originState,
-      destinationCity: load.destinationCity,
-      destinationState: load.destinationState,
-      grossRate: load.grossRate,
-      loadedMiles: load.loadedMiles,
-      deadheadMiles: load.deadheadMiles,
-      contributionProfitPerMile: load.metrics.profitPerMile,
-      profitPerMile: load.metrics.profitPerMile,
-      rating: load.metrics.rating,
-    }));
+    .map((load) => {
+      const allocatedOperatingCosts = roundMoney(
+        load.metrics.totalMiles * allocatedOperatingCostPerMile,
+      );
+      // This is one load in the phone's LoadDTO, which /api/mobile/loads
+      // already satisfies in full. It is a single decoder on the client, so a
+      // shorter shape here is not a smaller card -- it is a decode failure
+      // that empties the whole dashboard. Keep the two routes identical.
+      return {
+        id: load.id,
+        date: load.date,
+        broker: load.broker,
+        originCity: load.originCity,
+        originState: load.originState,
+        destinationCity: load.destinationCity,
+        destinationState: load.destinationState,
+        grossRate: load.grossRate,
+        loadedMiles: load.loadedMiles,
+        deadheadMiles: load.deadheadMiles,
+        directTripCosts: load.metrics.tripExpenses,
+        contributionProfit: load.metrics.tripProfit,
+        contributionProfitPerMile: load.metrics.profitPerMile,
+        contributionMargin: load.metrics.profitMargin,
+        allocatedOperatingCosts,
+        estimatedFullyLoadedOperatingProfit: roundMoney(
+          load.metrics.tripProfit - allocatedOperatingCosts,
+        ),
+        debtCashBurden: roundMoney(load.metrics.totalMiles * tripCostBasis.debtServicePerMile),
+        allocationBasisLabel: tripCostBasis.basisLabel,
+        // Read-compatible aliases for older mobile builds.
+        profitPerMile: load.metrics.profitPerMile,
+        profitMargin: load.metrics.profitMargin,
+        deadheadPct: load.metrics.deadheadPct,
+        rating: load.metrics.rating,
+      };
+    });
 
   return NextResponse.json(
     {

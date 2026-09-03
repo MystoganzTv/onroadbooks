@@ -178,7 +178,6 @@ struct ReportTableView: View {
 
     @ViewBuilder
     private func tableBody(_ table: ReportTable) -> some View {
-        let widths = columnWidths(table)
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text(table.title)
@@ -216,66 +215,24 @@ struct ReportTableView: View {
                     .foregroundStyle(OBColor.mutedForeground)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // Horizontal inside vertical: a report is wide by nature, and
-                // squeezing eleven columns into 390 points would make every one
-                // of them unreadable.
-                // Every column used to be 130pt wide, so thirty-three of them
-                // came to 4,290pt of mostly air: a date needs half that and an
-                // empty column needs none of it. Widths now follow the widest
-                // cell actually in the column, which is what makes several of
-                // them fit on screen at once.
-                ScrollView([.horizontal, .vertical]) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        HStack(spacing: 0) {
-                            ForEach(Array(table.columns.enumerated()), id: \.offset) { index, column in
-                                Text(column)
-                                    .font(.caption2.weight(.semibold))
-                                    .foregroundStyle(OBColor.mutedForeground)
-                                    .frame(width: widths[index], alignment: .leading)
-                                    .padding(.vertical, 8)
-                                    .padding(.horizontal, OBSpacing.sm)
-                            }
-                        }
-                        .background(OBColor.surfaceRaised)
-
-                        ForEach(Array(table.rows.enumerated()), id: \.offset) { index, row in
-                            HStack(spacing: 0) {
-                                ForEach(Array(row.enumerated()), id: \.offset) { column, cell in
-                                    Text(cell)
-                                        .font(.caption)
-                                        .monospacedDigit()
-                                        .lineLimit(1)
-                                        .foregroundStyle(OBColor.foreground)
-                                        .frame(
-                                            width: column < widths.count ? widths[column] : 96,
-                                            alignment: .leading
-                                        )
-                                        .padding(.vertical, 7)
-                                        .padding(.horizontal, OBSpacing.sm)
-                                }
-                            }
-                            .background(index.isMultiple(of: 2) ? Color.clear : OBColor.surface)
+                // A 33-column grid on a 390pt screen is a spreadsheet read
+                // through a keyhole: you scroll sideways past empty columns to
+                // reach the next number and lose the row you were on. And a
+                // short table in a two-axis ScrollView gets centred, which is
+                // why it used to sit stranded in the middle of the screen. One
+                // card per row reads downward instead — the direction a phone
+                // already scrolls. The wide table still exists: it is what the
+                // PDF, Excel and CSV exports carry.
+                ScrollView {
+                    LazyVStack(spacing: OBSpacing.sm) {
+                        ForEach(Array(table.rows.enumerated()), id: \.offset) { _, row in
+                            ReportRowCard(columns: table.columns, row: row)
                         }
                     }
-                    // Two rows in a full-height scroll view were being centred,
-                    // which read as a broken screen with a table stranded in
-                    // the middle of it.
-                    .frame(maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.horizontal, OBSpacing.md)
+                    .padding(.vertical, OBSpacing.sm)
                 }
             }
-        }
-    }
-
-    /// Roughly how wide each column needs to be for its widest cell, clamped
-    /// so a long note cannot push everything else off screen and an empty
-    /// column still keeps a readable header stub.
-    private func columnWidths(_ table: ReportTable) -> [CGFloat] {
-        table.columns.indices.map { index in
-            let header = table.columns[index].count
-            let widest = table.rows.reduce(header) { longest, row in
-                index < row.count ? max(longest, row[index].count) : longest
-            }
-            return min(max(CGFloat(widest) * 7.2, 56), 190)
         }
     }
 
@@ -311,6 +268,79 @@ struct ShareSheet: UIViewControllerRepresentable {
     func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
 
+
+
+/// One row of a report, read top to bottom.
+///
+/// Reports are generic — six of them, each with its own columns — so there is
+/// no per-report headline to lift out. The first populated fields lead, and
+/// the rest open on demand. Empty cells are dropped: a card that spells out
+/// "Ending Odometer  —" on every load buries the fields that do carry a
+/// number. Nothing is lost by it — the exports still carry every column.
+private struct ReportRowCard: View {
+    let columns: [String]
+    let row: [String]
+
+    @State private var isExpanded = false
+
+    private static let collapsedCount = 4
+
+    private var fields: [(label: String, value: String)] {
+        columns.indices.compactMap { index in
+            guard index < row.count else { return nil }
+            let value = row[index].trimmingCharacters(in: .whitespaces)
+            guard !value.isEmpty else { return nil }
+            return (columns[index], value)
+        }
+    }
+
+    var body: some View {
+        let populated = fields
+        let visible = isExpanded ? populated : Array(populated.prefix(Self.collapsedCount))
+
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(visible.enumerated()), id: \.offset) { index, field in
+                HStack(alignment: .firstTextBaseline, spacing: OBSpacing.sm) {
+                    Text(field.label)
+                        .font(.caption)
+                        .foregroundStyle(OBColor.mutedForeground)
+                    Spacer(minLength: OBSpacing.sm)
+                    Text(field.value)
+                        .font(.subheadline)
+                        .monospacedDigit()
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(OBColor.foreground)
+                }
+                .padding(.horizontal, OBSpacing.md)
+                .padding(.vertical, 7)
+
+                if index < visible.count - 1 {
+                    Rectangle().fill(OBColor.border).frame(height: 1)
+                        .padding(.leading, OBSpacing.md)
+                }
+            }
+
+            if populated.count > Self.collapsedCount {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) { isExpanded.toggle() }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(isExpanded ? "Ver menos" : "Ver los \(populated.count) campos")
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.caption2)
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(OBColor.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, OBSpacing.md)
+                    .padding(.vertical, OBSpacing.sm)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .obPanel()
+    }
+}
 
 /// The months a report can be asked for: this one and the twelve before it,
 /// which covers "the month I am settling" and "the same month last year".
