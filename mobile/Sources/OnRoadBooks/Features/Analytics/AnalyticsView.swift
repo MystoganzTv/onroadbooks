@@ -9,6 +9,9 @@ import SwiftUI
 /// condemned off one lucky run.
 struct AnalyticsView: View {
     let repository: LedgerRepository
+    /// Markets, like the web's lanes page. "Richmond → North Jersey is a
+    /// different business from NJ → VA" is what that page exists to say.
+    @State private var grouping: LaneGrouping = .market
 
     @State private var snapshot: AnalyticsSnapshot?
     @State private var isLoading = true
@@ -40,7 +43,7 @@ struct AnalyticsView: View {
         .navigationTitle("Analytics")
         .navigationBarTitleDisplayMode(.inline)
         .obScopeBar()
-        .obReloadsOnScope { await reload() }
+        .obReloadsOnScope(alsoOn: grouping) { await reload() }
         .refreshable { await reload() }
     }
 
@@ -49,10 +52,23 @@ struct AnalyticsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: OBSpacing.lg) {
 
-                Text(snapshot.periodLabel)
-                    .font(.footnote)
-                    .foregroundStyle(OBColor.mutedForeground)
-                    .padding(.horizontal, OBSpacing.md)
+                HStack {
+                    Text(snapshot.periodLabel)
+                        .font(.footnote)
+                        .foregroundStyle(OBColor.mutedForeground)
+                    Spacer(minLength: OBSpacing.sm)
+                    // The web's lanes page toggles between the two and says
+                    // which one you are looking at. This screen was silently
+                    // grouping by state while that page grouped by market.
+                    Picker("Agrupar por", selection: $grouping) {
+                        ForEach(LaneGrouping.allCases, id: \.self) { option in
+                            Text(option.label).tag(option)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 180)
+                }
+                .padding(.horizontal, OBSpacing.md)
 
                 if snapshot.qualifiedCount == 0 && snapshot.emerging.isEmpty {
                     Text("Todavía no hay loads suficientes en este período.")
@@ -192,7 +208,7 @@ struct AnalyticsView: View {
 
     private func reload() async {
         do {
-            snapshot = try await repository.fetchAnalytics()
+            snapshot = try await repository.fetchAnalytics(grouping: grouping)
             failure = nil
             locked = false
         } catch {

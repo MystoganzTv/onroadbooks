@@ -226,3 +226,19 @@ final class ScopeBox: @unchecked Sendable {
         lock.unlock()
     }
 }
+
+
+/// How lanes are bucketed. Mirrors `LaneGrouping` in `src/lib/finance/lanes.ts`
+/// and the toggle on the web's `/analytics/lanes` page, which defaults to
+/// markets — "Richmond → North Jersey is a different business from NJ → VA"
+/// is the whole point of that page, and states cannot say it.
+enum LaneGrouping: String, CaseIterable {
+    case market, state
+
+    var label: String {
+        switch self {
+        case .market: return "Mercados"
+        case .state: return "Estados"
+        }
+    }
+}

@@ -9,7 +9,7 @@ import {
   withMetricsAll,
 } from "@/lib/calculations";
 import { getRepository } from "@/lib/db";
-import { calculateLanePerformance, rankLanes } from "@/lib/finance/lanes";
+import { calculateLanePerformance, rankLanes, LANE_MIN_LOADS } from "@/lib/finance/lanes";
 import { periodFromSearchParams } from "@/lib/period-params";
 import { capabilityRefusal, planAllows } from "@/lib/plans";
 
@@ -43,7 +43,13 @@ export async function GET(request: NextRequest) {
     linkedFuelByLoad(dataset.fuelEntries),
   );
 
-  const lanes = calculateLanePerformance(scored, thresholds);
+  // `calculateLanePerformance` defaults to "state"; this route was taking that
+  // default while the page it mirrors -- /analytics/lanes -- defaults to
+  // "market" and offers ?group=state. Same screen name, different unit of
+  // analysis, nothing on either saying so. Read the param the same way.
+  const groupRaw = request.nextUrl.searchParams.get("group");
+  const grouping = groupRaw === "state" ? "state" : "market";
+  const lanes = calculateLanePerformance(scored, thresholds, LANE_MIN_LOADS, grouping);
   const ranking = rankLanes(lanes);
   const brokers = brokerPerformance(scored, thresholds);
 
@@ -60,6 +66,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(
     {
       periodLabel: period.label,
+      grouping,
       minLoads: ranking.minLoads,
       qualifiedCount: ranking.qualifiedCount,
       best: ranking.best.map(lane),

@@ -159,7 +159,15 @@ final class APIRepository: LedgerRepository {
         let response = try await get("api/mobile/expenses", as: ExpensesResponseDTO.self)
         return ExpenseLedger(
             entries: response.expenses.map { $0.toDomain() },
-            categories: response.categories.map { ExpenseCategory(id: $0.id, label: $0.label) }
+            categories: response.categories.map { ExpenseCategory(id: $0.id, label: $0.label) },
+            summary: ExpenseSummary(
+                operatingExpenses: response.summary.operatingExpenses,
+                debtService: response.summary.debtService,
+                fixedExpenses: response.summary.fixedExpenses,
+                variableExpenses: response.summary.variableExpenses,
+                fuelExpense: response.summary.fuelExpense,
+                costPerMile: response.summary.costPerMile
+            )
         )
     }
 
@@ -259,8 +267,12 @@ final class APIRepository: LedgerRepository {
         )
     }
 
-    func fetchAnalytics() async throws -> AnalyticsSnapshot {
-        try await get("api/mobile/analytics", as: AnalyticsResponseDTO.self).toDomain()
+    func fetchAnalytics(grouping: LaneGrouping) async throws -> AnalyticsSnapshot {
+        try await get(
+            "api/mobile/analytics",
+            query: [URLQueryItem(name: "group", value: grouping.rawValue)],
+            as: AnalyticsResponseDTO.self
+        ).toDomain()
     }
 
     func fetchCalculatorDefaults() async throws -> CalculatorDefaults {
@@ -554,6 +566,15 @@ private struct CategoryOptionDTO: Decodable {
 }
 
 private struct ExpensesResponseDTO: Decodable {
+    struct Summary: Decodable {
+        let operatingExpenses: Double
+        let debtService: Double
+        let fixedExpenses: Double
+        let variableExpenses: Double
+        let fuelExpense: Double
+        let costPerMile: Double
+    }
+    let summary: Summary
     let periodLabel: String
     let expenses: [ExpenseDTO]
     let categories: [CategoryOptionDTO]

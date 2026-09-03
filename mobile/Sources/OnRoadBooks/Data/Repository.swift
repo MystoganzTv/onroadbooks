@@ -13,7 +13,10 @@ protocol LedgerRepository {
     func fetchInvoices() async throws -> InvoiceLedger
     func fetchReserves() async throws -> ReserveLedger
     func fetchTruck() async throws -> TruckSummary
-    func fetchAnalytics() async throws -> AnalyticsSnapshot
+    /// `grouping` mirrors the toggle on the web's lanes page. The route used
+    /// to take the function default, "state", while that page defaults to
+    /// "market" — same screen, different unit of analysis, unlabelled.
+    func fetchAnalytics(grouping: LaneGrouping) async throws -> AnalyticsSnapshot
     func fetchCalculatorDefaults() async throws -> CalculatorDefaults
     func fetchIfta(quarter: String?) async throws -> IftaReport
     func fetchReports() async throws -> [ReportSummary]

@@ -153,6 +153,20 @@ struct ExpenseCategory: Identifiable, Hashable {
 struct ExpenseLedger {
     let entries: [ExpenseEntry]
     let categories: [ExpenseCategory]
+    /// The figures the web expenses page states, computed by the server's
+    /// `summarizePeriod`. The phone used to add up the rows itself and label
+    /// the result "This Month" — a third number that matched neither of the
+    /// two the web shows, and contradicted the dashboard for the same month.
+    let summary: ExpenseSummary
+}
+
+struct ExpenseSummary: Equatable {
+    let operatingExpenses: Double
+    let debtService: Double
+    let fixedExpenses: Double
+    let variableExpenses: Double
+    let fuelExpense: Double
+    let costPerMile: Double
 }
 
 // Write models. These carry only what the road actually knows at the moment of

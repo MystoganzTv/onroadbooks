@@ -166,8 +166,14 @@ struct OBPeriodBar: View {
 extension View {
     /// Reload when the period bar changes — and once when the screen appears,
     /// which is what a plain `.task` did before there was a bar.
-    func obReloadsOnScope(_ reload: @escaping () async -> Void) -> some View {
-        modifier(ReloadsOnScope(reload: reload))
+    ///
+    /// `alsoOn` folds a screen-local control into the same task id rather than
+    /// adding a second `.task`, which would fetch twice on every appearance.
+    func obReloadsOnScope(
+        alsoOn token: AnyHashable? = nil,
+        _ reload: @escaping () async -> Void
+    ) -> some View {
+        modifier(ReloadsOnScope(token: token, reload: reload))
     }
 
     /// The bar pinned under the navigation bar, for pushed screens. Tab roots
@@ -180,9 +186,15 @@ extension View {
 
 private struct ReloadsOnScope: ViewModifier {
     @EnvironmentObject private var scopeStore: ScopeStore
+    let token: AnyHashable?
     let reload: () async -> Void
 
+    private struct Key: Hashable {
+        let scope: Scope
+        let token: AnyHashable?
+    }
+
     func body(content: Content) -> some View {
-        content.task(id: scopeStore.scope) { await reload() }
+        content.task(id: Key(scope: scopeStore.scope, token: token)) { await reload() }
     }
 }

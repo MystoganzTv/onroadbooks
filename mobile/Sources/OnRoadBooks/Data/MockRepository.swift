@@ -101,7 +101,7 @@ final class MockRepository: LedgerRepository {
         )
     }
 
-    func fetchAnalytics() async throws -> AnalyticsSnapshot {
+    func fetchAnalytics(grouping: LaneGrouping) async throws -> AnalyticsSnapshot {
         AnalyticsSnapshot(
             periodLabel: "August 2026 · Full Month",
             minLoads: 3,
@@ -655,7 +655,12 @@ final class MockRepository: LedgerRepository {
                 .init(id: "INSURANCE", label: "Insurance"),
                 .init(id: "TRUCK_PAYMENT", label: "Truck Payment"),
                 .init(id: "OTHER", label: "Other"),
-            ]
+            ],
+            summary: ExpenseSummary(
+                operatingExpenses: 4859.82, debtService: 513.00,
+                fixedExpenses: 1981.97, variableExpenses: 2877.85,
+                fuelExpense: 1320.94, costPerMile: 1.46
+            )
         )
     }
 

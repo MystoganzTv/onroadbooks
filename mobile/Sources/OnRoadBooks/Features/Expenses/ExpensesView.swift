@@ -11,7 +11,12 @@ struct ExpensesView: View {
     @State private var pendingDelete: ExpenseEntry?
     @State private var deleteFailure: String?
 
-    private var total: Double { expenses.reduce(0) { $0 + $1.amount } }
+    /// Was `expenses.reduce(0) { $0 + $1.amount }` — every treatment added
+    /// together, TRUCK_PAYMENT included, under the label "This Month". That is
+    /// neither of the two totals the web states and it contradicted the
+    /// dashboard's operating expenses for the same month. The server sends
+    /// both now.
+    @State private var summary: ExpenseSummary?
 
     var body: some View {
         NavigationStack {
@@ -30,13 +35,31 @@ struct ExpensesView: View {
                 } else {
                     List {
                         Section {
-                            HStack {
-                                LabelXS("This Month")
-                                Spacer()
-                                MoneyText(amount: total, font: .title3.weight(.semibold))
+                            if let summary {
+                                VStack(spacing: 6) {
+                                    HStack {
+                                        LabelXS("Gastos operativos")
+                                        Spacer()
+                                        MoneyText(amount: summary.operatingExpenses,
+                                                  font: .title3.weight(.semibold))
+                                    }
+                                    HStack {
+                                        LabelXS("Servicio de deuda")
+                                        Spacer()
+                                        MoneyText(amount: summary.debtService,
+                                                  font: .subheadline.weight(.semibold),
+                                                  color: OBColor.mutedForeground)
+                                    }
+                                    HStack {
+                                        Text("Fijos \(summary.fixedExpenses, format: .currency(code: "USD").precision(.fractionLength(0))) · Variables \(summary.variableExpenses, format: .currency(code: "USD").precision(.fractionLength(0))) · \(summary.costPerMile, format: .currency(code: "USD").precision(.fractionLength(2)))/mi")
+                                            .font(.caption2)
+                                            .foregroundStyle(OBColor.mutedForeground)
+                                        Spacer()
+                                    }
+                                }
+                                .listRowBackground(OBColor.background)
+                                .listRowSeparator(.hidden)
                             }
-                            .listRowBackground(OBColor.background)
-                            .listRowSeparator(.hidden)
                         }
                         Section {
                             ForEach(expenses) { expense in
@@ -147,6 +170,7 @@ struct ExpensesView: View {
         // Keep the last known picker list rather than emptying it on a failed
         // refresh -- a dropped connection should not make the add form unusable.
         if let categories = ledger?.categories, !categories.isEmpty { self.categories = categories }
+        if let ledger { summary = ledger.summary }
         isLoading = false
     }
 }

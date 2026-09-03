@@ -6,7 +6,7 @@ import { getMobileSession, requireMobileWrite } from "@/lib/auth/mobile";
 import { expenseSchema } from "@/lib/schemas";
 import type { ExpenseCategoryId } from "@/lib/types";
 import { getRepository } from "@/lib/db";
-import { expensesInPeriod } from "@/lib/calculations";
+import { expensesInPeriod, summarizePeriod } from "@/lib/calculations";
 import { EXPENSE_CATEGORIES, getCategory } from "@/lib/categories";
 import { periodFromSearchParams } from "@/lib/period-params";
 import { mobileExpenseRows } from "@/lib/finance/mobile-expense-ledger";
@@ -28,9 +28,30 @@ export async function GET(request: NextRequest) {
     (category) => getCategory(category).label,
   );
 
+  // The six figures the web expenses page states, from the same
+  // `summarizePeriod` it calls. The phone was adding up the rows it received
+  // -- every treatment together, TRUCK_PAYMENT included -- and labelling the
+  // result "This Month", which is neither of the two totals the web shows and
+  // contradicts the dashboard's operatingExpenses for the same month.
+  const summary = summarizePeriod(
+    dataset.loads,
+    dataset.expenses,
+    period,
+    dataset.settings,
+    dataset.paymentEvents,
+  );
+
   return NextResponse.json(
     {
       periodLabel: period.label,
+      summary: {
+        operatingExpenses: summary.operatingExpenses,
+        debtService: summary.debtService,
+        fixedExpenses: summary.fixedExpenses,
+        variableExpenses: summary.variableExpenses,
+        fuelExpense: summary.fuelExpense,
+        costPerMile: summary.costPerMile,
+      },
       expenses: results,
       // The picker in the app is built from this, so a category added here is
       // available on the phone without shipping a new build.
