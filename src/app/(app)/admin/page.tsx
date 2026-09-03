@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Activity, CreditCard, ShieldCheck, Users } from "lucide-react";
 
 import { AdminAccountsTable } from "@/components/admin/admin-accounts-table";
+import { AdminOperationsCheck } from "@/components/admin/admin-operations-check";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { requireAdminPageSession } from "@/lib/auth/admin";
@@ -66,6 +67,8 @@ export default async function AdminPage() {
           </Card>
         ))}
       </div>
+
+      <AdminOperationsCheck />
 
       <AdminAccountsTable accounts={accounts} now={new Date(now).toISOString()} />
     </div>

@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { Prisma, PrismaClient } from "../src/generated/prisma";
+import { buildSeedDataset } from "../src/lib/seed/seed-data";
 
 import { APPLICATION_TABLES } from "./lib/postgres";
 
@@ -161,13 +162,7 @@ async function certifyIsolatedImport(baseUrl: string): Promise<void> {
   const fixtureDir = await mkdtemp(path.join(tmpdir(), "onroadbooks-import-cert-"));
 
   try {
-    const source = JSON.parse(
-      await readFile(path.join(process.cwd(), ".e2e-data", "onroad-books.json"), "utf8"),
-    ) as {
-      business: { id: string };
-      loads: Array<{ costsPosted: boolean }>;
-      expenses: Array<{ id: string }>;
-    };
+    const source = buildSeedDataset();
     // Recreate the shape of the pre-Postgres ledger. Modern E2E data contains
     // mirrored trip-cost rows which the one-time importer correctly rejects.
     source.loads = source.loads.map((load) => ({ ...load, costsPosted: false }));

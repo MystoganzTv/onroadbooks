@@ -5,10 +5,46 @@ import { revalidatePath } from "next/cache";
 import { requireAdminSession } from "@/lib/auth/admin";
 import { getAuthStore, getRepository } from "@/lib/db";
 import { isPlatformAdminEmail } from "@/lib/platform-admin";
+import { sendOperationalTestAlert } from "@/lib/operations";
 import { getDocumentStorage } from "@/lib/storage";
+import { getStripe, stripePriceId, stripeSecretLivemode } from "@/lib/stripe";
 import { deleteSupabaseAuthUserByEmail } from "@/lib/supabase/admin";
 import type { PlanId } from "@/lib/types";
 import type { ActionResult } from "./types";
+
+export async function adminRunOperationsCheck(): Promise<ActionResult> {
+  try {
+    const admin = await requireAdminSession();
+    const livemode = stripeSecretLivemode();
+    if (livemode === null) throw new Error("Stripe secret mode could not be determined.");
+
+    const planIds: PlanId[] = ["SOLO", "OWNER", "FLEET"];
+    const prices = await Promise.all(
+      planIds.map((plan) => getStripe().prices.retrieve(stripePriceId(plan))),
+    );
+    for (const [index, price] of prices.entries()) {
+      if (price.livemode !== livemode) {
+        throw new Error(`${planIds[index]} price is in a different Stripe mode.`);
+      }
+      if (!price.active || price.type !== "recurring" || !price.recurring) {
+        throw new Error(`${planIds[index]} price is not an active recurring price.`);
+      }
+    }
+
+    const alert = await sendOperationalTestAlert(admin.email);
+    if (!alert.delivered) throw new Error("The operations alert could not be delivered.");
+
+    console.info("[admin-operations-check]", {
+      admin: admin.email,
+      stripeMode: livemode ? "live" : "test",
+      prices: prices.length,
+      alertDelivered: true,
+    });
+    return { ok: true, id: livemode ? "live" : "test" };
+  } catch (error) {
+    return { ok: false, error: (error as Error).message || "Operations check failed." };
+  }
+}
 
 async function targetAccount(userId: string) {
   const account = (await getAuthStore().listAccounts()).find((candidate) => candidate.userId === userId);

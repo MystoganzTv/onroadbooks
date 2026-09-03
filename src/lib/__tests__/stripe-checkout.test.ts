@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { subscriptionCheckoutParameters } from "../stripe-checkout";
+import { stripeSecretLivemode } from "../stripe";
 
 describe("Stripe subscription checkout", () => {
   it("routes a Fleet purchase back to the correct OnRoad workspace", () => {
@@ -41,5 +42,28 @@ describe("Stripe subscription checkout", () => {
     });
 
     assert.equal(checkout.subscription_data?.trial_end, trialEnd);
+  });
+});
+
+describe("Stripe environment mode", () => {
+  it("recognizes live, test, restricted, missing and unknown keys", () => {
+    const original = process.env.STRIPE_SECRET_KEY;
+    try {
+      process.env.STRIPE_SECRET_KEY = "sk_live_example";
+      assert.equal(stripeSecretLivemode(), true);
+      process.env.STRIPE_SECRET_KEY = "rk_live_example";
+      assert.equal(stripeSecretLivemode(), true);
+      process.env.STRIPE_SECRET_KEY = "sk_test_example";
+      assert.equal(stripeSecretLivemode(), false);
+      process.env.STRIPE_SECRET_KEY = "rk_test_example";
+      assert.equal(stripeSecretLivemode(), false);
+      process.env.STRIPE_SECRET_KEY = "unknown";
+      assert.equal(stripeSecretLivemode(), null);
+      delete process.env.STRIPE_SECRET_KEY;
+      assert.equal(stripeSecretLivemode(), null);
+    } finally {
+      if (original === undefined) delete process.env.STRIPE_SECRET_KEY;
+      else process.env.STRIPE_SECRET_KEY = original;
+    }
   });
 });

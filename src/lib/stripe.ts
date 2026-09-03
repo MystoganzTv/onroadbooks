@@ -44,6 +44,14 @@ export function stripeWebhookSecret(): string {
   return required("STRIPE_WEBHOOK_SECRET");
 }
 
+export function stripeSecretLivemode(): boolean | null {
+  const key = process.env.STRIPE_SECRET_KEY?.trim();
+  if (!key) return null;
+  if (key.startsWith("sk_live_") || key.startsWith("rk_live_")) return true;
+  if (key.startsWith("sk_test_") || key.startsWith("rk_test_")) return false;
+  return null;
+}
+
 export function stripeBillingConfigured(): boolean {
   return [
     "STRIPE_SECRET_KEY",

@@ -4,7 +4,7 @@ import type Stripe from "stripe";
 import { syncStripeSubscription } from "@/lib/billing";
 import { BusinessNotFoundError } from "@/lib/db/repository";
 import { operationalLog, reportOperationalError } from "@/lib/operations";
-import { getStripe, stripeWebhookSecret } from "@/lib/stripe";
+import { getStripe, stripeSecretLivemode, stripeWebhookSecret } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 
@@ -34,6 +34,19 @@ export async function POST(request: Request) {
       error: error instanceof Error ? error.message : "Unknown error",
     });
     return NextResponse.json({ error: "Invalid Stripe signature." }, { status: 400 });
+  }
+
+  const configuredLivemode = stripeSecretLivemode();
+  if (configuredLivemode !== null && event.livemode !== configuredLivemode) {
+    operationalLog("warning", "Stripe webhook ignored for mismatched mode", {
+      route: "/api/stripe/webhook",
+      requestId,
+      eventId: event.id,
+      eventType: event.type,
+      eventMode: event.livemode ? "live" : "test",
+      configuredMode: configuredLivemode ? "live" : "test",
+    });
+    return NextResponse.json({ received: true });
   }
 
   try {

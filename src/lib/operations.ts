@@ -3,6 +3,8 @@ import "server-only";
 type LogLevel = "info" | "warning" | "error";
 type LogContext = Record<string, string | number | boolean | null | undefined>;
 
+const ALERT_DELIVERY_TIMEOUT_MS = 10_000;
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -40,7 +42,7 @@ async function sendAlertEmail(
   if (!key || !to) return "unconfigured";
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 3_000);
+  const timeout = setTimeout(() => controller.abort(), ALERT_DELIVERY_TIMEOUT_MS);
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -97,14 +99,21 @@ export async function reportOperationalError(
   // Email first: it is where he already is. The webhook stays supported for
   // anyone who wants a chat channel, but nobody should have to adopt Discord
   // to find out their app broke.
-  const email = await sendAlertEmail(message, summary);
+  return deliverOperationalAlert(message, summary);
+}
+
+async function deliverOperationalAlert(
+  subject: string,
+  summary: string,
+): Promise<{ delivered: boolean }> {
+  const email = await sendAlertEmail(subject, summary);
   if (email !== "unconfigured") return { delivered: email === "sent" };
 
   const url = process.env.OPERATIONS_ALERT_WEBHOOK_URL?.trim();
   if (!url) return { delivered: false };
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 3_000);
+  const timeout = setTimeout(() => controller.abort(), ALERT_DELIVERY_TIMEOUT_MS);
   try {
     const response = await fetch(url, {
       method: "POST",
@@ -115,7 +124,7 @@ export async function reportOperationalError(
     if (!response.ok) {
       operationalLog("error", "Operations alert delivery failed", {
         alertStatus: response.status,
-        originalMessage: message,
+        originalMessage: subject,
       });
       return { delivered: false };
     }
@@ -123,12 +132,31 @@ export async function reportOperationalError(
   } catch (alertError) {
     operationalLog("error", "Operations alert delivery failed", {
       alertError: errorMessage(alertError),
-      originalMessage: message,
+      originalMessage: subject,
     });
     return { delivered: false };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/** Platform-admin smoke check for the real notification channel. */
+export async function sendOperationalTestAlert(
+  requestedBy: string,
+): Promise<{ delivered: boolean }> {
+  const subject = "Operations alert delivery test";
+  const summary = [
+    `OnRoad Books: ${subject}`,
+    "This is an intentional production smoke test. No customer request failed.",
+    `Requested by: ${requestedBy}`,
+    `Time: ${new Date().toISOString()}`,
+  ].join("\n");
+  const result = await deliverOperationalAlert(subject, summary);
+  operationalLog(result.delivered ? "info" : "error", subject, {
+    route: "/admin",
+    delivered: result.delivered,
+  });
+  return result;
 }
 
 /* ---- Unhandled request failures --------------------------------------- */

@@ -512,7 +512,7 @@ npm test
 npm run test:e2e
 ```
 
-The current `node:test` suite contains **362 passing tests**. It covers the parts where a quiet
+The current `node:test` suite contains **441 passing tests**. It covers the parts where a quiet
 mistake costs money rather than throwing an error:
 
 | File | What it pins down |
@@ -527,8 +527,8 @@ mistake costs money rather than throwing an error:
 | `store-contract.test.ts` | the JSON and Prisma stores expose the same shape, so the Postgres implementation cannot drift without the suite noticing |
 | `store-behaviour.test.ts` | the rules both stores must keep: a fuel purchase appears in the ledger exactly once across create/edit/delete, a service record's ledger row lives and dies with it, deleting a load unlinks its costs instead of deleting them, an odometer never moves backwards, a session cannot touch another business's rows, an older ledger file upgrades instead of crashing, and a corrupt one is set aside rather than replaced |
 
-The store tests run against a temporary directory, never `data/`. Five serial
-Playwright flows exercise owner signup and onboarding, protected routes, loads,
+The store tests run against a temporary directory, never `data/`. Sixteen serial
+Playwright checks exercise owner signup and onboarding, protected routes, loads,
 expenses, local document upload, Fleet drivers, frozen driver-pay statements,
 role boundaries and the authenticated mobile shell. Their ledger, uploads and
 session key live under `.e2e-data`, never the developer's local books.
@@ -541,7 +541,8 @@ scratch directory.
 
 `.github/workflows/ci.yml` runs types, lint, unit tests, Playwright and a production build on
 every push and pull request, and then a second job against a real Postgres
-service: `prisma db push`, `npm run db:seed`, `npm run smoke:postgres`. That
+service: deploy migrations, reapply Supabase hardening, verify schema parity,
+then run `npm run db:seed` and `npm run smoke:postgres`. That
 last one is `scripts/postgres-smoke.ts`, which asserts what only a server can
 prove -- that every reserve bucket handed out is a row, that closing a
 settlement stores the snapshot and posts its contributions, that reopening

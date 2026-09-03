@@ -62,9 +62,18 @@ event ID, event type, request ID, and duration. Synchronization failures return
 
 Set `OPERATIONS_ALERT_WEBHOOK_URL` in Vercel Production to deliver the same
 failure immediately to a Slack- or Discord-compatible incoming webhook. Alert
-delivery has a three-second timeout and cannot replace the original error.
+delivery has a ten-second timeout and cannot replace the original error.
 Invalid signatures are logged as warnings but are not alerted to avoid turning
 internet noise into an alert storm.
+
+The platform Admin page includes a production operations check. It retrieves
+the configured Solo, Pro and Fleet prices from Stripe, verifies that all three
+are active recurring prices in the same live/test mode as the secret key, and
+sends a real delivery-test message through the configured operations alert
+channel. Run it after changing Stripe or Resend configuration and confirm that
+the message arrives. Stripe events from the opposite mode are acknowledged and
+logged without being synchronized; this prevents a test event from making a
+live endpoint retry indefinitely.
 
 ## What CI costs, and why it runs the way it does
 
