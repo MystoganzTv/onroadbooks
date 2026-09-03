@@ -895,6 +895,16 @@ test.describe.serial("critical browser flows", () => {
     await expect(page.getByRole("heading", { name: "Where is my money?" })).toBeVisible();
     await expect(page.getByText("Financial details", { exact: true }).first()).toBeVisible();
 
+    const planning = page.getByTestId("monthly-planning");
+    await expect(planning.getByText("Unavailable", { exact: true })).toHaveCount(2);
+    await expect(planning.getByText("— Configure expected miles", { exact: true })).toHaveCount(2);
+    await expect(
+      planning.locator('[aria-label="Operating break-even: Unavailable — Configure expected miles"]'),
+    ).toBeVisible();
+    await expect(
+      planning.locator('[aria-label="Cash break-even: Unavailable — Configure expected miles"]'),
+    ).toBeVisible();
+
     await page.goto("/settlements?month=2026-08&half=SECOND");
     await expect(page.getByRole("heading", { name: "Owner Settlements" })).toBeVisible();
     await expect(page.getByText("Half-month payday", { exact: true })).toBeVisible();
