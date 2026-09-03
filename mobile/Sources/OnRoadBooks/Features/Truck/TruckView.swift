@@ -252,9 +252,9 @@ private enum FilingScope: Hashable {
 
     init(_ enabled: Bool?) {
         switch enabled {
-        case true: self = .included
-        case false: self = .excluded
-        case nil: self = .undecided
+        case .some(true): self = .included
+        case .some(false): self = .excluded
+        case .none: self = .undecided
         }
     }
 
