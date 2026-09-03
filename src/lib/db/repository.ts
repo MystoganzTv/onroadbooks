@@ -347,6 +347,7 @@ export interface Repository {
   deleteExpense(id: string): Promise<void>;
 
   createFinancialObligation(input: FinancialObligationInput): Promise<FinancialObligation>;
+  updateFinancialObligation(id: string, input: FinancialObligationInput): Promise<FinancialObligation>;
   classifyDebtPayment(id: string, input: DebtPaymentClassificationInput): Promise<Expense[]>;
   createPaymentEvent(input: PaymentEventInput): Promise<PaymentEvent>;
 

@@ -1411,6 +1411,39 @@ export class JsonRepository implements Repository {
     }, this.businessId);
   }
 
+  async updateFinancialObligation(
+    id: string,
+    input: FinancialObligationInput,
+  ): Promise<FinancialObligation> {
+    return mutate((dataset) => {
+      const obligation = dataset.financialObligations.find((row) => row.id === id);
+      if (!obligation) throw new Error("That obligation does not belong to this workspace.");
+      if (
+        input.kind !== obligation.kind
+        && dataset.expenses.some((expense) => expense.obligationId === obligation.id)
+      ) {
+        throw new Error("The financing type cannot change after payments have been linked.");
+      }
+      const truckId = input.truckId?.trim() || null;
+      if (truckId && !dataset.trucks.some((truck) => truck.id === truckId)) {
+        throw new Error("That truck does not belong to this workspace.");
+      }
+      obligation.truckId = truckId;
+      obligation.name = input.name.trim();
+      obligation.kind = input.kind;
+      obligation.counterparty = input.counterparty?.trim() || null;
+      obligation.startedOn = input.startedOn ?? null;
+      obligation.endedOn = input.endedOn ?? null;
+      obligation.expectedMonthlyPayment = input.expectedMonthlyPayment ?? null;
+      obligation.active = input.active ?? true;
+      if (obligation.active && truckId) {
+        const truck = dataset.trucks.find((candidate) => candidate.id === truckId);
+        if (truck) truck.financingConfirmedNone = null;
+      }
+      return obligation;
+    }, this.businessId);
+  }
+
   async classifyDebtPayment(
     id: string,
     input: DebtPaymentClassificationInput,

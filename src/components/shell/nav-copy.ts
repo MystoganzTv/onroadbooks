@@ -9,6 +9,7 @@ const ITEM_KEYS: Record<string, keyof ShellCopy> = {
   "/expenses": "expenses",
   "/fuel": "fuel",
   "/drivers": "drivers",
+  "/financing": "financing",
   "/invoices": "invoices",
   "/settlements": "ownerSettlements",
   "/driver-settlements": "driverPay",

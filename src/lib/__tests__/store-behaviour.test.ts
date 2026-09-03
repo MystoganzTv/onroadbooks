@@ -1292,6 +1292,36 @@ describe("drivers and driver statements", () => {
 });
 
 describe("financial review and customer cash events", () => {
+  it("manages a financing obligation independently from its payments", async () => {
+    const dataset = await repo.getDataset();
+    const created = await repo.createFinancialObligation({
+      truckId: dataset.trucks[0].id,
+      name: "Original truck note",
+      kind: "LOAN",
+      counterparty: "Original Bank",
+      expectedMonthlyPayment: 500,
+      active: true,
+    });
+
+    const updated = await repo.updateFinancialObligation(created.id, {
+      truckId: null,
+      name: "Closed Amex note",
+      kind: "LOAN",
+      counterparty: "American Express",
+      startedOn: "2025-01-01",
+      endedOn: "2026-09-02",
+      expectedMonthlyPayment: 513,
+      active: false,
+    });
+
+    assert.equal(updated.name, "Closed Amex note");
+    assert.equal(updated.counterparty, "American Express");
+    assert.equal(updated.truckId, null);
+    assert.equal(updated.expectedMonthlyPayment, 513);
+    assert.equal(updated.active, false);
+    assert.equal(updated.endedOn, "2026-09-02");
+  });
+
   it("splits a reviewed loan payment without changing its total", async () => {
     const dataset = await repo.getDataset();
     const original = await repo.createExpense(expense({
@@ -1319,6 +1349,19 @@ describe("financial review and customer cash events", () => {
       ["INTEREST", "PRINCIPAL"],
     );
     assert.ok(rows.every((row) => row.obligationId && row.splitGroupId));
+    const obligation = (await repo.getDataset()).financialObligations.find(
+      (item) => item.id === rows[0].obligationId,
+    )!;
+    await assert.rejects(
+      () => repo.updateFinancialObligation(obligation.id, {
+        truckId: obligation.truckId,
+        name: obligation.name,
+        kind: "OPERATING_LEASE",
+        expectedMonthlyPayment: obligation.expectedMonthlyPayment,
+        active: obligation.active,
+      }),
+      /type cannot change/,
+    );
   });
 
   it("lets a classified loan payment be corrected without changing its total", async () => {

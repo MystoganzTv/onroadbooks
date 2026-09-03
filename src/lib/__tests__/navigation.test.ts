@@ -25,7 +25,7 @@ function item(href: string) {
 
 describe("progressive navigation", () => {
   it("keeps first-entry workflows available in an empty workspace", () => {
-    for (const href of ["/loads", "/calculator", "/expenses", "/fuel", "/reserves", "/truck"]) {
+    for (const href of ["/loads", "/calculator", "/expenses", "/fuel", "/financing", "/reserves", "/truck"]) {
       assert.equal(navAvailability(item(href), empty).enabled, true, href);
     }
   });
@@ -61,6 +61,8 @@ describe("progressive navigation", () => {
     assert.equal(isNavVisibleToRole(item("/settlements"), "ADMIN"), false);
     assert.equal(isNavVisibleToRole(item("/driver-settlements"), "ADMIN"), true);
     assert.equal(isNavVisibleToRole(item("/driver-settlements"), "BOOKKEEPER"), false);
+    assert.equal(isNavVisibleToRole(item("/financing"), "BOOKKEEPER"), true);
+    assert.equal(isNavVisibleToRole(item("/financing"), "DISPATCHER"), false);
     assert.equal(PRIMARY_NAV.some((candidate) => candidate.href === "/team"), false);
   });
 });

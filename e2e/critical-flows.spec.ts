@@ -260,13 +260,13 @@ test.describe.serial("critical browser flows", () => {
     await expect(editDialog.getByLabel("Bank or lender")).toHaveValue("Amex");
     await expect(editDialog.getByLabel("Loan principal")).toHaveValue("513");
     await expect(editDialog.getByLabel("Loan interest")).toHaveValue("0");
+    await editDialog.getByLabel("Loan interest").fill("25");
     await editDialog.getByLabel("Total payment").fill("525");
+    await expect(editDialog.getByLabel("Loan principal")).toHaveValue("500");
     await editDialog.getByLabel("Date").fill("2026-09-02");
     await editDialog.getByLabel("Description").fill("AMEX September payment");
     await editDialog.getByLabel("Bank or lender").fill("American Express");
     await editDialog.getByRole("switch", { name: "Recurring expense" }).check();
-    await editDialog.getByLabel("Loan principal").fill("500");
-    await editDialog.getByLabel("Loan interest").fill("25");
     await editDialog.getByLabel("Obligation name").fill("Amex Business Card");
     await editDialog.getByLabel("Expected monthly payment").fill("525");
     await editDialog.getByRole("switch", { name: "Active financing" }).uncheck();
@@ -311,6 +311,69 @@ test.describe.serial("critical browser flows", () => {
     expect(datasetAfterDelete.expenses.some((expense) => expense.description.startsWith("AMEX"))).toBe(false);
     expect(datasetAfterDelete.financialObligations.some(
       (obligation) => obligation.name === "Amex Business Card" && !obligation.active,
+    )).toBe(true);
+
+    await writeDataset(datasetBeforeTest);
+  });
+
+  test("owner manages financing independently from a payment", async ({ page }) => {
+    const datasetBeforeTest = await readDataset() as CalculatorFixtureDataset;
+    const truckName = datasetBeforeTest.trucks[0]?.name;
+    expect(truckName).toBeTruthy();
+    await login(page);
+    await page.goto("/financing");
+
+    await expect(page.getByRole("heading", { name: "Financing obligations" })).toBeVisible();
+    await page.getByRole("button", { name: "Add financing" }).first().click();
+    const createDialog = page.getByRole("dialog", { name: "Add financing" });
+    await createDialog.getByLabel("Obligation name").fill("AMEX equipment note");
+    await createDialog.getByLabel("Bank or lender").fill("American Express");
+    await createDialog.getByLabel("Expected monthly payment").fill("513");
+    await createDialog.getByLabel("Associated truck").click();
+    await page.getByRole("option", { name: truckName!, exact: true }).click();
+    await createDialog.getByLabel("Start date").fill("2026-01-01");
+    await createDialog.getByRole("button", { name: "Create financing" }).click();
+    await expect(createDialog).toBeHidden();
+
+    const obligation = page.locator("article").filter({ hasText: "AMEX equipment note" });
+    await expect(obligation).toContainText("Active");
+    await expect(obligation).toContainText("$513.00");
+    await expect(obligation).toContainText(truckName!);
+    await obligation.getByRole("button", { name: "Edit financing: AMEX equipment note" }).click();
+
+    const editDialog = page.getByRole("dialog", { name: "Edit financing" });
+    await editDialog.getByLabel("Obligation name").fill("AMEX equipment financing");
+    await editDialog.getByLabel("Expected monthly payment").fill("525");
+    await editDialog.getByLabel("Closed date").fill("2026-09-02");
+    await editDialog.getByRole("switch", { name: "Active financing" }).uncheck();
+    await editDialog.getByRole("button", { name: "Save changes" }).click();
+    await expect(editDialog).toBeHidden();
+
+    const closedObligation = page.locator("article").filter({ hasText: "AMEX equipment financing" });
+    await expect(closedObligation).toContainText("Closed");
+    await expect(closedObligation).toContainText("$525.00");
+    const datasetAfterEdit = await readDataset() as CalculatorFixtureDataset & {
+      financialObligations: Array<{
+        name: string;
+        counterparty: string | null;
+        expectedMonthlyPayment: number | null;
+        active: boolean;
+        endedOn: string | null;
+      }>;
+    };
+    expect(datasetAfterEdit.financialObligations.some((item) =>
+      item.name === "AMEX equipment financing"
+      && item.counterparty === "American Express"
+      && item.expectedMonthlyPayment === 525
+      && item.active === false
+      && item.endedOn === "2026-09-02"
+    )).toBe(true);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/financing");
+    await expect(page.getByRole("heading", { name: "Financing obligations" })).toBeVisible();
+    await expect.poll(() => page.evaluate(() =>
+      document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1
     )).toBe(true);
 
     await writeDataset(datasetBeforeTest);

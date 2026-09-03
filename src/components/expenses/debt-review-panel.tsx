@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { classifyDebtPaymentAction } from "@/lib/actions/expenses";
+import { roundMoney } from "@/lib/calculations";
 import { reconcileDebtPaymentSplit } from "@/lib/finance/debt-payment";
 import { formatMoney } from "@/lib/formatters";
 import { formatLocaleDate } from "@/lib/i18n-format";
@@ -207,6 +208,23 @@ export function DebtClassificationDialog({
     setObligationActive(selected?.active ?? true);
   }
 
+  function changePaymentTotal(nextTotal: string) {
+    setPaymentTotal(nextTotal);
+    const nextValue = Number(nextTotal);
+    const currentInterestValue = Number(interest);
+    if (
+      nextTotal.trim() !== ""
+      && interest.trim() !== ""
+      && Number.isFinite(nextValue)
+      && Number.isFinite(currentInterestValue)
+      && nextValue > 0
+      && currentInterestValue >= 0
+      && currentInterestValue <= nextValue
+    ) {
+      setPrincipal(String(roundMoney(nextValue - currentInterestValue)));
+    }
+  }
+
   function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!formValid) {
@@ -305,7 +323,7 @@ export function DebtClassificationDialog({
                       min="0.01"
                       step="0.01"
                       value={paymentTotal}
-                      onChange={(event) => setPaymentTotal(event.target.value)}
+                      onChange={(event) => changePaymentTotal(event.target.value)}
                       aria-invalid={!paymentAmountValid}
                       required
                     />

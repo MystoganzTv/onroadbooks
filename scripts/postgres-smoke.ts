@@ -262,6 +262,103 @@ async function smokeThreeTruckLedger() {
   }
 }
 
+async function smokeAtomicLoanPayment() {
+  const temporary = await prisma.business.create({
+    data: { name: `Loan-payment smoke ${Date.now()}`, currency: "USD" },
+  });
+  const repository = new PrismaRepository(temporary.id);
+
+  try {
+    const dataset = await repository.getDataset();
+    const truck = dataset.trucks[0];
+    const payment = await repository.createExpense({
+      truckId: truck.id,
+      date: "2026-09-01",
+      category: "TRUCK_PAYMENT",
+      description: "Atomic Amex payment",
+      vendor: "American Express",
+      amount: 600,
+      recurring: true,
+      notes: "Autopay",
+    });
+    const rows = await repository.classifyDebtPayment(payment.id, {
+      treatment: "LOAN_SPLIT",
+      principalAmount: 550,
+      interestAmount: 50,
+      newObligation: {
+        truckId: truck.id,
+        name: "Amex financing",
+        kind: "LOAN",
+        counterparty: "American Express",
+        expectedMonthlyPayment: 600,
+        active: true,
+      },
+    });
+    const principal = rows.find((row) => row.financialTreatment === "PRINCIPAL");
+    const interest = rows.find((row) => row.financialTreatment === "INTEREST");
+    assert.ok(principal?.splitGroupId && interest?.splitGroupId, "classification creates a complete split group");
+    assert.equal(principal.splitGroupId, interest.splitGroupId);
+    assert.ok(principal.obligationId, "the classified payment keeps its obligation");
+
+    const document = await repository.createDocument({
+      type: "OTHER",
+      label: "Historical attachment",
+      fileName: "historical.pdf",
+      contentType: "application/pdf",
+      sizeBytes: 100,
+      storageKey: `smoke/${temporary.id}/historical.pdf`,
+      expenseId: principal.id,
+    });
+
+    await assert.rejects(
+      () => repository.classifyDebtPayment(interest.id, {
+        treatment: "LOAN_SPLIT",
+        obligationId: principal.obligationId,
+        paymentAmount: 700,
+        principalAmount: 640,
+        interestAmount: 50,
+        description: "This must roll back",
+        obligationUpdate: {
+          truckId: truck.id,
+          name: "This must also roll back",
+          expectedMonthlyPayment: 700,
+          active: false,
+        },
+      }),
+      /short of/,
+    );
+    const afterRefusal = await repository.getDataset();
+    assert.equal(
+      afterRefusal.expenses
+        .filter((row) => row.splitGroupId === principal.splitGroupId)
+        .reduce((total, row) => total + row.amount, 0),
+      600,
+      "a rejected correction rolls back every payment-row change",
+    );
+    assert.equal(
+      afterRefusal.financialObligations.find((row) => row.id === principal.obligationId)?.name,
+      "Amex financing",
+      "a rejected correction also rolls back the obligation update",
+    );
+    ok("an invalid loan-payment correction rolls back rows and obligation together");
+
+    await repository.deleteExpense(interest.id);
+    assert.equal(
+      await prisma.expense.count({ where: { businessId: temporary.id, splitGroupId: principal.splitGroupId } }),
+      0,
+      "deleting either split row removes the complete payment",
+    );
+    assert.equal(
+      await prisma.document.count({ where: { id: document.id } }),
+      0,
+      "historical attachments cascade with the complete payment",
+    );
+    ok("one serializable delete removes principal, interest and historical attachments");
+  } finally {
+    await prisma.business.delete({ where: { id: temporary.id } });
+  }
+}
+
 async function main() {
   const business = await prisma.business.findFirst({ orderBy: { createdAt: "asc" } });
   assert.ok(business, "No business found. Run `npm run db:seed` first.");
@@ -375,6 +472,9 @@ async function main() {
 
   // --- complete three-truck accounting -----------------------------------
   await smokeThreeTruckLedger();
+
+  // --- one loan payment, one transaction ---------------------------------
+  await smokeAtomicLoanPayment();
 
   // --- scoping -------------------------------------------------------------
   const stranger = new PrismaRepository("not-this-business");

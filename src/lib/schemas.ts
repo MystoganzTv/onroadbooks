@@ -172,7 +172,7 @@ export const paymentEventSchema = z.object({
   notes: z.string().trim().max(1000).optional().nullable(),
 });
 
-const financialObligationSchema = z
+export const financialObligationSchema = z
   .object({
     truckId: z.string().trim().optional().nullable(),
     name: z.string().trim().min(1, "Name the obligation").max(120),

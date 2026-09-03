@@ -1817,6 +1817,52 @@ export class PrismaRepository implements Repository {
     return (await this.getDataset()).financialObligations.find((item) => item.id === row.id)!;
   }
 
+  async updateFinancialObligation(
+    id: string,
+    input: FinancialObligationInput,
+  ): Promise<FinancialObligation> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const truckId = input.truckId?.trim() || null;
+    if (truckId && !business.trucks.some((truck) => truck.id === truckId)) {
+      throw new Error("That truck does not belong to this workspace.");
+    }
+    const active = input.active ?? true;
+    await client.$transaction(async (tx) => {
+      const obligation = await tx.financialObligation.findFirst({
+        where: { id, businessId: business.id },
+        select: { id: true, kind: true },
+      });
+      if (!obligation) throw new Error("That obligation does not belong to this workspace.");
+      if (
+        input.kind !== obligation.kind
+        && await tx.expense.count({ where: { businessId: business.id, obligationId: obligation.id } }) > 0
+      ) {
+        throw new Error("The financing type cannot change after payments have been linked.");
+      }
+      await tx.financialObligation.update({
+        where: { id: obligation.id },
+        data: {
+          truckId,
+          name: input.name.trim(),
+          kind: input.kind,
+          counterparty: input.counterparty?.trim() || null,
+          startedOn: input.startedOn ? toDate(input.startedOn) : null,
+          endedOn: input.endedOn ? toDate(input.endedOn) : null,
+          expectedMonthlyPayment: input.expectedMonthlyPayment ?? null,
+          active,
+        },
+      });
+      if (active && truckId) {
+        await tx.truck.updateMany({
+          where: { id: truckId, businessId: business.id },
+          data: { financingConfirmedNone: null },
+        });
+      }
+    }, { isolationLevel: "Serializable" });
+    return (await this.getDataset()).financialObligations.find((item) => item.id === id)!;
+  }
+
   async classifyDebtPayment(
     id: string,
     input: DebtPaymentClassificationInput,
