@@ -12,6 +12,7 @@ struct FuelView: View {
     @State private var ledger: FuelLedger?
     @State private var isLoading = true
     @State private var isAdding = false
+    @State private var editing: FuelStop?
     @State private var pendingDelete: FuelStop?
     @State private var deleteFailure: String?
 
@@ -23,10 +24,17 @@ struct FuelView: View {
             } else if let ledger {
                 content(ledger)
             } else {
-                ComingSoonView(title: "Fuel", systemImage: "fuelpump.fill")
+                OBUnavailableView(title: "Combustible")
             }
         }
         .background(OBColor.background)
+        .sheet(item: $editing) { stop in
+            EditFuelView(
+                repository: repository,
+                fuelId: stop.id,
+                onSaved: { Task { await reload() } }
+            )
+        }
         // Deleting the fill-up takes its mirrored FUEL row out of the ledger
         // with it -- which is exactly why the ledger row itself refuses to be
         // deleted from the Expenses screen.
@@ -129,7 +137,13 @@ struct FuelView: View {
                                     .padding(.horizontal, OBSpacing.md)
                                     .padding(.vertical, OBSpacing.sm)
                                     .contentShape(Rectangle())
+                                    .onTapGesture { editing = stop }
                                     .contextMenu {
+                                        Button {
+                                            editing = stop
+                                        } label: {
+                                            Label("Editar", systemImage: "pencil")
+                                        }
                                         Button(role: .destructive) {
                                             pendingDelete = stop
                                         } label: {

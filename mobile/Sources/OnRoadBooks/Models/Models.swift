@@ -167,6 +167,7 @@ struct NewLoad {
 /// the owner actually typed, from `GET /api/mobile/loads/{id}`.
 struct LoadDetail: Identifiable, Equatable {
     let id: String
+    var driverId: String?
     var date: Date
     var broker: String
     var originCity: String
@@ -190,6 +191,10 @@ struct LoadDetail: Identifiable, Equatable {
 /// IFTA jurisdiction miles, the equipment, the commodity, dispatch and
 /// factoring — is merged in by the server and survives untouched.
 struct LoadEdit: Equatable {
+    /// `nil` means unassigned, and it is sent as an explicit JSON null so it
+    /// really unassigns — Swift's synthesized encoder would drop the key and
+    /// the server's merge would keep the old driver.
+    var driverId: String?
     var date: Date
     var broker: String
     var originCity: String
@@ -225,12 +230,14 @@ struct CalculatorDefaults {
     /// those four are entered explicitly, and a rate that still contained them
     /// would charge them twice.
     let overheadPerMile: Double
+    let debtServicePerMile: Double
     let trueCostPerMile: Double
     let basisLabel: String
     let basisMiles: Double
     /// False when there are not enough recorded miles behind the overhead. The
     /// screen has to say so rather than quietly costing a load against thin data.
     let basisSufficient: Bool
+    let debtServiceAvailable: Bool
     let targetProfitPerMile: Double
     let deadheadWarnPct: Double
     let thresholds: RatingThresholds
@@ -573,6 +580,73 @@ struct DashboardSnapshot {
     let reserves: [ReserveAccount]
 }
 
+
+/// A correction to an expense already in the books. Only the fields the phone
+/// shows — scope, truck, linked load, recurring and the receipt number are
+/// merged in by the server and survive untouched.
+struct ExpenseDetail: Equatable {
+    let id: String
+    var date: Date
+    var categoryId: String
+    var detail: String
+    var vendor: String
+    var amount: Double
+    /// A row the app wrote for you: a fuel or service mirror, or a load's
+    /// posted trip cost. Editable only at its source, and the reason says
+    /// which source.
+    let readOnly: Bool
+    let readOnlyReason: String?
+}
+
+/// A correction to a fill-up. Editing the entry is what keeps its mirrored
+/// FUEL row in the ledger in step; editing that row directly is refused.
+struct FuelDetail: Equatable {
+    let id: String
+    var date: Date
+    var gallons: Double
+    var pricePerGallon: Double
+    var totalCost: Double
+    var odometer: Int?
+    var location: String
+    var jurisdiction: String
+}
+
+/// A movement into or out of a reserve bucket. A balance is always the signed
+/// sum of these — there is no stored balance to correct.
+struct ReserveMovementInput {
+    var accountId: String
+    var date: Date
+    /// CONTRIBUTION | WITHDRAWAL
+    var type: String
+    var amount: Double
+    var description: String
+}
+
+/// One driver statement, opened. The lines are the loads it paid for and the
+/// adjustments are everything added or taken off afterwards.
+struct DriverStatementDetail {
+    struct Line: Identifiable, Hashable {
+        let id: String
+        let loadLabel: String
+        let date: String
+        let grossRevenue: Double
+        let totalMiles: Double
+        let payAmount: Double
+    }
+
+    struct Adjustment: Identifiable, Hashable {
+        let id: String
+        let type: String
+        let label: String
+        let amount: Double
+        /// True when it comes OFF the pay: deductions and advances.
+        var reducesPay: Bool { type == "DEDUCTION" || type == "ADVANCE" }
+    }
+
+    let statement: DriverStatement
+    let lines: [Line]
+    let adjustments: [Adjustment]
+}
 
 // MARK: - Fleet (Fleet plan only)
 

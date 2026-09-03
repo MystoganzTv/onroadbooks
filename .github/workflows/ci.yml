@@ -5,8 +5,8 @@ name: CI
 #
 #   - main and pull requests only. Pushing a work branch used to run the whole
 #     suite twice, once for the push and again for the PR.
-#   - nothing here tests Swift, Markdown or ADRs, so a commit touching only
-#     those starts no job at all. That is waste and noise, not thrift.
+#   - Swift changes run in the separate iOS workflow on macOS. Markdown and
+#     ADR-only commits still start no job because neither app artifact changes.
 #   - Chromium is cached against package-lock.json, because downloading the
 #     same binary every run is a minute of nothing.
 #

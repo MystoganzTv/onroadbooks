@@ -81,6 +81,20 @@ protocol LedgerRepository {
     @discardableResult func updateTeamMemberRole(userId: String, role: AssignableRole) async throws -> String
     func removeTeamMember(userId: String) async throws
 
+    /// Correcting an expense or a fill-up. Same merge-on-the-server contract
+    /// as a load: the phone sends what it shows, the rest is preserved.
+    func fetchExpenseDetail(id: String) async throws -> ExpenseDetail
+    @discardableResult func updateExpense(id: String, _ change: NewExpense) async throws -> String
+    func fetchFuelDetail(id: String) async throws -> FuelDetail
+    @discardableResult func updateFuelStop(id: String, _ change: NewFuelStop) async throws -> String
+
+    /// Money into or out of a reserve bucket, by hand. Owner-only and
+    /// cockpit-gated, exactly as on the web.
+    @discardableResult func recordReserveMovement(_ movement: ReserveMovementInput) async throws -> String
+
+    /// One driver statement with its loads and adjustments.
+    func fetchDriverStatement(id: String) async throws -> DriverStatementDetail
+
     /// Fleet, on the phone. All three ride the same `hasFleetAccess` gate the
     /// web does, so on a Solo or Pro business they throw `APIError.refused`
     /// with the server's own sentence — a lock with a reason, not an error.

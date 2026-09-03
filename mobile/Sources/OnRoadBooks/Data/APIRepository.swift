@@ -107,7 +107,7 @@ final class APIRepository: LedgerRepository {
             }
             // Died in flight. It may be in the ledger already, so it waits for
             // a person rather than retrying itself.
-            await MainActor.run {
+            _ = await MainActor.run {
                 queue.enqueue(
                     path: path, body: encoded, summary: summary, amount: amount,
                     state: .attention,
@@ -381,6 +381,37 @@ final class APIRepository: LedgerRepository {
         )
     }
 
+    func fetchExpenseDetail(id: String) async throws -> ExpenseDetail {
+        try await get("api/mobile/expenses/\(id)", as: ExpenseDetailResponseDTO.self).toDomain()
+    }
+
+    @discardableResult
+    func updateExpense(id: String, _ change: NewExpense) async throws -> String {
+        try await directWrite("api/mobile/expenses/\(id)", method: "PATCH", body: NewExpenseDTO(change))
+    }
+
+    func fetchFuelDetail(id: String) async throws -> FuelDetail {
+        try await get("api/mobile/fuel/\(id)", as: FuelDetailResponseDTO.self).entry.toDomain()
+    }
+
+    @discardableResult
+    func updateFuelStop(id: String, _ change: NewFuelStop) async throws -> String {
+        try await directWrite("api/mobile/fuel/\(id)", method: "PATCH", body: NewFuelDTO(change))
+    }
+
+    @discardableResult
+    func recordReserveMovement(_ movement: ReserveMovementInput) async throws -> String {
+        try await directWrite(
+            "api/mobile/reserves/transactions",
+            method: "POST",
+            body: ReserveMovementDTO(movement)
+        )
+    }
+
+    func fetchDriverStatement(id: String) async throws -> DriverStatementDetail {
+        try await get("api/mobile/driver-settlements/\(id)", as: DriverStatementDetailDTO.self).toDomain()
+    }
+
     func fetchDrivers() async throws -> [DriverRecord] {
         try await get("api/mobile/drivers", as: DriversResponseDTO.self).drivers.map { $0.toDomain() }
     }
@@ -570,10 +601,12 @@ private struct CalculatorDefaultsDTO: Decodable {
     let dispatchPct: Double
     let factoringPct: Double
     let overheadPerMile: Double
+    let debtServicePerMile: Double
     let trueCostPerMile: Double
     let basisLabel: String
     let basisMiles: Double
     let basisSufficient: Bool
+    let debtServiceAvailable: Bool
     let targetProfitPerMile: Double
     let deadheadWarnPct: Double
     let thresholds: Thresholds
@@ -582,8 +615,10 @@ private struct CalculatorDefaultsDTO: Decodable {
         CalculatorDefaults(
             fuelPrice: fuelPrice, mpg: mpg,
             dispatchPct: dispatchPct, factoringPct: factoringPct,
-            overheadPerMile: overheadPerMile, trueCostPerMile: trueCostPerMile,
+            overheadPerMile: overheadPerMile, debtServicePerMile: debtServicePerMile,
+            trueCostPerMile: trueCostPerMile,
             basisLabel: basisLabel, basisMiles: basisMiles, basisSufficient: basisSufficient,
+            debtServiceAvailable: debtServiceAvailable,
             targetProfitPerMile: targetProfitPerMile, deadheadWarnPct: deadheadWarnPct,
             thresholds: RatingThresholds(
                 great: thresholds.great, good: thresholds.good, marginal: thresholds.marginal
@@ -1200,6 +1235,7 @@ private struct LoadDetailResponseDTO: Decodable {
 
 private struct LoadDetailDTO: Decodable {
     let id: String
+    let driverId: String?
     let date: String
     let broker: String?
     let originCity: String
@@ -1218,6 +1254,7 @@ private struct LoadDetailDTO: Decodable {
     func toDomain() -> LoadDetail {
         LoadDetail(
             id: id,
+            driverId: driverId,
             date: ISODate.parse(date),
             broker: broker ?? "",
             originCity: originCity,
@@ -1240,6 +1277,7 @@ private struct LoadDetailDTO: Decodable {
 /// load, so dispatch, factoring, equipment and IFTA miles are never blanked
 /// by an edit made from a phone.
 private struct LoadEditDTO: Encodable {
+    let driverId: String?
     let date: String
     let broker: String?
     let originCity: String
@@ -1254,6 +1292,7 @@ private struct LoadEditDTO: Encodable {
     let otherExpenses: Double
 
     init(_ change: LoadEdit) {
+        driverId = change.driverId
         date = ISODate.day(change.date)
         broker = change.broker.isEmpty ? nil : change.broker
         originCity = change.originCity
@@ -1266,6 +1305,36 @@ private struct LoadEditDTO: Encodable {
         fuelCost = change.fuelCost
         tolls = change.tolls
         otherExpenses = change.otherExpenses
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case driverId, date, broker, originCity, originState, destinationCity
+        case destinationState, grossRate, loadedMiles, deadheadMiles
+        case fuelCost, tolls, otherExpenses
+    }
+
+    /// `encodeNil` rather than the synthesized encoder: a nil optional would
+    /// be OMITTED, and an omitted key means "leave it alone" to the server's
+    /// merge — so unassigning a driver would silently do nothing.
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        if let driverId {
+            try container.encode(driverId, forKey: .driverId)
+        } else {
+            try container.encodeNil(forKey: .driverId)
+        }
+        try container.encode(date, forKey: .date)
+        try container.encode(broker, forKey: .broker)
+        try container.encode(originCity, forKey: .originCity)
+        try container.encode(originState, forKey: .originState)
+        try container.encode(destinationCity, forKey: .destinationCity)
+        try container.encode(destinationState, forKey: .destinationState)
+        try container.encode(grossRate, forKey: .grossRate)
+        try container.encode(loadedMiles, forKey: .loadedMiles)
+        try container.encode(deadheadMiles, forKey: .deadheadMiles)
+        try container.encode(fuelCost, forKey: .fuelCost)
+        try container.encode(tolls, forKey: .tolls)
+        try container.encode(otherExpenses, forKey: .otherExpenses)
     }
 }
 
@@ -1393,6 +1462,118 @@ private struct DriverStatementDTO: Decodable {
             status: status, paidOn: paidOn, loads: loads, grossRevenue: grossRevenue,
             totalMiles: totalMiles, basePay: basePay, additions: additions,
             deductions: deductions, advances: advances, netPay: netPay
+        )
+    }
+}
+
+private struct ExpenseDetailResponseDTO: Decodable {
+    struct Row: Decodable {
+        let id: String
+        let date: String
+        let category: String
+        let description: String
+        let vendor: String?
+        let amount: Double
+    }
+
+    let expense: Row
+    let readOnly: Bool
+    let readOnlyReason: String?
+
+    func toDomain() -> ExpenseDetail {
+        ExpenseDetail(
+            id: expense.id,
+            date: ISODate.parse(expense.date),
+            categoryId: expense.category,
+            detail: expense.description,
+            vendor: expense.vendor ?? "",
+            amount: expense.amount,
+            readOnly: readOnly,
+            readOnlyReason: readOnlyReason
+        )
+    }
+}
+
+private struct FuelDetailResponseDTO: Decodable {
+    struct Row: Decodable {
+        let id: String
+        let date: String
+        let gallons: Double
+        let pricePerGallon: Double
+        let totalCost: Double
+        let odometer: Int?
+        let location: String?
+        let jurisdiction: String?
+
+        func toDomain() -> FuelDetail {
+            FuelDetail(
+                id: id,
+                date: ISODate.parse(date),
+                gallons: gallons,
+                pricePerGallon: pricePerGallon,
+                totalCost: totalCost,
+                odometer: odometer,
+                location: location ?? "",
+                jurisdiction: jurisdiction ?? ""
+            )
+        }
+    }
+
+    let entry: Row
+}
+
+private struct ReserveMovementDTO: Encodable {
+    let accountId: String
+    let date: String
+    let type: String
+    let amount: Double
+    let description: String
+
+    init(_ movement: ReserveMovementInput) {
+        accountId = movement.accountId
+        date = ISODate.day(movement.date)
+        type = movement.type
+        amount = movement.amount
+        description = movement.description
+    }
+}
+
+private struct DriverStatementDetailDTO: Decodable {
+    struct Line: Decodable {
+        let id: String
+        let loadLabel: String
+        let date: String
+        let grossRevenue: Double
+        let totalMiles: Double
+        let payAmount: Double
+    }
+
+    struct Adjustment: Decodable {
+        let id: String
+        let type: String
+        let label: String
+        let amount: Double
+    }
+
+    let statement: DriverStatementDTO
+    let lines: [Line]
+    let adjustments: [Adjustment]
+
+    func toDomain() -> DriverStatementDetail {
+        DriverStatementDetail(
+            statement: statement.toDomain(),
+            lines: lines.map {
+                DriverStatementDetail.Line(
+                    id: $0.id, loadLabel: $0.loadLabel, date: $0.date,
+                    grossRevenue: $0.grossRevenue, totalMiles: $0.totalMiles,
+                    payAmount: $0.payAmount
+                )
+            },
+            adjustments: adjustments.map {
+                DriverStatementDetail.Adjustment(
+                    id: $0.id, type: $0.type, label: $0.label, amount: $0.amount
+                )
+            }
         )
     }
 }

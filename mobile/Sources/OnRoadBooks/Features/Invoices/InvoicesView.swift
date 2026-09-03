@@ -30,7 +30,7 @@ struct InvoicesView: View {
             } else if let ledger {
                 content(ledger)
             } else {
-                ComingSoonView(title: "Invoices", systemImage: "doc.text.fill")
+                OBUnavailableView(title: "Facturas")
             }
         }
         .background(OBColor.background)

@@ -1,0 +1,53 @@
+name: iOS CI
+
+# Keep native validation separate from the web pipeline: a mobile-only change
+# needs Xcode, not Node, Chromium, and Postgres. The generated project is never
+# trusted as an input; CI recreates it from project.yml on every run.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mobile/**"
+      - ".github/workflows/ios.yml"
+  pull_request:
+    paths:
+      - "mobile/**"
+      - ".github/workflows/ios.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Generate and build the iOS app
+    runs-on: macos-15
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode version
+        run: xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate the Xcode project
+        working-directory: mobile
+        run: xcodegen generate
+
+      - name: Build for the iOS Simulator
+        run: >-
+          xcodebuild
+          -project mobile/OnRoadBooksMobile.xcodeproj
+          -scheme OnRoadBooks
+          -configuration Debug
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath "$RUNNER_TEMP/OnRoadBooksDerivedData"
+          CODE_SIGNING_ALLOWED=NO
+          build

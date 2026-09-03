@@ -38,14 +38,42 @@ struct LoadEstimate {
     let factoring: Double
     let otherCost: Double
     let overhead: Double
+    let debtService: Double
     let tripCost: Double
     let totalCost: Double
+    let contributionProfit: Double
+    let contributionProfitPerMile: Double
+    let contributionMargin: Double
     let profit: Double
     let profitPerMile: Double
     let profitMargin: Double
     let lines: [CostLine]
     let rating: LoadRating
     let valid: Bool
+}
+
+struct TargetRates {
+    let directCostBreakEven: Double
+    let operatingBreakEven: Double
+    let cashBreakEven: Double
+    let minimum: Double
+    let good: Double
+    let great: Double
+    let customTarget: Double
+    let openingQuote: Double
+    let totalMiles: Double
+    let impossible: Bool
+}
+
+enum OfferPosition {
+    case great, good, marginal, belowMinimum
+}
+
+struct OfferComparison {
+    let position: OfferPosition
+    let differenceVsGreat: Double
+    let settlementTarget: Double?
+    let suggestedCounteroffer: Double?
 }
 
 enum LoadCalculatorMath {
@@ -84,6 +112,7 @@ enum LoadCalculatorMath {
         factoringValue: Double,
         otherCost: Double,
         overheadPerMile: Double,
+        debtServicePerMile: Double,
         thresholds: RatingThresholds
     ) -> LoadEstimate {
         let loadedMiles = max(0, loadedMiles)
@@ -98,10 +127,14 @@ enum LoadCalculatorMath {
         let factoring = feeAmount(mode: factoringMode, value: factoringValue, gross: grossRate)
         let other = roundMoney(max(0, otherCost))
         let overhead = roundMoney(totalMiles * max(0, overheadPerMile))
+        let debtService = roundMoney(totalMiles * max(0, debtServicePerMile))
 
         let tripCost = roundMoney(fuelCost + tollsAmt + dispatch + factoring + other)
         let totalCost = roundMoney(tripCost + overhead)
-        let profit = roundMoney(grossRate - totalCost)
+        let contributionProfit = roundMoney(grossRate - tripCost)
+        let contributionProfitPerMile = div(contributionProfit, totalMiles)
+        let contributionMargin = grossRate > 0 ? div(contributionProfit, grossRate) * 100 : 0
+        let profit = roundMoney(contributionProfit - overhead)
         let profitPerMile = div(profit, totalMiles)
         let profitMargin = grossRate > 0 ? div(profit, grossRate) * 100 : 0
         let deadheadPct = div(deadheadMiles, totalMiles)
@@ -113,8 +146,6 @@ enum LoadCalculatorMath {
             CostLine(label: "Dispatch", amount: dispatch, note: dispatchMode == .percent ? "\(Int(dispatchValue))% of gross" : "Flat fee"),
             CostLine(label: "Factoring", amount: factoring, note: factoringMode == .percent ? "\(Int(factoringValue))% of gross" : "Flat fee"),
             CostLine(label: "Other costs", amount: other, note: nil),
-            CostLine(label: "Truck operating cost", amount: overhead,
-                     note: String(format: "%.0f mi at $%.2f/mi overhead", totalMiles, overheadPerMile)),
         ]
 
         return LoadEstimate(
@@ -127,13 +158,17 @@ enum LoadCalculatorMath {
             factoring: factoring,
             otherCost: other,
             overhead: overhead,
+            debtService: debtService,
             tripCost: tripCost,
             totalCost: totalCost,
+            contributionProfit: contributionProfit,
+            contributionProfitPerMile: contributionProfitPerMile,
+            contributionMargin: contributionMargin,
             profit: profit,
             profitPerMile: profitPerMile,
             profitMargin: profitMargin,
             lines: lines,
-            rating: rate(profitPerMile: profitPerMile, thresholds: thresholds),
+            rating: rate(profitPerMile: contributionProfitPerMile, thresholds: thresholds),
             valid: totalMiles > 0 && mpg > 0
         )
     }
@@ -153,14 +188,17 @@ enum LoadCalculatorMath {
         factoringValue: Double,
         otherCost: Double,
         overheadPerMile: Double,
+        debtServicePerMile: Double,
+        thresholds: RatingThresholds,
         targetProfitPerMile: Double
-    ) -> (breakeven: Double, target: Double, totalMiles: Double, impossible: Bool) {
+    ) -> TargetRates {
         let totalMiles = max(0, loadedMiles) + max(0, deadheadMiles)
         let gallons = mpg > 0 ? totalMiles / mpg : 0
         let fuelCost = roundMoney(gallons * max(0, fuelPrice))
         let tollsAmt = roundMoney(max(0, tolls))
         let other = roundMoney(max(0, otherCost))
         let overhead = roundMoney(totalMiles * max(0, overheadPerMile))
+        let debtService = roundMoney(totalMiles * max(0, debtServicePerMile))
 
         let flatFees =
             (dispatchMode == .amount ? max(0, dispatchValue) : 0) +
@@ -169,13 +207,68 @@ enum LoadCalculatorMath {
             (dispatchMode == .percent ? max(0, dispatchValue) : 0) / 100 +
             (factoringMode == .percent ? max(0, factoringValue) : 0) / 100
 
-        let fixedCost = roundMoney(fuelCost + tollsAmt + other + overhead + flatFees)
+        let directCost = roundMoney(fuelCost + tollsAmt + other + flatFees)
+        let fixedCost = roundMoney(directCost + overhead)
         let impossible = feeRate >= 1
-        guard !impossible else { return (0, 0, totalMiles, true) }
+        guard !impossible else {
+            return TargetRates(
+                directCostBreakEven: 0, operatingBreakEven: 0, cashBreakEven: 0,
+                minimum: 0, good: 0, great: 0, customTarget: 0,
+                openingQuote: 0, totalMiles: totalMiles, impossible: true
+            )
+        }
 
-        let breakeven = roundMoney(fixedCost / (1 - feeRate))
+        func rateFor(_ amount: Double) -> Double { roundMoney(amount / (1 - feeRate)) }
+        let directCostBreakEven = rateFor(directCost)
+        let operatingBreakEven = rateFor(fixedCost)
+        let cashBreakEven = rateFor(fixedCost + debtService)
+        let minimum = rateFor(directCost + thresholds.marginal * totalMiles)
+        let good = rateFor(directCost + thresholds.good * totalMiles)
+        let great = rateFor(directCost + thresholds.great * totalMiles)
         let targetProfit = targetProfitPerMile * totalMiles
-        let target = roundMoney((fixedCost + targetProfit) / (1 - feeRate))
-        return (breakeven, target, totalMiles, false)
+        let customTarget = rateFor(fixedCost + targetProfit)
+        let openingQuote = suggestedOpeningQuote(settlementTarget: max(great, customTarget))
+        return TargetRates(
+            directCostBreakEven: directCostBreakEven,
+            operatingBreakEven: operatingBreakEven,
+            cashBreakEven: cashBreakEven,
+            minimum: minimum,
+            good: good,
+            great: great,
+            customTarget: customTarget,
+            openingQuote: openingQuote,
+            totalMiles: totalMiles,
+            impossible: false
+        )
+    }
+
+    static func suggestedOpeningQuote(settlementTarget: Double, currentOffer: Double = 0) -> Double {
+        let safeTarget = max(0, settlementTarget)
+        let cushion = max(25, safeTarget * 0.03)
+        let rounded = ceil((safeTarget + cushion) / 25) * 25
+        return roundMoney(max(max(0, currentOffer), rounded))
+    }
+
+    static func compareOffer(_ currentOffer: Double, rates: TargetRates) -> OfferComparison {
+        let offer = max(0, currentOffer)
+        let difference = roundMoney(offer - rates.great)
+        if offer >= rates.great {
+            return OfferComparison(
+                position: .great, differenceVsGreat: difference,
+                settlementTarget: nil, suggestedCounteroffer: nil
+            )
+        }
+        let position: OfferPosition = offer >= rates.good
+            ? .good
+            : offer >= rates.minimum ? .marginal : .belowMinimum
+        let settlementTarget = position == .good ? rates.great : rates.good
+        return OfferComparison(
+            position: position,
+            differenceVsGreat: difference,
+            settlementTarget: settlementTarget,
+            suggestedCounteroffer: suggestedOpeningQuote(
+                settlementTarget: settlementTarget, currentOffer: offer
+            )
+        )
     }
 }

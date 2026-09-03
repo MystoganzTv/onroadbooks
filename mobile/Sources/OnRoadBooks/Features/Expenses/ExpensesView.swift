@@ -6,6 +6,7 @@ struct ExpensesView: View {
     @State private var categories: [ExpenseCategory] = []
     @State private var isLoading = true
     @State private var isAdding = false
+    @State private var editing: ExpenseEntry?
     @State private var pendingDelete: ExpenseEntry?
     @State private var deleteFailure: String?
 
@@ -38,6 +39,8 @@ struct ExpensesView: View {
                         Section {
                             ForEach(expenses) { expense in
                                 ExpenseRow(expense: expense)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { editing = expense }
                                     .listRowBackground(OBColor.card)
                                     .listRowSeparatorTint(OBColor.border)
                                     .swipeActions(edge: .trailing) {
@@ -58,6 +61,14 @@ struct ExpensesView: View {
             .toolbar(.hidden, for: .navigationBar)
             .task { await reload() }
             .refreshable { await reload() }
+            .sheet(item: $editing) { expense in
+                EditExpenseView(
+                    repository: repository,
+                    expenseId: expense.id,
+                    categories: categories,
+                    onSaved: { Task { await reload() } }
+                )
+            }
             .sheet(isPresented: $isAdding) {
                 AddExpenseView(
                     repository: repository,

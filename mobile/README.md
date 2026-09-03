@@ -19,10 +19,10 @@ de iOS — y ahora conectada de verdad al mismo backend que usa la web.
 - **Settlements**: quincenas OPEN/CLOSED con su snapshot real.
 - **Load Calculator**: "¿me conviene este load?" y "¿qué tarifa pido?",
   portado fórmula por fórmula de `src/lib/finance/load-calculator.ts`.
-- **More**: el resto de la navegación (Fuel, Invoices, Reserves, IFTA,
-  Analytics, Reports, Fleet, Truck, Drivers, Admin) como placeholders
-  "Coming soon" — la información arquitectónica ya está ahí, lista para
-  llenarse pantalla por pantalla.
+- **More**: pantallas funcionales para Fuel, Invoices, Reserves, IFTA,
+  Analytics, Reports, Fleet, Truck, Drivers y Driver Pay. Las funciones de
+  Fleet respetan el plan y los permisos del negocio; Plans & Billing explica
+  que esa gestión continúa en `onroadbooks.com`.
 - **Settings**: cierre de sesión real (borra el token del Keychain).
 
 ## Datos: reales, no solo demo
@@ -35,11 +35,9 @@ cifras reales de agosto ($9,795.00 / $6,143.90 / $3,651.10 / $1.84 CPM /
 $2,235.23 safe-to-pay) para que la app se vea con números creíbles incluso
 sin cuenta.
 
-**Antes de que el login real funcione en tu iPhone**, esas rutas necesitan
-llegar a producción: el commit ya está hecho en `OnroadBooks`
-(`git log` → "Add read-only /api/mobile/* endpoints for the iOS app") pero
-falta que tú hagas `git push origin main` y que Vercel termine el deploy.
-Hasta entonces, usa "Ver con datos de muestra".
+Las rutas móviles ya están desplegadas en producción, por lo que el login y
+los datos reales funcionan desde el iPhone. "Ver con datos de muestra" sigue
+disponible como modo demo deliberado y no como sustituto temporal del backend.
 
 ## Por qué no hay un `.xcodeproj` ya generado
 
@@ -67,6 +65,11 @@ En Xcode:
 Cada vez que se agreguen archivos `.swift` nuevos hay que volver a correr
 `xcodegen generate` (o simplemente reabrir el proyecto si usas Xcode 16+,
 que sincroniza carpetas automáticamente).
+
+Para una entrega a App Store Connect, crea primero un archive Release desde
+Xcode. `ExportOptions.plist` deja versionadas las opciones de exportación del
+equipo; no contiene certificados ni contraseñas. El archivo `.xcarchive`, los
+perfiles y las credenciales de Apple permanecen fuera del repositorio.
 
 ## Estructura
 
@@ -110,19 +113,13 @@ Por eso, en `OnroadBooks` (el repo de la web, no este) se agregaron:
   header `Authorization: Bearer` en vez de una cookie.
 - `POST /api/mobile/login` — espejo de `/api/auth/login`, devuelve el
   token en el JSON en vez de ponerlo en una cookie.
-- `GET /api/mobile/dashboard`, `/loads`, `/expenses`, `/settlements` —
-  solo lectura, reutilizan exactamente las mismas funciones de
-  `lib/calculations` y `lib/finance` que ya usa el dashboard web, así que
-  ninguna regla de negocio vive dos veces.
+- Las rutas `/api/mobile/*` cubren dashboard, cargas, gastos, combustible,
+  facturas, reservas, cierres, reportes, IFTA y Fleet. Las lecturas reutilizan
+  las mismas funciones de `lib/calculations` y `lib/finance` que usa la web;
+  las escrituras pasan por sus mismas validaciones y reglas de negocio.
 
-Verificado ahí: `npm run typecheck` limpio, `npm run lint` limpio en los
-archivos nuevos, `npm test` 297/297. Corrido contra un build real, no —
-por la regla del proyecto de no tocar `.next` de esa carpeta desde esta
-sesión (ver `truckledger.md`), así que la primera prueba real es tu propio
-`npm run dev` o el deploy en producción.
-
-Todavía no hay rutas de escritura (crear load, crear gasto) — el próximo
-paso natural una vez que el login se sienta sólido.
+La app ya se ha compilado correctamente para el simulador de iOS y el backend
+se valida en CI junto con TypeScript, lint, pruebas unitarias y E2E.
 
 ## Ícono de la app
 

@@ -78,10 +78,13 @@ change operating cost per mile. Forward-looking tools use a separate rolling
 change the answer to "what should I quote".
 
 **Load calculator** -- two questions on one cost model. *Evaluate*: the broker is
-offering $700, is it worth running? *Target*: I want $1.50/mile of profit, what
-do I quote? Fuel from miles, MPG and price; tolls, dispatch and factoring as a
-percentage or a flat amount; and the truck's own overhead per mile, which
-excludes those four precisely because the form already asks for them.
+offering $700, is it worth running? When an offer exists, the quote view compares
+it with the Minimum / Good / Great contribution thresholds and never suggests a
+counteroffer below the broker's number. With no offer, it shows the threshold
+rates and a deterministic opening quote: 3% negotiation room (at least $25),
+rounded up to the next $25. Direct Cost Break-Even is always kept separate from
+True Operating and Cash Break-Even; unavailable overhead or financing history is
+shown as unavailable, never as a known $0.
 
 **Loads** -- dense sortable table with search and broker / status / rating /
 date-range filters, a totals row, and a detail page per load carrying the trip

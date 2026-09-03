@@ -114,7 +114,11 @@ struct MoreView: View {
 
                     Section {
                         NavigationLink {
-                            ComingSoonView(title: "Plans & Billing", systemImage: "creditcard.fill")
+                            OBUnavailableView(
+                                title: "Plan y facturación",
+                                message: "Tu plan y tu método de pago se administran en onroadbooks.com desde el navegador.",
+                                systemImage: "creditcard.fill"
+                            )
                         } label: {
                             Label("Plans & Billing", systemImage: "creditcard.fill")
                                 .foregroundStyle(OBColor.foreground)

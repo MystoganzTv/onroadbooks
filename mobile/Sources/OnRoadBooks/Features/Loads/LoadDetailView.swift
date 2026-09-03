@@ -18,6 +18,8 @@ struct LoadDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var detail: LoadDetail?
+    @State private var drivers: [DriverRecord] = []
+    @State private var driverId: String = ""
     @State private var isLoading = true
     @State private var loadFailure: String?
 
@@ -112,6 +114,20 @@ struct LoadDetailView: View {
                 }
             }
             .listRowBackground(OBColor.card)
+
+            // Only when the account actually has drivers. Assigning one here is
+            // what puts this load on his pay statement.
+            if !drivers.isEmpty {
+                Section("Chofer") {
+                    Picker("Asignado a", selection: $driverId) {
+                        Text("Sin asignar").tag("")
+                        ForEach(drivers) { driver in
+                            Text(driver.name).tag(driver.id)
+                        }
+                    }
+                }
+                .listRowBackground(OBColor.card)
+            }
 
             Section("Costos del viaje") {
                 OBNumberRow(label: "Combustible", prefix: "$", placeholder: "0.00", text: $fuelText)
@@ -218,6 +234,10 @@ struct LoadDetailView: View {
             fuelText = Self.text(record.fuelCost)
             tollsText = Self.text(record.tolls)
             otherText = Self.text(record.otherExpenses)
+            driverId = record.driverId ?? ""
+            // A Solo or Pro account refuses this, and that is fine: no drivers
+            // means no picker, and the screen says nothing about it.
+            drivers = ((try? await repository.fetchDrivers()) ?? []).filter { $0.active }
             loadFailure = nil
         } catch {
             loadFailure = (error as? LocalizedError)?.errorDescription ?? "No se pudo abrir este load."
@@ -234,6 +254,7 @@ struct LoadDetailView: View {
                 try await repository.updateLoad(
                     id: loadId,
                     LoadEdit(
+                        driverId: driverId.isEmpty ? nil : driverId,
                         date: date,
                         broker: broker.trimmingCharacters(in: .whitespaces),
                         originCity: originCity.trimmingCharacters(in: .whitespaces),

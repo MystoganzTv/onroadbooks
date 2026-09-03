@@ -360,6 +360,32 @@ struct OBNumberRow: View {
 
 // MARK: - Empty / coming soon
 
+/// The screen exists and could not load — which is a different sentence from
+/// "coming soon", and saying the wrong one trains people to distrust the app.
+struct OBUnavailableView: View {
+    let title: String
+    var message: String = "No se pudo cargar. Revisa la señal y desliza para reintentar."
+    var systemImage: String = "wifi.exclamationmark"
+
+    var body: some View {
+        VStack(spacing: OBSpacing.sm) {
+            Image(systemName: systemImage)
+                .font(.system(size: 34))
+                .foregroundStyle(OBColor.mutedForeground)
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(OBColor.foreground)
+            Text(message)
+                .font(.subheadline)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(OBColor.mutedForeground)
+                .padding(.horizontal, OBSpacing.lg)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(OBColor.background)
+    }
+}
+
 struct ComingSoonView: View {
     let title: String
     let systemImage: String

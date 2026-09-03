@@ -3,7 +3,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getMobileSession } from "@/lib/auth/mobile";
 import { div, summarizeFuel, thresholdsFromSettings } from "@/lib/calculations";
 import { getRepository } from "@/lib/db";
-import { overheadCostPerMile, trailingCostBasis } from "@/lib/finance/cost-per-mile";
+import {
+  MIN_BASIS_MILES,
+  overheadCostPerMile,
+  trailingCostBasis,
+} from "@/lib/finance/cost-per-mile";
 import { capabilityRefusal, planAllows } from "@/lib/plans";
 import { todayISO } from "@/lib/periods";
 import { FINANCIAL_MODEL_VERSION } from "@/lib/finance/terminology";
@@ -41,6 +45,8 @@ export async function GET(request: NextRequest) {
   }
 
   const basis = trailingCostBasis(loads, expenses, settings, todayISO());
+  const operatingCostAvailable = basis.sufficient && basis.totalMiles >= MIN_BASIS_MILES;
+  const debtServiceAvailable = operatingCostAvailable && basis.debtServiceTotal > 0;
   const fuel = summarizeFuel(fuelEntries, basis.totalMiles);
 
   const grossRevenue = loads.reduce((total, load) => total + load.grossRate, 0);
@@ -62,7 +68,8 @@ export async function GET(request: NextRequest) {
       trueCostPerMile: basis.trueCostPerMile,
       basisLabel: basis.basisLabel,
       basisMiles: basis.totalMiles,
-      basisSufficient: basis.sufficient,
+      basisSufficient: operatingCostAvailable,
+      debtServiceAvailable,
       targetProfitPerMile: goals.targetProfitPerMile,
       deadheadWarnPct: settings.deadheadWarnPct,
       thresholds: thresholdsFromSettings(settings),

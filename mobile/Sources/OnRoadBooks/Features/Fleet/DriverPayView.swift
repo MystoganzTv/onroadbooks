@@ -46,9 +46,16 @@ struct DriverPayView: View {
             } else {
                 List {
                     ForEach(statements) { statement in
-                        StatementRow(statement: statement)
-                            .listRowBackground(OBColor.card)
-                            .listRowSeparatorTint(OBColor.border)
+                        NavigationLink {
+                            DriverStatementDetailView(
+                                repository: repository,
+                                statementId: statement.id
+                            )
+                        } label: {
+                            StatementRow(statement: statement)
+                        }
+                        .listRowBackground(OBColor.card)
+                        .listRowSeparatorTint(OBColor.border)
                     }
                 }
                 .listStyle(.plain)

@@ -89,8 +89,9 @@ final class MockRepository: LedgerRepository {
     func fetchCalculatorDefaults() async throws -> CalculatorDefaults {
         CalculatorDefaults(
             fuelPrice: 4.465, mpg: 7.0, dispatchPct: 10, factoringPct: 3,
-            overheadPerMile: 0.94, trueCostPerMile: 1.84,
+            overheadPerMile: 0.94, debtServicePerMile: 0.31, trueCostPerMile: 1.84,
             basisLabel: "últimos 90 días", basisMiles: 3339, basisSufficient: true,
+            debtServiceAvailable: true,
             targetProfitPerMile: 0.75, deadheadWarnPct: 20,
             thresholds: RatingThresholds(great: 1.25, good: 0.75, marginal: 0.25)
         )
@@ -306,6 +307,7 @@ final class MockRepository: LedgerRepository {
         let destination = load.destination.components(separatedBy: ", ")
         return LoadDetail(
             id: load.id,
+            driverId: nil,
             date: load.date,
             broker: load.broker,
             originCity: lane.first ?? load.origin,
@@ -415,6 +417,48 @@ final class MockRepository: LedgerRepository {
 
     func fetchDriverStatements() async throws -> [DriverStatement] {
         []
+    }
+
+    func fetchExpenseDetail(id: String) async throws -> ExpenseDetail {
+        guard let row = expenses.first(where: { $0.id == id }) else { throw APIError.requestFailed }
+        return ExpenseDetail(
+            id: row.id, date: row.date, categoryId: row.category, detail: row.note,
+            vendor: "", amount: row.amount, readOnly: false, readOnlyReason: nil
+        )
+    }
+
+    @discardableResult
+    func updateExpense(id: String, _ change: NewExpense) async throws -> String {
+        if let index = expenses.firstIndex(where: { $0.id == id }) {
+            expenses[index] = ExpenseEntry(
+                id: id, date: change.date, category: change.categoryId,
+                note: change.detail, amount: change.amount
+            )
+        }
+        return id
+    }
+
+    func fetchFuelDetail(id: String) async throws -> FuelDetail {
+        guard let stop = fuel.first(where: { $0.id == id }) else { throw APIError.requestFailed }
+        return FuelDetail(
+            id: stop.id, date: stop.date, gallons: stop.gallons,
+            pricePerGallon: stop.pricePerGallon, totalCost: stop.totalCost,
+            odometer: stop.odometer, location: "", jurisdiction: ""
+        )
+    }
+
+    @discardableResult
+    func updateFuelStop(id: String, _ change: NewFuelStop) async throws -> String {
+        id
+    }
+
+    @discardableResult
+    func recordReserveMovement(_ movement: ReserveMovementInput) async throws -> String {
+        "movement-\(UUID().uuidString.prefix(8))"
+    }
+
+    func fetchDriverStatement(id: String) async throws -> DriverStatementDetail {
+        throw APIError.requestFailed
     }
 
     @discardableResult

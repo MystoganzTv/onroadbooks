@@ -14,6 +14,7 @@ struct ReservesView: View {
     /// True only when the server refused on purpose (the cockpit plan gate),
     /// which reads very differently from a dropped connection.
     @State private var locked = false
+    @State private var isMoving = false
 
     var body: some View {
         Group {
@@ -35,12 +36,26 @@ struct ReservesView: View {
             } else if let ledger {
                 content(ledger)
             } else {
-                ComingSoonView(title: "Reserves", systemImage: "building.columns.fill")
+                OBUnavailableView(title: "Reservas")
             }
         }
         .background(OBColor.background)
         .navigationTitle("Reserves")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if let ledger, !ledger.accounts.isEmpty, !locked {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { isMoving = true } label: { Image(systemName: "plus.forwardslash.minus") }
+                }
+            }
+        }
+        .sheet(isPresented: $isMoving) {
+            ReserveMovementView(
+                repository: repository,
+                buckets: ledger?.accounts ?? [],
+                onSaved: { Task { await reload() } }
+            )
+        }
         .task { await reload() }
         .refreshable { await reload() }
     }

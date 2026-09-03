@@ -42,7 +42,7 @@ struct TeamView: View {
             } else if let roster {
                 content(roster)
             } else {
-                ComingSoonView(title: "Access & Roles", systemImage: "person.3.fill")
+                OBUnavailableView(title: "Accesos y roles")
             }
         }
         .background(OBColor.background)
