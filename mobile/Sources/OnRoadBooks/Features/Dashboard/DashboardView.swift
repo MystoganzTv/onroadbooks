@@ -58,6 +58,116 @@ struct DashboardView: View {
         }
     }
 
+    /// `PlanningCard` — the six figures, and the same refusal to show a
+    /// break-even without expected miles.
+    @ViewBuilder
+    private func planningPanel(_ planning: FinancialPlanning) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            PanelHeader(title: "Planeación mensual", trailing: "base normalizada")
+            VStack(spacing: OBSpacing.md) {
+                HStack(spacing: OBSpacing.sm) {
+                    planningMetric("Millas esperadas", "\(Int(planning.expectedMonthlyMiles).formatted()) mi")
+                    planningMetric(
+                        "Costo/milla normalizado",
+                        planning.normalizedCostPerMile
+                            .formatted(.currency(code: "USD").precision(.fractionLength(2)))
+                    )
+                }
+                HStack(spacing: OBSpacing.sm) {
+                    planningMetric(
+                        "Break-even operativo",
+                        planning.hasExpectedMiles
+                            ? planning.operatingBreakEvenRevenue
+                                .formatted(.currency(code: "USD").precision(.fractionLength(0)))
+                            : "--",
+                        hint: planning.hasExpectedMiles ? nil : "Configura las millas esperadas"
+                    )
+                    planningMetric(
+                        "Break-even de caja",
+                        planning.hasExpectedMiles
+                            ? planning.cashBreakEvenRevenue
+                                .formatted(.currency(code: "USD").precision(.fractionLength(0)))
+                            : "--",
+                        hint: planning.hasExpectedMiles ? nil : "Configura las millas esperadas"
+                    )
+                }
+                HStack(spacing: OBSpacing.sm) {
+                    planningMetric(
+                        "Obligaciones mensuales",
+                        planning.activeMonthlyObligations
+                            .formatted(.currency(code: "USD").precision(.fractionLength(0)))
+                    )
+                    planningMetric(
+                        "Cobertura",
+                        planning.activeMonthlyObligations > 0
+                            ? String(format: "%.2f×", planning.fixedObligationCoverage)
+                            : "--"
+                    )
+                }
+            }
+            .padding(OBSpacing.md)
+        }
+        .obPanel()
+        .padding(.horizontal, OBSpacing.md)
+    }
+
+    private func planningMetric(_ label: String, _ value: String, hint: String? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            LabelXS(label)
+            Text(value)
+                .font(.headline)
+                .monospacedDigit()
+                .foregroundStyle(OBColor.foreground)
+            if let hint {
+                Text("— " + hint)
+                    .font(.caption2)
+                    .foregroundStyle(OBColor.mutedForeground)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func financialDetails(_ s: DashboardSnapshot) -> some View {
+        DisclosureGroup {
+            VStack(spacing: 0) {
+                detailRow("Ingreso facturado", s.bookedRevenue)
+                detailRow("Ingreso cobrado", s.collectedRevenue)
+                detailRow("Por cobrar", s.accountsReceivable)
+                detailRow("Utilidad operativa", s.operatingProfit)
+                detailRow("Intereses", s.interestExpense)
+                detailRow("Capital", s.principalPayment)
+                detailRow("Servicio de deuda", s.debtService)
+                detailRow("Efectivo después de deuda", s.cashAfterDebtService, strong: true)
+            }
+            .padding(.bottom, OBSpacing.sm)
+        } label: {
+            Text("Detalle financiero")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(OBColor.mutedForeground)
+        }
+        .tint(OBColor.mutedForeground)
+        .padding(.horizontal, OBSpacing.md)
+        .padding(.vertical, OBSpacing.sm)
+        .overlay(alignment: .top) {
+            Rectangle().fill(OBColor.border).frame(height: 1)
+        }
+    }
+
+    private func detailRow(_ label: String, _ amount: Double, strong: Bool = false) -> some View {
+        HStack {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(OBColor.mutedForeground)
+            Spacer(minLength: OBSpacing.sm)
+            Text(amount, format: .currency(code: "USD").precision(.fractionLength(2)))
+                .font(strong ? .subheadline.weight(.semibold) : .subheadline)
+                .monospacedDigit()
+                .foregroundStyle(OBColor.foreground)
+        }
+        .padding(.vertical, 5)
+    }
+
     @ViewBuilder
     private func content(for s: DashboardSnapshot) -> some View {
         VStack(alignment: .leading, spacing: OBSpacing.lg) {
@@ -83,7 +193,10 @@ struct DashboardView: View {
                 StatTile(
                     label: "Today Operations",
                     value: s.todayBookedRevenue,
-                    footnote: s.todayLoads == 1 ? "1 load" : "\(s.todayLoads) loads"
+                    footnote: (s.todayLoads == 1 ? "1 load" : "\(s.todayLoads) loads")
+                        + " · " + s.todayOperatingProfit
+                            .formatted(.currency(code: "USD").precision(.fractionLength(0)))
+                        + " utilidad"
                 )
             }
             .padding(.horizontal, OBSpacing.md)
@@ -147,9 +260,18 @@ struct DashboardView: View {
                     }
                 }
                 .padding(OBSpacing.md)
+
+                // The web's "Financial details" disclosure, same eight rows in
+                // the same order (`money-flow.tsx`). Every one of them has been
+                // arriving in this screen's JSON all along.
+                financialDetails(s)
             }
             .obPanel()
             .padding(.horizontal, OBSpacing.md)
+
+            if let planning = s.planning {
+                planningPanel(planning)
+            }
 
             // Recent loads
             VStack(alignment: .leading, spacing: 0) {

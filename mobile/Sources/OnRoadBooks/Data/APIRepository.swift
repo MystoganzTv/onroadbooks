@@ -1239,6 +1239,16 @@ private struct DashboardDTO: Decodable {
     struct Category: Decodable { let category: String; let label: String; let amount: Double }
     struct Reserve: Decodable { let id: String; let name: String; let contributionPct: Double?; let balance: Double }
 
+    struct Planning: Decodable {
+        let expectedMonthlyMiles: Double
+        let normalizedCostPerMile: Double
+        let expectedOperatingCosts: Double
+        let activeMonthlyObligations: Double
+        let operatingBreakEvenRevenue: Double
+        let cashBreakEvenRevenue: Double
+        let fixedObligationCoverage: Double
+    }
+
     let periodLabel: String
     let bookedRevenue: Double
     let operatingExpenses: Double
@@ -1246,6 +1256,15 @@ private struct DashboardDTO: Decodable {
     let bookedRevenueDeltaPct: Double
     let operatingProfitDeltaPct: Double
     let actualCostPerMile: Double
+    let collectedRevenue: Double
+    let accountsReceivable: Double
+    let interestExpense: Double
+    let principalPayment: Double
+    let debtService: Double
+    let cashAfterDebtService: Double
+    let debtServicePerMile: Double
+    /// Null on a plan without the cockpit — hence optional, unlike the rest.
+    let planning: Planning?
     /// `null` when the plan or the role does not include owner planning.
     let safeToPay: Double?
     let totalMiles: Double
@@ -1278,6 +1297,24 @@ private struct DashboardDTO: Decodable {
             todayLoads: today.loadCount,
             todayCashCollected: today.cashActivity.collectedRevenue,
             todayNetCashActivity: today.cashActivity.netCashActivity,
+            collectedRevenue: collectedRevenue,
+            accountsReceivable: accountsReceivable,
+            interestExpense: interestExpense,
+            principalPayment: principalPayment,
+            debtService: debtService,
+            cashAfterDebtService: cashAfterDebtService,
+            debtServicePerMile: debtServicePerMile,
+            planning: planning.map {
+                FinancialPlanning(
+                    expectedMonthlyMiles: $0.expectedMonthlyMiles,
+                    normalizedCostPerMile: $0.normalizedCostPerMile,
+                    expectedOperatingCosts: $0.expectedOperatingCosts,
+                    activeMonthlyObligations: $0.activeMonthlyObligations,
+                    operatingBreakEvenRevenue: $0.operatingBreakEvenRevenue,
+                    cashBreakEvenRevenue: $0.cashBreakEvenRevenue,
+                    fixedObligationCoverage: $0.fixedObligationCoverage
+                )
+            },
             expenseBreakdown: expenseBreakdown.map { CategoryTotal(id: $0.category, label: $0.label, amount: $0.amount) },
             recentLoads: recentLoads.map { $0.toDomain() },
             reserves: reserves.map { reserve in

@@ -741,6 +741,22 @@ final class MockRepository: LedgerRepository {
             todayLoads: 1,
             todayCashCollected: 900,
             todayNetCashActivity: 615,
+            collectedRevenue: 7395.00,
+            accountsReceivable: 2400.00,
+            interestExpense: 200.00,
+            principalPayment: 313.00,
+            debtService: 513.00,
+            cashAfterDebtService: 2022.18,
+            debtServicePerMile: 0.15,
+            planning: FinancialPlanning(
+                expectedMonthlyMiles: 9000,
+                normalizedCostPerMile: 1.84,
+                expectedOperatingCosts: 16560,
+                activeMonthlyObligations: 513,
+                operatingBreakEvenRevenue: 16560,
+                cashBreakEvenRevenue: 17073,
+                fixedObligationCoverage: 3.94
+            ),
             expenseBreakdown: breakdown,
             recentLoads: loads,
             reserves: reserves

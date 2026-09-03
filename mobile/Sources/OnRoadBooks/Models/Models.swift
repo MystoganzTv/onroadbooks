@@ -599,9 +599,41 @@ struct DashboardSnapshot {
     let todayCashCollected: Double
     let todayNetCashActivity: Double
 
+    /// The eight rows behind the web's "Financial details" disclosure in
+    /// `money-flow.tsx`, in its order. All of them have been in the mobile
+    /// dashboard's JSON since it was written; nothing rendered them.
+    let collectedRevenue: Double
+    let accountsReceivable: Double
+    let interestExpense: Double
+    let principalPayment: Double
+    let debtService: Double
+    let cashAfterDebtService: Double
+    let debtServicePerMile: Double
+
+    /// `nil` when the plan does not include the cockpit — the server sends
+    /// null rather than zeros, and a break-even of $0 would be a lie.
+    let planning: FinancialPlanning?
+
     let expenseBreakdown: [CategoryTotal]
     let recentLoads: [Load]
     let reserves: [ReserveAccount]
+}
+
+/// `FinancialPlanningSummary` from `src/lib/finance/planning.ts`, as the web's
+/// `PlanningCard` reads it.
+struct FinancialPlanning: Equatable {
+    let expectedMonthlyMiles: Double
+    let normalizedCostPerMile: Double
+    let expectedOperatingCosts: Double
+    let activeMonthlyObligations: Double
+    let operatingBreakEvenRevenue: Double
+    let cashBreakEvenRevenue: Double
+    let fixedObligationCoverage: Double
+
+    /// The web refuses to show a break-even without expected miles, and says
+    /// what to do instead. Same guard, same reason: the number would be zero
+    /// and zero would read as an answer.
+    var hasExpectedMiles: Bool { expectedMonthlyMiles > 0 }
 }
 
 
