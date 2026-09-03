@@ -39,7 +39,8 @@ struct AnalyticsView: View {
         .background(OBColor.background)
         .navigationTitle("Analytics")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await reload() }
+        .obScopeBar()
+        .obReloadsOnScope { await reload() }
         .refreshable { await reload() }
     }
 

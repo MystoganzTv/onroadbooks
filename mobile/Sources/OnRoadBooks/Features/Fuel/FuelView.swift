@@ -82,7 +82,8 @@ struct FuelView: View {
                     .accessibilityLabel(Text("Nueva carga de combustible"))
             }
         }
-        .task { await reload() }
+        .obScopeBar()
+        .obReloadsOnScope { await reload() }
         .refreshable { await reload() }
         .sheet(isPresented: $isAdding) {
             AddFuelView(repository: repository, onSaved: { Task { await reload() } })

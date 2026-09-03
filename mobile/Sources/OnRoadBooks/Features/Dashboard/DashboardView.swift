@@ -33,6 +33,7 @@ struct DashboardView: View {
                 // "Dashboard" was dead weight: the tab bar underneath already
                 // says it. The greeting earns the line instead.
                 OBScreenHeader(title: greeting, subtitle: viewModel.snapshot?.periodLabel)
+                OBPeriodBar()
 
                 ScrollView {
                     if let snapshot = viewModel.snapshot {
@@ -53,7 +54,7 @@ struct DashboardView: View {
             }
             .background(OBColor.background)
             .toolbar(.hidden, for: .navigationBar)
-            .task { await viewModel.load() }
+            .obReloadsOnScope { await viewModel.load() }
         }
     }
 

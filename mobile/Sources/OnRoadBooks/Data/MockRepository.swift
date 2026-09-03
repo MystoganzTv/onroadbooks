@@ -203,7 +203,7 @@ final class MockRepository: LedgerRepository {
         ]
     }
 
-    func fetchReportTable(_ reportId: String, month: String?) async throws -> ReportTable {
+    func fetchReportTable(_ reportId: String) async throws -> ReportTable {
         ReportTable(
             title: "Loads — August 2026",
             columns: ["Date", "Lane", "Broker", "Rate", "Miles", "Profit/mi"],
@@ -215,7 +215,7 @@ final class MockRepository: LedgerRepository {
         )
     }
 
-    func downloadReport(_ reportId: String, format: String, month: String?) async throws -> URL {
+    func downloadReport(_ reportId: String, format: String) async throws -> URL {
         throw APIError.refused("Los exports necesitan una cuenta real. Entra con tu cuenta para descargarlos.")
     }
 

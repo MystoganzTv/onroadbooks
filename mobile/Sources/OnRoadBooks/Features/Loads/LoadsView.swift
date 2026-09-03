@@ -16,6 +16,7 @@ struct LoadsView: View {
                     actionLabel: "Nuevo load",
                     action: { isAdding = true }
                 )
+                OBPeriodBar()
 
                 if isLoading {
                     ProgressView().tint(OBColor.primary)
@@ -42,7 +43,7 @@ struct LoadsView: View {
             }
             .background(OBColor.background)
             .toolbar(.hidden, for: .navigationBar)
-            .task { await reload() }
+            .obReloadsOnScope { await reload() }
             .refreshable { await reload() }
             .sheet(isPresented: $isAdding) {
                 AddLoadView(repository: repository, onSaved: { Task { await reload() } })

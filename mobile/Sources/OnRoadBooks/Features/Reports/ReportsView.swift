@@ -117,9 +117,6 @@ struct ReportTableView: View {
     @State private var isExporting = false
     @State private var failure: String?
     @State private var share: SharePayload?
-    /// "YYYY-MM". The report used to be whatever month the server considered
-    /// current, which on the 3rd of a month is three days of rows.
-    @State private var month = ReportMonth.current()
 
     var body: some View {
         Group {
@@ -159,17 +156,18 @@ struct ReportTableView: View {
         .sheet(item: $share) { payload in
             ShareSheet(url: payload.url)
         }
-        .task(id: month) {
-            // Full-screen spinner only for the first load. Switching months
-            // keeps the table (and the menu that switched it) on screen.
+        .obScopeBar()
+        .obReloadsOnScope {
+            // Full-screen spinner only for the first load. Changing the period
+            // keeps the table on screen while the next one arrives.
             if table == nil { isLoading = true }
             failure = nil
             do {
-                table = try await repository.fetchReportTable(report.id, month: month)
+                table = try await repository.fetchReportTable(report.id)
             } catch {
-                // Deliberately keeping the last good table: the month menu
-                // lives in its header, and dropping it would strand you on
-                // an error screen with no way back to a month that loads.
+                // Keeping the last good table on purpose: the period bar is
+                // pinned above it, so an error is something you can scope your
+                // way out of rather than a dead end.
                 failure = (error as? LocalizedError)?.errorDescription
             }
             isLoading = false
@@ -179,27 +177,13 @@ struct ReportTableView: View {
     @ViewBuilder
     private func tableBody(_ table: ReportTable) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text(table.title)
-                    .font(.footnote)
-                    .foregroundStyle(OBColor.mutedForeground)
-                    .lineLimit(1)
-                Spacer(minLength: OBSpacing.sm)
-                Menu {
-                    ForEach(ReportMonth.recent(), id: \.value) { option in
-                        Button(option.label) { month = option.value }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(ReportMonth.label(for: month))
-                        Image(systemName: "chevron.up.chevron.down").font(.caption2)
-                    }
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(OBColor.primary)
-                }
-            }
-            .padding(.horizontal, OBSpacing.md)
-            .padding(.vertical, OBSpacing.sm)
+            // The server's own label for the range the bar above is set to.
+            Text(table.title)
+                .font(.footnote)
+                .foregroundStyle(OBColor.mutedForeground)
+                .lineLimit(1)
+                .padding(.horizontal, OBSpacing.md)
+                .padding(.vertical, OBSpacing.sm)
 
             if let failure {
                 Text(failure)
@@ -241,7 +225,7 @@ struct ReportTableView: View {
         failure = nil
         Task {
             do {
-                let url = try await repository.downloadReport(report.id, format: format, month: month)
+                let url = try await repository.downloadReport(report.id, format: format)
                 share = SharePayload(url: url)
             } catch {
                 failure = (error as? LocalizedError)?.errorDescription ?? "No se pudo generar el archivo."
@@ -342,37 +326,3 @@ private struct ReportRowCard: View {
     }
 }
 
-/// The months a report can be asked for: this one and the twelve before it,
-/// which covers "the month I am settling" and "the same month last year".
-enum ReportMonth {
-    struct Option { let value: String; let label: String }
-
-    private static var keyFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM"
-        return formatter
-    }
-
-    private static var displayFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.locale = .current
-        formatter.setLocalizedDateFormatFromTemplate("MMMM yyyy")
-        return formatter
-    }
-
-    static func current() -> String { keyFormatter.string(from: Date()) }
-
-    static func recent() -> [Option] {
-        let calendar = Calendar.current
-        return (0..<13).compactMap { offset in
-            guard let date = calendar.date(byAdding: .month, value: -offset, to: Date()) else { return nil }
-            return Option(value: keyFormatter.string(from: date), label: displayFormatter.string(from: date))
-        }
-    }
-
-    static func label(for value: String) -> String {
-        guard let date = keyFormatter.date(from: value) else { return value }
-        return displayFormatter.string(from: date)
-    }
-}

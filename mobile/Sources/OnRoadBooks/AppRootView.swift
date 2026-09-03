@@ -10,6 +10,10 @@ struct AppRootView: View {
     @StateObject private var authSession = AuthSession()
     @StateObject private var monitor = NetworkMonitor()
     @StateObject private var appLock = AppLock()
+    /// The period and truck every screen reads from — the phone's equivalent
+    /// of the scope the web keeps in the URL. Owned here so it survives tab
+    /// switches and is the same object for all of them.
+    @StateObject private var scopeStore = ScopeStore()
     @StateObject private var queue = WriteQueue(
         client: APIClient(baseURL: APIConfig.baseURL, tokenProvider: { AuthSession.storedToken() })
     )
@@ -24,7 +28,8 @@ struct AppRootView: View {
                         repository: APIRepository(
                             tokenProvider: { authSession.token },
                             queue: queue,
-                            isOnline: { [flag = monitor.flag] in flag.current }
+                            isOnline: { [flag = monitor.flag] in flag.current },
+                            scope: { [box = scopeStore.box] in box.current }
                         ),
                         accountLabel: authSession.email ?? "Signed in",
                         greetingName: authSession.firstName,
@@ -44,6 +49,7 @@ struct AppRootView: View {
                     LoginView(authSession: authSession, onUseDemo: { useDemo = true })
                 }
             }
+            .environmentObject(scopeStore)
 
             // Covers a real session or demo mode -- never the login screen,
             // which has nothing yet worth locking behind a second gate.

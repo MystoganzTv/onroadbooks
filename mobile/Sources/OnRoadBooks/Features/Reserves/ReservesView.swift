@@ -56,7 +56,8 @@ struct ReservesView: View {
                 onSaved: { Task { await reload() } }
             )
         }
-        .task { await reload() }
+        .obScopeBar()
+        .obReloadsOnScope { await reload() }
         .refreshable { await reload() }
     }
 

@@ -9,6 +9,7 @@ import SwiftUI
 /// truck is a bad one.
 struct FleetView: View {
     let repository: LedgerRepository
+    @EnvironmentObject private var scopeStore: ScopeStore
 
     @State private var overview: FleetOverview?
     @State private var isLoading = true
@@ -44,7 +45,8 @@ struct FleetView: View {
         .background(OBColor.background)
         .navigationTitle("Flota")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await reload() }
+        .obScopeBar()
+        .obReloadsOnScope { await reload() }
         .refreshable { await reload() }
     }
 
@@ -151,7 +153,16 @@ struct FleetView: View {
 
     private func reload() async {
         do {
-            overview = try await repository.fetchFleet()
+            let fetched = try await repository.fetchFleet()
+            overview = fetched
+            // The only place the phone learns the fleet's names. Taken only
+            // when looking at the whole fleet, so scoping to one truck cannot
+            // shrink the list you would use to scope back out.
+            if scopeStore.box.current.truckId == nil {
+                await scopeStore.setTrucks(
+                    fetched.units.map { ScopeStore.TruckChoice(id: $0.truckId, name: $0.truckName) }
+                )
+            }
             refusal = nil
         } catch APIError.refused(let message) {
             refusal = message

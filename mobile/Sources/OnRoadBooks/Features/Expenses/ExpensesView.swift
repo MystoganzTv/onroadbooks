@@ -22,6 +22,7 @@ struct ExpensesView: View {
                     actionLabel: "Nuevo gasto",
                     action: { isAdding = true }
                 )
+                OBPeriodBar()
 
                 if isLoading {
                     ProgressView().tint(OBColor.primary)
@@ -74,7 +75,7 @@ struct ExpensesView: View {
             }
             .background(OBColor.background)
             .toolbar(.hidden, for: .navigationBar)
-            .task { await reload() }
+            .obReloadsOnScope { await reload() }
             .refreshable { await reload() }
             .sheet(item: $editing) { expense in
                 EditExpenseView(

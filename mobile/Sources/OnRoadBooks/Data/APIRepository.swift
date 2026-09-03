@@ -35,16 +35,21 @@ final class APIRepository: LedgerRepository {
     private let client: APIClient
     private let queue: WriteQueue?
     private let isOnline: () -> Bool
+    /// What the app is currently scoped to. Read at request time rather than
+    /// captured, because the bar can change it between two screens' loads.
+    private let scope: () -> Scope
 
     init(
         baseURL: URL = APIConfig.baseURL,
         tokenProvider: @escaping () -> String?,
         queue: WriteQueue? = nil,
-        isOnline: @escaping () -> Bool = { true }
+        isOnline: @escaping () -> Bool = { true },
+        scope: @escaping () -> Scope = { .current() }
     ) {
         client = APIClient(baseURL: baseURL, tokenProvider: tokenProvider)
         self.queue = queue
         self.isOnline = isOnline
+        self.scope = scope
     }
 
     private func get<T: Decodable>(
@@ -53,9 +58,14 @@ final class APIRepository: LedgerRepository {
         as type: T.Type
     ) async throws -> T {
         var request = client.request(path, method: "GET")
-        if !query.isEmpty, let url = request.url,
+        // The scope rides on every read, exactly as it rides in the URL of
+        // every web page. Routes that do not read it ignore it; the ones that
+        // do were parsing `?month=&period=&truck=` long before the phone
+        // started sending any of it.
+        let items = scope().queryItems + query
+        if let url = request.url,
            var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
-            components.queryItems = query
+            components.queryItems = items
             request.url = components.url
         }
 
@@ -270,23 +280,8 @@ final class APIRepository: LedgerRepository {
             .reports.map { ReportSummary(id: $0.id, label: $0.label, description: $0.description) }
     }
 
-    /// The report routes have always read `?month=&period=` — the phone was
-    /// the only caller sending neither, so `periodFromSearchParams({})` fell
-    /// through to the current month on every request.
-    private func monthQuery(_ month: String?) -> [URLQueryItem] {
-        guard let month else { return [] }
-        return [
-            URLQueryItem(name: "month", value: month),
-            URLQueryItem(name: "period", value: "full"),
-        ]
-    }
-
-    func fetchReportTable(_ reportId: String, month: String?) async throws -> ReportTable {
-        let response = try await get(
-            "api/mobile/reports/\(reportId)",
-            query: monthQuery(month),
-            as: ReportTableResponseDTO.self
-        )
+    func fetchReportTable(_ reportId: String) async throws -> ReportTable {
+        let response = try await get("api/mobile/reports/\(reportId)", as: ReportTableResponseDTO.self)
         return ReportTable(
             title: response.table.title,
             columns: response.table.columns,
@@ -304,11 +299,13 @@ final class APIRepository: LedgerRepository {
         return try await download(request, fallbackName: "onroad-books-\(year).xlsx")
     }
 
-    func downloadReport(_ reportId: String, format: String, month: String?) async throws -> URL {
+    func downloadReport(_ reportId: String, format: String) async throws -> URL {
         var request = client.request("api/mobile/reports/\(reportId)", method: "GET")
         if let url = request.url,
            var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
-            components.queryItems = [URLQueryItem(name: "format", value: format)] + monthQuery(month)
+            // Same scope as the table on screen, so the file the accountant
+            // gets is the period the owner was looking at.
+            components.queryItems = scope().queryItems + [URLQueryItem(name: "format", value: format)]
             request.url = components.url
         }
 

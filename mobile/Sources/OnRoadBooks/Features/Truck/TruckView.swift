@@ -41,7 +41,8 @@ struct TruckView: View {
         .background(OBColor.background)
         .navigationTitle("Truck")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await reload() }
+        .obScopeBar()
+        .obReloadsOnScope { await reload() }
         .refreshable { await reload() }
     }
 
