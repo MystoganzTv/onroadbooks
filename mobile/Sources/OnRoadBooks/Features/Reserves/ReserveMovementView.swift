@@ -73,14 +73,16 @@ struct ReserveMovementView: View {
                 .listRowBackground(OBColor.card)
 
                 Section {
-                    TextField("Para qué", text: $reason)
+                    // The asterisk is the only warning you get before Guardar
+                    // refuses: the field is required in both directions.
+                    TextField("Para qué *", text: $reason)
                 } footer: {
                     // "por qué salió ese dinero" only makes sense for a
                     // withdrawal -- a contribution needs the mirror sentence,
                     // not a line that describes money leaving the bucket.
                     Text(type == "WITHDRAWAL"
-                        ? "Dentro de seis meses esta línea es lo único que explica por qué salió ese dinero."
-                        : "Dentro de seis meses esta línea es lo único que explica de dónde salió este dinero.")
+                        ? "Obligatorio. Dentro de seis meses esta línea es lo único que explica por qué salió ese dinero."
+                        : "Obligatorio. Dentro de seis meses esta línea es lo único que explica de dónde salió este dinero.")
                         .foregroundStyle(OBColor.mutedForeground)
                 }
                 .listRowBackground(OBColor.card)

@@ -270,8 +270,23 @@ final class APIRepository: LedgerRepository {
             .reports.map { ReportSummary(id: $0.id, label: $0.label, description: $0.description) }
     }
 
-    func fetchReportTable(_ reportId: String) async throws -> ReportTable {
-        let response = try await get("api/mobile/reports/\(reportId)", as: ReportTableResponseDTO.self)
+    /// The report routes have always read `?month=&period=` — the phone was
+    /// the only caller sending neither, so `periodFromSearchParams({})` fell
+    /// through to the current month on every request.
+    private func monthQuery(_ month: String?) -> [URLQueryItem] {
+        guard let month else { return [] }
+        return [
+            URLQueryItem(name: "month", value: month),
+            URLQueryItem(name: "period", value: "full"),
+        ]
+    }
+
+    func fetchReportTable(_ reportId: String, month: String?) async throws -> ReportTable {
+        let response = try await get(
+            "api/mobile/reports/\(reportId)",
+            query: monthQuery(month),
+            as: ReportTableResponseDTO.self
+        )
         return ReportTable(
             title: response.table.title,
             columns: response.table.columns,
@@ -289,11 +304,11 @@ final class APIRepository: LedgerRepository {
         return try await download(request, fallbackName: "onroad-books-\(year).xlsx")
     }
 
-    func downloadReport(_ reportId: String, format: String) async throws -> URL {
+    func downloadReport(_ reportId: String, format: String, month: String?) async throws -> URL {
         var request = client.request("api/mobile/reports/\(reportId)", method: "GET")
         if let url = request.url,
            var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
-            components.queryItems = [URLQueryItem(name: "format", value: format)]
+            components.queryItems = [URLQueryItem(name: "format", value: format)] + monthQuery(month)
             request.url = components.url
         }
 

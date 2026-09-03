@@ -17,10 +17,15 @@ protocol LedgerRepository {
     func fetchCalculatorDefaults() async throws -> CalculatorDefaults
     func fetchIfta(quarter: String?) async throws -> IftaReport
     func fetchReports() async throws -> [ReportSummary]
-    func fetchReportTable(_ reportId: String) async throws -> ReportTable
+    /// `month` is "YYYY-MM", or nil for whatever the server calls current.
+    /// Without it every report is pinned to the calendar month in progress,
+    /// which on the 3rd is three days of data and no way back to the month
+    /// you are actually settling.
+    func fetchReportTable(_ reportId: String, month: String?) async throws -> ReportTable
     /// Renders the report as a file and returns a local URL to hand to the
     /// share sheet. A report on a phone is usually not read — it is sent.
-    func downloadReport(_ reportId: String, format: String) async throws -> URL
+    /// Takes the same `month` so the file matches the table on screen.
+    func downloadReport(_ reportId: String, format: String, month: String?) async throws -> URL
     /// The whole year in one workbook, for the accountant.
     func downloadYearEndPacket(year: Int) async throws -> URL
 

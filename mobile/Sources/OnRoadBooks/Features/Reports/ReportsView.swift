@@ -117,6 +117,9 @@ struct ReportTableView: View {
     @State private var isExporting = false
     @State private var failure: String?
     @State private var share: SharePayload?
+    /// "YYYY-MM". The report used to be whatever month the server considered
+    /// current, which on the 3rd of a month is three days of rows.
+    @State private var month = ReportMonth.current()
 
     var body: some View {
         Group {
@@ -156,10 +159,17 @@ struct ReportTableView: View {
         .sheet(item: $share) { payload in
             ShareSheet(url: payload.url)
         }
-        .task {
+        .task(id: month) {
+            // Full-screen spinner only for the first load. Switching months
+            // keeps the table (and the menu that switched it) on screen.
+            if table == nil { isLoading = true }
+            failure = nil
             do {
-                table = try await repository.fetchReportTable(report.id)
+                table = try await repository.fetchReportTable(report.id, month: month)
             } catch {
+                // Deliberately keeping the last good table: the month menu
+                // lives in its header, and dropping it would strand you on
+                // an error screen with no way back to a month that loads.
                 failure = (error as? LocalizedError)?.errorDescription
             }
             isLoading = false
@@ -168,12 +178,29 @@ struct ReportTableView: View {
 
     @ViewBuilder
     private func tableBody(_ table: ReportTable) -> some View {
+        let widths = columnWidths(table)
         VStack(alignment: .leading, spacing: 0) {
-            Text(table.title)
-                .font(.footnote)
-                .foregroundStyle(OBColor.mutedForeground)
-                .padding(.horizontal, OBSpacing.md)
-                .padding(.vertical, OBSpacing.sm)
+            HStack {
+                Text(table.title)
+                    .font(.footnote)
+                    .foregroundStyle(OBColor.mutedForeground)
+                    .lineLimit(1)
+                Spacer(minLength: OBSpacing.sm)
+                Menu {
+                    ForEach(ReportMonth.recent(), id: \.value) { option in
+                        Button(option.label) { month = option.value }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(ReportMonth.label(for: month))
+                        Image(systemName: "chevron.up.chevron.down").font(.caption2)
+                    }
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(OBColor.primary)
+                }
+            }
+            .padding(.horizontal, OBSpacing.md)
+            .padding(.vertical, OBSpacing.sm)
 
             if let failure {
                 Text(failure)
@@ -192,14 +219,19 @@ struct ReportTableView: View {
                 // Horizontal inside vertical: a report is wide by nature, and
                 // squeezing eleven columns into 390 points would make every one
                 // of them unreadable.
+                // Every column used to be 130pt wide, so thirty-three of them
+                // came to 4,290pt of mostly air: a date needs half that and an
+                // empty column needs none of it. Widths now follow the widest
+                // cell actually in the column, which is what makes several of
+                // them fit on screen at once.
                 ScrollView([.horizontal, .vertical]) {
                     VStack(alignment: .leading, spacing: 0) {
                         HStack(spacing: 0) {
-                            ForEach(Array(table.columns.enumerated()), id: \.offset) { _, column in
+                            ForEach(Array(table.columns.enumerated()), id: \.offset) { index, column in
                                 Text(column)
                                     .font(.caption2.weight(.semibold))
                                     .foregroundStyle(OBColor.mutedForeground)
-                                    .frame(width: 130, alignment: .leading)
+                                    .frame(width: widths[index], alignment: .leading)
                                     .padding(.vertical, 8)
                                     .padding(.horizontal, OBSpacing.sm)
                             }
@@ -208,13 +240,16 @@ struct ReportTableView: View {
 
                         ForEach(Array(table.rows.enumerated()), id: \.offset) { index, row in
                             HStack(spacing: 0) {
-                                ForEach(Array(row.enumerated()), id: \.offset) { _, cell in
+                                ForEach(Array(row.enumerated()), id: \.offset) { column, cell in
                                     Text(cell)
                                         .font(.caption)
                                         .monospacedDigit()
                                         .lineLimit(1)
                                         .foregroundStyle(OBColor.foreground)
-                                        .frame(width: 130, alignment: .leading)
+                                        .frame(
+                                            width: column < widths.count ? widths[column] : 96,
+                                            alignment: .leading
+                                        )
                                         .padding(.vertical, 7)
                                         .padding(.horizontal, OBSpacing.sm)
                                 }
@@ -222,8 +257,25 @@ struct ReportTableView: View {
                             .background(index.isMultiple(of: 2) ? Color.clear : OBColor.surface)
                         }
                     }
+                    // Two rows in a full-height scroll view were being centred,
+                    // which read as a broken screen with a table stranded in
+                    // the middle of it.
+                    .frame(maxHeight: .infinity, alignment: .topLeading)
                 }
             }
+        }
+    }
+
+    /// Roughly how wide each column needs to be for its widest cell, clamped
+    /// so a long note cannot push everything else off screen and an empty
+    /// column still keeps a readable header stub.
+    private func columnWidths(_ table: ReportTable) -> [CGFloat] {
+        table.columns.indices.map { index in
+            let header = table.columns[index].count
+            let widest = table.rows.reduce(header) { longest, row in
+                index < row.count ? max(longest, row[index].count) : longest
+            }
+            return min(max(CGFloat(widest) * 7.2, 56), 190)
         }
     }
 
@@ -232,7 +284,7 @@ struct ReportTableView: View {
         failure = nil
         Task {
             do {
-                let url = try await repository.downloadReport(report.id, format: format)
+                let url = try await repository.downloadReport(report.id, format: format, month: month)
                 share = SharePayload(url: url)
             } catch {
                 failure = (error as? LocalizedError)?.errorDescription ?? "No se pudo generar el archivo."
@@ -257,4 +309,40 @@ struct ShareSheet: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
+
+
+/// The months a report can be asked for: this one and the twelve before it,
+/// which covers "the month I am settling" and "the same month last year".
+enum ReportMonth {
+    struct Option { let value: String; let label: String }
+
+    private static var keyFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM"
+        return formatter
+    }
+
+    private static var displayFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.setLocalizedDateFormatFromTemplate("MMMM yyyy")
+        return formatter
+    }
+
+    static func current() -> String { keyFormatter.string(from: Date()) }
+
+    static func recent() -> [Option] {
+        let calendar = Calendar.current
+        return (0..<13).compactMap { offset in
+            guard let date = calendar.date(byAdding: .month, value: -offset, to: Date()) else { return nil }
+            return Option(value: keyFormatter.string(from: date), label: displayFormatter.string(from: date))
+        }
+    }
+
+    static func label(for value: String) -> String {
+        guard let date = keyFormatter.date(from: value) else { return value }
+        return displayFormatter.string(from: date)
+    }
 }
