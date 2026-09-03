@@ -192,14 +192,29 @@ export const debtPaymentClassificationSchema = z
   .object({
     obligationId: z.string().trim().optional().nullable(),
     newObligation: financialObligationSchema.optional(),
+    obligationUpdate: z.object({
+      truckId: z.string().trim().optional().nullable(),
+      name: z.string().trim().min(1, "Name the obligation").max(120),
+      expectedMonthlyPayment: money.optional().nullable(),
+      active: z.boolean(),
+    }).optional(),
     treatment: z.enum(["OPERATING_LEASE", "LOAN_SPLIT", "DEBT_UNALLOCATED"]),
     principalAmount: money.optional(),
     interestAmount: money.optional(),
+    paymentAmount: money.min(0.01, "Amount is required").optional(),
+    date: isoDate.optional(),
+    description: z.string().trim().min(1, "Description is required").max(200).optional(),
+    vendor: z.string().trim().max(120).optional().nullable(),
+    recurring: z.boolean().optional(),
     notes: z.string().trim().max(2000).optional().nullable(),
   })
   .refine((value) => !(value.obligationId && value.newObligation), {
     message: "Choose an existing obligation or create a new one, not both",
     path: ["obligationId"],
+  })
+  .refine((value) => !value.obligationUpdate || Boolean(value.obligationId), {
+    message: "Choose an existing obligation before updating it",
+    path: ["obligationUpdate"],
   });
 
 export const iftaRatesSchema = z.object({

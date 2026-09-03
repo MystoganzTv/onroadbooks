@@ -22,6 +22,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -76,7 +78,7 @@ export function DebtReviewPanel({
               <p className="text-xs text-muted-foreground">{formatLocaleDate(expense.date, locale, { month: "short", day: "numeric" })} · {expense.vendor ?? copy.noLender} · {trucks.find((truck) => truck.id === expense.truckId)?.name ?? copy.business}</p>
             </div>
             <span className="tnum text-sm font-semibold">{formatMoney(expense.amount)}</span>
-            <DebtClassificationDialog expense={expense} obligations={obligations} />
+            <DebtClassificationDialog expense={expense} obligations={obligations} trucks={trucks} />
           </div>
         ))}
       </CardContent>
@@ -87,11 +89,13 @@ export function DebtReviewPanel({
 export function DebtClassificationDialog({
   expense,
   obligations,
+  trucks,
   paymentRows,
   trigger,
 }: {
   expense: Expense;
   obligations: FinancialObligation[];
+  trucks: Truck[];
   paymentRows?: Expense[];
   trigger?: React.ReactNode;
 }) {
@@ -104,7 +108,7 @@ export function DebtClassificationDialog({
     () => paymentRows?.filter((row) => row.splitGroupId === expense.splitGroupId) ?? [expense],
     [expense, paymentRows],
   );
-  const paymentAmount = rows.reduce((total, row) => total + row.amount, 0);
+  const storedPaymentAmount = rows.reduce((total, row) => total + row.amount, 0);
   const currentPrincipal = rows.find((row) => row.financialTreatment === "PRINCIPAL")?.amount ?? 0;
   const currentInterest = rows.find((row) => row.financialTreatment === "INTEREST")?.amount ?? 0;
   const currentNotes = rows.find((row) => row.financialTreatment === "PRINCIPAL")?.notes
@@ -112,13 +116,21 @@ export function DebtClassificationDialog({
     ?? expense.notes
     ?? "";
   const initialObligationId = expense.obligationId ?? (editingSplit ? "none" : "new");
+  const initialObligation = obligations.find((obligation) => obligation.id === initialObligationId);
 
   const [open, setOpen] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
   const [treatment, setTreatment] = React.useState<Treatment>("LOAN_SPLIT");
   const [obligationId, setObligationId] = React.useState(initialObligationId);
-  const [name, setName] = React.useState(expense.vendor ?? "");
-  const [monthlyPayment, setMonthlyPayment] = React.useState(String(paymentAmount));
+  const [obligationName, setObligationName] = React.useState(initialObligation?.name ?? expense.vendor ?? "");
+  const [monthlyPayment, setMonthlyPayment] = React.useState(String(initialObligation?.expectedMonthlyPayment ?? storedPaymentAmount));
+  const [obligationTruckId, setObligationTruckId] = React.useState(initialObligation?.truckId ?? expense.truckId ?? "none");
+  const [obligationActive, setObligationActive] = React.useState(initialObligation?.active ?? true);
+  const [paymentTotal, setPaymentTotal] = React.useState(String(storedPaymentAmount));
+  const [date, setDate] = React.useState(expense.date);
+  const [description, setDescription] = React.useState(expense.description.replace(/ · interest$/u, ""));
+  const [vendor, setVendor] = React.useState(expense.vendor ?? "");
+  const [recurring, setRecurring] = React.useState(expense.recurring);
   const [principal, setPrincipal] = React.useState(String(editingSplit ? currentPrincipal : expense.amount));
   const [interest, setInterest] = React.useState(String(editingSplit ? currentInterest : 0));
   const [notes, setNotes] = React.useState(currentNotes);
@@ -127,8 +139,15 @@ export function DebtClassificationDialog({
     if (!open) return;
     setTreatment("LOAN_SPLIT");
     setObligationId(initialObligationId);
-    setName(expense.vendor ?? "");
-    setMonthlyPayment(String(paymentAmount));
+    setObligationName(initialObligation?.name ?? expense.vendor ?? "");
+    setMonthlyPayment(String(initialObligation?.expectedMonthlyPayment ?? storedPaymentAmount));
+    setObligationTruckId(initialObligation?.truckId ?? expense.truckId ?? "none");
+    setObligationActive(initialObligation?.active ?? true);
+    setPaymentTotal(String(storedPaymentAmount));
+    setDate(expense.date);
+    setDescription(expense.description.replace(/ · interest$/u, ""));
+    setVendor(expense.vendor ?? "");
+    setRecurring(expense.recurring);
     setPrincipal(String(editingSplit ? currentPrincipal : expense.amount));
     setInterest(String(editingSplit ? currentInterest : 0));
     setNotes(currentNotes);
@@ -138,14 +157,22 @@ export function DebtClassificationDialog({
     currentNotes,
     editingSplit,
     expense.amount,
+    expense.date,
+    expense.description,
+    expense.recurring,
+    expense.truckId,
     expense.vendor,
+    initialObligation,
     initialObligationId,
     open,
-    paymentAmount,
+    storedPaymentAmount,
   ]);
+  const paymentAmount = editingSplit ? Number(paymentTotal) : storedPaymentAmount;
   const principalValue = Number(principal);
   const interestValue = Number(interest);
-  const splitInputsValid = principal.trim() !== ""
+  const paymentAmountValid = Number.isFinite(paymentAmount) && paymentAmount > 0;
+  const splitInputsValid = paymentAmountValid
+    && principal.trim() !== ""
     && interest.trim() !== ""
     && Number.isFinite(principalValue)
     && Number.isFinite(interestValue)
@@ -158,6 +185,10 @@ export function DebtClassificationDialog({
   );
   const splitBalanced = treatment !== "LOAN_SPLIT"
     || (splitInputsValid && reconciliation.state === "BALANCED");
+  const paymentDetailsValid = !editingSplit
+    || (paymentAmountValid && date.trim().length > 0 && description.trim().length > 0);
+  const obligationDetailsValid = obligationId === "none" || obligationName.trim().length > 0;
+  const formValid = splitBalanced && paymentDetailsValid && obligationDetailsValid;
 
   const matching = obligations.filter((obligation) =>
     treatment === "LOAN_SPLIT"
@@ -167,36 +198,60 @@ export function DebtClassificationDialog({
         : obligation.kind === "UNKNOWN",
   );
 
+  function changeObligation(nextId: string) {
+    setObligationId(nextId);
+    const selected = obligations.find((obligation) => obligation.id === nextId);
+    setObligationName(selected?.name ?? expense.vendor ?? "");
+    setMonthlyPayment(String(selected?.expectedMonthlyPayment ?? storedPaymentAmount));
+    setObligationTruckId(selected?.truckId ?? expense.truckId ?? "none");
+    setObligationActive(selected?.active ?? true);
+  }
+
   function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!splitBalanced) {
+    if (!formValid) {
+      if (splitBalanced) return;
       toast.error(copy.exactRequired, {
         description: splitMessage(reconciliation, paymentAmount, copy),
       });
       return;
     }
-    const creating = obligationId === "new" && name.trim().length > 0;
+    const creating = obligationId === "new" && obligationName.trim().length > 0;
+    const updatingObligation = obligationId !== "new" && obligationId !== "none";
     startTransition(async () => {
       const result = await classifyDebtPaymentAction(expense.id, {
         treatment,
         obligationId: obligationId !== "new" && obligationId !== "none" ? obligationId : null,
         newObligation: creating
           ? {
-              truckId: expense.truckId,
-              name,
+              truckId: obligationTruckId === "none" ? null : obligationTruckId,
+              name: obligationName,
               kind:
                 treatment === "LOAN_SPLIT"
                   ? "LOAN"
                   : treatment === "OPERATING_LEASE"
                     ? "OPERATING_LEASE"
                     : "UNKNOWN",
-              counterparty: expense.vendor,
+              counterparty: editingSplit ? vendor.trim() || null : expense.vendor,
               expectedMonthlyPayment: Number(monthlyPayment) || null,
-              active: true,
+              active: obligationActive,
+            }
+          : undefined,
+        obligationUpdate: updatingObligation
+          ? {
+              truckId: obligationTruckId === "none" ? null : obligationTruckId,
+              name: obligationName,
+              expectedMonthlyPayment: Number(monthlyPayment) || null,
+              active: obligationActive,
             }
           : undefined,
         principalAmount: treatment === "LOAN_SPLIT" ? Number(principal) : undefined,
         interestAmount: treatment === "LOAN_SPLIT" ? Number(interest) : undefined,
+        paymentAmount: editingSplit ? paymentAmount : undefined,
+        date: editingSplit ? date : undefined,
+        description: editingSplit ? description : undefined,
+        vendor: editingSplit ? vendor.trim() || null : undefined,
+        recurring: editingSplit ? recurring : undefined,
         notes: notes.trim() || null,
       });
       if (!result.ok) {
@@ -204,7 +259,7 @@ export function DebtClassificationDialog({
         return;
       }
       toast.success(editingSplit ? copy.paymentSplitUpdated : copy.paymentClassified, {
-        description: copy.totalPreserved,
+        description: editingSplit ? copy.paymentUpdatedTogether : copy.totalPreserved,
       });
       setOpen(false);
       router.refresh();
@@ -216,21 +271,82 @@ export function DebtClassificationDialog({
       <DialogTrigger asChild>
         {trigger ?? <Button size="sm" variant="outline">{copy.review}</Button>}
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-xl">
         <form onSubmit={submit} className="contents">
           <DialogHeader>
             <DialogTitle>
               {editingSplit
-                ? interpolate(copy.editLoanPayment, { amount: formatMoney(paymentAmount) })
-                : interpolate(copy.classifyPayment, { amount: formatMoney(paymentAmount) })}
+                ? interpolate(copy.editLoanPayment, { amount: formatMoney(storedPaymentAmount) })
+                : interpolate(copy.classifyPayment, { amount: formatMoney(storedPaymentAmount) })}
             </DialogTitle>
             <DialogDescription>
               {editingSplit ? copy.editLoanPaymentDescription : copy.classifyDescription}
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4">
+            {editingSplit ? (
+              <div className="space-y-4 rounded-lg border border-border bg-surface-sunken/45 p-3">
+                <p className="label-xs">{copy.paymentDetails}</p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label={copy.date} htmlFor={`payment-date-${expense.id}`} required>
+                    <Input
+                      id={`payment-date-${expense.id}`}
+                      type="date"
+                      value={date}
+                      onChange={(event) => setDate(event.target.value)}
+                      required
+                    />
+                  </Field>
+                  <Field label={copy.paymentTotal} htmlFor={`payment-total-${expense.id}`} required hint={copy.paymentTotalHint}>
+                    <Input
+                      id={`payment-total-${expense.id}`}
+                      type="number"
+                      inputMode="decimal"
+                      min="0.01"
+                      step="0.01"
+                      value={paymentTotal}
+                      onChange={(event) => setPaymentTotal(event.target.value)}
+                      aria-invalid={!paymentAmountValid}
+                      required
+                    />
+                  </Field>
+                </div>
+                <Field label={copy.description} htmlFor={`payment-description-${expense.id}`} required>
+                  <Input
+                    id={`payment-description-${expense.id}`}
+                    maxLength={200}
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label={copy.lenderBank} htmlFor={`payment-vendor-${expense.id}`}>
+                  <Input
+                    id={`payment-vendor-${expense.id}`}
+                    maxLength={120}
+                    value={vendor}
+                    onChange={(event) => setVendor(event.target.value)}
+                    placeholder={copy.optional}
+                  />
+                </Field>
+                <div className="flex items-center justify-between rounded-md border border-border bg-card px-3 py-2">
+                  <div>
+                    <Label htmlFor={`payment-recurring-${expense.id}`} className="normal-case tracking-normal text-foreground">
+                      {copy.recurringExpense}
+                    </Label>
+                    <p className="mt-0.5 text-2xs text-muted-foreground">{copy.recurringDescription}</p>
+                  </div>
+                  <Switch
+                    id={`payment-recurring-${expense.id}`}
+                    checked={recurring}
+                    onCheckedChange={setRecurring}
+                  />
+                </div>
+              </div>
+            ) : null}
+
             {!editingSplit ? <Field label={copy.treatment} htmlFor={`treatment-${expense.id}`} required>
-              <Select value={treatment} onValueChange={(value) => { setTreatment(value as Treatment); setObligationId("new"); }}>
+              <Select value={treatment} onValueChange={(value) => { setTreatment(value as Treatment); changeObligation("new"); }}>
                 <SelectTrigger id={`treatment-${expense.id}`}><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="LOAN_SPLIT">{copy.loanSplit}</SelectItem>
@@ -241,7 +357,7 @@ export function DebtClassificationDialog({
             </Field> : null}
 
             <Field label={copy.obligation} htmlFor={`obligation-${expense.id}`}>
-              <Select value={obligationId} onValueChange={setObligationId}>
+              <Select value={obligationId} onValueChange={changeObligation}>
                 <SelectTrigger id={`obligation-${expense.id}`}><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="new">{copy.createFromReview}</SelectItem>
@@ -251,14 +367,53 @@ export function DebtClassificationDialog({
               </Select>
             </Field>
 
-            {obligationId === "new" ? (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label={copy.obligationName} htmlFor={`obligation-name-${expense.id}`}>
-                  <Input id={`obligation-name-${expense.id}`} value={name} onChange={(event) => setName(event.target.value)} placeholder={copy.obligationPlaceholder} />
+            {obligationId !== "none" ? (
+              <div className="space-y-4 rounded-lg border border-border p-3">
+                <p className="label-xs">{copy.obligationDetails}</p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label={copy.obligationName} htmlFor={`obligation-name-${expense.id}`} required>
+                    <Input
+                      id={`obligation-name-${expense.id}`}
+                      value={obligationName}
+                      onChange={(event) => setObligationName(event.target.value)}
+                      placeholder={copy.obligationPlaceholder}
+                      required
+                    />
+                  </Field>
+                  <Field label={copy.expectedMonthlyPayment} htmlFor={`monthly-payment-${expense.id}`}>
+                    <Input
+                      id={`monthly-payment-${expense.id}`}
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.01"
+                      value={monthlyPayment}
+                      onChange={(event) => setMonthlyPayment(event.target.value)}
+                    />
+                  </Field>
+                </div>
+                <Field label={copy.associatedTruck} htmlFor={`obligation-truck-${expense.id}`}>
+                  <Select value={obligationTruckId} onValueChange={setObligationTruckId}>
+                    <SelectTrigger id={`obligation-truck-${expense.id}`}><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">{copy.noTruckAssociation}</SelectItem>
+                      {trucks.map((truck) => <SelectItem key={truck.id} value={truck.id}>{truck.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </Field>
-                <Field label={copy.expectedMonthlyPayment} htmlFor={`monthly-payment-${expense.id}`}>
-                  <Input id={`monthly-payment-${expense.id}`} inputMode="decimal" value={monthlyPayment} onChange={(event) => setMonthlyPayment(event.target.value)} />
-                </Field>
+                <div className="flex items-center justify-between rounded-md border border-border bg-surface-sunken px-3 py-2">
+                  <div>
+                    <Label htmlFor={`obligation-active-${expense.id}`} className="normal-case tracking-normal text-foreground">
+                      {copy.obligationActive}
+                    </Label>
+                    <p className="mt-0.5 text-2xs text-muted-foreground">{copy.obligationActiveHint}</p>
+                  </div>
+                  <Switch
+                    id={`obligation-active-${expense.id}`}
+                    checked={obligationActive}
+                    onCheckedChange={setObligationActive}
+                  />
+                </div>
               </div>
             ) : null}
 
@@ -271,7 +426,7 @@ export function DebtClassificationDialog({
                       type="number"
                       inputMode="decimal"
                       min="0"
-                      max={paymentAmount}
+                      max={paymentAmountValid ? paymentAmount : undefined}
                       step="0.01"
                       value={principal}
                       aria-invalid={!splitInputsValid || reconciliation.state === "OVER"}
@@ -284,7 +439,7 @@ export function DebtClassificationDialog({
                       type="number"
                       inputMode="decimal"
                       min="0"
-                      max={paymentAmount}
+                      max={paymentAmountValid ? paymentAmount : undefined}
                       step="0.01"
                       value={interest}
                       aria-invalid={!splitInputsValid || reconciliation.state === "OVER"}
@@ -305,7 +460,7 @@ export function DebtClassificationDialog({
                 >
                   <div className="flex items-center justify-between gap-3 text-xs">
                     <span className="text-muted-foreground">{copy.paymentToClassify}</span>
-                    <span className="font-semibold tnum">{formatMoney(paymentAmount)}</span>
+                    <span className="font-semibold tnum">{paymentAmountValid ? formatMoney(paymentAmount) : "—"}</span>
                   </div>
                   <div className="mt-1 flex items-center justify-between gap-3 text-xs">
                     <span className="text-muted-foreground">{copy.principalPlusInterest}</span>
@@ -342,7 +497,7 @@ export function DebtClassificationDialog({
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>{common.cancel}</Button>
-            <Button type="submit" disabled={pending || !splitBalanced}>
+            <Button type="submit" disabled={pending || !formValid}>
               {pending ? <Loader2 className="animate-spin" /> : null}
               {editingSplit ? copy.saveLoanPaymentSplit : copy.confirmClassification}
             </Button>

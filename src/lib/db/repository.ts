@@ -141,9 +141,20 @@ export interface FinancialObligationInput {
 export interface DebtPaymentClassificationInput {
   obligationId?: string | null;
   newObligation?: FinancialObligationInput;
+  obligationUpdate?: {
+    truckId?: string | null;
+    name: string;
+    expectedMonthlyPayment?: number | null;
+    active: boolean;
+  };
   treatment: "OPERATING_LEASE" | "LOAN_SPLIT" | "DEBT_UNALLOCATED";
   principalAmount?: number;
   interestAmount?: number;
+  paymentAmount?: number;
+  date?: string;
+  description?: string;
+  vendor?: string | null;
+  recurring?: boolean;
   notes?: string | null;
 }
 

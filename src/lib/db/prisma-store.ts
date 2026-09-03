@@ -1750,18 +1750,36 @@ export class PrismaRepository implements Repository {
   async deleteExpense(id: string): Promise<void> {
     const client = await getClient();
     const business = await this.business(client);
-    if (await client.driverSettlementLine.count({ where: { expenseId: id, settlement: { businessId: business.id } } })) {
-      throw new Error("Driver Pay expenses are controlled by their paid statement and cannot be deleted.");
-    }
-    // A service record's row is an optional link and may be deleted here --
-    // `MaintenanceRecord.expenseId` is `onDelete: SetNull`, so the pointer
-    // clears itself. Fuel and load rows are not optional.
-    if (isLoadExpenseId(id)) throw new Error(mirrorRefusal("LOAD"));
-    if (await client.fuelEntry.count({ where: { expenseId: id, businessId: business.id } })) {
-      throw new Error(mirrorRefusal("FUEL"));
-    }
-    const deleted = await client.expense.deleteMany({ where: { id, businessId: business.id } });
-    if (deleted.count !== 1) throw new Error("That expense does not belong to this workspace.");
+    await client.$transaction(async (tx) => {
+      const expense = await tx.expense.findFirst({
+        where: { id, businessId: business.id },
+        select: { id: true, splitGroupId: true },
+      });
+      if (!expense) throw new Error("That expense does not belong to this workspace.");
+      const targetRows = expense.splitGroupId
+        ? await tx.expense.findMany({
+            where: { businessId: business.id, splitGroupId: expense.splitGroupId },
+            select: { id: true },
+          })
+        : [expense];
+      const targetIds = targetRows.map((row) => row.id);
+      if (await tx.driverSettlementLine.count({ where: { expenseId: { in: targetIds }, settlement: { businessId: business.id } } })) {
+        throw new Error("Driver Pay expenses are controlled by their paid statement and cannot be deleted.");
+      }
+      // A service record's row is an optional link and may be deleted here --
+      // `MaintenanceRecord.expenseId` is `onDelete: SetNull`, so the pointer
+      // clears itself. Fuel and load rows are not optional.
+      if (targetIds.some(isLoadExpenseId)) throw new Error(mirrorRefusal("LOAD"));
+      if (await tx.fuelEntry.count({ where: { expenseId: { in: targetIds }, businessId: business.id } })) {
+        throw new Error(mirrorRefusal("FUEL"));
+      }
+      const deleted = await tx.expense.deleteMany({
+        where: { id: { in: targetIds }, businessId: business.id },
+      });
+      if (deleted.count !== targetIds.length) {
+        throw new Error("The complete payment could not be deleted.");
+      }
+    }, { isolationLevel: "Serializable" });
   }
 
   async createFinancialObligation(
@@ -1856,6 +1874,28 @@ export class PrismaRepository implements Repository {
       if (obligationId && !obligation) {
         throw new Error("That obligation does not belong to this workspace.");
       }
+      if (input.obligationUpdate) {
+        if (!obligation) throw new Error("Choose an existing obligation before updating it.");
+        const truckId = input.obligationUpdate.truckId?.trim() || null;
+        if (truckId && !business.trucks.some((truck) => truck.id === truckId)) {
+          throw new Error("That truck does not belong to this workspace.");
+        }
+        await tx.financialObligation.update({
+          where: { id: obligation.id },
+          data: {
+            name: input.obligationUpdate.name.trim(),
+            truckId,
+            expectedMonthlyPayment: input.obligationUpdate.expectedMonthlyPayment ?? null,
+            active: input.obligationUpdate.active,
+          },
+        });
+        if (input.obligationUpdate.active && truckId) {
+          await tx.truck.updateMany({
+            where: { id: truckId, businessId: business.id },
+            data: { financingConfirmedNone: null },
+          });
+        }
+      }
       const normalizedNotes = input.notes === undefined
         ? undefined
         : input.notes?.trim() || null;
@@ -1894,9 +1934,12 @@ export class PrismaRepository implements Repository {
             where: { businessId: business.id, splitGroupId: expense.splitGroupId },
           })
         : [expense];
-      const paymentAmount = roundMoney(
+      const currentPaymentAmount = roundMoney(
         existingRows.reduce((total, row) => total + num(row.amount), 0),
       );
+      const paymentAmount = editingSplit && input.paymentAmount !== undefined
+        ? roundMoney(input.paymentAmount)
+        : currentPaymentAmount;
       const { principal, interest } = requireExactDebtPaymentSplit(
         paymentAmount,
         input.principalAmount ?? 0,
@@ -1907,8 +1950,14 @@ export class PrismaRepository implements Repository {
         const splitGroupId = expense.splitGroupId!;
         const principalRow = existingRows.find((row) => row.financialTreatment === "PRINCIPAL");
         const baseRow = principalRow ?? existingRows[0];
-        const baseDescription = (principalRow?.description ?? baseRow.description)
+        const currentDescription = (principalRow?.description ?? baseRow.description)
           .replace(/ · interest$/u, "");
+        const baseDescription = input.description?.trim() || currentDescription;
+        const resolvedDate = input.date ? toDate(input.date) : baseRow.date;
+        const resolvedVendor = input.vendor === undefined
+          ? baseRow.vendor
+          : input.vendor?.trim() || null;
+        const resolvedRecurring = input.recurring ?? baseRow.recurring;
         const resolvedNotes = normalizedNotes === undefined ? baseRow.notes : normalizedNotes;
         const keptIds: string[] = [];
 
@@ -1921,6 +1970,9 @@ export class PrismaRepository implements Repository {
               amount: principal,
               obligationId,
               description: baseDescription,
+              date: resolvedDate,
+              vendor: resolvedVendor,
+              recurring: resolvedRecurring,
               notes: resolvedNotes,
             },
           });
@@ -1939,6 +1991,9 @@ export class PrismaRepository implements Repository {
                   amount: interest,
                   obligationId,
                   description: `${baseDescription} · interest`,
+                  date: resolvedDate,
+                  vendor: resolvedVendor,
+                  recurring: resolvedRecurring,
                   notes: resolvedNotes,
                 },
               });
@@ -1950,15 +2005,15 @@ export class PrismaRepository implements Repository {
                   truckId: baseRow.truckId,
                   scope: baseRow.scope,
                   loadId: baseRow.loadId,
-                  date: baseRow.date,
+                  date: resolvedDate,
                   category: "INTEREST_EXPENSE",
                   financialTreatment: "INTEREST",
                   obligationId,
                   splitGroupId,
                   description: `${baseDescription} · interest`,
-                  vendor: baseRow.vendor,
+                  vendor: resolvedVendor,
                   amount: interest,
-                  recurring: baseRow.recurring,
+                  recurring: resolvedRecurring,
                   notes: resolvedNotes,
                 },
               });
@@ -1974,6 +2029,9 @@ export class PrismaRepository implements Repository {
               amount: interest,
               obligationId,
               description: `${baseDescription} · interest`,
+              date: resolvedDate,
+              vendor: resolvedVendor,
+              recurring: resolvedRecurring,
               notes: resolvedNotes,
             },
           });

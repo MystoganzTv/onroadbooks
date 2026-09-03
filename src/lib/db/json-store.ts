@@ -1371,17 +1371,28 @@ export class JsonRepository implements Repository {
 
   async deleteExpense(id: string): Promise<void> {
     await mutate((dataset) => {
-      if (dataset.driverSettlements.some((settlement) => settlement.lines.some((line) => line.expenseId === id))) {
+      const expense = dataset.expenses.find((row) => row.id === id);
+      if (!expense) throw new Error(`Expense ${id} not found`);
+      const targetIds = new Set(
+        expense.splitGroupId
+          ? dataset.expenses
+              .filter((row) => row.splitGroupId === expense.splitGroupId)
+              .map((row) => row.id)
+          : [id],
+      );
+      if (dataset.driverSettlements.some((settlement) => settlement.lines.some((line) => targetIds.has(line.expenseId ?? "")))) {
         throw new Error("Driver Pay expenses are controlled by their paid statement and cannot be deleted.");
       }
       // A service record's row is an optional link and may be deleted here
       // (the pointer is cleared below). Fuel and load rows are not optional.
-      const mirror = expenseMirrorSource(dataset, id);
-      if (mirror && mirror !== "SERVICE") throw new Error(mirrorRefusal(mirror));
-      dataset.expenses = dataset.expenses.filter((e) => e.id !== id);
-      dataset.documents = dataset.documents.filter((d) => d.expenseId !== id);
+      for (const targetId of targetIds) {
+        const mirror = expenseMirrorSource(dataset, targetId);
+        if (mirror && mirror !== "SERVICE") throw new Error(mirrorRefusal(mirror));
+      }
+      dataset.expenses = dataset.expenses.filter((row) => !targetIds.has(row.id));
+      dataset.documents = dataset.documents.filter((document) => !targetIds.has(document.expenseId ?? ""));
       for (const record of dataset.maintenanceRecords) {
-        if (record.expenseId === id) record.expenseId = null;
+        if (targetIds.has(record.expenseId ?? "")) record.expenseId = null;
       }
     }, this.businessId);
   }
@@ -1434,6 +1445,21 @@ export class JsonRepository implements Repository {
       if (obligationId && !obligation) {
         throw new Error("That obligation does not belong to this workspace.");
       }
+      if (input.obligationUpdate) {
+        if (!obligation) throw new Error("Choose an existing obligation before updating it.");
+        const truckId = input.obligationUpdate.truckId?.trim() || null;
+        if (truckId && !dataset.trucks.some((truck) => truck.id === truckId)) {
+          throw new Error("That truck does not belong to this workspace.");
+        }
+        obligation.name = input.obligationUpdate.name.trim();
+        obligation.truckId = truckId;
+        obligation.expectedMonthlyPayment = input.obligationUpdate.expectedMonthlyPayment ?? null;
+        obligation.active = input.obligationUpdate.active;
+        if (obligation.active && truckId) {
+          const truck = dataset.trucks.find((candidate) => candidate.id === truckId);
+          if (truck) truck.financingConfirmedNone = null;
+        }
+      }
       const normalizedNotes = input.notes === undefined
         ? undefined
         : input.notes?.trim() || null;
@@ -1462,9 +1488,12 @@ export class JsonRepository implements Repository {
       const existingRows = editingSplit
         ? dataset.expenses.filter((row) => row.splitGroupId === expense.splitGroupId)
         : [expense];
-      const paymentAmount = roundMoney(
+      const currentPaymentAmount = roundMoney(
         existingRows.reduce((total, row) => total + row.amount, 0),
       );
+      const paymentAmount = editingSplit && input.paymentAmount !== undefined
+        ? roundMoney(input.paymentAmount)
+        : currentPaymentAmount;
       const { principal, interest } = requireExactDebtPaymentSplit(
         paymentAmount,
         input.principalAmount ?? 0,
@@ -1475,8 +1504,14 @@ export class JsonRepository implements Repository {
         const splitGroupId = expense.splitGroupId!;
         const principalRow = existingRows.find((row) => row.financialTreatment === "PRINCIPAL");
         const baseRow = principalRow ?? existingRows[0];
-        const baseDescription = (principalRow?.description ?? baseRow.description)
+        const currentDescription = (principalRow?.description ?? baseRow.description)
           .replace(/ · interest$/u, "");
+        const baseDescription = input.description?.trim() || currentDescription;
+        const resolvedDate = input.date ?? baseRow.date;
+        const resolvedVendor = input.vendor === undefined
+          ? baseRow.vendor
+          : input.vendor?.trim() || null;
+        const resolvedRecurring = input.recurring ?? baseRow.recurring;
         const resolvedNotes = normalizedNotes === undefined ? baseRow.notes : normalizedNotes;
         const kept: Expense[] = [];
 
@@ -1486,6 +1521,9 @@ export class JsonRepository implements Repository {
           baseRow.amount = principal;
           baseRow.obligationId = obligationId;
           baseRow.description = baseDescription;
+          baseRow.date = resolvedDate;
+          baseRow.vendor = resolvedVendor;
+          baseRow.recurring = resolvedRecurring;
           baseRow.notes = resolvedNotes;
           kept.push(baseRow);
 
@@ -1499,6 +1537,9 @@ export class JsonRepository implements Repository {
               existingInterest.amount = interest;
               existingInterest.obligationId = obligationId;
               existingInterest.description = `${baseDescription} · interest`;
+              existingInterest.date = resolvedDate;
+              existingInterest.vendor = resolvedVendor;
+              existingInterest.recurring = resolvedRecurring;
               existingInterest.notes = resolvedNotes;
               kept.push(existingInterest);
             } else {
@@ -1522,6 +1563,9 @@ export class JsonRepository implements Repository {
           baseRow.amount = interest;
           baseRow.obligationId = obligationId;
           baseRow.description = `${baseDescription} · interest`;
+          baseRow.date = resolvedDate;
+          baseRow.vendor = resolvedVendor;
+          baseRow.recurring = resolvedRecurring;
           baseRow.notes = resolvedNotes;
           kept.push(baseRow);
         }

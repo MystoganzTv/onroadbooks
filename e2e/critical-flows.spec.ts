@@ -218,7 +218,7 @@ test.describe.serial("critical browser flows", () => {
     await expect(page.getByText(/Online billing is being configured/).first()).toBeVisible();
   });
 
-  test("owner can correct a zero-interest loan payment split without changing its total", async ({ page }) => {
+  test("owner manages a loan payment as one editable and deletable transaction", async ({ page }) => {
     const datasetBeforeTest = await readDataset();
     await login(page);
     await page.goto("/expenses?month=2026-09&period=month");
@@ -246,33 +246,72 @@ test.describe.serial("critical browser flows", () => {
     await classifyDialog.getByRole("button", { name: "Confirm classification" }).click();
     await expect(classifyDialog).toBeHidden();
 
-    const principalRow = page.getByRole("row").filter({
+    const originalPaymentRow = page.getByRole("row").filter({
       has: page.getByText("AMEX payment", { exact: true }),
     });
-    await expect(principalRow).toContainText("Loan Principal Payment");
-    await expect(principalRow).toContainText("$513.00");
-    await principalRow.getByRole("button", { name: "Edit principal and interest" }).click();
+    await expect(originalPaymentRow).toContainText("Loan payment");
+    await expect(originalPaymentRow).toContainText("$513.00");
+    await originalPaymentRow.getByRole("button", { name: "Edit principal and interest" }).click();
 
     const editDialog = page.getByRole("dialog", { name: "Edit $513.00 loan payment" });
+    await expect(editDialog.getByLabel("Total payment")).toHaveValue("513");
+    await expect(editDialog.getByLabel("Date")).toHaveValue("2026-09-01");
+    await expect(editDialog.getByLabel("Description")).toHaveValue("AMEX payment");
+    await expect(editDialog.getByLabel("Bank or lender")).toHaveValue("Amex");
     await expect(editDialog.getByLabel("Loan principal")).toHaveValue("513");
     await expect(editDialog.getByLabel("Loan interest")).toHaveValue("0");
-    await editDialog.getByLabel("Loan principal").fill("475");
-    await editDialog.getByLabel("Loan interest").fill("38");
+    await editDialog.getByLabel("Total payment").fill("525");
+    await editDialog.getByLabel("Date").fill("2026-09-02");
+    await editDialog.getByLabel("Description").fill("AMEX September payment");
+    await editDialog.getByLabel("Bank or lender").fill("American Express");
+    await editDialog.getByRole("switch", { name: "Recurring expense" }).check();
+    await editDialog.getByLabel("Loan principal").fill("500");
+    await editDialog.getByLabel("Loan interest").fill("25");
+    await editDialog.getByLabel("Obligation name").fill("Amex Business Card");
+    await editDialog.getByLabel("Expected monthly payment").fill("525");
+    await editDialog.getByRole("switch", { name: "Active financing" }).uncheck();
     await editDialog.getByLabel("Notes").fill("September Amex autopay");
     await editDialog.getByRole("button", { name: "Save payment split" }).click();
     await expect(editDialog).toBeHidden();
 
-    await expect(principalRow).toContainText("$475.00");
-    const interestRow = page.getByRole("row").filter({
-      has: page.getByText("AMEX payment · interest", { exact: true }),
+    const paymentRow = page.getByRole("row").filter({
+      has: page.getByText("AMEX September payment", { exact: true }),
     });
-    await expect(interestRow).toContainText("Loan Interest Payment");
-    await expect(interestRow).toContainText("$38.00");
+    await expect(paymentRow).toContainText("Loan payment");
+    await expect(paymentRow).toContainText("$525.00");
+    await paymentRow.getByRole("button", { name: "Show principal and interest breakdown" }).click();
+    const principalDetail = page.getByRole("row").filter({ hasText: "Loan principal" });
+    const interestDetail = page.getByRole("row").filter({ hasText: "Loan interest" });
+    await expect(principalDetail).toContainText("$500.00");
+    await expect(interestDetail).toContainText("$25.00");
 
-    await principalRow.getByRole("button", { name: "Edit principal and interest" }).click();
-    await expect(editDialog.getByLabel("Loan principal")).toHaveValue("475");
-    await expect(editDialog.getByLabel("Loan interest")).toHaveValue("38");
-    await expect(editDialog.getByLabel("Notes")).toHaveValue("September Amex autopay");
+    await paymentRow.getByRole("button", { name: "Edit principal and interest" }).click();
+    const updatedDialog = page.getByRole("dialog", { name: "Edit $525.00 loan payment" });
+    await expect(updatedDialog.getByLabel("Total payment")).toHaveValue("525");
+    await expect(updatedDialog.getByLabel("Date")).toHaveValue("2026-09-02");
+    await expect(updatedDialog.getByLabel("Description")).toHaveValue("AMEX September payment");
+    await expect(updatedDialog.getByLabel("Bank or lender")).toHaveValue("American Express");
+    await expect(updatedDialog.getByLabel("Loan principal")).toHaveValue("500");
+    await expect(updatedDialog.getByLabel("Loan interest")).toHaveValue("25");
+    await expect(updatedDialog.getByLabel("Obligation name")).toHaveValue("Amex Business Card");
+    await expect(updatedDialog.getByLabel("Expected monthly payment")).toHaveValue("525");
+    await expect(updatedDialog.getByRole("switch", { name: "Active financing" })).not.toBeChecked();
+    await expect(updatedDialog.getByLabel("Notes")).toHaveValue("September Amex autopay");
+    await updatedDialog.getByRole("button", { name: "Cancel" }).click();
+
+    await paymentRow.getByRole("button", { name: "Delete complete loan payment" }).click();
+    const deleteDialog = page.getByRole("dialog", { name: "Delete this payment?" });
+    await expect(deleteDialog.getByText("The complete principal and interest breakdown")).toBeVisible();
+    await deleteDialog.getByRole("button", { name: "Delete payment", exact: true }).click();
+    await expect(page.getByText("AMEX September payment", { exact: true })).toHaveCount(0);
+
+    const datasetAfterDelete = await readDataset() as CalculatorFixtureDataset & {
+      financialObligations: Array<{ name: string; active: boolean }>;
+    };
+    expect(datasetAfterDelete.expenses.some((expense) => expense.description.startsWith("AMEX"))).toBe(false);
+    expect(datasetAfterDelete.financialObligations.some(
+      (obligation) => obligation.name === "Amex Business Card" && !obligation.active,
+    )).toBe(true);
 
     await writeDataset(datasetBeforeTest);
   });

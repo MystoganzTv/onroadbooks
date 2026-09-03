@@ -1345,30 +1345,51 @@ describe("financial review and customer cash events", () => {
     const corrected = await repo.classifyDebtPayment(principalOnly.id, {
       treatment: "LOAN_SPLIT",
       obligationId: principalOnly.obligationId,
-      principalAmount: 475,
-      interestAmount: 38,
+      paymentAmount: 525,
+      principalAmount: 500,
+      interestAmount: 25,
+      date: "2026-09-01",
+      description: "Amex September payment",
+      vendor: "American Express",
+      recurring: true,
       notes: "September Amex autopay",
+      obligationUpdate: {
+        truckId: dataset.trucks[0].id,
+        name: "Amex Business Card",
+        expectedMonthlyPayment: 525,
+        active: false,
+      },
     });
-    assert.equal(corrected.reduce((total, row) => total + row.amount, 0), 513);
+    assert.equal(corrected.reduce((total, row) => total + row.amount, 0), 525);
     assert.deepEqual(
       corrected.map((row) => [row.financialTreatment, row.amount]).sort(),
-      [["INTEREST", 38], ["PRINCIPAL", 475]],
+      [["INTEREST", 25], ["PRINCIPAL", 500]],
     );
     assert.ok(corrected.every((row) => row.splitGroupId === principalOnly.splitGroupId));
     assert.ok(corrected.every((row) => row.notes === "September Amex autopay"));
+    assert.ok(corrected.every((row) => row.date === "2026-09-01"));
+    assert.ok(corrected.every((row) => row.vendor === "American Express"));
+    assert.ok(corrected.every((row) => row.recurring));
+    assert.equal(corrected.find((row) => row.financialTreatment === "PRINCIPAL")?.description, "Amex September payment");
+    const updatedObligation = (await repo.getDataset()).financialObligations.find(
+      (obligation) => obligation.id === principalOnly.obligationId,
+    );
+    assert.equal(updatedObligation?.name, "Amex Business Card");
+    assert.equal(updatedObligation?.expectedMonthlyPayment, 525);
+    assert.equal(updatedObligation?.active, false);
 
     const interestRow = corrected.find((row) => row.financialTreatment === "INTEREST")!;
     const correctedFromInterest = await repo.classifyDebtPayment(interestRow.id, {
       treatment: "LOAN_SPLIT",
       obligationId: principalOnly.obligationId,
-      principalAmount: 500,
+      principalAmount: 512,
       interestAmount: 13,
       notes: null,
     });
-    assert.equal(correctedFromInterest.reduce((total, row) => total + row.amount, 0), 513);
+    assert.equal(correctedFromInterest.reduce((total, row) => total + row.amount, 0), 525);
     assert.deepEqual(
       correctedFromInterest.map((row) => [row.financialTreatment, row.amount]).sort(),
-      [["INTEREST", 13], ["PRINCIPAL", 500]],
+      [["INTEREST", 13], ["PRINCIPAL", 512]],
     );
     assert.ok(correctedFromInterest.every((row) => row.notes === null));
 
@@ -1376,12 +1397,36 @@ describe("financial review and customer cash events", () => {
     const principalAgain = await repo.classifyDebtPayment(principalRow.id, {
       treatment: "LOAN_SPLIT",
       obligationId: principalOnly.obligationId,
-      principalAmount: 513,
+      principalAmount: 525,
       interestAmount: 0,
     });
     assert.equal(principalAgain.length, 1);
     assert.equal(principalAgain[0].financialTreatment, "PRINCIPAL");
-    assert.equal(principalAgain[0].amount, 513);
+    assert.equal(principalAgain[0].amount, 525);
+  });
+
+  it("deletes every row in a classified loan payment together", async () => {
+    const dataset = await repo.getDataset();
+    const original = await repo.createExpense(expense({
+      truckId: dataset.trucks[0].id,
+      category: "TRUCK_PAYMENT",
+      description: "Atomic loan payment",
+      amount: 600,
+    }));
+    const rows = await repo.classifyDebtPayment(original.id, {
+      treatment: "LOAN_SPLIT",
+      principalAmount: 550,
+      interestAmount: 50,
+    });
+    assert.equal(rows.length, 2);
+
+    await repo.deleteExpense(rows[1].id);
+
+    const afterDelete = await repo.getDataset();
+    assert.equal(
+      afterDelete.expenses.filter((row) => row.splitGroupId === rows[0].splitGroupId).length,
+      0,
+    );
   });
 
   it("rejects loan splits that are over or under the original payment", async () => {

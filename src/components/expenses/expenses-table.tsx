@@ -6,6 +6,7 @@ import {
   ArrowUpDown,
   ExternalLink,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   Paperclip,
   Pencil,
@@ -97,6 +98,7 @@ export function ExpensesTable({
     dir: "desc",
   });
   const [deleting, setDeleting] = React.useState<string | null>(null);
+  const [expandedPayments, setExpandedPayments] = React.useState<Set<string>>(() => new Set());
 
   const filtered = React.useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -135,6 +137,31 @@ export function ExpensesTable({
     }
     return groups;
   }, [expenses]);
+  const displayRows = React.useMemo(() => {
+    const filteredIds = new Set(filtered.map((expense) => expense.id));
+    const seenGroups = new Set<string>();
+    return filtered.flatMap((expense) => {
+      if (!expense.splitGroupId) {
+        return [{ expense, paymentRows: [] as Expense[], visiblePaymentRows: [] as Expense[], displayAmount: expense.amount }];
+      }
+      if (seenGroups.has(expense.splitGroupId)) return [];
+      seenGroups.add(expense.splitGroupId);
+      const paymentRows = splitRowsByGroup.get(expense.splitGroupId) ?? [expense];
+      const visiblePaymentRows = paymentRows.filter((row) => filteredIds.has(row.id));
+      const paymentExpense = paymentRows.find((row) => row.financialTreatment === "PRINCIPAL")
+        ?? paymentRows[0];
+      return [{
+        expense: paymentExpense,
+        paymentRows,
+        visiblePaymentRows,
+        displayAmount: visiblePaymentRows.reduce((total, row) => total + row.amount, 0),
+      }];
+    });
+  }, [filtered, splitRowsByGroup]);
+  const transactionCount = React.useMemo(
+    () => new Set(expenses.map((expense) => expense.splitGroupId ? `split:${expense.splitGroupId}` : `expense:${expense.id}`)).size,
+    [expenses],
+  );
   // With one truck every cost is that truck's, so saying so on every row is
   // noise. With a fleet it is the first thing you need to know.
   const showCharge = trucks.length > 1;
@@ -152,11 +179,22 @@ export function ExpensesTable({
     const result = await deleteExpenseAction(expense.id);
     setDeleting(null);
     if (result.ok) {
-      toast.success(copy.expenseDeleted, { description: expense.description });
+      toast.success(expense.splitGroupId ? copy.paymentDeleted : copy.expenseDeleted, {
+        description: expense.description,
+      });
       router.refresh();
     } else {
       toast.error(localizedClientError(result.error));
     }
+  }
+
+  function togglePayment(groupId: string) {
+    setExpandedPayments((previous) => {
+      const next = new Set(previous);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
   }
 
   const columns: { key: SortKey; label: string; numeric?: boolean }[] = [
@@ -222,7 +260,7 @@ export function ExpensesTable({
         ) : null}
 
         <span className="ml-auto whitespace-nowrap text-2xs text-muted-foreground tnum">
-          {interpolate(copy.shownOfTotal, { shown: filtered.length, total: expenses.length })}
+          {interpolate(copy.shownOfTotal, { shown: displayRows.length, total: transactionCount })}
         </span>
       </div>
 
@@ -293,7 +331,10 @@ export function ExpensesTable({
             </TableHeader>
 
             <TableBody>
-              {filtered.map((expense) => {
+              {displayRows.map(({ expense, paymentRows, visiblePaymentRows, displayAmount }) => {
+                const paymentGroupId = expense.splitGroupId;
+                const isPaymentGroup = Boolean(paymentGroupId);
+                const paymentExpanded = Boolean(paymentGroupId && expandedPayments.has(paymentGroupId));
                 const isFixed = behaviorOf(expense.category, categoryBehavior) === "FIXED";
                 // Rows the app writes for you must be changed at their source.
                 // Load costs have a focused editor here that updates that
@@ -304,14 +345,12 @@ export function ExpensesTable({
                 const mirroredLoad = mirrorSource === "LOAD" || expense.id.startsWith("expload_");
                 const mirroredDriver = expense.id.startsWith("expdriver_");
                 const mirrored = mirroredFuel || mirroredService || mirroredLoad || mirroredDriver;
-                const paymentRows = expense.splitGroupId
-                  ? splitRowsByGroup.get(expense.splitGroupId) ?? []
-                  : [];
                 const paymentExpense = paymentRows.find(
                   (row) => row.financialTreatment === "PRINCIPAL",
                 ) ?? paymentRows[0];
                 return (
-                  <TableRow key={expense.id}>
+                  <React.Fragment key={paymentGroupId ?? expense.id}>
+                  <TableRow>
                     <TableCell className="text-muted-foreground">
                       {formatLocaleDate(expense.date, locale, { month: "short", day: "numeric" })}
                     </TableCell>
@@ -322,13 +361,24 @@ export function ExpensesTable({
                           style={{ background: categoryColor(expense.category) }}
                           aria-hidden
                         />
-                        {categoryLabel(expense.category, locale)}
+                        {isPaymentGroup ? copy.loanPayment : categoryLabel(expense.category, locale)}
                         <Badge variant={isFixed ? "info" : "outline"} className="ml-0.5">
                           {isFixed ? copy.fixed : copy.variable}
                         </Badge>
                       </span>
                     </TableCell>
                     <TableCell className="max-w-[20rem] truncate">
+                      {paymentGroupId ? (
+                        <button
+                          type="button"
+                          onClick={() => togglePayment(paymentGroupId)}
+                          className="mr-1 inline-flex rounded-sm align-middle text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          aria-expanded={paymentExpanded}
+                          aria-label={paymentExpanded ? copy.collapsePaymentBreakdown : copy.expandPaymentBreakdown}
+                        >
+                          {paymentExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                        </button>
+                      ) : null}
                       {expense.description}
                       {expense.recurring ? (
                         <Repeat
@@ -336,7 +386,9 @@ export function ExpensesTable({
                           aria-label={copy.recurring}
                         />
                       ) : null}
-                      {documents.some((d) => d.expenseId === expense.id) ? (
+                      {documents.some((document) => paymentRows.length > 0
+                        ? paymentRows.some((row) => row.id === document.expenseId)
+                        : document.expenseId === expense.id) ? (
                         <Paperclip
                           className="ml-1.5 inline size-3 text-muted-foreground"
                           aria-label={copy.receiptAttached}
@@ -370,7 +422,7 @@ export function ExpensesTable({
                       {expense.vendor ?? "--"}
                     </TableCell>
                     <TableCell className="text-right tnum font-medium text-neg">
-                      -{formatMoney(expense.amount)}
+                      -{formatMoney(displayAmount)}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-0.5">
@@ -393,6 +445,7 @@ export function ExpensesTable({
                             expense={paymentExpense}
                             paymentRows={paymentRows}
                             obligations={obligations}
+                            trucks={trucks}
                             trigger={
                               <Button
                                 variant="ghost"
@@ -449,19 +502,24 @@ export function ExpensesTable({
                         ) : null}
                         {mirrored ? null : (
                         <ConfirmDelete
-                          entity="expense"
-                          label={`${expense.description} - ${formatMoney(expense.amount)}`}
+                          entity={isPaymentGroup ? copy.payment : "expense"}
+                          label={`${expense.description} - ${formatMoney(displayAmount)}`}
                           consequences={
-                            documents.some((d) => d.expenseId === expense.id)
-                              ? ["Any receipt attached to this expense"]
-                              : []
+                            [
+                              ...(isPaymentGroup ? [copy.entirePaymentSplit] : []),
+                              ...(documents.some((document) => paymentRows.length > 0
+                                ? paymentRows.some((row) => row.id === document.expenseId)
+                                : document.expenseId === expense.id)
+                                ? [copy.anyAttachedReceipt]
+                                : []),
+                            ]
                           }
                           onConfirm={() => remove(expense)}
                           trigger={
                             <Button
                               variant="ghost"
                               size="icon-sm"
-                              aria-label={copy.deleteExpense}
+                              aria-label={isPaymentGroup ? copy.deleteLoanPayment : copy.deleteExpense}
                               disabled={deleting === expense.id}
                               className="text-muted-foreground hover:text-neg"
                             >
@@ -473,6 +531,22 @@ export function ExpensesTable({
                       </div>
                     </TableCell>
                   </TableRow>
+                  {paymentExpanded ? visiblePaymentRows.map((row) => (
+                    <TableRow key={row.id} className="bg-surface-sunken/45 hover:bg-surface-sunken/65">
+                      <TableCell />
+                      <TableCell colSpan={3} className="pl-8 text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground">
+                          {row.financialTreatment === "INTEREST" ? copy.interest : copy.principal}
+                        </span>
+                        <span className="ml-2">{categoryLabel(row.category, locale)}</span>
+                      </TableCell>
+                      <TableCell className="text-right text-xs font-medium text-neg tnum">
+                        -{formatMoney(row.amount)}
+                      </TableCell>
+                      <TableCell />
+                    </TableRow>
+                  )) : null}
+                  </React.Fragment>
                 );
               })}
             </TableBody>
