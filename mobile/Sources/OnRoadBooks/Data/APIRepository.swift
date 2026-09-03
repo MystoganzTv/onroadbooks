@@ -1201,6 +1201,14 @@ private struct SettlementDTO: Decodable {
     let month: String?
     let half: String?
     let closable: Bool?
+    let bookedRevenue: Double
+    let collectedRevenue: Double?
+    let accountsReceivable: Double?
+    let interestExpense: Double?
+    let principalPayment: Double?
+    let unallocatedDebtService: Double?
+    let debtService: Double?
+    let cashAfterDebtService: Double?
 
     func toDomain() -> SettlementPeriod {
         SettlementPeriod(
@@ -1212,7 +1220,16 @@ private struct SettlementDTO: Decodable {
             ownerDraw: safeToPay,
             month: month,
             half: half,
-            closable: closable ?? false
+            closable: closable ?? false,
+            bookedRevenue: bookedRevenue,
+            collectedRevenue: collectedRevenue,
+            accountsReceivable: accountsReceivable,
+            interestExpense: interestExpense,
+            principalPayment: principalPayment,
+            unallocatedDebtService: unallocatedDebtService,
+            debtService: debtService,
+            cashAfterDebtService: cashAfterDebtService,
+            drifted: drifted
         )
     }
 }

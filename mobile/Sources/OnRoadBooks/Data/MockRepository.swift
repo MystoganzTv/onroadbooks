@@ -699,10 +699,10 @@ final class MockRepository: LedgerRepository {
 
     func fetchSettlements() async throws -> [SettlementPeriod] {
         [
-            SettlementPeriod(id: "s-aug-16", label: "Aug 16 – 31", status: .open, operatingProfit: 1802.40, reserveContributions: 0, ownerDraw: 0, month: "2026-08", half: "SECOND", closable: true),
-            SettlementPeriod(id: "s-aug-01", label: "Aug 1 – 15", status: .closed, operatingProfit: 1848.70, reserveContributions: 703.10, ownerDraw: 1145.60, month: "2026-08", half: "FIRST", closable: false),
-            SettlementPeriod(id: "s-jul-16", label: "Jul 16 – 31", status: .closed, operatingProfit: 1710.05, reserveContributions: 649.90, ownerDraw: 1060.15, month: "2026-07", half: "SECOND", closable: false),
-            SettlementPeriod(id: "s-jul-01", label: "Jul 1 – 15", status: .closed, operatingProfit: 1594.30, reserveContributions: 606.20, ownerDraw: 988.10, month: "2026-07", half: "FIRST", closable: false),
+            SettlementPeriod(id: "s-aug-16", label: "Aug 16 – 31", status: .open, operatingProfit: 1802.40, reserveContributions: 0, ownerDraw: 0, month: "2026-08", half: "SECOND", closable: true, bookedRevenue: 4980.00, collectedRevenue: 3100.00, accountsReceivable: 1880.00, interestExpense: 100.00, principalPayment: 156.50, unallocatedDebtService: 0, debtService: 256.50, cashAfterDebtService: 1545.90, drifted: false),
+            SettlementPeriod(id: "s-aug-01", label: "Aug 1 – 15", status: .closed, operatingProfit: 1848.70, reserveContributions: 703.10, ownerDraw: 1145.60, month: "2026-08", half: "FIRST", closable: false, bookedRevenue: 5120.00, collectedRevenue: 5120.00, accountsReceivable: 0, interestExpense: 100.00, principalPayment: 156.50, unallocatedDebtService: 0, debtService: 256.50, cashAfterDebtService: 1592.20, drifted: true),
+            SettlementPeriod(id: "s-jul-16", label: "Jul 16 – 31", status: .closed, operatingProfit: 1710.05, reserveContributions: 649.90, ownerDraw: 1060.15, month: "2026-07", half: "SECOND", closable: false, bookedRevenue: 5120.00, collectedRevenue: 5120.00, accountsReceivable: 0, interestExpense: 100.00, principalPayment: 156.50, unallocatedDebtService: 0, debtService: 256.50, cashAfterDebtService: 1592.20, drifted: false),
+            SettlementPeriod(id: "s-jul-01", label: "Jul 1 – 15", status: .closed, operatingProfit: 1594.30, reserveContributions: 606.20, ownerDraw: 988.10, month: "2026-07", half: "FIRST", closable: false, bookedRevenue: 5120.00, collectedRevenue: 5120.00, accountsReceivable: 0, interestExpense: 100.00, principalPayment: 156.50, unallocatedDebtService: 0, debtService: 256.50, cashAfterDebtService: 1592.20, drifted: false),
         ]
     }
 

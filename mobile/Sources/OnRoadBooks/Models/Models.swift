@@ -577,6 +577,23 @@ struct SettlementPeriod: Identifiable {
     /// OPEN and the period has actually ended. A half-month cannot be closed
     /// while it is still running — the server refuses it and says why.
     let closable: Bool
+
+    /// The rows behind the web's "Detalles financieros" disclosure in
+    /// `settlement-detail.tsx`, in its order. Optional because the route sends
+    /// null for a period frozen under an older financial model — and null
+    /// prints as "—" there rather than as a zero, for the obvious reason.
+    let bookedRevenue: Double
+    let collectedRevenue: Double?
+    let accountsReceivable: Double?
+    let interestExpense: Double?
+    let principalPayment: Double?
+    let unallocatedDebtService: Double?
+    let debtService: Double?
+    let cashAfterDebtService: Double?
+
+    /// The books moved after this window was settled. Decoded and discarded
+    /// until now: a drifted close is money quietly frozen at the wrong number.
+    let drifted: Bool
 }
 
 struct DashboardSnapshot {

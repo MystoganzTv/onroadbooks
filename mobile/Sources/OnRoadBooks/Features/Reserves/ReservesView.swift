@@ -78,6 +78,22 @@ struct ReservesView: View {
                 .obPanel()
                 .padding(.horizontal, OBSpacing.md)
 
+                // `safeToPay` has been in this screen's JSON and in
+                // `ReserveLedger` from the start, and nothing rendered it --
+                // on the one screen whose whole job is answering how much of
+                // this is actually yours to take.
+                VStack(alignment: .leading, spacing: 6) {
+                    LabelXS("Disponible para ti")
+                    MoneyText(amount: ledger.safeToPay, font: .title2.weight(.semibold), color: OBColor.primary)
+                    Text("Después de apartar lo que va a las cubetas.")
+                        .font(.caption)
+                        .foregroundStyle(OBColor.mutedForeground)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(OBSpacing.md)
+                .obPanel()
+                .padding(.horizontal, OBSpacing.md)
+
                 VStack(spacing: OBSpacing.sm) {
                     ForEach(ledger.accounts) { bucket in
                         BucketCard(bucket: bucket)

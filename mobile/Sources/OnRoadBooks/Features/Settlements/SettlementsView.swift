@@ -126,13 +126,39 @@ private struct SettlementRow: View {
                 Spacer()
                 StatusPill(text: settlement.status.rawValue, isActive: settlement.status == .open)
             }
+            // These used to be hidden until the window was closed, directly
+            // above the button that closes it -- asking someone to settle a
+            // fortnight without telling them what they earned, what they
+            // collected, or what they could safely take. The web shows all of
+            // it open or closed; the status pill is what says which it is.
             HStack(spacing: OBSpacing.lg) {
                 metric("Operating Profit", settlement.operatingProfit, color: OBColor.pos)
-                if settlement.status == .closed {
-                    metric("To Reserves", settlement.reserveContributions)
-                    metric("Owner Draw", settlement.ownerDraw, color: OBColor.primary)
-                }
+                metric("To Reserves", settlement.reserveContributions)
+                metric("Safe to Pay", settlement.ownerDraw, color: OBColor.primary)
             }
+            HStack(spacing: OBSpacing.lg) {
+                optionalMetric("Cobrado", settlement.collectedRevenue)
+                optionalMetric("Aún pendiente", settlement.accountsReceivable, color: OBColor.warn)
+            }
+
+            if settlement.drifted {
+                // `drifted` arrived in this DTO from the first version and was
+                // decoded straight into the bin. A close that drifted is money
+                // frozen at a number the books no longer agree with.
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Los libros cambiaron después de liquidar esta quincena")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(OBColor.warn)
+                    Text("Reábrela para revisar las cifras actualizadas y vuelve a liquidarla si son correctas.")
+                        .font(.caption2)
+                        .foregroundStyle(OBColor.mutedForeground)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(OBSpacing.sm)
+                .background(OBColor.warnSoft, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+
+            financialDetails
 
             if settlement.status == .open {
                 if settlement.closable {
@@ -165,6 +191,81 @@ private struct SettlementRow: View {
         .padding(.vertical, 6)
     }
 
+    /// The web's "Detalles financieros", same rows in the same order. A null
+    /// prints as "—" exactly as `DetailRow` does: those periods were frozen
+    /// under an older financial model and the figure genuinely is not known.
+    private var financialDetails: some View {
+        DisclosureGroup {
+            VStack(spacing: 0) {
+                detailRow("Ingreso facturado", settlement.bookedRevenue)
+                detailRow("Ingreso cobrado", settlement.collectedRevenue)
+                detailRow("Por cobrar", settlement.accountsReceivable)
+                detailRow("Utilidad operativa", settlement.operatingProfit, strong: true)
+                detailRow("Intereses", settlement.interestExpense)
+                detailRow("Capital", settlement.principalPayment)
+                detailRow("Deuda sin asignar", settlement.unallocatedDebtService)
+                detailRow("Servicio de deuda", settlement.debtService, negative: true)
+                detailRow("Efectivo después de deuda", settlement.cashAfterDebtService, strong: true)
+            }
+        } label: {
+            Text("Detalles financieros")
+                .font(.caption)
+                .foregroundStyle(OBColor.mutedForeground)
+        }
+        .tint(OBColor.mutedForeground)
+    }
+
+    private func detailRow(
+        _ label: String,
+        _ amount: Double?,
+        negative: Bool = false,
+        strong: Bool = false
+    ) -> some View {
+        HStack {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(strong ? OBColor.foreground : OBColor.mutedForeground)
+            Spacer(minLength: OBSpacing.sm)
+            if let amount {
+                Text(
+                    negative && amount > 0 ? -amount : amount,
+                    format: .currency(code: "USD").precision(.fractionLength(2))
+                )
+                .font(strong ? .subheadline.weight(.semibold) : .subheadline)
+                .monospacedDigit()
+                .foregroundStyle(negative ? OBColor.neg : OBColor.foreground)
+            } else {
+                Text("—")
+                    .font(.subheadline)
+                    .foregroundStyle(OBColor.mutedForeground)
+            }
+        }
+        .padding(.vertical, 5)
+    }
+
+    private func optionalMetric(
+        _ label: String,
+        _ value: Double?,
+        color: Color = OBColor.foreground
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label.uppercased())
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(OBColor.mutedForeground)
+            if let value {
+                Text(value, format: .currency(code: "USD").precision(.fractionLength(0)))
+                    .font(.caption.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(color)
+            } else {
+                Text("—")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(OBColor.mutedForeground)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private func metric(_ label: String, _ value: Double, color: Color = OBColor.foreground) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label.uppercased())
@@ -175,5 +276,6 @@ private struct SettlementRow: View {
                 .monospacedDigit()
                 .foregroundStyle(color)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
