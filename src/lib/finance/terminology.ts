@@ -163,6 +163,12 @@ export const FINANCIAL_TERMS = {
       "A stable planning cost per mile based on recent actual operating history rather than one short reporting window.",
     basis: "Trailing 90-day Actual Cost Per Mile, falling back to all history below the minimum mileage sample.",
   },
+  directCostBreakEven: {
+    label: "Direct Cost Break-Even",
+    definition:
+      "The rate at which a proposed load covers only the costs caused directly by that trip.",
+    basis: "Fuel, tolls, dispatch, factoring and other direct trip costs.",
+  },
   operatingBreakEven: {
     label: "Operating Break-Even",
     definition:

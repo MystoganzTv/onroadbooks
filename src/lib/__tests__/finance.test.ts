@@ -10,12 +10,24 @@ import {
 import { defaultCategoryBehavior } from "../categories";
 import {
   calculateTrueCostPerMile,
+  hasSufficientOperatingCostBasis,
+  hasUnallocatedSharedOperatingCosts,
   overheadCostPerMile,
+  sharedOperatingCostPerFleetMile,
   trailingCostBasis,
 } from "../finance/cost-per-mile";
+import {
+  hasCompleteOperatingCostCoverage,
+  operatingCostCoverage,
+} from "../finance/cost-coverage";
 import { calculateSafeOwnerPay, resolveReserveRules } from "../finance/owner-pay";
 import { calculateLoadScore, scoreLoads, bestAndWorst } from "../finance/load-score";
-import { calculateLoadEstimate, calculateTargetRate } from "../finance/load-calculator";
+import {
+  calculateLoadEstimate,
+  calculateTargetRate,
+  compareOfferToThresholds,
+  suggestedOpeningQuote,
+} from "../finance/load-calculator";
 import { calculateDeadheadCost } from "../finance/deadhead";
 import { calculateLanePerformance } from "../finance/lanes";
 import { calculateBrokerPerformance, sortBrokers } from "../finance/brokers";
@@ -323,6 +335,144 @@ describe("overheadCostPerMile", () => {
   it("is zero, not negative, when there is no basis", () => {
     const cost = calculateTrueCostPerMile([], [], august, settings, "x");
     assert.equal(overheadCostPerMile(cost), 0);
+  });
+});
+
+describe("hasSufficientOperatingCostBasis", () => {
+  it("does not treat mileage plus direct trip costs as complete operating history", () => {
+    const basis = calculateTrueCostPerMile(
+      [load({ loadedMiles: 900, deadheadMiles: 100 })],
+      [
+        expense({ id: "fuel", category: "FUEL", amount: 500 }),
+        expense({ id: "tolls", category: "TOLLS", amount: 100 }),
+      ],
+      august,
+      settings,
+      "x",
+    );
+    assert.equal(hasSufficientOperatingCostBasis(basis), false);
+  });
+
+  it("requires both 500 miles and recorded indirect operating costs", () => {
+    const withOverhead = (loadedMiles: number) => calculateTrueCostPerMile(
+      [load({ loadedMiles, deadheadMiles: 0 })],
+      [expense({ id: "insurance", category: "INSURANCE", amount: 500 })],
+      august,
+      settings,
+      "x",
+    );
+    assert.equal(hasSufficientOperatingCostBasis(withOverhead(499)), false);
+    assert.equal(hasSufficientOperatingCostBasis(withOverhead(500)), true);
+  });
+});
+
+describe("hasUnallocatedSharedOperatingCosts", () => {
+  const basis = calculateTrueCostPerMile(
+    [load({ loadedMiles: 900, deadheadMiles: 100 })],
+    [expense({ id: "insurance", category: "INSURANCE", amount: 500 })],
+    august,
+    settings,
+    "Trailing 90 days",
+  );
+
+  it("detects shared operating overhead inside the truck's basis window", () => {
+    assert.equal(
+      hasUnallocatedSharedOperatingCosts([
+        expense({
+          id: "office",
+          truckId: null,
+          scope: "BUSINESS",
+          category: "OTHER",
+          amount: 125,
+        }),
+      ], basis, "2026-08-29"),
+      true,
+    );
+  });
+
+  it("ignores old shared costs outside a trailing basis and financing rows", () => {
+    assert.equal(
+      hasUnallocatedSharedOperatingCosts([
+        expense({
+          id: "old-office",
+          truckId: null,
+          scope: "BUSINESS",
+          date: "2025-01-05",
+          category: "OTHER",
+        }),
+        expense({
+          id: "shared-debt",
+          truckId: null,
+          scope: "BUSINESS",
+          category: "TRUCK_PAYMENT",
+        }),
+      ], basis, "2026-08-29"),
+      false,
+    );
+  });
+});
+
+describe("sharedOperatingCostPerFleetMile", () => {
+  it("spreads shared operating dollars across all Fleet miles in the exact basis window", () => {
+    const basis = calculateTrueCostPerMile(
+      [load({ truckId: "t1", loadedMiles: 900, deadheadMiles: 100 })],
+      [expense({ truckId: "t1", category: "INSURANCE", amount: 500 })],
+      august,
+      settings,
+      "Trailing 90 days",
+    );
+    const rate = sharedOperatingCostPerFleetMile(
+      [
+        load({ id: "t1-load", truckId: "t1", loadedMiles: 900, deadheadMiles: 100 }),
+        load({ id: "t2-load", truckId: "t2", loadedMiles: 400, deadheadMiles: 100 }),
+        load({ id: "old", truckId: "t2", date: "2025-01-05", loadedMiles: 5000 }),
+      ],
+      [
+        expense({ id: "office", truckId: null, scope: "BUSINESS", category: "OTHER", amount: 300 }),
+        expense({ id: "old-office", truckId: null, scope: "BUSINESS", date: "2025-01-05", category: "OTHER", amount: 900 }),
+        expense({ id: "shared-debt", truckId: null, scope: "BUSINESS", category: "TRUCK_PAYMENT", amount: 600 }),
+        expense({ id: "unassigned-fuel", truckId: null, scope: "BUSINESS", category: "FUEL", amount: 750 }),
+      ],
+      basis,
+    );
+
+    assert.equal(rate, 0.2);
+  });
+});
+
+describe("operatingCostCoverage", () => {
+  const basis = calculateTrueCostPerMile(
+    [load({ loadedMiles: 900, deadheadMiles: 100 })],
+    [expense({ category: "INSURANCE", amount: 500 })],
+    august,
+    settings,
+    "August",
+  );
+
+  it("requires every group to be recorded in the basis window or explicitly not applicable", () => {
+    const coverage = operatingCostCoverage([
+      expense({ id: "insurance", category: "INSURANCE", amount: 500 }),
+      expense({ id: "maintenance", category: "MAINTENANCE", amount: 300 }),
+      expense({ id: "permit", category: "PERMITS", amount: 100 }),
+    ], basis, { RECURRING_SERVICES: true });
+
+    assert.deepEqual(coverage.map((item) => item.status), [
+      "RECORDED",
+      "RECORDED",
+      "RECORDED",
+      "NOT_APPLICABLE",
+    ]);
+    assert.equal(hasCompleteOperatingCostCoverage(coverage), true);
+  });
+
+  it("keeps old, zero-dollar and missing groups unknown", () => {
+    const coverage = operatingCostCoverage([
+      expense({ id: "old-insurance", date: "2025-01-05", category: "INSURANCE", amount: 500 }),
+      expense({ id: "zero-maintenance", category: "MAINTENANCE", amount: 0 }),
+    ], basis, undefined);
+
+    assert.equal(coverage.every((item) => item.status === "UNKNOWN"), true);
+    assert.equal(hasCompleteOperatingCostCoverage(coverage), false);
   });
 });
 
@@ -705,6 +855,47 @@ describe("calculateTargetRate", () => {
     const rate = (t: ReturnType<typeof calculateTargetRate>) =>
       t.tiers.find((x) => x.key === "target")!.rate;
     assert.ok(rate(withEmpty) > rate(without));
+  });
+
+  it("keeps direct-cost break-even separate from allocated operating costs", () => {
+    const target = calculateTargetRate(base, thresholds);
+    const operating = target.tiers.find((tier) => tier.key === "operatingBreakeven")!;
+    assert.ok(target.directCostBreakEven < operating.rate);
+  });
+});
+
+describe("offer-aware quote strategy", () => {
+  const rates = { minimum: 589.81, good: 753.22, great: 916.62 };
+
+  it("rounds the Great target to a $950 opening quote", () => {
+    assert.equal(suggestedOpeningQuote(rates.great), 950);
+  });
+
+  it("never recommends negotiating below an existing offer", () => {
+    const comparison = compareOfferToThresholds(1_100, rates);
+    assert.equal(comparison.position, "GREAT");
+    assert.equal(comparison.differenceVsGreat, 183.38);
+    assert.equal(comparison.suggestedCounteroffer, null);
+  });
+
+  it("aims a GOOD offer toward GREAT and a MARGINAL offer toward GOOD", () => {
+    const good = compareOfferToThresholds(850, rates);
+    const marginal = compareOfferToThresholds(650, rates);
+    assert.equal(good.position, "GOOD");
+    assert.equal(good.settlementTarget, rates.great);
+    assert.equal(good.suggestedCounteroffer, 950);
+    assert.equal(marginal.position, "MARGINAL");
+    assert.equal(marginal.settlementTarget, rates.good);
+    assert.equal(marginal.suggestedCounteroffer, 800);
+  });
+
+  it("uses inclusive threshold boundaries and preserves decimal offers", () => {
+    assert.equal(compareOfferToThresholds(916.62, rates).position, "GREAT");
+    assert.equal(compareOfferToThresholds(753.22, rates).position, "GOOD");
+    assert.equal(compareOfferToThresholds(589.81, rates).position, "MARGINAL");
+    assert.equal(compareOfferToThresholds(589.8, rates).position, "BELOW_MINIMUM");
+    assert.equal(compareOfferToThresholds(850.25, rates).suggestedCounteroffer, 950);
+    assert.equal(compareOfferToThresholds(650.5, rates).suggestedCounteroffer, 800);
   });
 });
 

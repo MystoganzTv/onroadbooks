@@ -29,6 +29,7 @@ export async function updateSettingsAction(values: unknown): Promise<ActionResul
       taxReservePct: parsed.data.taxReservePct,
       maintenanceReservePct: parsed.data.maintenanceReservePct,
       categoryBehavior: parsed.data.categoryBehavior,
+      fleetOverheadAllocation: parsed.data.fleetOverheadAllocation,
       ratingGreatPerMile: parsed.data.ratingGreatPerMile,
       ratingGoodPerMile: parsed.data.ratingGoodPerMile,
       ratingMarginalPerMile: parsed.data.ratingMarginalPerMile,

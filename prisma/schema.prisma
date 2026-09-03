@@ -393,6 +393,8 @@ model FinancialSettings {
   maintenanceReservePct Decimal @default(5) @db.Decimal(5, 2)
   /// Map of ExpenseCategory -> ExpenseBehavior overrides.
   categoryBehavior      Json    @default("{}")
+  /// Owner-selected treatment of shared business overhead in Fleet unit costs.
+  fleetOverheadAllocation String @default("UNALLOCATED")
 
   /// Profit-per-total-mile floors for the load profitability rating.
   ratingGreatPerMile    Decimal @default(2) @db.Decimal(8, 2)
@@ -424,6 +426,11 @@ model Truck {
   purchasePrice                       Decimal? @db.Decimal(12, 2)
   monthlyPayment                      Decimal? @db.Decimal(12, 2)
   monthlyInsurance                    Decimal? @db.Decimal(12, 2)
+  /// True only after the owner explicitly confirms this unit currently has
+  /// no loan, truck payment, finance lease or other financing. Null is unknown.
+  financingConfirmedNone              Boolean?
+  /// Cost groups the owner explicitly confirms do not apply to this unit.
+  operatingCostExemptions             Json     @default("{}")
   /// Facts used to assess whether this unit is likely subject to IFTA.
   /// Null means the owner has not answered yet; historical units are never guessed.
   axleCount                           Int?

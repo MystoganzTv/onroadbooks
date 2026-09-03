@@ -98,6 +98,8 @@ export function migrateTruck(truck: Truck): Truck {
   truck.registeredGrossWeightLbs ??= null;
   truck.operatesInMultipleIftaJurisdictions ??= null;
   truck.iftaReportingEnabled ??= null;
+  truck.financingConfirmedNone ??= null;
+  truck.operatingCostExemptions ??= {};
   return truck;
 }
 

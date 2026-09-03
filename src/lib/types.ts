@@ -80,6 +80,14 @@ export interface Business {
   createdAt: string;
 }
 
+export type OperatingCostGroup =
+  | "INSURANCE"
+  | "MAINTENANCE_REPAIRS"
+  | "PERMITS_REGISTRATION"
+  | "RECURRING_SERVICES";
+
+export type OperatingCostExemptions = Partial<Record<OperatingCostGroup, true>>;
+
 export interface FinancialSettings {
   id: string;
   businessId: string;
@@ -103,6 +111,8 @@ export interface FinancialSettings {
   maintenanceWarnDays: number;
   /** Quarterly IFTA rates keyed as `YYYY-QN:ST`, in dollars per gallon. */
   iftaTaxRates: Record<string, number>;
+  /** Explicit owner choice for attributing shared Fleet overhead to units. */
+  fleetOverheadAllocation?: "UNALLOCATED" | "FLEET_MILES";
   updatedAt: string;
 }
 
@@ -125,6 +135,10 @@ export interface Truck {
   purchasePrice: number | null;
   monthlyPayment: number | null;
   monthlyInsurance: number | null;
+  /** True only after the owner explicitly confirms this unit has no financing. */
+  financingConfirmedNone?: boolean | null;
+  /** Cost groups the owner explicitly confirms do not apply to this unit. */
+  operatingCostExemptions?: OperatingCostExemptions;
   /** Power-unit axles. Missing historical data remains unknown. */
   axleCount?: number | null;
   /** Registered gross vehicle or combination weight, in pounds. */

@@ -266,6 +266,7 @@ export const settingsSchema = z.object({
   categoryBehavior: z
     .record(z.enum(CATEGORY_IDS as [string, ...string[]]), z.enum(["FIXED", "VARIABLE"]))
     .optional(),
+  fleetOverheadAllocation: z.enum(["UNALLOCATED", "FLEET_MILES"]).optional(),
   ratingGreatPerMile: z
     .number({ invalid_type_error: "Enter a number" })
     .min(0, "Cannot be negative")
@@ -349,6 +350,21 @@ export const maintenanceSchema = z
 export const truckArchiveSchema = z.object({
   id: z.string().trim().min(1),
   soldOn: isoDate.optional().nullable(),
+});
+
+export const truckFinancingConfirmationSchema = z.object({
+  truckId: z.string().trim().min(1),
+  confirmedNone: z.boolean(),
+});
+
+export const truckOperatingCostExemptionsSchema = z.object({
+  truckId: z.string().trim().min(1),
+  exemptions: z.object({
+    INSURANCE: z.literal(true).optional(),
+    MAINTENANCE_REPAIRS: z.literal(true).optional(),
+    PERMITS_REGISTRATION: z.literal(true).optional(),
+    RECURRING_SERVICES: z.literal(true).optional(),
+  }).strict(),
 });
 
 export const documentMetaSchema = z.object({

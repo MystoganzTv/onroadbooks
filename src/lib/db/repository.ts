@@ -46,6 +46,7 @@ import type {
   MaintenanceType,
   MemberRole,
   PaymentStatus,
+  OperatingCostExemptions,
   Truck,
 } from "../types";
 
@@ -178,6 +179,7 @@ export interface SettingsInput {
   maintenanceWarnMiles: number;
   maintenanceWarnDays: number;
   iftaTaxRates?: Record<string, number>;
+  fleetOverheadAllocation?: "UNALLOCATED" | "FLEET_MILES";
 }
 
 export interface MaintenanceInput {
@@ -371,6 +373,13 @@ export interface Repository {
   createTruck(input: TruckInput): Promise<Truck>;
   /** Omitting the id updates the primary truck, which is what a single-truck business means. */
   updateTruck(input: TruckInput, id?: string): Promise<Truck>;
+  /** Stores the owner's explicit no-financing answer; null means not confirmed. */
+  setTruckFinancingConfirmedNone(id: string, value: boolean | null): Promise<Truck>;
+  /** Stores only explicit not-applicable cost groups; recorded evidence stays ledger-derived. */
+  setTruckOperatingCostExemptions(
+    id: string,
+    exemptions: OperatingCostExemptions,
+  ): Promise<Truck>;
   /**
    * Retires a unit without deleting anything. Its loads, expenses and service
    * history stay exactly where they are and keep appearing in past reports.

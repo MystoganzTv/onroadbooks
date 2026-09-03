@@ -58,6 +58,7 @@ export const FIXTURE_SETTINGS: FinancialSettings = {
   maintenanceWarnMiles: 2000,
   maintenanceWarnDays: 30,
   iftaTaxRates: {},
+  fleetOverheadAllocation: "UNALLOCATED",
   updatedAt: CREATED,
 };
 
@@ -74,6 +75,7 @@ export const FIXTURE_TRUCK: Truck = {
   purchasePrice: 68500,
   monthlyPayment: 1285,
   monthlyInsurance: 685,
+  operatingCostExemptions: {},
   startingOdometer: 118400,
   currentOdometer: 144780,
   active: true,

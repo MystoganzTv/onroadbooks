@@ -25,6 +25,7 @@ describe("canonical financial terminology", () => {
       "safeToPayYourself",
       "actualCostPerMile",
       "normalizedCostPerMile",
+      "directCostBreakEven",
       "operatingBreakEven",
       "cashBreakEven",
       "expectedMonthlyMiles",

@@ -36,6 +36,7 @@ interface SettingsFormProps {
   previewLabel: string;
   /** Every bucket, so the preview shows the same Safe to Pay as the app. */
   reserveAccounts: ReserveAccount[];
+  hasFleet: boolean;
 }
 
 export function SettingsForm({
@@ -44,6 +45,7 @@ export function SettingsForm({
   preview,
   previewLabel,
   reserveAccounts,
+  hasFleet,
 }: SettingsFormProps) {
   const router = useRouter();
   const { locale, dictionary } = useLanguage();
@@ -67,6 +69,9 @@ export function SettingsForm({
     ...defaultCategoryBehavior(),
     ...settings.categoryBehavior,
   });
+  const [fleetOverheadAllocation, setFleetOverheadAllocation] = React.useState<
+    "UNALLOCATED" | "FLEET_MILES"
+  >(settings.fleetOverheadAllocation ?? "UNALLOCATED");
   const [ratingGreat, setRatingGreat] = React.useState(String(settings.ratingGreatPerMile));
   const [ratingGood, setRatingGood] = React.useState(String(settings.ratingGoodPerMile));
   const [ratingMarginal, setRatingMarginal] = React.useState(
@@ -101,6 +106,7 @@ export function SettingsForm({
       taxReservePct: toRequiredNumber(taxPct),
       maintenanceReservePct: toRequiredNumber(maintenancePct),
       categoryBehavior: behavior,
+      fleetOverheadAllocation,
       ratingGreatPerMile: toRequiredNumber(ratingGreat),
       ratingGoodPerMile: toRequiredNumber(ratingGood),
       ratingMarginalPerMile: toRequiredNumber(ratingMarginal),
@@ -145,6 +151,7 @@ export function SettingsForm({
     setWarnMiles("2000");
     setWarnDays("30");
     setBehavior(defaultCategoryBehavior());
+    setFleetOverheadAllocation("UNALLOCATED");
     toast.info(copy.defaultsRestored);
   }
 
@@ -180,6 +187,36 @@ export function SettingsForm({
           </Field>
         </CardContent>
       </section>
+
+      {hasFleet ? (
+        <section className="rounded-lg border border-border bg-card">
+          <CardHeader>
+            <CardTitle>{copy.fleetOverheadAllocation}</CardTitle>
+            <span className="text-2xs leading-relaxed text-muted-foreground">
+              {copy.fleetOverheadAllocationHint}
+            </span>
+          </CardHeader>
+          <CardContent className="p-4">
+            <fieldset className="grid gap-3 sm:grid-cols-2">
+              <legend className="sr-only">{copy.fleetOverheadAllocation}</legend>
+              <AllocationOption
+                value="UNALLOCATED"
+                checked={fleetOverheadAllocation === "UNALLOCATED"}
+                onChange={setFleetOverheadAllocation}
+                title={copy.keepOverheadUnallocated}
+                description={copy.keepOverheadUnallocatedDescription}
+              />
+              <AllocationOption
+                value="FLEET_MILES"
+                checked={fleetOverheadAllocation === "FLEET_MILES"}
+                onChange={setFleetOverheadAllocation}
+                title={copy.allocateByFleetMiles}
+                description={copy.allocateByFleetMilesDescription}
+              />
+            </fieldset>
+          </CardContent>
+        </section>
+      ) : null}
 
       <section className="rounded-lg border border-border bg-card">
         <CardHeader>
@@ -460,6 +497,44 @@ export function SettingsForm({
 function roundOrMissing(value: string): number | undefined {
   const n = toRequiredNumber(value);
   return n === undefined ? undefined : Math.round(n);
+}
+
+function AllocationOption({
+  value,
+  checked,
+  onChange,
+  title,
+  description,
+}: {
+  value: "UNALLOCATED" | "FLEET_MILES";
+  checked: boolean;
+  onChange: (value: "UNALLOCATED" | "FLEET_MILES") => void;
+  title: string;
+  description: string;
+}) {
+  return (
+    <label
+      className={cn(
+        "flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors",
+        checked ? "border-primary bg-primary/5" : "border-border bg-surface-sunken",
+      )}
+    >
+      <input
+        type="radio"
+        name="fleet-overhead-allocation"
+        value={value}
+        checked={checked}
+        onChange={() => onChange(value)}
+        className="mt-0.5 size-4 shrink-0 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      />
+      <span className="min-w-0">
+        <span className="block text-sm font-medium text-foreground">{title}</span>
+        <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+          {description}
+        </span>
+      </span>
+    </label>
+  );
 }
 
 function PreviewRow({

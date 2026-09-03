@@ -90,6 +90,9 @@ export interface CostPerMile {
   basisLabel: string;
   /** Days the window spans, for the basis footnote. */
   days: number;
+  /** Exact evidence window, reused by Fleet overhead allocation. */
+  rangeStart?: string;
+  rangeEnd?: string;
 }
 
 /** Categories the load calculator asks the driver to enter directly. */
@@ -151,7 +154,13 @@ export function calculateTrueCostPerMile(
   const totalMiles = loadedMiles + deadheadMiles;
   const days = dayCountOf(range);
 
-  if (totalMiles <= 0) return { ...emptyCostPerMile(basisLabel, days) };
+  if (totalMiles <= 0) {
+    return {
+      ...emptyCostPerMile(basisLabel, days),
+      rangeStart: range.start,
+      rangeEnd: range.end,
+    };
+  }
 
   const overrides = settings?.categoryBehavior;
   const buckets = new Map<ExpenseCategoryId, number>();
@@ -214,12 +223,89 @@ export function calculateTrueCostPerMile(
     sufficient: true,
     basisLabel,
     days,
+    rangeStart: range.start,
+    rangeEnd: range.end,
   };
 }
 
 /** Miles the calculator should be shown before its numbers mean anything. */
 export const MIN_BASIS_MILES = 500;
 export const TRAILING_COST_DAYS = 90;
+
+/**
+ * Whether the calculator has enough evidence to allocate real operating
+ * overhead to a proposed load.
+ *
+ * Miles alone are not evidence that insurance, maintenance and the rest of
+ * the business's indirect operating costs were recorded. Require both the
+ * minimum mileage sample and at least one operating dollar that is not a
+ * direct trip cost. This is deliberately conservative: an incomplete ledger
+ * stays unavailable instead of presenting a deceptively low break-even.
+ */
+export function hasSufficientOperatingCostBasis(basis: CostPerMile): boolean {
+  if (!basis.sufficient || basis.totalMiles < MIN_BASIS_MILES) return false;
+  return roundMoney(basis.totalCost - basis.directTripTotal) > 0;
+}
+
+/**
+ * Whether a per-truck basis omits shared fleet costs from the same evidence
+ * window. Until the owner chooses an allocation rule, those dollars cannot be
+ * attributed to one unit without turning an accounting fact into a guess.
+ */
+export function hasUnallocatedSharedOperatingCosts(
+  expenses: Expense[],
+  basis: CostPerMile,
+  today: string,
+  days = TRAILING_COST_DAYS,
+): boolean {
+  const recentRange = basis.basisLabel === `Trailing ${days} days`
+    ? { start: addDays(today, -(days - 1)), end: today }
+    : null;
+
+  return expenses.some((expense) =>
+    isSharedOperatingOverhead(expense)
+    && (!recentRange || inRange(expense.date, recentRange)),
+  );
+}
+
+/**
+ * Deterministically allocate shared operating overhead over every Fleet mile
+ * recorded in the selected truck's evidence window. Every unit therefore gets
+ * the same shared dollars-per-mile rate; no revenue or vehicle-size guess is
+ * introduced. Returns null only when the Fleet mileage denominator is absent.
+ */
+export function sharedOperatingCostPerFleetMile(
+  loads: Load[],
+  expenses: Expense[],
+  basis: CostPerMile,
+): number | null {
+  const range = basis.rangeStart && basis.rangeEnd
+    ? { start: basis.rangeStart, end: basis.rangeEnd }
+    : null;
+  const inBasis = (date: string) => !range || inRange(date, range);
+  const fleetMiles = sum(
+    loads.filter((load) => inBasis(load.date)),
+    (load) => load.loadedMiles + load.deadheadMiles,
+  );
+  if (fleetMiles <= 0) return null;
+
+  const sharedOperatingTotal = sum(
+    expenses.filter((expense) =>
+      isSharedOperatingOverhead(expense)
+      && inBasis(expense.date),
+    ),
+    (expense) => expense.amount,
+  );
+
+  return Math.round(div(sharedOperatingTotal, fleetMiles) * 10_000) / 10_000;
+}
+
+function isSharedOperatingOverhead(expense: Expense): boolean {
+  return expense.scope === "BUSINESS"
+    && financialTreatmentOf(expense) === "OPERATING"
+    && !DIRECT_TRIP_CATEGORIES.includes(expense.category)
+    && !isLoadExpenseId(expense.id);
+}
 
 /**
  * The stable cost basis used by the load calculator and the target rate tool.

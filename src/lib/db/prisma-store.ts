@@ -893,6 +893,10 @@ export class PrismaRepository implements Repository {
       maintenanceWarnDays: business.settings?.maintenanceWarnDays ?? 30,
       iftaTaxRates:
         (business.settings?.iftaTaxRates as Record<string, number> | null) ?? {},
+      fleetOverheadAllocation:
+        business.settings?.fleetOverheadAllocation === "FLEET_MILES"
+          ? "FLEET_MILES"
+          : "UNALLOCATED",
       categoryBehavior: {
         ...defaultCategoryBehavior(),
         ...((business.settings?.categoryBehavior as Record<
@@ -916,6 +920,9 @@ export class PrismaRepository implements Repository {
       purchasePrice: numOrNull(row.purchasePrice),
       monthlyPayment: numOrNull(row.monthlyPayment),
       monthlyInsurance: numOrNull(row.monthlyInsurance),
+      financingConfirmedNone: row.financingConfirmedNone,
+      operatingCostExemptions:
+        (row.operatingCostExemptions as Truck["operatingCostExemptions"] | null) ?? {},
       axleCount: row.axleCount,
       registeredGrossWeightLbs: row.registeredGrossWeightLbs,
       operatesInMultipleIftaJurisdictions: row.operatesInMultipleIftaJurisdictions,
@@ -1763,18 +1770,28 @@ export class PrismaRepository implements Repository {
     if (truckId && !business.trucks.some((truck) => truck.id === truckId)) {
       throw new Error("That truck does not belong to this workspace.");
     }
-    const row = await client.financialObligation.create({
-      data: {
-        businessId: business.id,
-        truckId,
-        name: input.name.trim(),
-        kind: input.kind,
-        counterparty: input.counterparty?.trim() || null,
-        startedOn: input.startedOn ? toDate(input.startedOn) : null,
-        endedOn: input.endedOn ? toDate(input.endedOn) : null,
-        expectedMonthlyPayment: input.expectedMonthlyPayment ?? null,
-        active: input.active ?? true,
-      },
+    const active = input.active ?? true;
+    const row = await client.$transaction(async (tx) => {
+      const created = await tx.financialObligation.create({
+        data: {
+          businessId: business.id,
+          truckId,
+          name: input.name.trim(),
+          kind: input.kind,
+          counterparty: input.counterparty?.trim() || null,
+          startedOn: input.startedOn ? toDate(input.startedOn) : null,
+          endedOn: input.endedOn ? toDate(input.endedOn) : null,
+          expectedMonthlyPayment: input.expectedMonthlyPayment ?? null,
+          active,
+        },
+      });
+      if (active && truckId) {
+        await tx.truck.updateMany({
+          where: { id: truckId, businessId: business.id },
+          data: { financingConfirmedNone: null },
+        });
+      }
+      return created;
     });
     return (await this.getDataset()).financialObligations.find((item) => item.id === row.id)!;
   }
@@ -1813,6 +1830,12 @@ export class PrismaRepository implements Repository {
             active: input.newObligation.active ?? true,
           },
         });
+        if ((input.newObligation.active ?? true) && truckId) {
+          await tx.truck.updateMany({
+            where: { id: truckId, businessId: business.id },
+            data: { financingConfirmedNone: null },
+          });
+        }
         obligationId = obligation.id;
       }
       const obligation = obligationId
@@ -2268,6 +2291,7 @@ export class PrismaRepository implements Repository {
         maintenanceWarnMiles: Math.round(input.maintenanceWarnMiles),
         maintenanceWarnDays: Math.round(input.maintenanceWarnDays),
         iftaTaxRates: (input.iftaTaxRates ?? {}) as Prisma.InputJsonValue,
+        fleetOverheadAllocation: input.fleetOverheadAllocation ?? "UNALLOCATED",
       },
       update: {
         taxReservePct: input.taxReservePct,
@@ -2281,6 +2305,9 @@ export class PrismaRepository implements Repository {
         maintenanceWarnDays: Math.round(input.maintenanceWarnDays),
         ...(input.iftaTaxRates
           ? { iftaTaxRates: input.iftaTaxRates as Prisma.InputJsonValue }
+          : {}),
+        ...(input.fleetOverheadAllocation
+          ? { fleetOverheadAllocation: input.fleetOverheadAllocation }
           : {}),
       },
     });
@@ -2319,6 +2346,8 @@ export class PrismaRepository implements Repository {
         purchasePrice: input.purchasePrice ?? null,
         monthlyPayment: input.monthlyPayment ?? null,
         monthlyInsurance: input.monthlyInsurance ?? null,
+        financingConfirmedNone: null,
+        operatingCostExemptions: {},
         axleCount: input.axleCount ?? null,
         registeredGrossWeightLbs: input.registeredGrossWeightLbs ?? null,
         operatesInMultipleIftaJurisdictions:
@@ -2353,6 +2382,9 @@ export class PrismaRepository implements Repository {
         purchasePrice: input.purchasePrice ?? null,
         monthlyPayment: input.monthlyPayment ?? null,
         monthlyInsurance: input.monthlyInsurance ?? null,
+        ...((input.monthlyPayment ?? 0) > 0
+          ? { financingConfirmedNone: null }
+          : {}),
         ...(input.axleCount === undefined ? {} : { axleCount: input.axleCount }),
         ...(input.registeredGrossWeightLbs === undefined
           ? {}
@@ -2371,6 +2403,38 @@ export class PrismaRepository implements Repository {
       },
     });
     return requireTruck(await this.getDataset(), targetId);
+  }
+
+  async setTruckFinancingConfirmedNone(
+    id: string,
+    value: boolean | null,
+  ): Promise<Truck> {
+    const client = await getClient();
+    const business = await this.business(client);
+    if (!business.trucks.some((truck) => truck.id === id)) {
+      throw new Error("That truck does not belong to this workspace.");
+    }
+    await client.truck.updateMany({
+      where: { id, businessId: business.id },
+      data: { financingConfirmedNone: value },
+    });
+    return requireTruck(await this.getDataset(), id);
+  }
+
+  async setTruckOperatingCostExemptions(
+    id: string,
+    exemptions: NonNullable<Truck["operatingCostExemptions"]>,
+  ): Promise<Truck> {
+    const client = await getClient();
+    const business = await this.business(client);
+    if (!business.trucks.some((truck) => truck.id === id)) {
+      throw new Error("That truck does not belong to this workspace.");
+    }
+    await client.truck.updateMany({
+      where: { id, businessId: business.id },
+      data: { operatingCostExemptions: exemptions as Prisma.InputJsonValue },
+    });
+    return requireTruck(await this.getDataset(), id);
   }
 
   /** Retires a unit. Deletes nothing -- its history stays in past reports. */

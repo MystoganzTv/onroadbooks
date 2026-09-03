@@ -35,6 +35,31 @@ type JsonDataset = {
   }>;
 };
 
+type CalculatorFixtureDataset = JsonDataset & {
+  settings: { fleetOverheadAllocation?: "UNALLOCATED" | "FLEET_MILES" };
+  trucks: Array<{
+    id: string;
+    name: string;
+    operatingCostExemptions?: Record<string, true>;
+  }>;
+  loads: Array<{
+    id: string;
+    truckId: string;
+    loadedMiles: number;
+    [key: string]: unknown;
+  }>;
+  expenses: Array<{
+    id: string;
+    truckId: string | null;
+    scope: string;
+    date: string;
+    category: string;
+    description: string;
+    amount: number;
+    [key: string]: unknown;
+  }>;
+};
+
 async function readDataset(): Promise<JsonDataset> {
   return JSON.parse(await fs.readFile(dataFile, "utf8")) as JsonDataset;
 }
@@ -193,6 +218,223 @@ test.describe.serial("critical browser flows", () => {
     await expect(page.getByText(/Online billing is being configured/).first()).toBeVisible();
   });
 
+  test("load calculator compares an existing offer and never counters downward", async ({ page }) => {
+    await login(page);
+    await page.goto("/calculator");
+
+    const offerContext = page.getByRole("button", { name: "I have a broker offer" });
+    const noOfferContext = page.getByRole("button", { name: "No offer / Call for rate" });
+    await expect(offerContext).toHaveAttribute("aria-pressed", "true");
+    await page.locator("#calc-gross").fill("1100");
+    await page.locator("#calc-loaded").fill("275");
+    await page.locator("#calc-deadhead").fill("42");
+    await page.locator("#calc-fuel").fill("5.50");
+    await page.locator("#calc-mpg").fill("8.5");
+    await page.locator("#calc-tolls").fill("50");
+    await page.locator("#calc-factoring").fill("3");
+
+    await page.getByRole("tab", { name: "What should I ask?" }).click();
+    await expect(page.getByRole("heading", { name: "Current offer vs thresholds" })).toBeVisible();
+    await expect(page.getByText("$183.38")).toBeVisible();
+    await expect(page.getByText(/already meets or exceeds your Great profitability threshold/)).toBeVisible();
+    await expect(page.getByText("Suggested counteroffer")).toHaveCount(0);
+
+    await noOfferContext.click();
+    await expect(noOfferContext).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#calc-gross")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "What to quote" })).toBeVisible();
+    await expect(page.getByText("Direct cost break-even")).toBeVisible();
+    await expect(page.getByText("True operating break-even")).toBeVisible();
+    await expect(page.getByText("Suggested opening quote")).toBeVisible();
+    await expect(page.getByText("$950")).toBeVisible();
+
+    const noFinancing = page.getByRole("checkbox", { name: "This truck has no financing" });
+    await expect(noFinancing).toBeVisible();
+    await noFinancing.check();
+    await expect(page.getByText("Financing status saved for this truck.")).toBeVisible();
+    await expect(page.getByText("$0.00 · confirmed", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("Required operating-cost groups are still unknown").first(),
+    ).toBeVisible();
+
+    // Switching contexts does not erase the broker's offer. It only decides
+    // whether that value participates in the result.
+    await offerContext.click();
+    await expect(page.locator("#calc-gross")).toHaveValue("1100");
+    await page.getByRole("tab", { name: "Should I take it?" }).click();
+    await page.locator("#calc-gross").fill("");
+    await expect(page.getByText("Enter a broker offer greater than $0 to evaluate this load.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Estimated result" })).toHaveCount(0);
+    await page.getByRole("tab", { name: "What should I ask?" }).click();
+    await expect(page.getByText("Enter a broker offer greater than $0 to evaluate this load.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "What to quote" })).toHaveCount(0);
+
+    await page.reload();
+    await expect(
+      page.getByRole("checkbox", { name: "This truck has no financing" }),
+    ).toBeChecked();
+  });
+
+  test("load calculator renders all offer bands, exact boundaries and decimal counters", async ({ page }) => {
+    await login(page);
+    await page.goto("/calculator");
+
+    const gross = page.locator("#calc-gross");
+    await page.locator("#calc-loaded").fill("275");
+    await page.locator("#calc-deadhead").fill("42");
+    await page.locator("#calc-fuel").fill("5.50");
+    await page.locator("#calc-mpg").fill("8.5");
+    await page.locator("#calc-tolls").fill("50");
+    await page.locator("#calc-factoring").fill("3");
+    await gross.fill("1100");
+    await page.getByRole("tab", { name: "What should I ask?" }).click();
+
+    const assertBand = async (
+      offer: string,
+      rating: string,
+      counter: string | null,
+    ) => {
+      await gross.fill(offer);
+      const currentOfferBlock = page.getByText("Current broker offer").locator("..");
+      await expect(currentOfferBlock).toContainText(`$${offer}`);
+      await expect(page.getByText(rating, { exact: true })).toBeVisible();
+      const announcement = page.getByTestId("offer-announcement");
+      await expect(announcement).toHaveAttribute("aria-live", "polite");
+      await expect(announcement).toHaveAttribute("aria-atomic", "true");
+      if (counter === null) {
+        await expect(page.getByText("Suggested counteroffer", { exact: true })).toHaveCount(0);
+        await expect(announcement).toHaveText(`${rating}. No counteroffer recommended.`);
+      } else {
+        const counterBlock = page
+          .getByText("Suggested counteroffer", { exact: true })
+          .locator("../..");
+        await expect(counterBlock).toContainText(counter);
+        await expect(announcement).toHaveText(`${rating}. Suggested counteroffer ${counter}.`);
+      }
+    };
+
+    // Threshold comparisons are inclusive: equality belongs to the higher
+    // band. Decimal offers retain cents while counters round up to $25.
+    await assertBand("916.62", "Great load", null);
+    await assertBand("850.25", "Good load", "$950");
+    await assertBand("753.22", "Good load", "$950");
+    await assertBand("650.50", "Marginal load", "$800");
+    await assertBand("589.81", "Marginal load", "$800");
+    await assertBand("589.80", "Below minimum", "$800");
+    await assertBand("500.25", "Below minimum", "$800");
+  });
+
+  test("load calculator is keyboard operable and announces changing decisions", async ({ page }) => {
+    await login(page);
+    await page.goto("/calculator");
+
+    const offerContext = page.getByRole("button", { name: "I have a broker offer" });
+    const noOfferContext = page.getByRole("button", { name: "No offer / Call for rate" });
+    await offerContext.focus();
+    await page.keyboard.press("Tab");
+    await expect(noOfferContext).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(noOfferContext).toHaveAttribute("aria-pressed", "true");
+
+    const keyboardOrder = [
+      page.locator("#calc-target-ppm"),
+      page.locator("#calc-loaded"),
+      page.locator("#calc-deadhead"),
+      page.locator("#calc-fuel"),
+      page.locator("#calc-mpg"),
+      page.locator("#calc-tolls"),
+      page.locator("#calc-other"),
+      page.locator("#calc-dispatch"),
+      page.getByRole("group", { name: "Dispatch fee unit" }).getByRole("button", { name: "%" }),
+      page.getByRole("group", { name: "Dispatch fee unit" }).getByRole("button", { name: "$" }),
+      page.locator("#calc-factoring"),
+      page.getByRole("group", { name: "Factoring fee unit" }).getByRole("button", { name: "%" }),
+      page.getByRole("group", { name: "Factoring fee unit" }).getByRole("button", { name: "$" }),
+      page.getByRole("checkbox", { name: "This truck has no financing" }),
+    ];
+    for (const control of keyboardOrder) {
+      await page.keyboard.press("Tab");
+      await expect(control).toBeFocused();
+    }
+    const wasConfirmed = await keyboardOrder.at(-1)!.isChecked();
+    await page.keyboard.press("Space");
+    if (wasConfirmed) await expect(keyboardOrder.at(-1)!).not.toBeChecked();
+    else await expect(keyboardOrder.at(-1)!).toBeChecked();
+    await expect(page.getByText("Financing status saved for this truck.")).toBeVisible();
+
+    // Radix tabs expose their arrow-key behavior as well as ordinary Tab
+    // order, so the two calculator questions do not require a pointer.
+    const evaluateTab = page.getByRole("tab", { name: "Should I take it?" });
+    const targetTab = page.getByRole("tab", { name: "What should I ask?" });
+    await evaluateTab.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(targetTab).toHaveAttribute("aria-selected", "true");
+
+    await offerContext.focus();
+    await page.keyboard.press("Enter");
+    await page.locator("#calc-gross").fill("850.25");
+    await page.locator("#calc-loaded").fill("275");
+    await page.locator("#calc-deadhead").fill("42");
+    await page.locator("#calc-fuel").fill("5.50");
+    await page.locator("#calc-mpg").fill("8.5");
+    await page.locator("#calc-tolls").fill("50");
+    await page.locator("#calc-factoring").fill("3");
+    await targetTab.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("offer-announcement")).toHaveText(
+      "Good load. Suggested counteroffer $950.",
+    );
+    await page.locator("#calc-gross").fill("1100");
+    await expect(page.getByTestId("offer-announcement")).toHaveText(
+      "Great load. No counteroffer recommended.",
+    );
+  });
+
+  test("load calculator threshold cards fit phone, tablet and desktop in Spanish", async ({ page }, testInfo) => {
+    await login(page);
+    await page.context().addCookies([{
+      name: "onroadbooks.locale",
+      value: "es",
+      url: "http://127.0.0.1:4173",
+    }]);
+
+    for (const viewport of [
+      { name: "phone", width: 390, height: 844 },
+      { name: "tablet", width: 768, height: 1024 },
+      { name: "desktop", width: 1440, height: 900 },
+    ]) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await page.goto("/calculator");
+      await page.locator("#calc-gross").fill("500.25");
+      await page.locator("#calc-loaded").fill("275");
+      await page.locator("#calc-deadhead").fill("42");
+      await page.locator("#calc-fuel").fill("5.50");
+      await page.locator("#calc-mpg").fill("8.5");
+      await page.locator("#calc-tolls").fill("50");
+      await page.locator("#calc-factoring").fill("3");
+      await page.getByRole("tab", { name: "¿Cuánto debo pedir?" }).click();
+
+      await expect(page.getByText("Por debajo del mínimo", { exact: true })).toBeVisible();
+      await expect(page.getByText(/Está por debajo de tu umbral mínimo.*Contraoferta hacia/)).toBeVisible();
+      await expect(page.getByText(/Agrega 3% de margen para negociar/)).toBeVisible();
+      expect(await page.evaluate(() => (
+        document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1
+      ))).toBe(true);
+
+      for (const label of ["Umbral mínimo", "Umbral bueno", "Umbral excelente"]) {
+        const box = await page.getByText(label, { exact: true }).locator("../..").boundingBox();
+        expect(box, `${label} should render at ${viewport.name}`).not.toBeNull();
+        expect(box!.x).toBeGreaterThanOrEqual(0);
+        expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width + 1);
+      }
+
+      await testInfo.attach(`calculator-es-${viewport.name}`, {
+        body: await page.screenshot({ fullPage: true }),
+        contentType: "image/png",
+      });
+    }
+  });
+
   test("owner issues a freight invoice and reviews an incomplete IFTA quarter", async ({ page }) => {
     await login(page);
     await page.goto("/invoices");
@@ -280,6 +522,124 @@ test.describe.serial("critical browser flows", () => {
     await page.getByRole("button", { name: "Mark paid" }).click();
     await page.getByRole("button", { name: "Post payment" }).click();
     await expect(page.getByText(/^Paid /).first()).toBeVisible();
+  });
+
+  test("Fleet calculator keeps truck history and financing confirmation scoped", async ({ page }) => {
+    await login(page);
+    await page.goto("/truck");
+    await page.getByRole("button", { name: "Add truck", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Add a truck" });
+    await dialog.locator("#new-truck-name").fill("Unit 202");
+    await dialog.locator("#new-truck-odo").fill("200000");
+    await dialog.getByRole("button", { name: "Add truck", exact: true }).click();
+    await expect(dialog).toBeHidden();
+
+    // Give Truck 1 a trustworthy unit sample plus one shared Fleet cost. The
+    // shared row must make true/cash break-even unavailable instead of being
+    // silently ignored or arbitrarily assigned to this truck.
+    const fixture = await readDataset() as CalculatorFixtureDataset;
+    const primary = fixture.trucks.find((truck) => truck.name === "Truck 1");
+    const primaryLoad = fixture.loads.find((load) => load.truckId === primary?.id);
+    const expenseTemplate = fixture.expenses.find((expense) => expense.truckId === primary?.id);
+    if (!primary || !primaryLoad || !expenseTemplate) {
+      throw new Error("Calculator Fleet fixture is incomplete.");
+    }
+    const originalLoadedMiles = primaryLoad.loadedMiles;
+    const originalCostExemptions = primary.operatingCostExemptions;
+    primaryLoad.loadedMiles = 600;
+    fixture.expenses.push({
+      ...expenseTemplate,
+      id: "expense_shared_calculator_e2e",
+      truckId: null,
+      scope: "BUSINESS",
+      date: "2026-09-02",
+      category: "OTHER",
+      description: "Shared Fleet office cost",
+      amount: 125,
+      financialTreatment: "OPERATING",
+    });
+    await writeDataset(fixture);
+
+    try {
+      await page.goto("/calculator");
+      const truckScope = page.getByRole("group", { name: "Truck" });
+      await expect(truckScope.getByRole("link", { name: "Truck 1", exact: true })).toHaveAttribute(
+        "aria-current",
+        "true",
+      );
+      await expect(page.getByTestId("shared-overhead-warning")).toBeVisible();
+
+      // Only an explicit owner choice may turn shared Fleet costs into a
+      // per-truck rate. Persist the miles policy, then verify Calculator uses
+      // it and explains the allocation instead of keeping break-even hidden.
+      await page.goto("/settings?section=business");
+      await page.getByRole("radio", { name: "Allocate by Fleet miles" }).check();
+      await page.getByRole("button", { name: "Save settings" }).click();
+      await expect(page.getByText("Settings saved")).toBeVisible();
+      await page.goto("/calculator");
+      await expect(page.getByTestId("shared-overhead-warning")).toHaveCount(0);
+      await expect(page.getByTestId("shared-overhead-allocation")).toBeVisible();
+      await expect(page.getByTestId("cost-profile-warning")).toBeVisible();
+
+      // Ledger evidence marks a group Recorded automatically. The owner can
+      // only resolve the remaining groups by explicitly saying they do not
+      // apply; missing entries never become zero by default.
+      for (const label of [
+        "Insurance",
+        "Maintenance & repairs",
+        "Permits & registration",
+        "Recurring services & administration",
+      ]) {
+        const exemption = page.getByRole("checkbox", {
+          name: `${label}: This cost group does not apply to this truck`,
+        });
+        if (await exemption.count()) {
+          await exemption.check();
+          await expect(page.getByText("Operating-cost profile saved for this truck.").last()).toBeVisible();
+        }
+      }
+      await expect(page.getByTestId("cost-profile-warning")).toHaveCount(0);
+
+      await truckScope.getByRole("link", { name: "Unit 202", exact: true }).click();
+      await expect(page).toHaveURL(/\/calculator\?truck=/);
+      await expect(truckScope.getByRole("link", { name: "Unit 202", exact: true })).toHaveAttribute(
+        "aria-current",
+        "true",
+      );
+      await expect(page.getByTestId("shared-overhead-warning")).toHaveCount(0);
+
+      const secondTruckConfirmation = page.getByRole("checkbox", {
+        name: "This truck has no financing",
+      });
+      await expect(secondTruckConfirmation).not.toBeChecked();
+      await secondTruckConfirmation.check();
+      await expect(page.getByText("Financing status saved for this truck.")).toBeVisible();
+      await page.reload();
+      await expect(
+        page.getByRole("checkbox", { name: "This truck has no financing" }),
+      ).toBeChecked();
+
+      await page.getByRole("group", { name: "Truck" })
+        .getByRole("link", { name: "Truck 1", exact: true })
+        .click();
+      await expect(page).toHaveURL(/\/calculator\?truck=/);
+      await expect(page.getByTestId("shared-overhead-warning")).toHaveCount(0);
+      await expect(page.getByTestId("shared-overhead-allocation")).toBeVisible();
+      await expect(
+        page.getByRole("checkbox", { name: "This truck has no financing" }),
+      ).not.toBeChecked();
+    } finally {
+      const cleanup = await readDataset() as CalculatorFixtureDataset;
+      const loadToRestore = cleanup.loads.find((load) => load.id === primaryLoad.id);
+      if (loadToRestore) loadToRestore.loadedMiles = originalLoadedMiles;
+      cleanup.expenses = cleanup.expenses.filter(
+        (expense) => expense.id !== "expense_shared_calculator_e2e",
+      );
+      cleanup.settings.fleetOverheadAllocation = "UNALLOCATED";
+      const primaryToRestore = cleanup.trucks.find((truck) => truck.id === primary.id);
+      if (primaryToRestore) primaryToRestore.operatingCostExemptions = originalCostExemptions ?? {};
+      await writeDataset(cleanup);
+    }
   });
 
   test("role boundaries are visible and enforced in the browser", async ({ page }) => {

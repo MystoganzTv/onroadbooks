@@ -6,7 +6,12 @@ import { requireWritableSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { activeTrucks } from "@/lib/fleet";
 import { truckAllowance } from "@/lib/plans";
-import { truckArchiveSchema, truckSchema } from "@/lib/schemas";
+import {
+  truckArchiveSchema,
+  truckFinancingConfirmationSchema,
+  truckOperatingCostExemptionsSchema,
+  truckSchema,
+} from "@/lib/schemas";
 import { fieldErrorsFrom, type ActionResult } from "./types";
 
 function revalidate() {
@@ -67,6 +72,84 @@ export async function updateTruckByIdAction(id: string, values: unknown): Promis
     return { ok: true, id };
   } catch (error) {
     return failed(error, "Could not save the truck.");
+  }
+}
+
+/**
+ * Records an owner's explicit answer instead of treating missing debt rows as
+ * zero. The answer belongs to one truck and cannot be asserted while the same
+ * truck still has an active financing obligation or monthly payment on file.
+ */
+export async function updateTruckFinancingConfirmationAction(
+  values: unknown,
+): Promise<ActionResult> {
+  const parsed = truckFinancingConfirmationSchema.safeParse(values);
+  if (!parsed.success) {
+    return { ok: false, error: "That financing answer is not valid." };
+  }
+
+  try {
+    const session = await requireWritableSession("manage_owner_finances");
+    const repository = getRepository(session.businessId);
+    const dataset = await repository.getDataset();
+    const truck = dataset.trucks.find((candidate) => candidate.id === parsed.data.truckId);
+    if (!truck) {
+      return { ok: false, error: "That truck does not belong to this workspace." };
+    }
+
+    if (parsed.data.confirmedNone) {
+      const hasActiveObligation = dataset.financialObligations.some(
+        (obligation) => obligation.truckId === truck.id && obligation.active,
+      );
+      if ((truck.monthlyPayment ?? 0) > 0 || hasActiveObligation) {
+        return {
+          ok: false,
+          error: "Remove or close this truck's active financing before confirming it has none.",
+        };
+      }
+    }
+
+    await repository.setTruckFinancingConfirmedNone(
+      truck.id,
+      parsed.data.confirmedNone ? true : null,
+    );
+    revalidate();
+    return { ok: true, id: truck.id };
+  } catch (error) {
+    return failed(error, "Could not save the truck's financing status.");
+  }
+}
+
+/**
+ * Stores explicit owner exemptions for the operating-cost checklist. Recorded
+ * coverage is never asserted here: Calculator derives it from the ledger in
+ * the exact cost-basis window.
+ */
+export async function updateTruckOperatingCostExemptionsAction(
+  values: unknown,
+): Promise<ActionResult> {
+  const parsed = truckOperatingCostExemptionsSchema.safeParse(values);
+  if (!parsed.success) {
+    return { ok: false, error: "That operating-cost profile is not valid." };
+  }
+
+  try {
+    const session = await requireWritableSession("manage_owner_finances");
+    const repository = getRepository(session.businessId);
+    const dataset = await repository.getDataset();
+    const truck = dataset.trucks.find((candidate) => candidate.id === parsed.data.truckId);
+    if (!truck) {
+      return { ok: false, error: "That truck does not belong to this workspace." };
+    }
+
+    await repository.setTruckOperatingCostExemptions(
+      truck.id,
+      parsed.data.exemptions,
+    );
+    revalidate();
+    return { ok: true, id: truck.id };
+  } catch (error) {
+    return failed(error, "Could not save the truck's operating-cost profile.");
   }
 }
 

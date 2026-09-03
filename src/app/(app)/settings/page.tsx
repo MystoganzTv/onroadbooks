@@ -122,6 +122,7 @@ export default async function SettingsPage({
                   preview={preview}
                   previewLabel={formatLocalePeriod(period, locale)}
                   reserveAccounts={reserveAccounts}
+                  hasFleet={hasFleet}
                 />
               ) : (
                 <Card>

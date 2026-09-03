@@ -620,6 +620,12 @@ describe("settings", () => {
     assert.ok(saved.categoryBehavior, "an unchanged field is not wiped");
 
     await repo.updateSettings({
+      ...saved,
+      fleetOverheadAllocation: "FLEET_MILES",
+    });
+    assert.equal((await repo.getDataset()).settings.fleetOverheadAllocation, "FLEET_MILES");
+
+    await repo.updateSettings({
       taxReservePct: before.taxReservePct,
       maintenanceReservePct: before.maintenanceReservePct,
       ratingGreatPerMile: before.ratingGreatPerMile,
@@ -628,6 +634,7 @@ describe("settings", () => {
       deadheadWarnPct: before.deadheadWarnPct,
       maintenanceWarnMiles: before.maintenanceWarnMiles,
       maintenanceWarnDays: before.maintenanceWarnDays,
+      fleetOverheadAllocation: before.fleetOverheadAllocation ?? "UNALLOCATED",
     });
   });
 });
@@ -914,6 +921,76 @@ describe("which truck a row belongs to", () => {
     const charged = await repo.createExpense(expense({ truckId: second.id }));
     assert.equal(charged.truckId, second.id);
     assert.equal(charged.scope, "TRUCK");
+  });
+
+  it("persists an explicit no-financing answer on only the selected truck", async () => {
+    const before = await repo.getDataset();
+    const selected = before.trucks.find((truck) => truck.name === "Unit 102");
+    const other = before.trucks.find((truck) => truck.id !== selected?.id);
+    assert.ok(selected);
+    assert.ok(other);
+
+    await repo.setTruckFinancingConfirmedNone(selected.id, true);
+
+    const reloaded = await new store.JsonRepository(BUSINESS).getDataset();
+    assert.equal(
+      reloaded.trucks.find((truck) => truck.id === selected.id)?.financingConfirmedNone,
+      true,
+    );
+    assert.equal(
+      reloaded.trucks.find((truck) => truck.id === other.id)?.financingConfirmedNone,
+      null,
+    );
+
+    await repo.setTruckFinancingConfirmedNone(selected.id, null);
+    assert.equal(
+      (await repo.getDataset()).trucks.find((truck) => truck.id === selected.id)
+        ?.financingConfirmedNone,
+      null,
+    );
+  });
+
+  it("persists operating-cost exemptions on only the selected truck", async () => {
+    const before = await repo.getDataset();
+    const selected = before.trucks.find((truck) => truck.name === "Unit 102");
+    const other = before.trucks.find((truck) => truck.id !== selected?.id);
+    assert.ok(selected);
+    assert.ok(other);
+
+    await repo.setTruckOperatingCostExemptions(selected.id, {
+      PERMITS_REGISTRATION: true,
+      RECURRING_SERVICES: true,
+    });
+
+    const reloaded = await new store.JsonRepository(BUSINESS).getDataset();
+    assert.deepEqual(
+      reloaded.trucks.find((truck) => truck.id === selected.id)?.operatingCostExemptions,
+      { PERMITS_REGISTRATION: true, RECURRING_SERVICES: true },
+    );
+    assert.deepEqual(
+      reloaded.trucks.find((truck) => truck.id === other.id)?.operatingCostExemptions,
+      {},
+    );
+  });
+
+  it("invalidates a no-financing answer when that truck gains active financing", async () => {
+    const selected = (await repo.getDataset()).trucks.find((truck) => truck.name === "Unit 102");
+    assert.ok(selected);
+    await repo.setTruckFinancingConfirmedNone(selected.id, true);
+
+    await repo.createFinancialObligation({
+      truckId: selected.id,
+      name: "Unit 102 loan",
+      kind: "LOAN",
+      expectedMonthlyPayment: 975,
+      active: true,
+    });
+
+    assert.equal(
+      (await repo.getDataset()).trucks.find((truck) => truck.id === selected.id)
+        ?.financingConfirmedNone,
+      null,
+    );
   });
 
   it("requires an explicit unit once more than one truck is active", async () => {

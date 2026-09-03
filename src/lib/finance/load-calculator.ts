@@ -243,15 +243,84 @@ export interface TargetRate {
   debtService: number;
   /** Costs that do not move with the rate. Dispatch and factoring do. */
   fixedTripCost: number;
+  /** Direct costs that do not move with the rate, before allocated overhead. */
+  directFixedCost: number;
   costPerMile: number;
   /** Combined dispatch + factoring share of gross, as a fraction (0.075). */
   grossFeeRate: number;
   /** Dispatch + factoring entered as flat dollars rather than a percentage. */
   flatFees: number;
+  /** Direct trip costs only. Always available when the trip inputs are valid. */
+  directCostBreakEven: number;
   tiers: RateTier[];
   valid: boolean;
   /** Set when fees are configured at 100% or more and no rate can work. */
   impossible: boolean;
+}
+
+export type OfferPosition = "GREAT" | "GOOD" | "MARGINAL" | "BELOW_MINIMUM";
+
+export interface OfferComparison {
+  position: OfferPosition;
+  differenceVsGreat: number;
+  /** The threshold the negotiation should aim to settle at. */
+  settlementTarget: number | null;
+  /** Null when the existing offer already meets or exceeds GREAT. */
+  suggestedCounteroffer: number | null;
+}
+
+export const QUOTE_ROUNDING_INCREMENT = 25;
+export const QUOTE_CUSHION_PCT = 0.03;
+export const MIN_QUOTE_CUSHION = 25;
+
+/**
+ * A deterministic opening anchor: add 3% (at least $25), then round UP to
+ * the next $25. The current offer is a hard floor and can never be rounded
+ * down by the suggestion.
+ */
+export function suggestedOpeningQuote(
+  settlementTarget: number,
+  currentOffer = 0,
+): number {
+  const safeTarget = Math.max(0, settlementTarget);
+  const safeOffer = Math.max(0, currentOffer);
+  const cushion = Math.max(MIN_QUOTE_CUSHION, safeTarget * QUOTE_CUSHION_PCT);
+  const rounded =
+    Math.ceil((safeTarget + cushion) / QUOTE_ROUNDING_INCREMENT) *
+    QUOTE_ROUNDING_INCREMENT;
+  return roundMoney(Math.max(safeOffer, rounded));
+}
+
+/** Compare a posted broker offer with the contribution-profit rate bands. */
+export function compareOfferToThresholds(
+  currentOffer: number,
+  rates: { minimum: number; good: number; great: number },
+): OfferComparison {
+  const offer = Math.max(0, currentOffer);
+  const differenceVsGreat = roundMoney(offer - rates.great);
+
+  if (offer >= rates.great) {
+    return {
+      position: "GREAT",
+      differenceVsGreat,
+      settlementTarget: null,
+      suggestedCounteroffer: null,
+    };
+  }
+
+  const position: OfferPosition = offer >= rates.good
+    ? "GOOD"
+    : offer >= rates.minimum
+      ? "MARGINAL"
+      : "BELOW_MINIMUM";
+  const settlementTarget = position === "GOOD" ? rates.great : rates.good;
+
+  return {
+    position,
+    differenceVsGreat,
+    settlementTarget,
+    suggestedCounteroffer: suggestedOpeningQuote(settlementTarget, offer),
+  };
 }
 
 /**
@@ -359,10 +428,12 @@ export function calculateTargetRate(
     otherCost,
     overhead,
     debtService,
+    directFixedCost,
     fixedTripCost,
     costPerMile: div(fixedTripCost, totalMiles),
     grossFeeRate,
     flatFees,
+    directCostBreakEven: rateFor(directFixedCost),
     tiers: tierDefs.map((tier) => {
       const rate = rateFor(tier.numerator);
       return {

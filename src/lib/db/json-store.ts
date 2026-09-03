@@ -172,6 +172,7 @@ async function seedFresh(): Promise<Dataset> {
       maintenanceWarnMiles: 2000,
       maintenanceWarnDays: 30,
       iftaTaxRates: {},
+      fleetOverheadAllocation: "UNALLOCATED",
       updatedAt: now,
     },
     goals: defaultGoals(businessId, now),
@@ -189,6 +190,8 @@ async function seedFresh(): Promise<Dataset> {
       purchasePrice: null,
       monthlyPayment: null,
       monthlyInsurance: null,
+      financingConfirmedNone: null,
+      operatingCostExemptions: {},
       axleCount: null,
       registeredGrossWeightLbs: null,
       operatesInMultipleIftaJurisdictions: null,
@@ -297,6 +300,10 @@ function migrate(dataset: Dataset): Dataset {
     maintenanceWarnMiles: dataset.settings?.maintenanceWarnMiles ?? 2000,
     maintenanceWarnDays: dataset.settings?.maintenanceWarnDays ?? 30,
     iftaTaxRates: dataset.settings?.iftaTaxRates ?? {},
+    fleetOverheadAllocation:
+      dataset.settings?.fleetOverheadAllocation === "FLEET_MILES"
+        ? "FLEET_MILES"
+        : "UNALLOCATED",
   };
 
   for (const load of dataset.loads) {
@@ -947,6 +954,8 @@ export class JsonAuthStore implements AuthStore {
           purchasePrice: null,
           monthlyPayment: null,
           monthlyInsurance: null,
+          financingConfirmedNone: null,
+          operatingCostExemptions: {},
           axleCount: null,
           registeredGrossWeightLbs: null,
           operatesInMultipleIftaJurisdictions: null,
@@ -972,6 +981,7 @@ export class JsonAuthStore implements AuthStore {
         maintenanceWarnMiles: 2000,
         maintenanceWarnDays: 30,
         iftaTaxRates: {},
+        fleetOverheadAllocation: "UNALLOCATED",
         updatedAt: now,
       };
       dataset.goals = defaultGoals(businessId, now);
@@ -1379,6 +1389,10 @@ export class JsonRepository implements Repository {
     return mutate((dataset) => {
       const obligation = financialObligationFromInput(input, dataset);
       dataset.financialObligations.push(obligation);
+      if (obligation.active && obligation.truckId) {
+        const truck = dataset.trucks.find((candidate) => candidate.id === obligation.truckId);
+        if (truck) truck.financingConfirmedNone = null;
+      }
       return obligation;
     }, this.businessId);
   }
@@ -1398,6 +1412,10 @@ export class JsonRepository implements Repository {
       if (input.newObligation) {
         const obligation = financialObligationFromInput(input.newObligation, dataset);
         dataset.financialObligations.push(obligation);
+        if (obligation.active && obligation.truckId) {
+          const truck = dataset.trucks.find((candidate) => candidate.id === obligation.truckId);
+          if (truck) truck.financingConfirmedNone = null;
+        }
         obligationId = obligation.id;
       }
       const obligation = obligationId
@@ -1674,6 +1692,8 @@ export class JsonRepository implements Repository {
         maintenanceWarnMiles: input.maintenanceWarnMiles,
         maintenanceWarnDays: input.maintenanceWarnDays,
         iftaTaxRates: input.iftaTaxRates ?? dataset.settings.iftaTaxRates,
+        fleetOverheadAllocation:
+          input.fleetOverheadAllocation ?? dataset.settings.fleetOverheadAllocation ?? "UNALLOCATED",
         updatedAt: new Date().toISOString(),
       };
       return dataset.settings;
@@ -1710,6 +1730,8 @@ export class JsonRepository implements Repository {
         purchasePrice: input.purchasePrice ?? null,
         monthlyPayment: input.monthlyPayment ?? null,
         monthlyInsurance: input.monthlyInsurance ?? null,
+        financingConfirmedNone: null,
+        operatingCostExemptions: {},
         axleCount: input.axleCount ?? null,
         registeredGrossWeightLbs: input.registeredGrossWeightLbs ?? null,
         operatesInMultipleIftaJurisdictions:
@@ -1758,6 +1780,31 @@ export class JsonRepository implements Repository {
         startingOdometer: input.startingOdometer,
         currentOdometer: input.currentOdometer,
       });
+      if ((target.monthlyPayment ?? 0) > 0) target.financingConfirmedNone = null;
+      return target;
+    }, this.businessId);
+  }
+
+  async setTruckFinancingConfirmedNone(
+    id: string,
+    value: boolean | null,
+  ): Promise<Truck> {
+    return mutate((dataset) => {
+      const target = dataset.trucks.find((truck) => truck.id === id);
+      if (!target) throw new Error(`Truck ${id} not found`);
+      target.financingConfirmedNone = value;
+      return target;
+    }, this.businessId);
+  }
+
+  async setTruckOperatingCostExemptions(
+    id: string,
+    exemptions: NonNullable<Truck["operatingCostExemptions"]>,
+  ): Promise<Truck> {
+    return mutate((dataset) => {
+      const target = dataset.trucks.find((truck) => truck.id === id);
+      if (!target) throw new Error(`Truck ${id} not found`);
+      target.operatingCostExemptions = { ...exemptions };
       return target;
     }, this.businessId);
   }
