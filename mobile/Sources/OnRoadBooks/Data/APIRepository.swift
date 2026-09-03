@@ -684,6 +684,18 @@ private struct CalculatorDefaultsDTO: Decodable {
             basisLabel: basisLabel, basisMiles: basisMiles, basisSufficient: basisSufficient,
             debtServiceAvailable: debtServiceAvailable,
             targetProfitPerMile: targetProfitPerMile, deadheadWarnPct: deadheadWarnPct,
+            costCoverage: costCoverage.map {
+                OperatingCostCoverage(
+                    group: $0.group,
+                    status: OperatingCostCoverage.Status(rawValue: $0.status) ?? .unknown
+                )
+            },
+            costCoverageComplete: costCoverageComplete,
+            sharedOverheadUnallocated: sharedOverheadUnallocated,
+            sharedOverheadPerMile: sharedOverheadPerMile,
+            debtServiceRecorded: debtServiceRecorded,
+            noFinancingConfirmed: noFinancingConfirmed,
+            truckName: truckName,
             thresholds: RatingThresholds(
                 great: thresholds.great, good: thresholds.good, marginal: thresholds.marginal
             )

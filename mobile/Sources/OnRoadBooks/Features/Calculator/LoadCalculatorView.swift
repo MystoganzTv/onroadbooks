@@ -252,7 +252,7 @@ struct LoadCalculatorView: View {
                 availabilityRow(
                     "Debt service",
                     value: defaults?.debtServiceAvailable == true ? -estimate.debtService : nil,
-                    unavailable: "More debt and financing history needed"
+                    unavailable: debtUnavailableReason
                 )
                 availabilityRow(
                     "Cash after debt service",
@@ -280,14 +280,60 @@ struct LoadCalculatorView: View {
 
     /// Says where the overhead came from, and refuses to imply it is his when
     /// there are not enough recorded miles behind it.
+    /// The web's paragraph under the cost profile, branch for branch
+    /// (`calculator-panel.tsx`). It used to say "not enough miles recorded"
+    /// for every refusal, which was usually the wrong reason: the basis is
+    /// withheld when a cost group is unrecorded, or when a Fleet's shared
+    /// overhead has no allocation policy, and neither of those is mileage.
     private var overheadNote: String {
         guard let defaults else {
             return "Sin conexión al ledger: este número no está sacado de tu camión."
         }
-        if !defaults.basisSufficient {
-            return "Todavía no hay millas suficientes registradas (\(Int(defaults.basisMiles).formatted()) mi). El punto de equilibrio operativo seguirá no disponible."
+        let sharedNote = defaults.sharedOverheadPerMile > 0
+            ? " Incluye \(defaults.sharedOverheadPerMile.formatted(.currency(code: "USD").precision(.fractionLength(2))))/mi de overhead compartido de Fleet, asignado entre todas las millas de Fleet del mismo período."
+            : ""
+
+        if defaults.sharedOverheadUnallocated {
+            return "Este camión tiene suficiente historial, pero Fleet también tiene gastos compartidos del negocio. Hasta definir una política de asignación, OnRoad no presentará una tarifa parcial como punto de equilibrio operativo o de efectivo real."
         }
-        return "Tu costo real de \(defaults.basisLabel): \(Int(defaults.basisMiles).formatted()) mi. Sin combustible, peajes, dispatch ni factoring — esos se cobran arriba."
+        if defaults.basisSufficient {
+            return "Basado en \(defaults.basisLabel): \(Int(defaults.basisMiles).formatted()) mi. Sin combustible, peajes, dispatch ni factoring — esos se cobran arriba." + sharedNote
+        }
+        if !defaults.costCoverageComplete {
+            return "Los puntos de equilibrio Operativo Real y de Efectivo permanecen no disponibles hasta que cada grupo de abajo aparezca registrado en este período de costos o se marque como no aplicable." + sharedNote
+        }
+        return "Registra al menos 500 millas y costos indirectos como seguro, mantenimiento, permisos o reparaciones. Los costos desconocidos quedan como no disponibles; la calificación sigue usando solo los costos directos del viaje." + sharedNote
+    }
+
+    /// The web's `CostCoverageChecklist`, read-only. Naming the group that is
+    /// missing is the whole difference between a refusal you can act on and
+    /// one that just says no.
+    @ViewBuilder
+    private var costProfileChecklist: some View {
+        if let defaults, !defaults.costCoverage.isEmpty, !defaults.costCoverageComplete {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(defaults.costCoverage) { item in
+                    HStack(spacing: 6) {
+                        Image(systemName: item.status == .unknown ? "circle" : "checkmark.circle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(item.status == .unknown ? OBColor.warn : OBColor.pos)
+                        Text(item.label)
+                            .font(.caption2)
+                            .foregroundStyle(item.status == .unknown ? OBColor.foreground : OBColor.mutedForeground)
+                        if item.status == .notApplicable {
+                            Text("no aplica")
+                                .font(.system(size: 9))
+                                .foregroundStyle(OBColor.mutedForeground)
+                        }
+                        Spacer()
+                    }
+                }
+                Text("Se marcan como no aplicables desde la web.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(OBColor.mutedForeground)
+            }
+            .padding(.top, 2)
+        }
     }
 
     /// Fuel cannot be estimated without an MPG the odometer proved.
@@ -343,6 +389,7 @@ struct LoadCalculatorView: View {
                     Text(overheadNote)
                         .font(.caption2)
                         .foregroundStyle(defaults?.basisSufficient == false ? OBColor.warn : OBColor.mutedForeground)
+                    costProfileChecklist
                 }
             }
             .padding(OBSpacing.md)
@@ -444,7 +491,7 @@ struct LoadCalculatorView: View {
                     availabilityRow(
                         "Cash Break-even",
                         value: defaults?.debtServiceAvailable == true ? rates.cashBreakEven : nil,
-                        unavailable: "More debt and financing history needed"
+                        unavailable: debtUnavailableReason
                     )
                     thresholdRow("Minimum Threshold", rates.minimum)
                     thresholdRow("Good Threshold", rates.good)
@@ -504,6 +551,16 @@ struct LoadCalculatorView: View {
                 .monospacedDigit()
                 .foregroundStyle(elevated ? OBColor.warn : OBColor.foreground)
         }
+    }
+
+    /// An owner who paid his truck off and said so on the web used to be told
+    /// he needed "more debt history" — a reason he could never satisfy, and
+    /// the wrong one. The route now sends `noFinancingConfirmed`, so the
+    /// refusal can name what is actually missing.
+    private var debtUnavailableReason: String {
+        guard let defaults else { return "Sin conexión al ledger" }
+        if defaults.noFinancingConfirmed { return "Necesita millas registradas suficientes" }
+        return "Registra los pagos de deuda, o confirma en la web que este camión no tiene financiamiento"
     }
 
     private func availabilityRow(_ label: String, value: Double?, unavailable: String) -> some View {

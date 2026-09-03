@@ -4,12 +4,29 @@ import { getMobileSession } from "@/lib/auth/mobile";
 import { div, summarizeFuel, thresholdsFromSettings } from "@/lib/calculations";
 import { getRepository } from "@/lib/db";
 import {
+  activeTrucks,
+  expensesForTruck,
+  loadsForTruck,
+  orderedTrucks,
+  overheadExpenses,
+  primaryTruck,
+  truckById,
+} from "@/lib/fleet";
+import {
+  hasSufficientOperatingCostBasis,
+  hasUnallocatedSharedOperatingCosts,
   MIN_BASIS_MILES,
   overheadCostPerMile,
+  sharedOperatingCostPerFleetMile,
   trailingCostBasis,
 } from "@/lib/finance/cost-per-mile";
+import {
+  hasCompleteOperatingCostCoverage,
+  operatingCostCoverage,
+} from "@/lib/finance/cost-coverage";
 import { capabilityRefusal, planAllows } from "@/lib/plans";
 import { todayISO } from "@/lib/periods";
+import { truckFromSearchParams } from "@/lib/period-params";
 import { FINANCIAL_MODEL_VERSION } from "@/lib/finance/terminology";
 
 export const runtime = "nodejs";
@@ -29,30 +46,90 @@ export const dynamic = "force-dynamic";
  * that still contained them would charge them twice. That is the classic way a
  * load calculator lies.
  *
- * `basisSufficient` is the honest part. When there are not enough recorded
- * miles behind the overhead, the app has to say so rather than quietly costing
- * a load against thin data.
+ * `basisSufficient` is the honest part, and for a long time this route got it
+ * wrong in the owner's favour. It tested recorded mileage and nothing else,
+ * while the page computes it as `!sharedOverheadUnallocated &&
+ * costCoverageComplete && ...`. A truck with 30,000 miles on file and no
+ * insurance expense recorded passed here and was refused there — so the phone
+ * quoted a load against an overhead the browser would not show, and printed
+ * "your real cost" over it. `cost-coverage.ts` says the rule this broke: a
+ * missing group is never silently converted to $0.
+ *
+ * Everything below is the same expression the page builds, including the truck
+ * scoping it does. That is the point: two clients, one calculation.
  */
 export async function GET(request: NextRequest) {
   const session = await getMobileSession(request);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const dataset = await getRepository(session.businessId).getDataset();
-  const { loads, expenses, settings, goals, fuelEntries, subscription } = dataset;
+  const { loads, expenses, settings, goals, fuelEntries, subscription, trucks } = dataset;
 
   if (!planAllows(subscription, "cockpit")) {
     return NextResponse.json({ error: capabilityRefusal("cockpit") }, { status: 403 });
   }
 
-  const basis = trailingCostBasis(loads, expenses, settings, todayISO());
-  const operatingCostAvailable = basis.sufficient && basis.totalMiles >= MIN_BASIS_MILES;
-  const debtServiceAvailable = operatingCostAvailable && basis.debtServiceTotal > 0;
-  const fuel = summarizeFuel(fuelEntries, basis.totalMiles);
+  const today = todayISO();
+  const search = Object.fromEntries(request.nextUrl.searchParams.entries());
+  const selectableTrucks = orderedTrucks(activeTrucks(trucks));
+  const selectedTruck =
+    truckById(selectableTrucks, truckFromSearchParams(search, selectableTrucks) ?? "")
+    ?? primaryTruck(selectableTrucks.length ? selectableTrucks : trucks);
 
-  const grossRevenue = loads.reduce((total, load) => total + load.grossRate, 0);
-  const dispatchPaid = loads.reduce((total, load) => total + load.dispatchFee, 0);
-  const factoringPaid = loads.reduce((total, load) => total + load.factoringFee, 0);
-  const latestFuel = [...fuelEntries].sort((a, b) => b.date.localeCompare(a.date))[0];
+  const scopedLoads = loadsForTruck(loads, selectedTruck.id);
+  const truckExpenses = expensesForTruck(expenses, selectedTruck.id);
+  // A one-truck business has only one honest destination for shared overhead.
+  // A Fleet does not: allocating its office/accounting costs requires an
+  // explicit policy, so those rows stay out of the unit basis until one exists.
+  const scopedExpenses = selectableTrucks.length > 1
+    ? truckExpenses
+    : [...truckExpenses, ...overheadExpenses(expenses)];
+  const scopedFuelEntries = fuelEntries.filter((entry) => entry.truckId === selectedTruck.id);
+
+  const basis = trailingCostBasis(scopedLoads, scopedExpenses, settings, today);
+  const truckMileageBasisSufficient = basis.sufficient && basis.totalMiles >= MIN_BASIS_MILES;
+  const truckOperatingBasisSufficient = hasSufficientOperatingCostBasis(basis);
+  const hasSharedFleetOverhead = selectableTrucks.length > 1
+    && truckMileageBasisSufficient
+    && hasUnallocatedSharedOperatingCosts(expenses, basis, today);
+  const allocateSharedOverheadByMiles = hasSharedFleetOverhead
+    && settings.fleetOverheadAllocation === "FLEET_MILES";
+  const sharedOverheadPerMile = allocateSharedOverheadByMiles
+    ? sharedOperatingCostPerFleetMile(loads, expenses, basis)
+    : 0;
+  const sharedOverheadUnallocated = hasSharedFleetOverhead && !allocateSharedOverheadByMiles;
+  const coverageExpenses = selectableTrucks.length > 1
+    && settings.fleetOverheadAllocation !== "FLEET_MILES"
+    ? truckExpenses
+    : [...truckExpenses, ...overheadExpenses(expenses)];
+  const costCoverage = operatingCostCoverage(
+    coverageExpenses,
+    basis,
+    selectedTruck.operatingCostExemptions,
+  );
+  const costCoverageComplete = hasCompleteOperatingCostCoverage(costCoverage);
+  const operatingCostAvailable = !sharedOverheadUnallocated
+    && costCoverageComplete
+    && (truckOperatingBasisSufficient || (sharedOverheadPerMile ?? 0) > 0);
+
+  const hasActiveFinancing = (selectedTruck.monthlyPayment ?? 0) > 0
+    || dataset.financialObligations.some(
+      (obligation) => obligation.truckId === selectedTruck.id && obligation.active,
+    );
+  const debtServiceRecorded = truckMileageBasisSufficient && basis.debtServiceTotal > 0;
+  const noFinancingConfirmed =
+    selectedTruck.financingConfirmedNone === true && !hasActiveFinancing;
+  // The web's cash basis: recorded debt OR an owner who said there is none.
+  // Gating on recorded debt alone told an owner who paid his truck off that he
+  // needed "more debt history", which is the wrong reason and unfixable.
+  const debtServiceAvailable = truckMileageBasisSufficient
+    && (debtServiceRecorded || noFinancingConfirmed);
+  const fuel = summarizeFuel(scopedFuelEntries, basis.totalMiles);
+
+  const grossRevenue = scopedLoads.reduce((total, load) => total + load.grossRate, 0);
+  const dispatchPaid = scopedLoads.reduce((total, load) => total + load.dispatchFee, 0);
+  const factoringPaid = scopedLoads.reduce((total, load) => total + load.factoringFee, 0);
+  const latestFuel = [...scopedFuelEntries].sort((a, b) => b.date.localeCompare(a.date))[0];
 
   return NextResponse.json(
     {
@@ -63,13 +140,22 @@ export async function GET(request: NextRequest) {
       mpg: fuel.milesPerGallon ?? null,
       dispatchPct: Math.round(div(dispatchPaid, grossRevenue) * 1000) / 10,
       factoringPct: Math.round(div(factoringPaid, grossRevenue) * 1000) / 10,
-      overheadPerMile: overheadCostPerMile(basis),
+      overheadPerMile: overheadCostPerMile(basis) + (sharedOverheadPerMile ?? 0),
       debtServicePerMile: basis.debtServicePerMile,
-      trueCostPerMile: basis.trueCostPerMile,
+      trueCostPerMile: basis.trueCostPerMile + (sharedOverheadPerMile ?? 0),
       basisLabel: basis.basisLabel,
       basisMiles: basis.totalMiles,
       basisSufficient: operatingCostAvailable,
       debtServiceAvailable,
+      // Why a refusal is a refusal. Without these the phone can only say
+      // "more history needed", which is often not the reason.
+      costCoverage,
+      costCoverageComplete,
+      sharedOverheadUnallocated,
+      sharedOverheadPerMile: sharedOverheadPerMile ?? 0,
+      debtServiceRecorded,
+      noFinancingConfirmed,
+      truckName: selectedTruck.name,
       targetProfitPerMile: goals.targetProfitPerMile,
       deadheadWarnPct: settings.deadheadWarnPct,
       thresholds: thresholdsFromSettings(settings),

@@ -97,6 +97,18 @@ final class MockRepository: LedgerRepository {
             basisLabel: "últimos 90 días", basisMiles: 3339, basisSufficient: true,
             debtServiceAvailable: true,
             targetProfitPerMile: 0.75, deadheadWarnPct: 20,
+            costCoverage: [
+                .init(group: "INSURANCE", status: .recorded),
+                .init(group: "MAINTENANCE_REPAIRS", status: .recorded),
+                .init(group: "PERMITS_REGISTRATION", status: .notApplicable),
+                .init(group: "RECURRING_SERVICES", status: .unknown),
+            ],
+            costCoverageComplete: false,
+            sharedOverheadUnallocated: false,
+            sharedOverheadPerMile: 0,
+            debtServiceRecorded: true,
+            noFinancingConfirmed: false,
+            truckName: "Unit 1",
             thresholds: RatingThresholds(great: 1.25, good: 0.75, marginal: 0.25)
         )
     }

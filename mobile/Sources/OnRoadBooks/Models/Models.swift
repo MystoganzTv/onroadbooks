@@ -272,12 +272,25 @@ struct CalculatorDefaults {
     let trueCostPerMile: Double
     let basisLabel: String
     let basisMiles: Double
-    /// False when there are not enough recorded miles behind the overhead. The
-    /// screen has to say so rather than quietly costing a load against thin data.
+    /// The web's `operatingCostAvailable`: not a mileage test. False when a
+    /// cost group is unrecorded, when a Fleet's shared overhead has no
+    /// allocation policy, or when there is not enough history — and the screen
+    /// has to say which, rather than quietly costing a load against thin data.
     let basisSufficient: Bool
     let debtServiceAvailable: Bool
     let targetProfitPerMile: Double
     let deadheadWarnPct: Double
+    /// Why a refusal is a refusal. Without these the screen could only say
+    /// "more history needed", which is often not the reason at all.
+    let costCoverage: [OperatingCostCoverage]
+    let costCoverageComplete: Bool
+    let sharedOverheadUnallocated: Bool
+    let sharedOverheadPerMile: Double
+    let debtServiceRecorded: Bool
+    let noFinancingConfirmed: Bool
+    /// Which unit these defaults describe. The route scopes to a truck now,
+    /// as the web page does.
+    let truckName: String?
     let thresholds: RatingThresholds
 }
 
@@ -426,6 +439,25 @@ struct ReportTable {
     let title: String
     let columns: [String]
     let rows: [[String]]
+}
+
+/// One row of the web's cost-profile checklist. `unknown` is the one that
+/// withholds a break-even: a missing group is never silently made $0.
+struct OperatingCostCoverage: Equatable, Identifiable {
+    enum Status: String { case recorded = "RECORDED", notApplicable = "NOT_APPLICABLE", unknown = "UNKNOWN" }
+    let group: String
+    let status: Status
+    var id: String { group }
+
+    var label: String {
+        switch group {
+        case "INSURANCE": return "Seguro"
+        case "MAINTENANCE_REPAIRS": return "Mantenimiento y reparaciones"
+        case "PERMITS_REGISTRATION": return "Permisos y registro"
+        case "RECURRING_SERVICES": return "Servicios recurrentes"
+        default: return group
+        }
+    }
 }
 
 // MARK: - Reserves
