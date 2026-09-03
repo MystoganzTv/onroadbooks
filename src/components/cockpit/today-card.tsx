@@ -53,7 +53,7 @@ export function TodayCard({ day, className }: { day: DaySnapshot; className?: st
 
   return (
     <div className={cn("overflow-hidden rounded-lg border border-border bg-card", className)}>
-      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5">
+      <div className="flex min-h-11 items-center justify-between gap-3 border-b border-border px-4 py-2.5">
         <span className="flex items-center gap-2">
           <CalendarCheck className="size-3.5 text-muted-foreground" />
           <span className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
@@ -70,7 +70,7 @@ export function TodayCard({ day, className }: { day: DaySnapshot; className?: st
         </span>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 p-4 sm:grid-cols-5">
+      <div className="grid grid-cols-3 gap-x-2 gap-y-3 p-4 sm:grid-cols-5">
         <Cell label={copy.youEarned} value={formatMoneyCompact(day.revenue)} />
         <Cell label={copy.businessExpenses} value={formatMoneyCompact(day.expenses)} tone="text-neg" />
         <Cell
@@ -91,9 +91,16 @@ export function TodayCard({ day, className }: { day: DaySnapshot; className?: st
 
 function Cell({ label, value, tone }: { label: string; value: string; tone?: string }) {
   return (
-    <div className="min-w-0">
-      <p className="label-xs truncate">{label}</p>
-      <p className={cn("mt-0.5 tnum text-lg font-semibold tracking-tight", tone)}>{value}</p>
+    <div className="min-w-0 text-center">
+      <p className="label-xs flex min-h-8 items-end justify-center text-center leading-4">
+        <span className="line-clamp-2">{label}</span>
+      </p>
+      <p
+        data-slot="today-metric-value"
+        className={cn("mt-1 whitespace-nowrap tnum text-lg font-semibold tracking-tight", tone)}
+      >
+        {value}
+      </p>
     </div>
   );
 }

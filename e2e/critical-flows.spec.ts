@@ -929,6 +929,12 @@ test.describe.serial("critical browser flows", () => {
     await expect(page.getByRole("heading", { name: "Where is my money?" })).toBeVisible();
     await expect(page.getByText("Financial details", { exact: true }).first()).toBeVisible();
 
+    const todayValueTops = await page.locator('[data-slot="today-metric-value"]').evaluateAll(
+      (elements) => elements.map((element) => element.getBoundingClientRect().top),
+    );
+    expect(todayValueTops).toHaveLength(9);
+    expect(Math.max(...todayValueTops) - Math.min(...todayValueTops)).toBeLessThan(1);
+
     const planning = page.getByTestId("monthly-planning");
     await expect(planning.getByText("Unavailable", { exact: true })).toHaveCount(2);
     await expect(planning.getByText("— Configure expected miles", { exact: true })).toHaveCount(2);
