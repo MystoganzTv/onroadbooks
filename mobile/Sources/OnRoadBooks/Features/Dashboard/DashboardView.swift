@@ -37,8 +37,15 @@ struct DashboardView: View {
                 ScrollView {
                     if let snapshot = viewModel.snapshot {
                         content(for: snapshot)
-                    } else {
+                    } else if viewModel.isLoading {
                         ProgressView().tint(OBColor.primary)
+                            .frame(maxWidth: .infinity, minHeight: 300)
+                    } else {
+                        // Same failure the other tabs already know how to
+                        // say: the request came back empty-handed, not that
+                        // it is still running. Pull to retry, per the
+                        // default OBUnavailableView message.
+                        OBUnavailableView(title: "Dashboard")
                             .frame(maxWidth: .infinity, minHeight: 300)
                     }
                 }

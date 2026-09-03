@@ -3,7 +3,7 @@ import Foundation
 @MainActor
 final class DashboardViewModel: ObservableObject {
     @Published var snapshot: DashboardSnapshot?
-    @Published var isLoading = false
+    @Published var isLoading = true
 
     private let repository: LedgerRepository
     init(repository: LedgerRepository) { self.repository = repository }
