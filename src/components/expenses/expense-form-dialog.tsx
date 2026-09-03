@@ -57,6 +57,12 @@ import { toNumber } from "@/lib/utils";
 
 /** The sentinel the "charged to" control uses for fleet overhead. */
 const BUSINESS = "BUSINESS";
+const FINANCING_PAYMENT_CATEGORIES = new Set<ExpenseCategoryId>([
+  "TRUCK_PAYMENT",
+  "PRINCIPAL_PAYMENT",
+  "INTEREST_EXPENSE",
+  "OPERATING_LEASE",
+]);
 
 interface FormState {
   /** A truck id, or BUSINESS for overhead. Empty when there is no fleet. */
@@ -175,6 +181,7 @@ export function ExpenseFormDialog({
 
   const behavior = behaviorOf(values.category, categoryBehavior);
   const canLinkToLoad = ["FUEL", "TOLLS", "DISPATCH", "FACTORING", "OTHER"].includes(values.category);
+  const isFinancingPayment = FINANCING_PAYMENT_CATEGORIES.has(values.category);
 
   // A linked load is not just a label: it determines which unit caused the
   // cost. Only offer loads from the selected truck, and keep an existing
@@ -201,6 +208,17 @@ export function ExpenseFormDialog({
     });
   }
 
+  function changeCategory(category: ExpenseCategoryId) {
+    setValues((previous) => ({
+      ...previous,
+      category,
+      receiptNumber: FINANCING_PAYMENT_CATEGORIES.has(category)
+        ? ""
+        : previous.receiptNumber,
+    }));
+    if (FINANCING_PAYMENT_CATEGORIES.has(category)) setAttachments([]);
+  }
+
   function submit(event: React.FormEvent) {
     event.preventDefault();
 
@@ -217,7 +235,9 @@ export function ExpenseFormDialog({
       amount: toNumber(values.amount),
       loadId: !canLinkToLoad || values.loadId === "none" ? null : values.loadId,
       recurring: values.recurring,
-      receiptNumber: values.receiptNumber || null,
+      receiptNumber: isFinancingPayment
+        ? (expense?.receiptNumber ?? null)
+        : (values.receiptNumber || null),
       notes: values.notes || null,
     };
 
@@ -247,7 +267,7 @@ export function ExpenseFormDialog({
         : await createExpenseAction(payload);
 
       if (result.ok) {
-        const upload = result.id
+        const upload = result.id && !isFinancingPayment
           ? await uploadPending("EXPENSE", result.id, attachments)
           : { uploaded: 0, failed: 0 };
         toast.success(isEdit ? copy.expenseUpdated : copy.expenseAdded, {
@@ -356,7 +376,7 @@ export function ExpenseFormDialog({
             >
               <Select
                 value={values.category}
-                onValueChange={(value) => set("category", value as ExpenseCategoryId)}
+                onValueChange={(value) => changeCategory(value as ExpenseCategoryId)}
               >
                 <SelectTrigger id="expense-category">
                   <SelectValue />
@@ -425,21 +445,23 @@ export function ExpenseFormDialog({
               </Field> : null}
             </div>
 
-            <Field
-              label={copy.receiptNumber}
-              htmlFor="expense-receipt"
-              hint={copy.receiptReference}
-              error={errors.receiptNumber}
-            >
-              <Input
-                id="expense-receipt"
-                maxLength={80}
-                aria-invalid={Boolean(errors.receiptNumber)}
-                value={values.receiptNumber}
-                onChange={(e) => set("receiptNumber", e.target.value)}
-                placeholder={copy.optional}
-              />
-            </Field>
+            {!isFinancingPayment ? (
+              <Field
+                label={copy.receiptNumber}
+                htmlFor="expense-receipt"
+                hint={copy.receiptReference}
+                error={errors.receiptNumber}
+              >
+                <Input
+                  id="expense-receipt"
+                  maxLength={80}
+                  aria-invalid={Boolean(errors.receiptNumber)}
+                  value={values.receiptNumber}
+                  onChange={(e) => set("receiptNumber", e.target.value)}
+                  placeholder={copy.optional}
+                />
+              </Field>
+            ) : null}
 
             <div className="flex items-center justify-between rounded-md border border-border bg-surface-sunken px-3 py-2">
               <div>
@@ -457,7 +479,12 @@ export function ExpenseFormDialog({
               />
             </div>
 
-            <Field label={copy.notes} htmlFor="expense-notes" error={errors.notes}>
+            <Field
+              label={copy.notes}
+              htmlFor="expense-notes"
+              error={errors.notes}
+              hint={isFinancingPayment ? copy.bankPaymentNotesHint : undefined}
+            >
               <Textarea
                 id="expense-notes"
                 maxLength={2000}
@@ -469,7 +496,7 @@ export function ExpenseFormDialog({
               />
             </Field>
 
-            <div className="space-y-2 border-t border-border pt-3">
+            {!isFinancingPayment ? <div className="space-y-2 border-t border-border pt-3">
               <p className="label-xs">{copy.receipt}</p>
               {isEdit && expense ? (
                 <>
@@ -484,7 +511,7 @@ export function ExpenseFormDialog({
                   compact
                 />
               )}
-            </div>
+            </div> : null}
           </form>
         </DialogBody>
 

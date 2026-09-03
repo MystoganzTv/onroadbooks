@@ -1434,10 +1434,14 @@ export class JsonRepository implements Repository {
       if (obligationId && !obligation) {
         throw new Error("That obligation does not belong to this workspace.");
       }
+      const normalizedNotes = input.notes === undefined
+        ? undefined
+        : input.notes?.trim() || null;
 
       if (input.treatment === "DEBT_UNALLOCATED") {
         expense.financialTreatment = "DEBT_UNALLOCATED";
         expense.obligationId = obligationId;
+        if (normalizedNotes !== undefined) expense.notes = normalizedNotes;
         return [expense];
       }
 
@@ -1448,6 +1452,7 @@ export class JsonRepository implements Repository {
         expense.category = "OPERATING_LEASE";
         expense.financialTreatment = "OPERATING";
         expense.obligationId = obligationId;
+        if (normalizedNotes !== undefined) expense.notes = normalizedNotes;
         return [expense];
       }
 
@@ -1472,6 +1477,7 @@ export class JsonRepository implements Repository {
         const baseRow = principalRow ?? existingRows[0];
         const baseDescription = (principalRow?.description ?? baseRow.description)
           .replace(/ · interest$/u, "");
+        const resolvedNotes = normalizedNotes === undefined ? baseRow.notes : normalizedNotes;
         const kept: Expense[] = [];
 
         if (principal > 0) {
@@ -1480,6 +1486,7 @@ export class JsonRepository implements Repository {
           baseRow.amount = principal;
           baseRow.obligationId = obligationId;
           baseRow.description = baseDescription;
+          baseRow.notes = resolvedNotes;
           kept.push(baseRow);
 
           if (interest > 0) {
@@ -1492,6 +1499,7 @@ export class JsonRepository implements Repository {
               existingInterest.amount = interest;
               existingInterest.obligationId = obligationId;
               existingInterest.description = `${baseDescription} · interest`;
+              existingInterest.notes = resolvedNotes;
               kept.push(existingInterest);
             } else {
               const interestRow: Expense = {
@@ -1514,6 +1522,7 @@ export class JsonRepository implements Repository {
           baseRow.amount = interest;
           baseRow.obligationId = obligationId;
           baseRow.description = `${baseDescription} · interest`;
+          baseRow.notes = resolvedNotes;
           kept.push(baseRow);
         }
 
@@ -1525,12 +1534,14 @@ export class JsonRepository implements Repository {
       }
 
       const splitGroupId = newId("split");
+      const resolvedNotes = normalizedNotes === undefined ? expense.notes : normalizedNotes;
       if (principal <= 0) {
         expense.category = "INTEREST_EXPENSE";
         expense.financialTreatment = "INTEREST";
         expense.amount = interest;
         expense.obligationId = obligationId;
         expense.splitGroupId = splitGroupId;
+        expense.notes = resolvedNotes;
         return [expense];
       }
       expense.category = "PRINCIPAL_PAYMENT";
@@ -1538,6 +1549,7 @@ export class JsonRepository implements Repository {
       expense.amount = principal;
       expense.obligationId = obligationId;
       expense.splitGroupId = splitGroupId;
+      expense.notes = resolvedNotes;
 
       const rows = [expense];
       if (interest > 0) {

@@ -229,8 +229,12 @@ test.describe.serial("critical browser flows", () => {
     await page.locator("#expense-amount").fill("513");
     await page.locator("#expense-category").click();
     await page.getByRole("option", { name: "Truck Payment (Unallocated)" }).click();
+    await expect(expenseDialog.getByLabel("Receipt number")).toHaveCount(0);
+    await expect(expenseDialog.locator('input[type="file"]')).toHaveCount(0);
+    await expect(expenseDialog.getByLabel("Notes")).toBeVisible();
     await page.locator("#expense-description").fill("AMEX payment");
     await page.locator("#expense-vendor").fill("Amex");
+    await expenseDialog.getByLabel("Notes").fill("ACH payment from operating account");
     await page.getByRole("button", { name: "Add expense", exact: true }).last().click();
     await expect(expenseDialog).toBeHidden();
 
@@ -238,6 +242,7 @@ test.describe.serial("critical browser flows", () => {
     const classifyDialog = page.getByRole("dialog", { name: "Classify $513.00 payment" });
     await expect(classifyDialog.getByLabel("Loan principal")).toHaveValue("513");
     await expect(classifyDialog.getByLabel("Loan interest")).toHaveValue("0");
+    await expect(classifyDialog.getByLabel("Notes")).toHaveValue("ACH payment from operating account");
     await classifyDialog.getByRole("button", { name: "Confirm classification" }).click();
     await expect(classifyDialog).toBeHidden();
 
@@ -253,6 +258,7 @@ test.describe.serial("critical browser flows", () => {
     await expect(editDialog.getByLabel("Loan interest")).toHaveValue("0");
     await editDialog.getByLabel("Loan principal").fill("475");
     await editDialog.getByLabel("Loan interest").fill("38");
+    await editDialog.getByLabel("Notes").fill("September Amex autopay");
     await editDialog.getByRole("button", { name: "Save payment split" }).click();
     await expect(editDialog).toBeHidden();
 
@@ -266,6 +272,7 @@ test.describe.serial("critical browser flows", () => {
     await principalRow.getByRole("button", { name: "Edit principal and interest" }).click();
     await expect(editDialog.getByLabel("Loan principal")).toHaveValue("475");
     await expect(editDialog.getByLabel("Loan interest")).toHaveValue("38");
+    await expect(editDialog.getByLabel("Notes")).toHaveValue("September Amex autopay");
 
     await writeDataset(datasetBeforeTest);
   });

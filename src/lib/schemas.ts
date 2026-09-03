@@ -195,6 +195,7 @@ export const debtPaymentClassificationSchema = z
     treatment: z.enum(["OPERATING_LEASE", "LOAN_SPLIT", "DEBT_UNALLOCATED"]),
     principalAmount: money.optional(),
     interestAmount: money.optional(),
+    notes: z.string().trim().max(2000).optional().nullable(),
   })
   .refine((value) => !(value.obligationId && value.newObligation), {
     message: "Choose an existing obligation or create a new one, not both",

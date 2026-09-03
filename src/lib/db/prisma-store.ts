@@ -1856,11 +1856,18 @@ export class PrismaRepository implements Repository {
       if (obligationId && !obligation) {
         throw new Error("That obligation does not belong to this workspace.");
       }
+      const normalizedNotes = input.notes === undefined
+        ? undefined
+        : input.notes?.trim() || null;
 
       if (input.treatment === "DEBT_UNALLOCATED") {
         await tx.expense.update({
           where: { id },
-          data: { financialTreatment: "DEBT_UNALLOCATED", obligationId },
+          data: {
+            financialTreatment: "DEBT_UNALLOCATED",
+            obligationId,
+            ...(normalizedNotes !== undefined ? { notes: normalizedNotes } : {}),
+          },
         });
         return [id];
       }
@@ -1874,6 +1881,7 @@ export class PrismaRepository implements Repository {
             category: "OPERATING_LEASE",
             financialTreatment: "OPERATING",
             obligationId,
+            ...(normalizedNotes !== undefined ? { notes: normalizedNotes } : {}),
           },
         });
         return [id];
@@ -1901,6 +1909,7 @@ export class PrismaRepository implements Repository {
         const baseRow = principalRow ?? existingRows[0];
         const baseDescription = (principalRow?.description ?? baseRow.description)
           .replace(/ · interest$/u, "");
+        const resolvedNotes = normalizedNotes === undefined ? baseRow.notes : normalizedNotes;
         const keptIds: string[] = [];
 
         if (principal > 0) {
@@ -1912,6 +1921,7 @@ export class PrismaRepository implements Repository {
               amount: principal,
               obligationId,
               description: baseDescription,
+              notes: resolvedNotes,
             },
           });
           keptIds.push(baseRow.id);
@@ -1929,6 +1939,7 @@ export class PrismaRepository implements Repository {
                   amount: interest,
                   obligationId,
                   description: `${baseDescription} · interest`,
+                  notes: resolvedNotes,
                 },
               });
               keptIds.push(existingInterest.id);
@@ -1948,7 +1959,7 @@ export class PrismaRepository implements Repository {
                   vendor: baseRow.vendor,
                   amount: interest,
                   recurring: baseRow.recurring,
-                  notes: baseRow.notes,
+                  notes: resolvedNotes,
                 },
               });
               keptIds.push(interestRow.id);
@@ -1963,6 +1974,7 @@ export class PrismaRepository implements Repository {
               amount: interest,
               obligationId,
               description: `${baseDescription} · interest`,
+              notes: resolvedNotes,
             },
           });
           keptIds.push(baseRow.id);
@@ -1979,6 +1991,7 @@ export class PrismaRepository implements Repository {
       }
 
       const splitGroupId = newId("split");
+      const resolvedNotes = normalizedNotes === undefined ? expense.notes : normalizedNotes;
       if (principal <= 0) {
         await tx.expense.update({
           where: { id },
@@ -1988,6 +2001,7 @@ export class PrismaRepository implements Repository {
             amount: interest,
             obligationId,
             splitGroupId,
+            notes: resolvedNotes,
           },
         });
         return [id];
@@ -2000,6 +2014,7 @@ export class PrismaRepository implements Repository {
           amount: principal,
           obligationId,
           splitGroupId,
+          notes: resolvedNotes,
         },
       });
       if (interest <= 0) return [id];
@@ -2018,7 +2033,7 @@ export class PrismaRepository implements Repository {
           vendor: expense.vendor,
           amount: interest,
           recurring: expense.recurring,
-          notes: expense.notes,
+          notes: resolvedNotes,
         },
       });
       return [id, interestRow.id];

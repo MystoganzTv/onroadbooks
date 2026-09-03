@@ -1328,6 +1328,7 @@ describe("financial review and customer cash events", () => {
       category: "TRUCK_PAYMENT",
       description: "Amex payment",
       amount: 513,
+      notes: "ACH payment from operating account",
     }));
     const [principalOnly] = await repo.classifyDebtPayment(original.id, {
       treatment: "LOAN_SPLIT",
@@ -1346,6 +1347,7 @@ describe("financial review and customer cash events", () => {
       obligationId: principalOnly.obligationId,
       principalAmount: 475,
       interestAmount: 38,
+      notes: "September Amex autopay",
     });
     assert.equal(corrected.reduce((total, row) => total + row.amount, 0), 513);
     assert.deepEqual(
@@ -1353,6 +1355,7 @@ describe("financial review and customer cash events", () => {
       [["INTEREST", 38], ["PRINCIPAL", 475]],
     );
     assert.ok(corrected.every((row) => row.splitGroupId === principalOnly.splitGroupId));
+    assert.ok(corrected.every((row) => row.notes === "September Amex autopay"));
 
     const interestRow = corrected.find((row) => row.financialTreatment === "INTEREST")!;
     const correctedFromInterest = await repo.classifyDebtPayment(interestRow.id, {
@@ -1360,12 +1363,14 @@ describe("financial review and customer cash events", () => {
       obligationId: principalOnly.obligationId,
       principalAmount: 500,
       interestAmount: 13,
+      notes: null,
     });
     assert.equal(correctedFromInterest.reduce((total, row) => total + row.amount, 0), 513);
     assert.deepEqual(
       correctedFromInterest.map((row) => [row.financialTreatment, row.amount]).sort(),
       [["INTEREST", 13], ["PRINCIPAL", 500]],
     );
+    assert.ok(correctedFromInterest.every((row) => row.notes === null));
 
     const principalRow = correctedFromInterest.find((row) => row.financialTreatment === "PRINCIPAL")!;
     const principalAgain = await repo.classifyDebtPayment(principalRow.id, {

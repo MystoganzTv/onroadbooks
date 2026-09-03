@@ -22,6 +22,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -106,6 +107,10 @@ export function DebtClassificationDialog({
   const paymentAmount = rows.reduce((total, row) => total + row.amount, 0);
   const currentPrincipal = rows.find((row) => row.financialTreatment === "PRINCIPAL")?.amount ?? 0;
   const currentInterest = rows.find((row) => row.financialTreatment === "INTEREST")?.amount ?? 0;
+  const currentNotes = rows.find((row) => row.financialTreatment === "PRINCIPAL")?.notes
+    ?? rows[0]?.notes
+    ?? expense.notes
+    ?? "";
   const initialObligationId = expense.obligationId ?? (editingSplit ? "none" : "new");
 
   const [open, setOpen] = React.useState(false);
@@ -116,6 +121,7 @@ export function DebtClassificationDialog({
   const [monthlyPayment, setMonthlyPayment] = React.useState(String(paymentAmount));
   const [principal, setPrincipal] = React.useState(String(editingSplit ? currentPrincipal : expense.amount));
   const [interest, setInterest] = React.useState(String(editingSplit ? currentInterest : 0));
+  const [notes, setNotes] = React.useState(currentNotes);
 
   React.useEffect(() => {
     if (!open) return;
@@ -125,9 +131,11 @@ export function DebtClassificationDialog({
     setMonthlyPayment(String(paymentAmount));
     setPrincipal(String(editingSplit ? currentPrincipal : expense.amount));
     setInterest(String(editingSplit ? currentInterest : 0));
+    setNotes(currentNotes);
   }, [
     currentInterest,
     currentPrincipal,
+    currentNotes,
     editingSplit,
     expense.amount,
     expense.vendor,
@@ -189,6 +197,7 @@ export function DebtClassificationDialog({
           : undefined,
         principalAmount: treatment === "LOAN_SPLIT" ? Number(principal) : undefined,
         interestAmount: treatment === "LOAN_SPLIT" ? Number(interest) : undefined,
+        notes: notes.trim() || null,
       });
       if (!result.ok) {
         toast.error(localizedClientError(result.error));
@@ -319,6 +328,17 @@ export function DebtClassificationDialog({
                 </div>
               </div>
             ) : null}
+
+            <Field label={copy.notes} htmlFor={`payment-notes-${expense.id}`} hint={copy.bankPaymentNotesHint}>
+              <Textarea
+                id={`payment-notes-${expense.id}`}
+                maxLength={2000}
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                rows={3}
+                placeholder={copy.optional}
+              />
+            </Field>
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>{common.cancel}</Button>

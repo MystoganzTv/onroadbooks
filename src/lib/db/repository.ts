@@ -144,6 +144,7 @@ export interface DebtPaymentClassificationInput {
   treatment: "OPERATING_LEASE" | "LOAN_SPLIT" | "DEBT_UNALLOCATED";
   principalAmount?: number;
   interestAmount?: number;
+  notes?: string | null;
 }
 
 export interface PaymentEventInput {
