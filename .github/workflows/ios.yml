@@ -41,6 +41,10 @@ jobs:
         working-directory: mobile
         run: xcodegen generate
 
+      - name: Validate the App Store icon
+        working-directory: mobile
+        run: ./Scripts/validate-app-icon.sh
+
       - name: Build for the iOS Simulator
         run: >-
           xcodebuild
@@ -49,5 +53,20 @@ jobs:
           -configuration Debug
           -destination 'generic/platform=iOS Simulator'
           -derivedDataPath "$RUNNER_TEMP/OnRoadBooksDerivedData"
+          CODE_SIGNING_ALLOWED=NO
+          build
+
+      # A simulator build targets a different SDK and architecture. This
+      # unsigned Release build catches device-only compiler, linker, asset
+      # catalog and Info.plist failures without putting Apple credentials in
+      # a public repository or on a shared runner.
+      - name: Build Release for physical iOS devices
+        run: >-
+          xcodebuild
+          -project mobile/OnRoadBooksMobile.xcodeproj
+          -scheme OnRoadBooks
+          -configuration Release
+          -destination 'generic/platform=iOS'
+          -derivedDataPath "$RUNNER_TEMP/OnRoadBooksDeviceDerivedData"
           CODE_SIGNING_ALLOWED=NO
           build

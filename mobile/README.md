@@ -68,8 +68,14 @@ que sincroniza carpetas automáticamente).
 
 Para una entrega a App Store Connect, crea primero un archive Release desde
 Xcode. `ExportOptions.plist` deja versionadas las opciones de exportación del
-equipo; no contiene certificados ni contraseñas. El archivo `.xcarchive`, los
-perfiles y las credenciales de Apple permanecen fuera del repositorio.
+equipo, permite a Apple administrar un build number válido y no contiene
+certificados ni contraseñas. El archivo `.xcarchive`, el `.ipa`, los perfiles y
+las credenciales de Apple permanecen fuera del repositorio.
+
+CI valida dos productos diferentes: Debug para el simulador y Release sin
+firma para `iphoneos/arm64`. La firma de distribución y la instalación en un
+dispositivo real se validan localmente, donde sí existen la cuenta y el
+llavero de Apple.
 
 ## Estructura
 
@@ -88,7 +94,7 @@ Sources/OnRoadBooks/
                         KeychainHelper.swift, Config.swift (URL del API)
   Features/             una carpeta por pantalla (incluye Auth/LoginView)
 Resources/
-  Assets.xcassets/      AppIcon (vacío, ver abajo), AccentColor, LaunchBackground
+  Assets.xcassets/      AppIcon 1024×1024, AccentColor, LaunchBackground
 ```
 
 ## El backend: `/api/mobile/*` en la propia app Next.js
@@ -118,13 +124,38 @@ Por eso, en `OnroadBooks` (el repo de la web, no este) se agregaron:
   las mismas funciones de `lib/calculations` y `lib/finance` que usa la web;
   las escrituras pasan por sus mismas validaciones y reglas de negocio.
 
-La app ya se ha compilado correctamente para el simulador de iOS y el backend
-se valida en CI junto con TypeScript, lint, pruebas unitarias y E2E.
+La app se compila en CI tanto para el simulador como para `iphoneos/arm64`, y
+el backend se valida junto con TypeScript, lint, pruebas unitarias y E2E.
 
-## Ícono de la app
+## Preparar un build para TestFlight
 
-`Resources/Assets.xcassets/AppIcon.appiconset` está vacío. Arrastra un PNG
-de 1024×1024 (puedes partir del logo ya usado en la web,
-`public/marketing/logo.webp`, exportado sin transparencia y en cuadrado) al
-slot "1024x1024" del icon set en Xcode — desde Xcode 14 basta con esa sola
-imagen, Xcode genera el resto de tamaños.
+El ícono universal ya está en
+`Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png`: mide 1024×1024,
+es RGB y no tiene transparencia. Xcode genera los tamaños de iPhone y iPad al
+compilar el asset catalog.
+
+Con el Team configurado en `Signing.xcconfig`, crea y exporta un build sin
+guardar credenciales en el repositorio:
+
+```bash
+xcodebuild \
+  -project OnRoadBooksMobile.xcodeproj \
+  -scheme OnRoadBooks \
+  -configuration Release \
+  -destination 'generic/platform=iOS' \
+  -archivePath "$TMPDIR/OnRoadBooks.xcarchive" \
+  -allowProvisioningUpdates \
+  archive
+
+xcodebuild \
+  -exportArchive \
+  -archivePath "$TMPDIR/OnRoadBooks.xcarchive" \
+  -exportPath "$TMPDIR/OnRoadBooksExport" \
+  -exportOptionsPlist ExportOptions.plist \
+  -allowProvisioningUpdates
+```
+
+Antes de subirlo, instala una build Debug firmada en un iPhone físico y abre
+la app para verificar arranque, login y conexión con producción. El `.ipa`
+exportado usa distribución App Store y se instala mediante TestFlight, no
+directamente con `devicectl`.
