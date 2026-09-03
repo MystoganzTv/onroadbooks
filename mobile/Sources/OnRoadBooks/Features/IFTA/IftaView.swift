@@ -92,6 +92,23 @@ struct IftaView: View {
                     .padding(.horizontal, OBSpacing.md)
                 }
 
+                // The quarter's actual range, and how many trucks are in it.
+                // Both arrive on every load and were read by nothing -- the
+                // screen said "N camiones pendientes" without ever saying of
+                // how many.
+                HStack(spacing: 6) {
+                    Text(report.start, format: .dateTime.month(.abbreviated).day())
+                    Text("–")
+                    Text(report.end, format: .dateTime.month(.abbreviated).day().year())
+                    Text("·")
+                    Text(report.includedTruckCount == 1
+                         ? "1 camión incluido"
+                         : "\(report.includedTruckCount) camiones incluidos")
+                }
+                .font(.caption)
+                .foregroundStyle(OBColor.mutedForeground)
+                .padding(.horizontal, OBSpacing.md)
+
                 HStack(spacing: OBSpacing.sm) {
                     tile("Millas", "\(Int(report.totalFleetMiles).formatted())",
                          footnote: "\(Int(report.assignedMiles).formatted()) asignadas")
@@ -180,8 +197,15 @@ private struct JurisdictionRow: View {
                 Text(row.jurisdiction)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(OBColor.foreground)
-                Text("\(Int(row.taxableMiles).formatted()) mi gravables · \(row.taxPaidGallons.formatted(.number.precision(.fractionLength(1)))) gal pagados")
+                Text("\(Int(row.totalMiles).formatted()) mi · \(Int(row.taxableMiles).formatted()) gravables · \(row.taxPaidGallons.formatted(.number.precision(.fractionLength(1)))) gal pagados")
                     .font(.caption)
+                    .foregroundStyle(OBColor.mutedForeground)
+                // netTaxableGallons is what the tax is actually charged on and
+                // taxRate is what it is charged at. Both were decoded and
+                // dropped, leaving a dollar figure with nothing behind it.
+                Text("\(row.netTaxableGallons.formatted(.number.precision(.fractionLength(1)))) gal netos"
+                     + (row.taxRate.map { " · $" + $0.formatted(.number.precision(.fractionLength(3))) + "/gal" } ?? ""))
+                    .font(.caption2)
                     .foregroundStyle(OBColor.mutedForeground)
             }
             Spacer(minLength: OBSpacing.sm)

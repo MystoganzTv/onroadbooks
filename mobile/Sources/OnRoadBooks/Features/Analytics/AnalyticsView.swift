@@ -120,7 +120,13 @@ struct AnalyticsView: View {
                                         }
                                     }
                                     Spacer(minLength: OBSpacing.sm)
-                                    RatingChip(rating: broker.rating)
+                                    VStack(alignment: .trailing, spacing: 3) {
+                                        Text(broker.revenue, format: .currency(code: "USD").precision(.fractionLength(0)))
+                                            .font(.subheadline.weight(.semibold))
+                                            .monospacedDigit()
+                                            .foregroundStyle(OBColor.foreground)
+                                        RatingChip(rating: broker.rating)
+                                    }
                                 }
                                 .padding(.horizontal, OBSpacing.md)
                                 .padding(.vertical, OBSpacing.sm)
@@ -155,7 +161,13 @@ struct AnalyticsView: View {
                                     .foregroundStyle(OBColor.mutedForeground)
                             }
                             Spacer(minLength: OBSpacing.sm)
-                            RatingChip(rating: lane.rating)
+                            VStack(alignment: .trailing, spacing: 3) {
+                                Text(lane.revenue, format: .currency(code: "USD").precision(.fractionLength(0)))
+                                    .font(.subheadline.weight(.semibold))
+                                    .monospacedDigit()
+                                    .foregroundStyle(OBColor.foreground)
+                                RatingChip(rating: lane.rating)
+                            }
                         }
                         .padding(.horizontal, OBSpacing.md)
                         .padding(.vertical, OBSpacing.sm)

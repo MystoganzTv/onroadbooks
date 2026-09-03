@@ -208,7 +208,7 @@ struct LoadCalculatorView: View {
                 HStack(spacing: OBSpacing.lg) {
                     metric("Contribution / mi", estimate.contributionProfitPerMile.formatted(.currency(code: "USD").precision(.fractionLength(2))))
                     metric("Margin", "\(Int(estimate.contributionMargin))%")
-                    metric("Deadhead", "\(Int(estimate.deadheadPct * 100))%")
+                    deadheadMetric
                     metric("Total miles", "\(Int(estimate.totalMiles))")
                 }
 
@@ -229,6 +229,37 @@ struct LoadCalculatorView: View {
                             .foregroundStyle(OBColor.mutedForeground)
                     }
                 }
+
+                Divider().overlay(OBColor.border)
+
+                // The web's EvaluateResult prints the whole ladder below
+                // contribution and says "Unavailable" with a reason where the
+                // basis does not support it. This screen computed every one of
+                // these -- overhead, debt service, the operating profit after
+                // both -- and displayed none of them, so contribution read as
+                // the answer when it is only the first rung. Same gates the
+                // target-rate side of this screen already honours.
+                availabilityRow(
+                    "Allocated operating costs",
+                    value: defaults?.basisSufficient == true ? -estimate.overhead : nil,
+                    unavailable: "More business cost history needed"
+                )
+                availabilityRow(
+                    "Fully-loaded operating profit",
+                    value: defaults?.basisSufficient == true ? estimate.profit : nil,
+                    unavailable: "Needs the operating cost basis above"
+                )
+                availabilityRow(
+                    "Debt service",
+                    value: defaults?.debtServiceAvailable == true ? -estimate.debtService : nil,
+                    unavailable: "More debt and financing history needed"
+                )
+                availabilityRow(
+                    "Cash after debt service",
+                    value: (defaults?.basisSufficient == true && defaults?.debtServiceAvailable == true)
+                        ? estimate.profit - estimate.debtService : nil,
+                    unavailable: "Needs both of the rows above"
+                )
 
                 Divider().overlay(OBColor.border)
 
@@ -456,6 +487,22 @@ struct LoadCalculatorView: View {
                 .font(.subheadline.weight(.semibold))
                 .monospacedDigit()
                 .foregroundStyle(OBColor.foreground)
+        }
+    }
+
+    /// `deadheadWarnPct` arrives on every load of this screen and was read by
+    /// nothing, so the threshold the owner configured never coloured anything.
+    private var deadheadMetric: some View {
+        let pct = estimate.deadheadPct * 100
+        let elevated = (defaults?.deadheadWarnPct).map { pct > $0 } ?? false
+        return VStack(alignment: .leading, spacing: 2) {
+            Text("DEADHEAD")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(OBColor.mutedForeground)
+            Text("\(Int(pct))%")
+                .font(.caption.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(elevated ? OBColor.warn : OBColor.foreground)
         }
     }
 
