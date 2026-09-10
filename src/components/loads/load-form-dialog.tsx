@@ -186,11 +186,27 @@ function stateFromLoad(load: Load): FormState {
 }
 
 /**
- * Numbers carried over from somewhere else -- today, the load calculator
- * handing off a quote it just priced. Only used when adding, never when
- * editing an existing load.
+ * Values carried over from somewhere else -- the load calculator handing off
+ * a quote it just priced, or a rate confirmation we just read. Only used when
+ * adding, never when editing an existing load.
+ *
+ * A prefill is a starting point, not a saved value: every field lands in the
+ * ordinary form, editable, and nothing reaches the ledger until the owner
+ * presses save.
  */
 export interface LoadPrefill {
+  date?: string;
+  deliveryDate?: string;
+  originCity?: string;
+  originState?: string;
+  destinationCity?: string;
+  destinationState?: string;
+  broker?: string;
+  loadNumber?: string;
+  equipmentType?: EquipmentType;
+  equipmentLengthFt?: number;
+  weightLbs?: number;
+  commodity?: string;
   loadedMiles?: number;
   deadheadMiles?: number;
   grossRate?: number;
@@ -199,17 +215,29 @@ export interface LoadPrefill {
   dispatchFee?: number;
   factoringFee?: number;
   otherExpenses?: number;
-  broker?: string;
 }
 
 function applyPrefill(state: FormState, prefill?: LoadPrefill): FormState {
   if (!prefill) return state;
   const put = (value: number | undefined) =>
     value !== undefined && Number.isFinite(value) && value > 0 ? String(roundMoney(value)) : "";
+  const whole = (value: number | undefined) =>
+    value !== undefined && Number.isFinite(value) && value > 0 ? String(Math.round(value)) : "";
 
   return {
     ...state,
+    date: prefill.date || state.date,
+    deliveryDate: prefill.deliveryDate ?? state.deliveryDate,
+    originCity: prefill.originCity ?? state.originCity,
+    originState: prefill.originState ?? state.originState,
+    destinationCity: prefill.destinationCity ?? state.destinationCity,
+    destinationState: prefill.destinationState ?? state.destinationState,
     broker: prefill.broker ?? state.broker,
+    loadNumber: prefill.loadNumber ?? state.loadNumber,
+    equipmentType: prefill.equipmentType ?? state.equipmentType,
+    equipmentLengthFt: whole(prefill.equipmentLengthFt) || state.equipmentLengthFt,
+    weightLbs: whole(prefill.weightLbs) || state.weightLbs,
+    commodity: prefill.commodity ?? state.commodity,
     loadedMiles: prefill.loadedMiles ? String(Math.round(prefill.loadedMiles)) : state.loadedMiles,
     deadheadMiles:
       prefill.deadheadMiles !== undefined
@@ -235,9 +263,15 @@ interface LoadFormDialogProps {
   ratingThresholds?: RatingThresholds;
   /** Existing dated assignments used only for a non-blocking availability warning. */
   driverSchedule?: DriverScheduleEntry[];
+  /** Pass `null` for a form opened from elsewhere, with no button of its own. */
   trigger?: React.ReactNode;
   /** Seed values for a NEW load, e.g. handed over by the load calculator. */
   prefill?: LoadPrefill;
+  /** Files staged for a NEW load, e.g. the rate confirmation it was read from. */
+  initialAttachments?: PendingUpload[];
+  /** Controlled open state, for a flow that hands off from another dialog. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -256,6 +290,9 @@ export function LoadFormDialog({
   driverSchedule = [],
   trigger,
   prefill,
+  initialAttachments,
+  open: openProp,
+  onOpenChange,
 }: LoadFormDialogProps) {
   const router = useRouter();
   const { locale, dictionary } = useLanguage();
@@ -293,7 +330,19 @@ export function LoadFormDialog({
     [load, defaultDate, defaultTruck, prefillKey],
   );
 
-  const [open, setOpen] = React.useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(false);
+  const open = openProp ?? uncontrolledOpen;
+  const setOpen = React.useCallback(
+    (next: boolean) => {
+      if (openProp === undefined) setUncontrolledOpen(next);
+      onOpenChange?.(next);
+    },
+    [openProp, onOpenChange],
+  );
+  // Read through a ref, synced in its own effect declared before the reset
+  // below so it is current when that one runs: a caller building this array
+  // inline would otherwise re-seed the form on every render while open.
+  const initialAttachmentsRef = React.useRef(initialAttachments);
   const [values, setValues] = React.useState<FormState>(initial);
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [attachments, setAttachments] = React.useState<PendingUpload[]>([]);
@@ -311,10 +360,14 @@ export function LoadFormDialog({
   }, []);
 
   React.useEffect(() => {
+    initialAttachmentsRef.current = initialAttachments;
+  }, [initialAttachments]);
+
+  React.useEffect(() => {
     if (open) {
       setValues(initial);
       setErrors({});
-      setAttachments([]);
+      setAttachments(initialAttachmentsRef.current ?? []);
       setLocationOverrides({ origin: false, destination: false });
     }
   }, [open, initial]);
@@ -464,14 +517,16 @@ export function LoadFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger ?? (
-          <Button size="sm">
-            <Plus />
-            {copy.addLoad}
-          </Button>
-        )}
-      </DialogTrigger>
+      {trigger !== null && (
+        <DialogTrigger asChild>
+          {trigger ?? (
+            <Button size="sm">
+              <Plus />
+              {copy.addLoad}
+            </Button>
+          )}
+        </DialogTrigger>
+      )}
 
       <DialogContent className="max-w-2xl">
         <DialogHeader>

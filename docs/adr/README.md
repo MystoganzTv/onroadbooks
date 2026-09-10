@@ -55,6 +55,7 @@ The format is in [0000-template.md](0000-template.md); the practice itself is
 | [0015](0015-deterministic-insights.md) | Deterministic insights, never a language model | Accepted |
 | [0017](0017-plans-in-code.md) | Plan catalogue in code, limits enforced server-side | Accepted |
 | [0022](0022-price-by-depth-not-by-taxes.md) | Price by depth — ledger, cockpit, fleet — and sell nothing that is not built | Accepted |
+| [0027](0027-read-the-rate-confirmation-never-file-it.md) | A model may read a document; it never files, decides or reaches the ledger | Accepted |
 
 ### Craft
 

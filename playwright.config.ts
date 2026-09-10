@@ -37,6 +37,9 @@ export default defineConfig({
       STRIPE_PRICE_FLEET_MONTHLY: "",
       SUPABASE_URL: "http://127.0.0.1:1",
       SUPABASE_SECRET_KEY: "e2e-disabled",
+      // Turns the Scan button on. The browser stubs the route, so no request
+      // ever leaves the machine and this value is never used as a key.
+      ANTHROPIC_API_KEY: "e2e-never-called",
     },
   },
 });

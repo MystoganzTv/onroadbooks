@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { PeriodControls } from "@/components/dashboard/period-controls";
 import { LoadFormDialog } from "@/components/loads/load-form-dialog";
 import { LoadsTable } from "@/components/loads/loads-table";
+import { RateConScanDialog } from "@/components/loads/rate-con-scan-dialog";
 import { MiniStat } from "@/components/dashboard/mini-stat";
 import { PageHeader } from "@/components/shared/page-header";
 import { TruckSwitcher } from "@/components/fleet/truck-switcher";
@@ -28,6 +29,7 @@ import { expensesForTruck, loadsForTruck, orderedTrucks } from "@/lib/fleet";
 import { overheadCostPerMile, trailingCostBasis } from "@/lib/finance";
 import { defaultEntryDate, todayISO } from "@/lib/periods";
 import { hasFleetAccess } from "@/lib/plans";
+import { isRateConScanConfigured } from "@/lib/rate-con/extract";
 import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
 import { formatLocalePeriod } from "@/lib/i18n-format";
 import { getAppLocale } from "@/lib/i18n-server";
@@ -80,15 +82,31 @@ export default async function LoadsPage({
       <PageHeader
         title={copy.title}
         description={interpolate(copy.periodDescription, { period: periodLabel })}
-        actions={<LoadFormDialog
-            brokers={brokers}
-            trucks={trucks}
-            drivers={hasFleetAccess(subscription) ? drivers : []}
-            defaultTruckId={scopeTruckId}
-            defaultDate={defaultEntryDate(period)}
-            ratingThresholds={ratingThresholds}
-            driverSchedule={driverSchedule}
-          />}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Offered only where a key is configured; the route checks again. */}
+            {isRateConScanConfigured() && (
+              <RateConScanDialog
+                brokers={brokers}
+                trucks={trucks}
+                drivers={hasFleetAccess(subscription) ? drivers : []}
+                defaultTruckId={scopeTruckId}
+                defaultDate={defaultEntryDate(period)}
+                ratingThresholds={ratingThresholds}
+                driverSchedule={driverSchedule}
+              />
+            )}
+            <LoadFormDialog
+              brokers={brokers}
+              trucks={trucks}
+              drivers={hasFleetAccess(subscription) ? drivers : []}
+              defaultTruckId={scopeTruckId}
+              defaultDate={defaultEntryDate(period)}
+              ratingThresholds={ratingThresholds}
+              driverSchedule={driverSchedule}
+            />
+          </div>
+        }
       />
 
       <div className="flex flex-wrap items-center gap-2">

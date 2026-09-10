@@ -27,6 +27,14 @@ const en = {
   mirrorService:
     "This row comes from a service record. Change it in the truck's service history and the ledger follows.",
   mirrorLoad: "This row comes from a load's trip costs. Change it on that load and the ledger follows.",
+  scanUnavailable: "Rate confirmation scanning is not set up on this deployment.",
+  scanRole: "Your role cannot add loads.",
+  scanNoFile: "Choose a rate confirmation to scan.",
+  scanFileType: "Scanning works on a PDF or a photo (PNG, JPEG or WebP).",
+  scanTooLarge: "That file is too large to scan. Try a smaller PDF or photo.",
+  scanBusy: "That is a lot of scans in one hour. Try again shortly.",
+  scanUnreadable: "We could not find a rate confirmation in that file. Check the file and try again.",
+  scanFailed: "The rate confirmation could not be read right now. Try again in a moment.",
 } as const;
 
 const es: { [K in keyof typeof en]: string } = {
@@ -56,6 +64,14 @@ const es: { [K in keyof typeof en]: string } = {
   mirrorService:
     "Esta fila viene de un registro de servicio. Cámbiala en el historial de servicio del camión y el libro se actualiza solo.",
   mirrorLoad: "Esta fila viene de los costos de viaje de una carga. Cámbiala en esa carga y el libro se actualiza solo.",
+  scanUnavailable: "El escaneo de confirmaciones de tarifa no está configurado en este despliegue.",
+  scanRole: "Tu rol no puede agregar cargas.",
+  scanNoFile: "Elige una confirmación de tarifa para escanear.",
+  scanFileType: "El escaneo funciona con un PDF o una foto (PNG, JPEG o WebP).",
+  scanTooLarge: "Ese archivo es demasiado grande para escanearlo. Prueba con un PDF o una foto más pequeños.",
+  scanBusy: "Son muchos escaneos en una hora. Inténtalo un poco más tarde.",
+  scanUnreadable: "No encontramos una confirmación de tarifa en ese archivo. Revísalo e inténtalo otra vez.",
+  scanFailed: "No se pudo leer la confirmación de tarifa ahora mismo. Inténtalo en un momento.",
 };
 
 const englishToKey = new Map<string, keyof typeof en>(
