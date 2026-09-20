@@ -38,7 +38,6 @@ import {
 } from "@/components/documents/document-uploader";
 import { createLoadAction, updateLoadAction } from "@/lib/actions/loads";
 import { div, rateLoad, roundMoney, type RatingThresholds } from "@/lib/calculations";
-import { PAYMENT_STATUSES } from "@/lib/categories";
 import {
   findDriverScheduleConflicts,
   type DriverScheduleEntry,
@@ -51,7 +50,7 @@ import { todayISO } from "@/lib/periods";
 import { orderedTrucks } from "@/lib/fleet";
 import { IFTA_JURISDICTIONS } from "@/lib/ifta";
 import { EQUIPMENT_TYPES, LOAD_CAPACITIES } from "@/lib/load-details";
-import type { Driver, EquipmentType, Load, LoadCapacity, PaymentStatus, Truck } from "@/lib/types";
+import type { Driver, EquipmentType, Load, LoadCapacity, Truck } from "@/lib/types";
 import { toNumber } from "@/lib/utils";
 import { LocationFields } from "./location-fields";
 
@@ -104,7 +103,6 @@ interface FormState {
   dispatchFee: string;
   factoringFee: string;
   otherExpenses: string;
-  status: PaymentStatus;
   jurisdictionMiles: JurisdictionRow[];
   notes: string;
 }
@@ -142,7 +140,6 @@ function emptyState(defaultDate: string, truckId: string): FormState {
     dispatchFee: "",
     factoringFee: "",
     otherExpenses: "",
-    status: "PENDING",
     jurisdictionMiles: [],
     notes: "",
   };
@@ -174,7 +171,6 @@ function stateFromLoad(load: Load): FormState {
     dispatchFee: load.dispatchFee ? String(load.dispatchFee) : "",
     factoringFee: load.factoringFee ? String(load.factoringFee) : "",
     otherExpenses: load.otherExpenses ? String(load.otherExpenses) : "",
-    status: load.status,
     jurisdictionMiles: load.jurisdictionMiles.map((row, index) => ({
       id: `${row.jurisdiction}-${index}`,
       jurisdiction: row.jurisdiction,
@@ -448,7 +444,8 @@ export function LoadFormDialog({
       factoringFee: toNumber(values.factoringFee),
       otherExpenses: toNumber(values.otherExpenses),
       costsPosted: true,
-      status: values.status,
+      // Retain legacy payment data when editing; collection is recorded in invoices.
+      status: load?.status ?? "PENDING",
       jurisdictionMiles: values.jurisdictionMiles.map((row) => ({
         jurisdiction: row.jurisdiction,
         totalMiles: Math.round(toNumber(row.totalMiles)),
@@ -585,7 +582,7 @@ export function LoadFormDialog({
               </Field>
             ) : null}
 
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <Field label={copy.pickupDate} htmlFor="load-date" required error={errors.date}>
                 <Input
                   id="load-date"
@@ -605,23 +602,6 @@ export function LoadFormDialog({
                   onChange={(e) => set("deliveryDate", e.target.value)}
                   aria-invalid={Boolean(errors.deliveryDate)}
                 />
-              </Field>
-              <Field label={copy.status} htmlFor="load-status">
-                <Select
-                  value={values.status}
-                  onValueChange={(value) => set("status", value as PaymentStatus)}
-                >
-                  <SelectTrigger id="load-status">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PAYMENT_STATUSES.map((status) => (
-                      <SelectItem key={status.id} value={status.id}>
-                        {status.id === "PAID" ? copy.paid : status.id === "INVOICED" ? copy.invoiced : copy.pending}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </Field>
               <Field label={copy.broker} htmlFor="load-broker" error={errors.broker}>
                 <Input

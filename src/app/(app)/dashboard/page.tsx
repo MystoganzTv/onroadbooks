@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Calculator, Route } from "lucide-react";
 
+import { ModeView, ViewModeToggle } from "@/components/shared/view-mode";
+import { SimpleOverview } from "@/components/dashboard/simple-overview";
 import { RevenueExpenseChart } from "@/components/charts/revenue-expense-chart";
 import { BestWorstLoads } from "@/components/cockpit/best-worst-loads";
 import { BrokerPanel } from "@/components/cockpit/broker-panel";
@@ -132,7 +134,8 @@ export default async function DashboardPage({
 }) {
   const params = await searchParams;
   const [session, locale] = await Promise.all([requireSession(), getAppLocale()]);
-  const copy = getWebDictionary(locale).dashboard;
+  const dictionary = getWebDictionary(locale);
+  const copy = dictionary.dashboard;
   const role = session.role ?? "VIEWER";
   const ownerPlanning = roleCan(role, "manage_owner_finances");
   const dataset = await getDataset(session.businessId);
@@ -333,6 +336,7 @@ export default async function DashboardPage({
           }
         />
         {subscriptionStatus}
+        <ViewModeToggle />
         <EmptyCockpit
           businessName={dataset.business.name}
           loadAction={loadAction}
@@ -365,33 +369,10 @@ export default async function DashboardPage({
       <div className="flex flex-wrap items-center gap-2">
         <PeriodControls period={period} />
         <TruckSwitcher trucks={orderedTrucks(trucks)} selectedId={truckId} />
+        <div className="sm:ml-auto"><ViewModeToggle /></div>
       </div>
 
       {paymentDateProblem ? <ActionableProblemBanner problem={paymentDateProblem} /> : null}
-
-      {/* ---- The bottom line ------------------------------------------- */}
-      <Section
-        title={copy.bottomLine}
-        description={`${periodDisplayLabel} · ${summary.loadCount} ${summary.loadCount === 1 ? copy.load : copy.loads} · ${formatMiles(summary.totalMiles)}`}
-      >
-        <HeroMetrics
-          summary={summary}
-          presentation={moneyPresentation}
-          previousLabel={prior.shortLabel}
-          deltas={{
-            revenue: pctChange(summary.bookedRevenue, priorSummary.bookedRevenue),
-            profit: pctChange(summary.operatingProfit, priorSummary.operatingProfit),
-            profitPerMile: pctChange(summary.profitPerMile, priorSummary.profitPerMile),
-          }}
-          showOwnerPlanning={ownerPlanning}
-        />
-        {ownerPlanning && !cockpit ? (
-          <PlanGate
-            capability="cockpit"
-            what={copy.cockpitGate}
-          />
-        ) : null}
-      </Section>
 
       <BookkeepingAlerts
         dueCount={monthlyDue.length}
@@ -404,157 +385,190 @@ export default async function DashboardPage({
       />
       <ActionableProblemList problems={secondaryProblems} />
 
-      {/* ---- Today ------------------------------------------------------ */}
-      <div className="grid gap-3 xl:grid-cols-2">
-        <TodayCard day={day} />
-        <TodayCashCard cash={cashToday} />
-      </div>
-
-      {/* ---- Business health -------------------------------------------- */}
-      <Section
-        title={copy.businessHealth}
-        description={copy.healthDescription}
-      >
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <MiniStat label={copy.totalMiles} value={formatNumber(summary.totalMiles)} sub="mi" />
-          <MiniStat label={copy.loadedMiles} value={formatNumber(summary.loadedMiles)} sub="mi" />
-          <MiniStat
-            label={copy.deadheadMiles}
-            value={formatNumber(summary.deadheadMiles)}
-            sub={formatPercent(summary.deadheadPct)}
-            tone={deadhead.elevated ? "warning" : "neutral"}
+      <ModeView simple={
+        <>
+          <SimpleOverview summary={summary} presentation={moneyPresentation} dictionary={dictionary} showOwnerPlanning={ownerPlanning} />
+          {roleCan(role, "manage_finances") ? <Button asChild variant="outline" size="sm"><Link href="/invoices">{dictionary.viewMode.recordCollection}</Link></Button> : null}
+          <RecentLoads loads={periodLoads.slice(0, 8)} simple />
+          <p className="text-xs text-muted-foreground">{dictionary.viewMode.tripProfitHint}</p>
+        </>
+      }>
+        {/* ---- The bottom line ------------------------------------------- */}
+        <Section
+          title={copy.bottomLine}
+          description={`${periodDisplayLabel} · ${summary.loadCount} ${summary.loadCount === 1 ? copy.load : copy.loads} · ${formatMiles(summary.totalMiles)}`}
+        >
+          <HeroMetrics
+            summary={summary}
+            presentation={moneyPresentation}
+            previousLabel={prior.shortLabel}
+            deltas={{
+              revenue: pctChange(summary.bookedRevenue, priorSummary.bookedRevenue),
+              profit: pctChange(summary.operatingProfit, priorSummary.operatingProfit),
+              profitPerMile: pctChange(summary.profitPerMile, priorSummary.profitPerMile),
+            }}
+            showOwnerPlanning={ownerPlanning}
           />
-          <MiniStat
-            label={copy.actualCostMile}
-            value={costBasis.sufficient ? formatRateValue(costBasis.trueCostPerMile) : "—"}
-            sub={copy.actualNotProrated}
-            tone="negative"
-          />
-          <MiniStat
-            label={copy.revenueMile}
-            value={formatRateValue(summary.revenuePerMile)}
-            sub={copy.allMiles}
-            tone="info"
-          />
-          <MiniStat
-            label={copy.loadsCompleted}
-            value={formatNumber(summary.loadCount)}
-            sub={`${formatMoneyCompact(summary.collectedRevenue)} ${copy.collected}`}
-            tone="neutral"
-          />
-        </div>
-
-        <div className="grid gap-3 lg:grid-cols-3">
-          <CostPerMileCard
-            cost={costBasis}
-            revenuePerMile={summary.revenuePerMile}
-            href={`/analytics/cost-per-mile?${query}`}
-            className="min-w-0"
-          />
-          {cockpit ? (
-            <GoalProgressCard
-              goals={goalProgress}
-              projection={projection}
-              periodLabel={periodDisplayLabel}
-              className="min-w-0"
+          {ownerPlanning && !cockpit ? (
+            <PlanGate
+              capability="cockpit"
+              what={copy.cockpitGate}
             />
           ) : null}
-          {cockpit ? <DeadheadMonitor report={deadhead} className="min-w-0" /> : null}
-          {cockpit ? <PlanningCard planning={planning} /> : null}
+        </Section>
+
+        {/* ---- Today ------------------------------------------------------ */}
+        <div className="grid gap-3 xl:grid-cols-2">
+          <TodayCard day={day} />
+          <TodayCashCard cash={cashToday} />
         </div>
-      </Section>
 
-      {/* ---- Money flow -------------------------------------------------- */}
-      <Section title={copy.moneyWent} description={periodDisplayLabel}>
-        <div className="grid gap-3 xl:grid-cols-3">
-          <MoneyFlow
-            ownerPay={ownerPay}
-            categories={categories}
-            periodLabel={periodDisplayLabel}
-            showOwnerPlanning={ownerPlanning}
-            locale={locale}
-            copy={copy}
-            className="min-w-0 xl:col-span-2"
-          />
-          <Card className="min-w-0">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Route className="size-3.5 text-muted-foreground" />
-                <CardTitle>{copy.earnedVsExpenses}</CardTitle>
-              </div>
-              <span className="text-2xs text-muted-foreground">
-                {period.days > 62 ? copy.byMonth : copy.byDay}
-              </span>
-            </CardHeader>
-            <CardContent className="px-2 py-3">
-              <RevenueExpenseChart data={buckets} />
-            </CardContent>
-          </Card>
-        </div>
-      </Section>
+        {/* ---- Business health -------------------------------------------- */}
+        <Section
+          title={copy.businessHealth}
+          description={copy.healthDescription}
+        >
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <MiniStat label={copy.totalMiles} value={formatNumber(summary.totalMiles)} sub="mi" />
+            <MiniStat label={copy.loadedMiles} value={formatNumber(summary.loadedMiles)} sub="mi" />
+            <MiniStat
+              label={copy.deadheadMiles}
+              value={formatNumber(summary.deadheadMiles)}
+              sub={formatPercent(summary.deadheadPct)}
+              tone={deadhead.elevated ? "warning" : "neutral"}
+            />
+            <MiniStat
+              label={copy.actualCostMile}
+              value={costBasis.sufficient ? formatRateValue(costBasis.trueCostPerMile) : "—"}
+              sub={copy.actualNotProrated}
+              tone="negative"
+            />
+            <MiniStat
+              label={copy.revenueMile}
+              value={formatRateValue(summary.revenuePerMile)}
+              sub={copy.allMiles}
+              tone="info"
+            />
+            <MiniStat
+              label={copy.loadsCompleted}
+              value={formatNumber(summary.loadCount)}
+              sub={`${formatMoneyCompact(summary.collectedRevenue)} ${copy.collected}`}
+              tone="neutral"
+            />
+          </div>
 
-      {/* ---- Load performance ------------------------------------------- */}
-      <Section
-        title={copy.loadPerformance}
-        description={copy.loadPerformanceDescription}
-      >
-        <BestWorstLoads
-          best={best}
-          worst={worst}
-          periodQuery={query}
-          periodLabel={periodDisplayLabel}
-        />
-        <RecentLoads loads={periodLoads.slice(0, 8)} />
-      </Section>
-
-      {/* ---- Operations intelligence ------------------------------------ */}
-      {cockpit ? (
-        <Section title={copy.operations} description={copy.operationsDescription}>
-          <div className="grid gap-3 lg:grid-cols-2">
-            <BrokerPanel
-              brokers={brokers}
-              href={`/analytics/brokers?${query}`}
+          <div className="grid gap-3 lg:grid-cols-3">
+            <CostPerMileCard
+              cost={costBasis}
+              revenuePerMile={summary.revenuePerMile}
+              href={`/analytics/cost-per-mile?${query}`}
               className="min-w-0"
             />
-            <LanePanel
-              lanes={lanes}
-              minLoads={LANE_MIN_LOADS}
-              href={`/analytics/lanes?${query}`}
-              className="min-w-0"
+            {cockpit ? (
+              <GoalProgressCard
+                goals={goalProgress}
+                projection={projection}
+                periodLabel={periodDisplayLabel}
+                className="min-w-0"
+              />
+            ) : null}
+            {cockpit ? <DeadheadMonitor report={deadhead} className="min-w-0" /> : null}
+            {cockpit ? <PlanningCard planning={planning} /> : null}
+          </div>
+        </Section>
+
+        {/* ---- Money flow -------------------------------------------------- */}
+        <Section title={copy.moneyWent} description={periodDisplayLabel}>
+          <div className="grid gap-3 xl:grid-cols-3">
+            <MoneyFlow
+              ownerPay={ownerPay}
+              categories={categories}
+              periodLabel={periodDisplayLabel}
+              showOwnerPlanning={ownerPlanning}
+              locale={locale}
+              copy={copy}
+              className="min-w-0 xl:col-span-2"
+            />
+            <Card className="min-w-0">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Route className="size-3.5 text-muted-foreground" />
+                  <CardTitle>{copy.earnedVsExpenses}</CardTitle>
+                </div>
+                <span className="text-2xs text-muted-foreground">
+                  {period.days > 62 ? copy.byMonth : copy.byDay}
+                </span>
+              </CardHeader>
+              <CardContent className="px-2 py-3">
+                <RevenueExpenseChart data={buckets} />
+              </CardContent>
+            </Card>
+          </div>
+        </Section>
+
+        {/* ---- Load performance ------------------------------------------- */}
+        <Section
+          title={copy.loadPerformance}
+          description={copy.loadPerformanceDescription}
+        >
+          <BestWorstLoads
+            best={best}
+            worst={worst}
+            periodQuery={query}
+            periodLabel={periodDisplayLabel}
+          />
+          <RecentLoads loads={periodLoads.slice(0, 8)} />
+        </Section>
+
+        {/* ---- Operations intelligence ------------------------------------ */}
+        {cockpit ? (
+          <Section title={copy.operations} description={copy.operationsDescription}>
+            <div className="grid gap-3 lg:grid-cols-2">
+              <BrokerPanel
+                brokers={brokers}
+                href={`/analytics/brokers?${query}`}
+                className="min-w-0"
+              />
+              <LanePanel
+                lanes={lanes}
+                minLoads={LANE_MIN_LOADS}
+                href={`/analytics/lanes?${query}`}
+                className="min-w-0"
+              />
+            </div>
+          </Section>
+        ) : null}
+
+        {/* ---- Reserves and the truck ------------------------------------- */}
+        <Section
+          title={ownerPlanning ? copy.reservesTruck : copy.truckCondition}
+          description={ownerPlanning ? copy.reservesDescription : copy.conditionDescription}
+        >
+          <div className="grid gap-3 lg:grid-cols-2">
+            {cockpit && ownerPlanning ? (
+              <ReservesPanel
+                balances={balances}
+                planned={ownerPay.reserves}
+                periodLabel={periodDisplayLabel}
+                className="min-w-0"
+              />
+            ) : null}
+            <TruckHealthPanel
+              health={maintenance}
+              showReserve={ownerPlanning}
+              className={cn("min-w-0", !ownerPlanning && "lg:col-span-2")}
             />
           </div>
         </Section>
-      ) : null}
 
-      {/* ---- Reserves and the truck ------------------------------------- */}
-      <Section
-        title={ownerPlanning ? copy.reservesTruck : copy.truckCondition}
-        description={ownerPlanning ? copy.reservesDescription : copy.conditionDescription}
-      >
-        <div className="grid gap-3 lg:grid-cols-2">
-          {cockpit && ownerPlanning ? (
-            <ReservesPanel
-              balances={balances}
-              planned={ownerPay.reserves}
-              periodLabel={periodDisplayLabel}
-              className="min-w-0"
-            />
-          ) : null}
-          <TruckHealthPanel
-            health={maintenance}
-            showReserve={ownerPlanning}
-            className={cn("min-w-0", !ownerPlanning && "lg:col-span-2")}
-          />
-        </div>
-      </Section>
-
-      {/* ---- Insights ---------------------------------------------------- */}
-      <Section
-        title={copy.insights}
-        description={copy.insightsDescription}
-      >
-        <InsightsPanel insights={insights} />
-      </Section>
+        {/* ---- Insights ---------------------------------------------------- */}
+        <Section
+          title={copy.insights}
+          description={copy.insightsDescription}
+        >
+          <InsightsPanel insights={insights} />
+        </Section>
+      </ModeView>
     </div>
   );
 }

@@ -324,7 +324,7 @@ describe("native exports", () => {
     assert.equal(loads.getCell("N9").value, "MILEAGE");
     assert.ok(loads.autoFilter);
     if (typeof loads.autoFilter === "string") {
-      assert.equal(loads.autoFilter, "A10:AG10");
+      assert.equal(loads.autoFilter, "A10:AF10");
     } else {
       assert.deepEqual(loads.autoFilter.from, { row: 10, column: 1 });
     }

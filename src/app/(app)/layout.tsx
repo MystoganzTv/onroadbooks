@@ -1,3 +1,5 @@
+import { ViewModeProvider } from "@/components/shell/view-mode-provider";
+import { getViewMode } from "@/lib/view-mode-server";
 import { AppShell } from "@/components/shell/app-shell";
 import { LanguageProvider } from "@/components/shell/language-provider";
 import { requireSession } from "@/lib/auth";
@@ -9,7 +11,7 @@ import { fleetIftaApplicability } from "@/lib/ifta-eligibility";
 import { getAppLocale } from "@/lib/i18n-server";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const [session, locale] = await Promise.all([requireSession(), getAppLocale()]);
+  const [session, locale, viewMode] = await Promise.all([requireSession(), getAppLocale(), getViewMode()]);
   const dataset = await getDataset(session.businessId);
   const {
     business,
@@ -28,38 +30,40 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <LanguageProvider initialLocale={locale}>
-      <AppShell
-        businessName={business.name}
-        truckName={
-          !hasFleet || running.length === 0
-            ? primaryTruck(trucks).name
-            : running.length === 1
-              ? running[0].name
-              : locale === "es"
-                ? `${running.length} camiones`
-                : `${running.length} trucks`
-        }
-        hasFleet={hasFleet}
-        isAdmin={isPlatformAdminEmail(session.email)}
-        role={session.role ?? "VIEWER"}
-        readiness={{
-          hasLoads: loads.length > 0,
-          hasFinancialActivity:
-            loads.length > 0 || expenses.length > 0 || paymentEvents.length > 0,
-          hasDriverPayActivity:
-            dataset.drivers.length > 0 && loads.some((load) => Boolean(load.driverId)),
-          hasIftaActivity:
-            loads.some((load) => load.jurisdictionMiles.length > 0) ||
-            fuelEntries.some((entry) => Boolean(entry.jurisdiction)) ||
-            running.some((truck) => truck.iftaReportingEnabled === true),
-          hasIftaDecisionPending: running.some(
-            (truck) => truck.iftaReportingEnabled == null,
-          ),
-          iftaApplicability: fleetIftaApplicability(running),
-        }}
-      >
-        {children}
-      </AppShell>
+      <ViewModeProvider mode={viewMode}>
+        <AppShell
+          businessName={business.name}
+          truckName={
+            !hasFleet || running.length === 0
+              ? primaryTruck(trucks).name
+              : running.length === 1
+                ? running[0].name
+                : locale === "es"
+                  ? `${running.length} camiones`
+                  : `${running.length} trucks`
+          }
+          hasFleet={hasFleet}
+          isAdmin={isPlatformAdminEmail(session.email)}
+          role={session.role ?? "VIEWER"}
+          readiness={{
+            hasLoads: loads.length > 0,
+            hasFinancialActivity:
+              loads.length > 0 || expenses.length > 0 || paymentEvents.length > 0,
+            hasDriverPayActivity:
+              dataset.drivers.length > 0 && loads.some((load) => Boolean(load.driverId)),
+            hasIftaActivity:
+              loads.some((load) => load.jurisdictionMiles.length > 0) ||
+              fuelEntries.some((entry) => Boolean(entry.jurisdiction)) ||
+              running.some((truck) => truck.iftaReportingEnabled === true),
+            hasIftaDecisionPending: running.some(
+              (truck) => truck.iftaReportingEnabled == null,
+            ),
+            iftaApplicability: fleetIftaApplicability(running),
+          }}
+        >
+          {children}
+        </AppShell>
+      </ViewModeProvider>
     </LanguageProvider>
   );
 }

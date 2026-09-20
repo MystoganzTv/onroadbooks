@@ -77,6 +77,8 @@ async function mutateDataset(change: (dataset: JsonDataset) => void): Promise<vo
 }
 
 async function login(page: Page, email = ownerEmail): Promise<void> {
+  // Existing scenarios exercise the full financial dashboard.
+  await page.context().addCookies([{ name: "onroad-view-mode", value: "detailed", url: "http://127.0.0.1:4173" }]);
   await page.goto("/login");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(password);
@@ -170,7 +172,8 @@ test.describe.serial("critical browser flows", () => {
     // request may include an on-demand compile. Keep that cost from turning a
     // working redirect into a five-second flake.
     await expect(page).toHaveURL(/\/dashboard$/, { timeout: 15_000 });
-    await expect(page.getByRole("heading", { name: "Business Overview" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Business overview", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Simple", exact: true })).toHaveAttribute("aria-pressed", "true");
 
     await page.goto("/truck");
     await expect(page.getByText("Setup incomplete").first()).toBeVisible();
@@ -216,6 +219,64 @@ test.describe.serial("critical browser flows", () => {
 
     await page.goto("/plans");
     await expect(page.getByText(/Online billing is being configured/).first()).toBeVisible();
+  });
+
+  test("simple and detailed views preserve data, scope and the saved preference", async ({ page }) => {
+    const browserErrors: string[] = [];
+    page.on("pageerror", (error) => browserErrors.push(error.message));
+    await login(page);
+    await page.goto("/dashboard?month=2026-08&period=month");
+    const datasetBefore = await fs.readFile(dataFile, "utf8");
+    await page.getByRole("button", { name: "Simple", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Simple", exact: true })).toHaveAttribute("aria-pressed", "true");
+    const summary = page.getByRole("region", { name: "Period summary" });
+    await expect(summary).toContainText("$700.00");
+    await expect(summary).toContainText("$494.50");
+    await expect(page.getByRole("heading", { name: "Business health", exact: true })).toHaveCount(0);
+    await expect(page.getByText("Profit is not your bank balance.", { exact: false })).toBeVisible();
+    await page.screenshot({ path: "/tmp/onroad-dashboard-simple.png", fullPage: true });
+
+    await page.getByRole("button", { name: "View details", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Business health", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Simple", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "Back to simple", exact: true }).click();
+    await expect(summary).toBeVisible();
+    await page.reload();
+    await expect(summary).toBeVisible();
+
+    await page.goto("/loads?month=2026-08&period=month");
+    await expect(page.getByRole("button", { name: "Simple", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("columnheader")).toHaveCount(4);
+    await expect(page.getByRole("columnheader", { name: "Trip profit" })).toBeVisible();
+    await expect(page.getByRole("table")).toContainText("$620.00");
+    await page.getByRole("textbox", { name: "Search loads" }).fill("does-not-exist");
+    await expect(page.getByRole("table")).toHaveCount(0);
+    await page.getByRole("textbox", { name: "Search loads" }).fill("");
+    await expect(page.getByRole("table")).toBeVisible();
+    await page.getByRole("button", { name: "Detailed", exact: true }).click();
+    await expect(page.getByRole("columnheader")).toHaveCount(12);
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Detailed", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(page).toHaveURL(/month=2026-08&period=month/);
+    await page.getByRole("button", { name: "Simple", exact: true }).click();
+    await expect(page.getByRole("columnheader")).toHaveCount(4);
+    await page.getByRole("button", { name: "View details", exact: true }).click();
+    await page.getByRole("combobox", { name: "Filter by rating" }).click();
+    await page.getByRole("option", { name: "Bad", exact: true }).click();
+    await expect(page.getByRole("table")).toHaveCount(0);
+    await page.getByRole("button", { name: "Back to simple", exact: true }).click();
+    await expect(page.getByRole("table")).toBeVisible();
+    await page.getByRole("button", { name: "Display settings", exact: true }).first().click();
+    await page.getByRole("menuitemradio", { name: /Español/ }).click();
+    await expect(page.getByRole("button", { name: "Detallado", exact: true })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Ganancia del viaje" })).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: "/tmp/onroad-loads-simple-mobile.png", fullPage: true });
+    await expect(page.getByRole("button", { name: "Ver detalle", exact: true })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Cargas", exact: true })).toContainText("$620.00");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    expect(await fs.readFile(dataFile, "utf8")).toBe(datasetBefore);
+    expect(browserErrors).toEqual([]);
   });
 
   test("owner manages a loan payment as one editable and deletable transaction", async ({ page }) => {

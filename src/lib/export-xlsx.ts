@@ -447,13 +447,13 @@ function columnGroups(sheetName: string, count: number): Array<{ label: string; 
     { label: "WHY IT MATTERS", start: 5, end: 5 },
     { label: "WHAT TO DO NEXT", start: 6, end: 7 },
   ];
-  if (sheetName === "Loads" && count >= 33) return [
+  if (sheetName === "Loads" && count >= 32) return [
     { label: "LOAD & ROUTE", start: 1, end: 13 },
     { label: "MILEAGE", start: 14, end: 17 },
     { label: "REVENUE", start: 18, end: 20 },
     { label: "DIRECT COSTS", start: 21, end: 27 },
     { label: "PROFITABILITY", start: 28, end: 30 },
-    { label: "STATUS", start: 31, end: 33 },
+    { label: "RATING & NOTES", start: 31, end: 32 },
   ];
   if (sheetName === "Expenses" && count >= 12) return [
     { label: "ASSIGNMENT", start: 1, end: 2 },

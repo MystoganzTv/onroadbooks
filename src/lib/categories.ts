@@ -85,14 +85,3 @@ export function behaviorOf(
 ): ExpenseBehavior {
   return overrides?.[id] ?? getCategory(id).defaultBehavior;
 }
-
-export const PAYMENT_STATUSES = [
-  { id: "PENDING", label: "Pending", labelEs: "Pendiente" },
-  { id: "INVOICED", label: "Invoiced", labelEs: "Facturada" },
-  { id: "PAID", label: "Paid", labelEs: "Pagada" },
-] as const;
-
-export function statusLabel(id: string, locale: AppLocale = "en"): string {
-  const status = PAYMENT_STATUSES.find((item) => item.id === id);
-  return status ? (locale === "es" ? status.labelEs : status.label) : id;
-}

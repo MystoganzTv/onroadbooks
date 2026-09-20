@@ -5,6 +5,18 @@ type DictionaryShape<T> = {
 };
 
 const en = {
+  viewMode: {
+    label: "View mode", simple: "Simple", detailed: "Detailed",
+    simpleHint: "The essentials at a glance.", detailHint: "More detail for this page. Your saved mode stays Simple.",
+    showDetails: "View details", hideDetails: "Back to simple", saveError: "Could not save your view. Try again.",
+    periodSummary: "Period summary", revenue: "Revenue", expenses: "Expenses", profit: "Business profit",
+    revenueHint: "Earned on loads in this period.", expensesHint: "Operating costs in this period.",
+    profitHint: "Revenue minus operating costs; before debt payments and reserves.",
+    cashHint: "Recorded collections for this period. Profit is not your bank balance.",
+    availableHint: "After operating costs, debt payments and planned reserves.",
+    tripProfit: "Trip profit", tripProfitHint: "After direct trip costs; before business overhead and debt payments.",
+    recordCollection: "Record payment", scopeHint: "Simplifies Dashboard and Loads on this browser.",
+  },
   common: {
     lookupOffline: "We could not check locations right now. Type the city and the two-letter state and we will verify it when you save.",
     errorTitle: "Something went wrong on this screen",
@@ -1649,6 +1661,18 @@ const en = {
 } as const;
 
 const es: DictionaryShape<typeof en> = {
+  viewMode: {
+    label: "Modo de vista", simple: "Simple", detailed: "Detallado",
+    simpleHint: "Lo esencial de un vistazo.", detailHint: "Más detalle en esta página. Tu modo guardado sigue siendo Simple.",
+    showDetails: "Ver detalle", hideDetails: "Volver a simple", saveError: "No se pudo guardar tu vista. Inténtalo de nuevo.",
+    periodSummary: "Resumen del período", revenue: "Ingresos", expenses: "Gastos", profit: "Ganancia del negocio",
+    revenueHint: "Generados por las cargas de este período.", expensesHint: "Costos operativos de este período.",
+    profitHint: "Ingresos menos costos operativos; antes de pagos de deuda y reservas.",
+    cashHint: "Cobros registrados en este período. La ganancia no es tu saldo bancario.",
+    availableHint: "Después de costos operativos, pagos de deuda y reservas previstas.",
+    tripProfit: "Ganancia del viaje", tripProfitHint: "Después de costos directos del viaje; antes de gastos generales y pagos de deuda.",
+    recordCollection: "Registrar cobro", scopeHint: "Simplifica Dashboard y Cargas en este navegador.",
+  },
   common: {
     lookupOffline: "No pudimos verificar ciudades ahora mismo. Escribe la ciudad y el estado de dos letras y lo verificamos al guardar.",
     errorTitle: "Algo falló en esta pantalla",

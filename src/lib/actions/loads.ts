@@ -6,7 +6,6 @@ import { requireWritableSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { locationReviewMessage, reviewLocation } from "@/lib/locations";
 import { loadSchema, type LoadFormValues } from "@/lib/schemas";
-import type { PaymentStatus } from "@/lib/types";
 import { fieldErrorsFrom, type ActionResult } from "./types";
 
 function revalidateAll() {
@@ -115,25 +114,6 @@ export async function updateLoadAction(id: string, values: unknown): Promise<Act
     return { ok: true, id };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Could not update the load." };
-  }
-}
-
-export async function updateLoadStatusAction(
-  id: string,
-  status: PaymentStatus,
-): Promise<ActionResult> {
-  try {
-    const repository = getRepository((await requireWritableSession("manage_loads")).businessId);
-    const dataset = await repository.getDataset();
-    const load = dataset.loads.find((l) => l.id === id);
-    if (!load) return { ok: false, error: "Load not found." };
-
-    await repository.updateLoad(id, { ...load, status });
-    revalidateAll();
-    revalidatePath(`/loads/${id}`);
-    return { ok: true, id };
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : "Could not update status." };
   }
 }
 

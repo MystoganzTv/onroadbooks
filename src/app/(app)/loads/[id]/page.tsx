@@ -7,7 +7,6 @@ import { DocumentUploader } from "@/components/documents/document-uploader";
 import { DeleteLoadButton } from "@/components/loads/delete-load-button";
 import { TripWaterfall } from "@/components/loads/trip-waterfall";
 import { LoadFormDialog } from "@/components/loads/load-form-dialog";
-import { LoadStatusControl } from "@/components/loads/load-status-control";
 import { HistoryBackButton } from "@/components/shared/history-back-button";
 import { Metric } from "@/components/shared/metric";
 import { Button } from "@/components/ui/button";
@@ -117,7 +116,6 @@ export default async function LoadDetailPage({
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <LoadStatusControl id={load.id} status={load.status} />
           <LoadFormDialog
             load={load}
             brokers={brokers}
@@ -185,7 +183,7 @@ export default async function LoadDetailPage({
 
             <Separator />
 
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               <Metric
                 label={copy.rateLoadedMile}
                 value={`${formatRateValue(metrics.revenuePerLoadedMile)}/mi`}
@@ -203,11 +201,6 @@ export default async function LoadDetailPage({
                     : undefined
                 }
                 sub={interpolate(copy.emptyMiles, { miles: formatMiles(load.deadheadMiles) })}
-              />
-              <Metric
-                label={copy.paymentStatus}
-                value={load.status === "PAID" ? copy.paid : load.status === "INVOICED" ? copy.invoiced : copy.pending}
-                sub={load.loadNumber ? interpolate(copy.loadNumber, { number: load.loadNumber }) : undefined}
               />
             </div>
 

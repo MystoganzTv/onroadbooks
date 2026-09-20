@@ -6,6 +6,7 @@ import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UI_SCALES, useTheme, type UiScale } from "@/components/shell/theme-provider";
 import { useLanguage } from "@/components/shell/language-provider";
 import { APP_LOCALES } from "@/lib/i18n";
+import { ViewModeToggle } from "@/components/shared/view-mode";
 import { cn } from "@/lib/utils";
 
 /**
@@ -37,6 +38,11 @@ export function DisplaySettings() {
       </CardHeader>
 
       <CardContent className="space-y-4 p-4">
+        <div>
+          <p className="label-xs">{dictionary.viewMode.label}</p>
+          <p className="mb-2 mt-1 text-2xs text-muted-foreground">{dictionary.viewMode.scopeHint}</p>
+          <ViewModeToggle />
+        </div>
         <div>
           <p className="label-xs">{copy.theme}</p>
           <div className="mt-2 grid grid-cols-2 gap-2 sm:max-w-sm">

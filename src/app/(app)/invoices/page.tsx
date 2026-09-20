@@ -7,7 +7,6 @@ import { InvoiceDialog } from "@/components/invoices/invoice-dialog";
 import { PaymentDialog } from "@/components/invoices/payment-dialog";
 import { MiniStat } from "@/components/dashboard/mini-stat";
 import { PageHeader } from "@/components/shared/page-header";
-import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -65,7 +64,7 @@ export default async function InvoicesPage() {
               <Table>
                 <TableHeader><TableRow>
                   <TableHead>{copy.invoiceLoad}</TableHead><TableHead>{copy.customer}</TableHead><TableHead>{copy.lane}</TableHead>
-                  <TableHead>{copy.issued}</TableHead><TableHead>{copy.due}</TableHead><TableHead>{copy.status}</TableHead>
+                  <TableHead>{copy.issued}</TableHead><TableHead>{copy.due}</TableHead>
                   <TableHead className="text-right">{copy.amount}</TableHead><TableHead className="text-right">{dictionary.common.actions}</TableHead>
                 </TableRow></TableHeader>
                 <TableBody>{loads.map((load) => {
@@ -83,7 +82,6 @@ export default async function InvoicesPage() {
                       {load.invoiceDueDate ? formatLocaleDate(load.invoiceDueDate, locale) : "—"}
                       {age != null && age > 0 ? <span className="block text-2xs">{interpolate(copy.daysOverdue, { days: age })}</span> : null}
                     </TableCell>
-                    <TableCell><StatusBadge status={load.status} locale={locale} /></TableCell>
                     <TableCell className="text-right font-medium tnum">
                       {formatMoney(load.grossRate)}
                       {payment.collected > 0 && payment.balance > 0 ? <span className="block text-2xs font-normal text-muted-foreground">{interpolate(copy.balanceDue, { amount: formatMoney(payment.balance) })}</span> : null}
@@ -93,7 +91,7 @@ export default async function InvoicesPage() {
                       {load.invoiceNumber ? <Button asChild size="icon-sm" variant="outline" title={copy.downloadPdf}><a href={`/api/export/invoice/${load.id}`}><Download /></a></Button> : null}
                       <Button asChild size="icon-sm" variant="ghost" title={copy.openLoad}><Link href={`/loads/${load.id}`}><ExternalLink /></Link></Button>
                       {load.invoiceNumber ? <PaymentDialog loadId={load.id} balance={payment.balance} today={today} canManage={canManage} /> : null}
-                      <InvoiceActions loadId={load.id} status={load.status} today={today} canManage={canManage} />
+                      <InvoiceActions loadId={load.id} canVoid={Boolean(load.invoiceNumber) && payment.collected === 0} canManage={canManage} />
                     </div></TableCell>
                   </TableRow>;
                 })}</TableBody>

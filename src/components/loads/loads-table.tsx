@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import {
   ArrowUpDown,
   ChevronDown,
-  ChevronRight,
   ChevronUp,
   Package,
   Search,
@@ -15,7 +14,6 @@ import {
 
 import { EmptyState } from "@/components/shared/empty-state";
 import { useLanguage } from "@/components/shell/language-provider";
-import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -49,6 +47,7 @@ import type { Driver, LoadWithMetrics, Truck } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { LoadFormDialog } from "./load-form-dialog";
 import { RatingBadge } from "./rating-badge";
+import { SimpleLoadCards } from "./simple-load-cards";
 
 /** Sort order so "best loads first" is one click on the Rating column. */
 const RATING_ORDER: Record<string, number> = { BAD: 0, MARGINAL: 1, GOOD: 2, GREAT: 3 };
@@ -65,8 +64,7 @@ type SortKey =
   | "expenses"
   | "profit"
   | "profitPerMile"
-  | "rating"
-  | "status";
+  | "rating";
 
 interface Column {
   key: SortKey;
@@ -101,14 +99,13 @@ function valueFor(load: LoadWithMetrics, key: SortKey): string | number {
       return load.metrics.profitPerMile;
     case "rating":
       return RATING_ORDER[load.metrics.rating];
-    case "status":
-      return load.status;
     default:
       return 0;
   }
 }
 
 interface LoadsTableProps {
+  simple?: boolean;
   loads: LoadWithMetrics[];
   brokers: string[];
   trucks?: Truck[];
@@ -134,6 +131,7 @@ export function LoadsTable({
   ratingThresholds,
   deadheadWarnPct = 20,
   emptyDescription,
+  simple = false,
 }: LoadsTableProps) {
   const { dictionary, locale } = useLanguage();
   const copy = dictionary.loads;
@@ -148,7 +146,7 @@ export function LoadsTable({
     { key: "expenses", label: copy.directTripCosts, numeric: true },
     { key: "profit", label: copy.contributionProfit, numeric: true },
     { key: "profitPerMile", label: copy.contributionPerMile, numeric: true },
-    { key: "rating", label: copy.rating }, { key: "status", label: copy.status },
+    { key: "rating", label: copy.rating },
   ];
   // Only worth a line on the row once there is more than one unit it could
   // have been.
@@ -157,7 +155,6 @@ export function LoadsTable({
   const router = useRouter();
   const [search, setSearch] = React.useState("");
   const [broker, setBroker] = React.useState("all");
-  const [status, setStatus] = React.useState("all");
   const [rating, setRating] = React.useState("all");
   const [from, setFrom] = React.useState("");
   const [to, setTo] = React.useState("");
@@ -171,7 +168,6 @@ export function LoadsTable({
 
     const rows = loads.filter((load) => {
       if (broker !== "all" && load.broker !== broker) return false;
-      if (status !== "all" && load.status !== status) return false;
       if (rating !== "all" && load.metrics.rating !== rating) return false;
       if (from && load.date < from) return false;
       if (to && load.date > to) return false;
@@ -203,7 +199,7 @@ export function LoadsTable({
           : String(av).localeCompare(String(bv));
       return sort.dir === "asc" ? cmp : -cmp;
     });
-  }, [loads, search, broker, status, rating, from, to, sort, locale]);
+  }, [loads, search, broker, rating, from, to, sort, locale]);
 
   const totals = React.useMemo(
     () =>
@@ -224,7 +220,6 @@ export function LoadsTable({
   const hasFilters =
     search !== "" ||
     broker !== "all" ||
-    status !== "all" ||
     rating !== "all" ||
     from !== "" ||
     to !== "";
@@ -233,14 +228,13 @@ export function LoadsTable({
     setSort((prev) =>
       prev.key === key
         ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
-        : { key, dir: key === "date" || key === "broker" || key === "status" ? "asc" : "desc" },
+        : { key, dir: key === "date" || key === "broker" ? "asc" : "desc" },
     );
   }
 
   function clearFilters() {
     setSearch("");
     setBroker("all");
-    setStatus("all");
     setRating("all");
     setFrom("");
     setTo("");
@@ -274,18 +268,7 @@ export function LoadsTable({
           </SelectContent>
         </Select>
 
-        <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-[9.5rem]" aria-label={copy.filterStatus}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{copy.allStatuses}</SelectItem>
-            <SelectItem value="PENDING">{copy.pending}</SelectItem>
-            <SelectItem value="INVOICED">{copy.invoiced}</SelectItem>
-            <SelectItem value="PAID">{copy.paid}</SelectItem>
-          </SelectContent>
-        </Select>
-
+        {!simple ? <>
         <Select value={rating} onValueChange={setRating}>
           <SelectTrigger className="w-[9.5rem]" aria-label={copy.filterRating}>
             <SelectValue />
@@ -316,6 +299,8 @@ export function LoadsTable({
             aria-label={copy.toDate}
           />
         </div>
+
+        </> : null}
 
         {hasFilters ? (
           <Button variant="ghost" size="sm" onClick={clearFilters}>
@@ -357,6 +342,38 @@ export function LoadsTable({
             )
           }
         />
+      ) : simple ? (
+        <>
+          <SimpleLoadCards loads={filtered} trucks={trucks} totals={totals} />
+          <TableWrapper className="hidden sm:block">
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>{copy.pickup}</TableHead>
+                <TableHead>{dictionary.dashboard.route}</TableHead>
+                <TableHead className="text-right">{copy.rate}</TableHead>
+                <TableHead className="text-right">{dictionary.viewMode.tripProfit}</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>{filtered.map((load) => (
+                <TableRow key={load.id} className="cursor-pointer" onClick={() => router.push(`/loads/${load.id}`)}>
+                  <TableCell className="text-muted-foreground">{formatLocaleDate(load.date, locale, "short")}</TableCell>
+                  <TableCell className="whitespace-normal min-w-40">
+                    <Link href={`/loads/${load.id}`} onClick={(event) => event.stopPropagation()} className="rounded-sm font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      {load.originCity}, {load.originState} → {load.destinationCity}, {load.destinationState}
+                    </Link>
+                    <span className="mt-1 block text-xs text-muted-foreground">{[load.broker, load.loadNumber, showTruck ? truckName(load.truckId) : null].filter(Boolean).join(" · ")}</span>
+                  </TableCell>
+                  <TableCell className="text-right font-medium tnum">{formatMoney(load.grossRate)}</TableCell>
+                  <TableCell className={cn("text-right font-medium tnum", load.metrics.tripProfit >= 0 ? "text-pos" : "text-neg")}>{formatMoney(load.metrics.tripProfit)}</TableCell>
+                </TableRow>
+              ))}</TableBody>
+              <TableFooter><TableRow>
+                <TableCell colSpan={2}>{copy.totals}</TableCell>
+                <TableCell className="text-right tnum">{formatMoney(totals.rate)}</TableCell>
+                <TableCell className={cn("text-right tnum", totals.profit >= 0 ? "text-pos" : "text-neg")}>{formatMoney(totals.profit)}</TableCell>
+              </TableRow></TableFooter>
+            </Table>
+          </TableWrapper>
+        </>
       ) : (
         <TableWrapper>
           <Table>
@@ -483,15 +500,6 @@ export function LoadsTable({
                   <TableCell>
                     <RatingBadge rating={load.metrics.rating} />
                   </TableCell>
-                  <TableCell>
-                    <span className="flex items-center justify-between gap-2">
-                      <StatusBadge status={load.status} locale={locale} />
-                      <ChevronRight
-                        className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
-                        aria-hidden
-                      />
-                    </span>
-                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -522,7 +530,6 @@ export function LoadsTable({
                 <TableCell className="text-right tnum">
                   {formatRateValue(div(totals.profit, totals.total))}
                 </TableCell>
-                <TableCell />
                 <TableCell />
               </TableRow>
             </TableFooter>

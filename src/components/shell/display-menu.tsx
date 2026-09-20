@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { APP_LOCALES } from "@/lib/i18n";
 import { useLanguage } from "./language-provider";
+import { useViewMode } from "./view-mode-provider";
 import { UI_SCALES, useTheme, type UiScale } from "./theme-provider";
 
 /**
@@ -25,7 +26,8 @@ import { UI_SCALES, useTheme, type UiScale } from "./theme-provider";
  */
 export function DisplayMenu({ className }: { className?: string }) {
   const { theme, setTheme, scale, setScale } = useTheme();
-  const { locale, setLocale, copy } = useLanguage();
+  const { locale, setLocale, copy, dictionary } = useLanguage();
+  const { mode, pending, setMode } = useViewMode();
 
   return (
     <DropdownMenu>
@@ -46,6 +48,15 @@ export function DisplayMenu({ className }: { className?: string }) {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="start" side="bottom" className="w-[13rem]">
+        <DropdownMenuLabel>{dictionary.viewMode.label}</DropdownMenuLabel>
+        {(["simple", "detailed"] as const).map((value) => (
+          <DropdownMenuItem key={value} role="menuitemradio" aria-checked={mode === value} disabled={pending} onSelect={() => setMode(value)}>
+            <span className="flex-1">{dictionary.viewMode[value]}</span>
+            {mode === value ? <Check className="size-4" /> : null}
+          </DropdownMenuItem>
+        ))}
+        <p className="px-2 py-1.5 text-2xs text-muted-foreground">{dictionary.viewMode.scopeHint}</p>
+        <DropdownMenuSeparator />
         <DropdownMenuLabel>{copy.theme}</DropdownMenuLabel>
         {(
           [

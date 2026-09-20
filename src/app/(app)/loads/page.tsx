@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { ModeView, ViewModeToggle } from "@/components/shared/view-mode";
 import { PeriodControls } from "@/components/dashboard/period-controls";
 import { LoadFormDialog } from "@/components/loads/load-form-dialog";
 import { LoadsTable } from "@/components/loads/loads-table";
@@ -50,7 +51,8 @@ export default async function LoadsPage({
   searchParams: Promise<SearchParams>;
 }) {
   const [params, session, locale] = await Promise.all([searchParams, requireSession(), getAppLocale()]);
-  const copy = getWebDictionary(locale).loads;
+  const dictionary = getWebDictionary(locale);
+  const copy = dictionary.loads;
   const { trucks, loads, expenses, fuelEntries, settings, drivers, subscription, paymentEvents } = await getDataset(
     session.businessId,
   );
@@ -112,94 +114,118 @@ export default async function LoadsPage({
       <div className="flex flex-wrap items-center gap-2">
         <PeriodControls period={period} />
         <TruckSwitcher trucks={orderedTrucks(trucks)} selectedId={scopeTruckId} />
+        <div className="sm:ml-auto"><ViewModeToggle /></div>
       </div>
 
-      <section
-        aria-label={copy.summaryLabel}
-        className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5"
-      >
-        <MiniStat
-          label={copy.loads}
-          value={formatNumber(summary.loadCount)}
-          sub={copy.inPeriod}
-          help={copy.loadCountHelp}
-          wrapText
-        />
-        <MiniStat
-          label={copy.bookedRevenue}
-          value={formatMoneyCompact(summary.bookedRevenue)}
-          tone="info"
-          help={copy.bookedRevenueHelp}
-          wrapText
-        />
-        <MiniStat
-          label={copy.totalMiles}
-          value={formatNumber(summary.totalMiles)}
-          sub="mi"
-          help={copy.totalMilesHelp}
-          wrapText
-        />
-        <MiniStat
-          label={copy.deadheadPercent}
-          value={formatPercent(summary.deadheadPct)}
-          tone={isDeadheadElevated(summary.deadheadPct, settings.deadheadWarnPct) ? "warning" : "positive"}
-          help={copy.deadheadHelp}
-          wrapText
-        />
-        <MiniStat
-          label={copy.directTripCosts}
-          value={formatMoneyCompact(tripExpenses)}
-          tone="negative"
-          sub={copy.tripCostsPaidDriver}
-          help={copy.directTripCostsHelp}
-          wrapText
-        />
-        <MiniStat
-          label={copy.revenuePerMile}
-          value={formatRate(summary.revenuePerMile)}
-          tone="info"
-          sub={interpolate(copy.contributionProfitAmount, { amount: formatMoneyCompact(tripProfit) })}
-          help={copy.revenuePerMileHelp}
-          wrapText
-        />
-        <MiniStat
-          label={copy.allocatedOperatingCosts}
-          value={formatMoneyCompact(allocatedOperatingCosts)}
-          tone="negative"
-          sub={interpolate(copy.estimate, { basis: costBasis.basisLabel })}
-          help={copy.allocatedOperatingCostsHelp}
-          wrapText
-        />
-        <MiniStat
-          label={copy.fullyLoadedProfit}
-          value={formatMoneyCompact(fullyLoadedOperatingProfit)}
-          tone={fullyLoadedOperatingProfit >= 0 ? "positive" : "negative"}
-          sub={copy.doesNotChangeRating}
-          help={copy.fullyLoadedProfitHelp}
-          wrapText
-        />
-        <MiniStat
-          label={copy.debtCashBurden}
-          value={formatMoneyCompact(debtCashBurden)}
-          tone="warning"
-          sub={copy.separateProfitability}
-          help={copy.debtCashBurdenHelp}
-          wrapText
-        />
-      </section>
+      <ModeView simple={
+        <>
+          <section aria-label={copy.summaryLabel} className="grid gap-3 sm:grid-cols-3">
+            <MiniStat label={copy.loads} value={formatNumber(summary.loadCount)} sub={periodLabel} />
+            <MiniStat label={dictionary.viewMode.revenue} value={formatMoneyCompact(summary.bookedRevenue)} tone="info" sub={dictionary.viewMode.revenueHint} wrapText />
+            <MiniStat label={dictionary.viewMode.tripProfit} value={formatMoneyCompact(tripProfit)} tone={tripProfit >= 0 ? "positive" : "negative"} sub={dictionary.viewMode.tripProfitHint} wrapText />
+          </section>
+          <LoadsTable
+            simple
+            loads={periodLoads}
+            brokers={brokers}
+            trucks={trucks}
+            drivers={hasFleetAccess(subscription) ? drivers : []}
+            driverSchedule={driverSchedule}
+            defaultTruckId={scopeTruckId}
+            defaultDate={defaultEntryDate(period)}
+            ratingThresholds={ratingThresholds}
+            deadheadWarnPct={settings.deadheadWarnPct}
+            emptyDescription={interpolate(copy.noLoadsPeriod, { period: periodLabel })}
+          />
+        </>
+      }>
+        <section
+          aria-label={copy.summaryLabel}
+          className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5"
+        >
+          <MiniStat
+            label={copy.loads}
+            value={formatNumber(summary.loadCount)}
+            sub={copy.inPeriod}
+            help={copy.loadCountHelp}
+            wrapText
+          />
+          <MiniStat
+            label={copy.bookedRevenue}
+            value={formatMoneyCompact(summary.bookedRevenue)}
+            tone="info"
+            help={copy.bookedRevenueHelp}
+            wrapText
+          />
+          <MiniStat
+            label={copy.totalMiles}
+            value={formatNumber(summary.totalMiles)}
+            sub="mi"
+            help={copy.totalMilesHelp}
+            wrapText
+          />
+          <MiniStat
+            label={copy.deadheadPercent}
+            value={formatPercent(summary.deadheadPct)}
+            tone={isDeadheadElevated(summary.deadheadPct, settings.deadheadWarnPct) ? "warning" : "positive"}
+            help={copy.deadheadHelp}
+            wrapText
+          />
+          <MiniStat
+            label={copy.directTripCosts}
+            value={formatMoneyCompact(tripExpenses)}
+            tone="negative"
+            sub={copy.tripCostsPaidDriver}
+            help={copy.directTripCostsHelp}
+            wrapText
+          />
+          <MiniStat
+            label={copy.revenuePerMile}
+            value={formatRate(summary.revenuePerMile)}
+            tone="info"
+            sub={interpolate(copy.contributionProfitAmount, { amount: formatMoneyCompact(tripProfit) })}
+            help={copy.revenuePerMileHelp}
+            wrapText
+          />
+          <MiniStat
+            label={copy.allocatedOperatingCosts}
+            value={formatMoneyCompact(allocatedOperatingCosts)}
+            tone="negative"
+            sub={interpolate(copy.estimate, { basis: costBasis.basisLabel })}
+            help={copy.allocatedOperatingCostsHelp}
+            wrapText
+          />
+          <MiniStat
+            label={copy.fullyLoadedProfit}
+            value={formatMoneyCompact(fullyLoadedOperatingProfit)}
+            tone={fullyLoadedOperatingProfit >= 0 ? "positive" : "negative"}
+            sub={copy.doesNotChangeRating}
+            help={copy.fullyLoadedProfitHelp}
+            wrapText
+          />
+          <MiniStat
+            label={copy.debtCashBurden}
+            value={formatMoneyCompact(debtCashBurden)}
+            tone="warning"
+            sub={copy.separateProfitability}
+            help={copy.debtCashBurdenHelp}
+            wrapText
+          />
+        </section>
 
-      <LoadsTable
-        loads={periodLoads}
-        brokers={brokers}
-        trucks={trucks}
-        drivers={hasFleetAccess(subscription) ? drivers : []}
-        driverSchedule={driverSchedule}
-        defaultTruckId={scopeTruckId}
-        defaultDate={defaultEntryDate(period)}
-        ratingThresholds={ratingThresholds}
-        deadheadWarnPct={settings.deadheadWarnPct}
-        emptyDescription={interpolate(copy.noLoadsPeriod, { period: periodLabel })}
-      />
+        <LoadsTable
+          loads={periodLoads}
+          brokers={brokers}
+          trucks={trucks}
+          drivers={hasFleetAccess(subscription) ? drivers : []}
+          driverSchedule={driverSchedule}
+          defaultTruckId={scopeTruckId}
+          defaultDate={defaultEntryDate(period)}
+          ratingThresholds={ratingThresholds}
+          deadheadWarnPct={settings.deadheadWarnPct}
+          emptyDescription={interpolate(copy.noLoadsPeriod, { period: periodLabel })}
+        />
+      </ModeView>
     </div>
   );
 }
