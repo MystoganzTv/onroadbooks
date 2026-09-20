@@ -1,3 +1,5 @@
+> Production uses Neon, Auth.js and R2 as of September 20, 2026. The former Supabase project is paused. See [cutover evidence](migrations/phase-10-supabase-retirement.md).
+
 # Production operations
 
 ## Health and uptime
@@ -111,7 +113,7 @@ The PostgreSQL CI job starts from an empty database and runs, in order:
 
 That proves the committed migration history can recreate the declared schema.
 Vercel uses `scripts/vercel-build.mjs`. Preview builds compile without touching
-production. A Production build uses exactly one migration system. The legacy `postgres` mode runs Prisma migrations, Supabase hardening and Prisma schema verification. `DATA_SOURCE=neon` requires matching Neon runtime/direct endpoints, applies Drizzle migrations and runs `db:drizzle:verify` against both business and private auth schemas plus migration hashes. Only then does `next build` run. Preview/local builds apply no migrations automatically.
+production. A Production build uses exactly one migration system. The legacy `postgres` mode runs Prisma migrations, database hardening and Prisma schema verification. `DATA_SOURCE=neon` requires matching Neon runtime/direct endpoints, applies Drizzle migrations and runs `db:drizzle:verify` against both business and private auth schemas plus migration hashes. Only then does `next build` run. Preview/local builds apply no migrations automatically.
 
 Production schema changes must remain backward-compatible with the currently
 running deployment. Use expand/contract changes: add nullable columns/tables
@@ -134,7 +136,7 @@ uses for auth mail and error alerts. No bucket and no new vendor.
 
 **Never add `upload-artifact` to that workflow while the repository is public.**
 
-Repository secrets: `DATABASE_URL` for the legacy backend, `BACKUP_PASSPHRASE`, `RESEND_API_KEY` and `BACKUP_EMAIL`. At the Neon cutover, add `NEON_DIRECT_URL` and set the repository variable `DATA_SOURCE=neon` in the same maintenance window as the application switch. Missing Neon credentials fail the backup; there is no fallback to the legacy database. The job installs PostgreSQL 18 clients, compatible with both the old PostgreSQL 17 source and Neon 18. Do not rotate the backup passphrase during this transition.
+Repository secrets: `DATABASE_URL` for the legacy backend, `BACKUP_PASSPHRASE`, `RESEND_API_KEY` and `BACKUP_EMAIL`. `NEON_DIRECT_URL` and the repository variable `DATA_SOURCE=neon` were configured during the production cutover on September 20, 2026; the main-branch backup run passed without sending email. Missing Neon credentials fail the backup; there is no fallback to the legacy database. The job installs PostgreSQL 18 clients, compatible with both the old PostgreSQL 17 source and Neon 18. Do not rotate the backup passphrase during this transition.
 
 `scripts/lib/backup-email.ts` refuses to send anything past 38 MB rather than
 mailing half a ledger. The day that throws is the day nightly backups need
@@ -206,7 +208,7 @@ The drill uses PostgreSQL 17 client tools to:
 1. create a logical, read-only dump of the production `public` schema;
 2. initialize a disposable PostgreSQL cluster on localhost;
 3. restore the dump with stop-on-error semantics;
-4. compare row counts and checksums for all 19 application tables;
+4. compare row counts and checksums for all 20 application tables;
 5. confirm RLS survived the restore; and
 6. stop the temporary server and securely remove the dump and data directory.
 
@@ -214,9 +216,10 @@ The script never prints rows, credentials, or provider identifiers. The dump
 does contain production data while the drill runs, so execute it only on an
 approved encrypted workstation and never keep or commit its temporary files.
 
-This certifies application database recovery. Supabase Auth identities and
-Storage object bytes use separate provider recovery/export procedures and must
-be included in a full disaster-recovery exercise.
+This legacy drill certifies the public application schema. For full Neon recovery,
+use `verify:migration-backup -- --auth` with the encrypted Neon archive to check
+Auth.js identities, invitations and the Drizzle journal too. R2 object bytes need
+a separate backup; the database stores their metadata, not their contents.
 
 ## Incident response
 
@@ -224,7 +227,8 @@ be included in a full disaster-recovery exercise.
 2. Inspect Vercel Runtime Errors and filter logs by route and request ID.
 3. For Stripe, find the event ID in Workbench and retry only after the cause is
    fixed; event handling is idempotent through subscription synchronization.
-4. For Supabase, inspect the matching service log (`postgres`, `auth`, or
-   `storage`) and rerun the failed operation after remediation.
+4. For database failures inspect Neon, for auth failures inspect Vercel Auth.js
+   logs, and for document failures inspect R2 and the Next.js upload routes.
+   Rerun the failed operation after remediation.
 5. Record detection time, customer impact, resolution, and the prevention
    added before closing the incident.

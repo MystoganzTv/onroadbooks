@@ -74,7 +74,7 @@ export default function PrivacyPage() {
         <h2>Service providers and disclosure</h2>
         <p>
           We use infrastructure, authentication, storage, and payment providers, including Google,
-          Supabase, Vercel, and Stripe, to operate the service. They process limited information on
+          Neon, Cloudflare, Resend, Vercel, and Stripe, to operate the service. They process limited information on
           our behalf or as needed to provide their service. We may also disclose information when
           required by law, to protect users or the service, or as part of a business transfer.
         </p>
@@ -115,9 +115,9 @@ export default function PrivacyPage() {
 
         <h3>Essential session and security cookies</h3>
         <p>
-          OnRoad Books uses a signed, HTTP-only session cookie after you log in. It identifies the
-          account and business workspace you may access and expires automatically. Supabase may
-          use short-lived cookies or equivalent storage during Google OAuth to verify that the
+          OnRoad Books uses an encrypted, HTTP-only session cookie after you log in. It identifies the
+          account and business workspace you may access and expires automatically. Our authentication system uses
+          short-lived security cookies during Google OAuth to verify that the
           login response belongs to the browser that started it. These technologies are necessary
           for the requested login and security functions.
         </p>

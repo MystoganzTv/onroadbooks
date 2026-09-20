@@ -7,10 +7,7 @@ import { SESSION_COOKIE } from "./constants";
 import { applicationUrl } from "../stripe";
 
 export async function inviteAuthUser(email: string, redirectTo: string) {
-  if (!usingAuthJs()) {
-    const { inviteSupabaseAuthUser } = await import("../supabase/admin");
-    return inviteSupabaseAuthUser(email, redirectTo);
-  }
+  if (!usingAuthJs()) throw new Error("Invitations require Auth.js authentication.");
   if (process.env.DATA_SOURCE !== "neon")
     throw new Error("Invitations require the Neon backend.");
   const key = process.env.RESEND_API_KEY?.trim();
@@ -51,22 +48,10 @@ export async function inviteAuthUser(email: string, redirectTo: string) {
     );
 }
 
-/** Neon identity and invitation rows are removed by FK cascades with User. */
-export async function deleteAuthIdentityByEmail(email: string) {
-  if (usingAuthJs()) return;
-  const { deleteSupabaseAuthUserByEmail } = await import("../supabase/admin");
-  await deleteSupabaseAuthUserByEmail(email);
-}
-
 export async function clearWebSessions() {
   (await cookies()).set(SESSION_COOKIE, "", { path: "/", maxAge: 0 });
   if (usingAuthJs()) {
     const { signOut } = await import("@/auth");
     await signOut({ redirect: false });
-  } else {
-    const { createSupabaseServerClient } = await import("../supabase/server");
-    await (
-      await createSupabaseServerClient()
-    ).auth.signOut({ scope: "global" });
   }
 }

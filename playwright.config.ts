@@ -31,15 +31,12 @@ export default defineConfig({
       ONROAD_DATA_DIR: isolatedData,
       AUTH_SECRET: "e2e-only-session-secret-longer-than-32-characters",
       NEXT_PUBLIC_APP_URL: baseURL,
-      NEXT_PUBLIC_GOOGLE_CLIENT_ID: "",
       RESEND_API_KEY: "",
       STRIPE_SECRET_KEY: "",
       STRIPE_WEBHOOK_SECRET: "",
       STRIPE_PRICE_SOLO_MONTHLY: "",
       STRIPE_PRICE_PRO_MONTHLY: "",
       STRIPE_PRICE_FLEET_MONTHLY: "",
-      SUPABASE_URL: "http://127.0.0.1:1",
-      SUPABASE_SECRET_KEY: "e2e-disabled",
       // Turns the Scan button on. The browser stubs the route, so no request
       // ever leaves the machine and this value is never used as a key.
       ANTHROPIC_API_KEY: "e2e-never-called",

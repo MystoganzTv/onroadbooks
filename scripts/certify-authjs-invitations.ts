@@ -67,12 +67,9 @@ async function main() {
     AUTH_SECRET: randomBytes(48).toString("base64url"),
     AUTH_GOOGLE_ID: "",
     AUTH_GOOGLE_SECRET: "",
-    NEXT_PUBLIC_GOOGLE_CLIENT_ID: "",
     AUTH_EMAIL_FROM: "OnRoad Books <no-reply@onroadbooks.com>",
     DOCUMENT_STORAGE: "local",
     ONROAD_DISPOSABLE_DATABASE: "1",
-    SUPABASE_URL: "http://127.0.0.1:1",
-    SUPABASE_SECRET_KEY: "disabled",
     STRIPE_SECRET_KEY: "",
     ANTHROPIC_API_KEY: "",
   });

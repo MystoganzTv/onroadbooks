@@ -8,9 +8,8 @@ import { R2DocumentStorage, r2Configuration } from "./r2";
 
 import { dataDirectory } from "@/lib/data-directory";
 import type { DocumentStorage } from "./contract";
-import { SupabaseDocumentStorage } from "./supabase";
 
-/** Selectable private object storage; existing backends remain available during migration. */
+/** Private R2 storage in production, with disk storage for local development. */
 export type { DocumentStorage } from "./contract";
 
 /** Resolved per call, for the same reason the ledger path is. */
@@ -70,31 +69,15 @@ export function getDocumentStorage(): DocumentStorage {
     return storage;
   }
 
-  if (process.env.DOCUMENT_STORAGE === "supabase") {
-    const url = process.env.SUPABASE_URL;
-    const key = process.env.SUPABASE_SECRET_KEY;
-    const bucket = process.env.SUPABASE_STORAGE_BUCKET || "documents";
-
-    if (url && key) {
-      storage = new SupabaseDocumentStorage(url, key, bucket);
-      return storage;
-    }
-    console.warn(
-      "[storage] DOCUMENT_STORAGE=supabase but SUPABASE_URL / SUPABASE_SECRET_KEY are not set. Falling back to local disk.",
-    );
-  }
+  if (process.env.DOCUMENT_STORAGE && process.env.DOCUMENT_STORAGE !== "local")
+    throw new Error("Unsupported document storage backend; choose r2 or local.");
 
   storage = new LocalDocumentStorage();
   return storage;
 }
 
-export function storageBackend(): "supabase" | "r2" | "local" {
-  const selected = getDocumentStorage();
-  return selected instanceof R2DocumentStorage
-    ? "r2"
-    : selected instanceof LocalDocumentStorage
-      ? "local"
-      : "supabase";
+export function storageBackend(): "r2" | "local" {
+  return getDocumentStorage() instanceof R2DocumentStorage ? "r2" : "local";
 }
 
 /** Storage keys are namespaced by owner so the bucket stays browsable. */

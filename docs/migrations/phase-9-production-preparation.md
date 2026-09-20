@@ -1,3 +1,5 @@
+> Registro histórico de preparación. El corte ya se completó; el estado vigente y sus pruebas están en [fase 10](phase-10-supabase-retirement.md). Las instrucciones pendientes de abajo describen el momento anterior al corte.
+
 # Preparación de producción
 
 El 20 de septiembre de 2026 se creó un despliegue con configuración Production y `--skip-domain`. No se promovió ni se movió el tráfico. Las 14 variables de la migración ya están persistidas exclusivamente en Production; Preview/Development conservan sus valores anteriores.

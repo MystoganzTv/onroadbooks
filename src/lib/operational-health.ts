@@ -83,21 +83,11 @@ export async function buildHealthReport(): Promise<HealthReport> {
     status: stripeBillingConfigured() ? "ok" : "error",
   };
   const auth: HealthCheck = {
-    status: (usingAuthJs()
-      ? [
-          process.env.AUTH_SECRET,
-          process.env.AUTH_GOOGLE_ID,
-          process.env.AUTH_GOOGLE_SECRET,
-          process.env.RESEND_API_KEY,
-        ]
-      : [
-          process.env.NEXT_PUBLIC_SUPABASE_URL,
-          process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-          process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-        ]
-    ).every(configured)
-      ? "ok"
-      : "error",
+    status: usingAuthJs()
+      ? [process.env.AUTH_SECRET, process.env.AUTH_GOOGLE_ID,
+          process.env.AUTH_GOOGLE_SECRET, process.env.RESEND_API_KEY].every(configured)
+        ? "ok" : "error"
+      : production ? "error" : "ok",
   };
   const checks = {
     application: { status: "ok" as const },

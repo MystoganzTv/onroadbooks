@@ -189,7 +189,7 @@ export default function TermsPage() {
       <section id="third-party">
         <h2>Third-party services</h2>
         <p>
-          The service relies on providers such as Stripe, Google, Supabase, and Vercel. Their own
+          The service relies on providers such as Stripe, Google, Neon, Cloudflare, Resend, and Vercel. Their own
           terms may apply when you use their features. We are not responsible for third-party
           services outside our control, but we select and configure providers to support the
           operation and security of OnRoad Books.

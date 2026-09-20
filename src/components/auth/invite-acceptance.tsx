@@ -6,7 +6,6 @@ import { KeyRound, Loader2, XCircle } from "lucide-react";
 
 import { BrandLogo } from "@/components/shell/brand-logo";
 import { Button } from "@/components/ui/button";
-import { invitationSessionFromUrl } from "@/lib/invitation-session";
 import type { AppLocale } from "@/lib/i18n";
 import { getWebDictionary } from "@/lib/i18n/dictionaries";
 import { localizeError } from "@/lib/i18n/errors";
@@ -47,51 +46,15 @@ export function InviteAcceptance({ locale }: { locale: AppLocale }) {
       });
       return;
     }
-    let active = true;
-
-    async function accept() {
-      try {
-        const invitation = invitationSessionFromUrl(
-          window.location.search,
-          window.location.hash,
-        );
-        if (!invitation.ok) throw new Error(invitation.error);
-
-        // Keep the browser on our own origin. The route exchanges/verifies the
-        // Supabase credentials server-side, so the strict CSP can stay intact.
-        const response = await fetch("/api/auth/invite/accept", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(invitation.session),
-        });
-        const result = (await response.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        if (!response.ok)
-          throw new Error(
-            result?.error
-              ? localizeError(result.error, locale)
-              : copy.inviteFailed,
-          );
-        window.location.replace("/dashboard?team=joined");
-      } catch (error) {
-        if (active) {
-          setState({
-            kind: "error",
-            message:
-              error instanceof Error
-                ? localizeError(error.message, locale)
-                : copy.inviteFailed,
-          });
-        }
-      }
-    }
-
-    void accept();
-    return () => {
-      active = false;
-    };
-  }, [copy.inviteFailed, locale, spanish]);
+    initialized.current = true;
+    window.history.replaceState(null, "", window.location.pathname);
+    setState({
+      kind: "error",
+      message: spanish
+        ? "La invitación no es válida. Pide al dueño del negocio una nueva invitación."
+        : "This invitation is invalid. Ask the workspace owner for a new invitation.",
+    });
+  }, [spanish]);
 
   async function acceptWithPassword(event: React.FormEvent) {
     event.preventDefault();

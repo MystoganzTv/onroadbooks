@@ -12,35 +12,9 @@ import {
   shouldOptimizePdf,
   targetDimensions,
 } from "../document-optimization";
-import { invitationSessionFromUrl, invitationSessionSchema } from "../invitation-session";
 import { isPlatformAdminEmail, platformAdminEmails } from "../platform-admin";
 import { isSameOriginRequest } from "../request-origin";
 import type { Dataset } from "../types";
-
-describe("invitation session boundary", () => {
-  it("accepts a PKCE code without requiring a browser Supabase connection", () => {
-    assert.deepEqual(invitationSessionFromUrl("?code=pkce-code", ""), {
-      ok: true,
-      session: { code: "pkce-code" },
-    });
-  });
-
-  it("supports legacy hash sessions and rejects incomplete credentials", () => {
-    assert.deepEqual(
-      invitationSessionFromUrl("", "#access_token=access&refresh_token=refresh"),
-      { ok: true, session: { accessToken: "access", refreshToken: "refresh" } },
-    );
-    assert.equal(invitationSessionFromUrl("", "#access_token=access").ok, false);
-    assert.equal(invitationSessionSchema.safeParse({ code: "ok", unexpected: true }).success, false);
-  });
-
-  it("surfaces an identity-provider error instead of spinning forever", () => {
-    assert.deepEqual(invitationSessionFromUrl("?error_description=Invite%20expired", ""), {
-      ok: false,
-      error: "Invite expired",
-    });
-  });
-});
 
 describe("platform admin allowlist", () => {
   it("normalizes a comma-separated environment value", () => {

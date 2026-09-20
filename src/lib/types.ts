@@ -353,7 +353,7 @@ export interface Document {
   sizeBytes: number;
   /**
    * Opaque key resolved by the storage adapter. Local storage treats it as a
-   * path under data/uploads; Supabase Storage would treat it as an object key.
+   * path under data/uploads; R2 treats it as a private object key.
    */
   storageKey: string;
   uploadedAt: string;

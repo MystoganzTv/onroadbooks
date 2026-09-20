@@ -1,0 +1,20 @@
+{
+  "origin": "https://onroadbooks.com",
+  "branch": "br-mute-paper-awpwo56b",
+  "checks": [
+    "production health: application, Neon, R2, billing and auth ok",
+    "anonymous web, mobile and cron access refused",
+    "two disposable workspaces with Secure HttpOnly Auth.js sessions",
+    "protected web routes render from Neon",
+    "incorrect password and foreign origin refused",
+    "mobile password login and bearer dashboard",
+    "10 MB document persists through production Vercel, Neon and R2",
+    "tenant isolation and private signed download preserve exact bytes",
+    "production document deletion removes R2 object",
+    "logout and subsequent password login",
+    "deleted disposable user loses web and mobile access"
+  ],
+  "passed": true,
+  "originalRowsPreserved": true,
+  "finishedAt": "2026-09-20T19:26:40.619Z"
+}
