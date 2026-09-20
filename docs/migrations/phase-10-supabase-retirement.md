@@ -1,6 +1,6 @@
 # Fases 9–10: corte y retirada de Supabase
 
-Estado: corte a producción completado el 20 de septiembre de 2026; retirada final del SDK preparada y pendiente de publicar.
+Estado: migración y retirada del SDK completadas en producción el 20 de septiembre de 2026.
 
 ## Corte certificado
 
@@ -29,7 +29,11 @@ Se conservan Prisma/PostgreSQL y JSON como implementaciones de referencia para p
 - 47 contratos por cada backend SQL (Prisma y Drizzle), sobre bases desechables.
 - 17 pruebas de navegador del producto.
 - Cinco flujos de navegador Drizzle/Auth.js/R2: datos y roles, sesiones/móvil/revocación, invitaciones de un uso, documentos de 10 MB, Stripe/cron e idempotencia.
-- Build local aprobado. CI, publicación final y verificación tras publicar se registrarán al completarse.
+- Build local y CI aprobados: PR `35533377885` y main `35533654333`.
+- PR #2 integrado como `accbf72118a4d5db3b92fb9a5591a3d012e94cf7`.
+- El usuario reanudó Vercel mediante su confirmación interactiva. Despliegue final READY y activo: `dpl_AgAgrwe17rgYifFhf8UrF1xpogh8`.
+- Retiradas de Production las 19 variables antiguas de Supabase/Postgres y el antiguo ID público de Google. Se verificó que el build no las recibió. Se conservaron sus otros ámbitos, y las credenciales de Neon/Auth.js/R2, Stripe, correo y cron no cambiaron.
+- [Certificación posterior a la retirada](phase-10-production-report.json): doce grupos aprobados, fixtures eliminadas y todas las filas originales intactas. Google OAuth real volvió a abrir el negocio existente.
 
 ## Operación posterior
 

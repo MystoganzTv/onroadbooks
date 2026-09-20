@@ -2,7 +2,7 @@
 
 Fecha: 2026-09-19. Repositorio: `onroad-books`. Commit auditado: `60aaa75192b498eb87766134877f2663b3df0177`.
 
-**Estado actualizado: producción migrada a Neon + Drizzle, Auth.js y R2.** Los 44 registros de 20 tablas y tres identidades Google se conciliaron durante la pausa. Google real, sesiones web/móvil y documentos privados se certificaron en producción. Supabase OnRoadBooks está pausado y se ha solicitado reactivar Bookliz. La fase 10 retira los SDK y rutas antiguas; su estado y pruebas están en [el informe de cierre](phase-10-supabase-retirement.md). Los apartados siguientes conservan el inventario histórico del origen.
+**Estado actualizado: producción migrada a Neon + Drizzle, Auth.js y R2.** Los 44 registros de 20 tablas y tres identidades Google se conciliaron durante la pausa. Google real, sesiones web/móvil y documentos privados se certificaron en producción. Supabase OnRoadBooks está pausado y Bookliz está restaurado. La fase 10 retiró los SDK, rutas antiguas y variables de producción, y fue publicada y certificada; su estado y pruebas están en [el informe de cierre](phase-10-supabase-retirement.md). Los apartados siguientes conservan el inventario histórico del origen.
 
 ## Decisión de arquitectura confirmada
 
