@@ -172,3 +172,32 @@ jobs:
 
       - name: Smoke check the store
         run: npm run smoke:postgres
+
+  drizzle:
+    name: Neon contracts, Auth.js and R2 protocol
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      AUTH_SECRET: ci-only-not-a-real-secret-longer-than-32-characters
+      PG_BIN: /usr/lib/postgresql/18/bin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: PostgreSQL 18 tools for disposable databases
+        run: |
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/pgdg.gpg
+          sudo sed -i 's|deb |deb [signed-by=/usr/share/keyrings/pgdg.gpg] |' /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-18
+      - name: Install
+        run: npm ci
+      - name: Both SQL repository contracts
+        run: npm run test:database
+      - name: Install browser
+        run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+      - name: Auth.js, Drizzle and private document flows
+        run: npm run test:browser:storage

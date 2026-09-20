@@ -8,7 +8,7 @@ import { isPlatformAdminEmail } from "@/lib/platform-admin";
 import { sendOperationalTestAlert } from "@/lib/operations";
 import { getDocumentStorage } from "@/lib/storage";
 import { getStripe, stripePriceId, stripeSecretLivemode } from "@/lib/stripe";
-import { deleteSupabaseAuthUserByEmail } from "@/lib/supabase/admin";
+import { deleteAuthIdentityByEmail } from "@/lib/auth/provider-admin";
 import type { PlanId } from "@/lib/types";
 import type { ActionResult } from "./types";
 
@@ -16,7 +16,8 @@ export async function adminRunOperationsCheck(): Promise<ActionResult> {
   try {
     const admin = await requireAdminSession();
     const livemode = stripeSecretLivemode();
-    if (livemode === null) throw new Error("Stripe secret mode could not be determined.");
+    if (livemode === null)
+      throw new Error("Stripe secret mode could not be determined.");
 
     const planIds: PlanId[] = ["SOLO", "OWNER", "FLEET"];
     const prices = await Promise.all(
@@ -24,15 +25,20 @@ export async function adminRunOperationsCheck(): Promise<ActionResult> {
     );
     for (const [index, price] of prices.entries()) {
       if (price.livemode !== livemode) {
-        throw new Error(`${planIds[index]} price is in a different Stripe mode.`);
+        throw new Error(
+          `${planIds[index]} price is in a different Stripe mode.`,
+        );
       }
       if (!price.active || price.type !== "recurring" || !price.recurring) {
-        throw new Error(`${planIds[index]} price is not an active recurring price.`);
+        throw new Error(
+          `${planIds[index]} price is not an active recurring price.`,
+        );
       }
     }
 
     const alert = await sendOperationalTestAlert(admin.email);
-    if (!alert.delivered) throw new Error("The operations alert could not be delivered.");
+    if (!alert.delivered)
+      throw new Error("The operations alert could not be delivered.");
 
     console.info("[admin-operations-check]", {
       admin: admin.email,
@@ -42,12 +48,17 @@ export async function adminRunOperationsCheck(): Promise<ActionResult> {
     });
     return { ok: true, id: livemode ? "live" : "test" };
   } catch (error) {
-    return { ok: false, error: (error as Error).message || "Operations check failed." };
+    return {
+      ok: false,
+      error: (error as Error).message || "Operations check failed.",
+    };
   }
 }
 
 async function targetAccount(userId: string) {
-  const account = (await getAuthStore().listAccounts()).find((candidate) => candidate.userId === userId);
+  const account = (await getAuthStore().listAccounts()).find(
+    (candidate) => candidate.userId === userId,
+  );
   if (!account) throw new Error("That account no longer exists.");
   return account;
 }
@@ -71,14 +82,18 @@ async function grantComplimentaryPlan(
     if (account.hasProviderSubscription) {
       return {
         ok: false,
-        error: "Stripe manages this account. Change its plan through billing instead.",
+        error:
+          "Stripe manages this account. Change its plan through billing instead.",
       };
     }
 
     const repository = getRepository(account.businessId);
     const current = (await repository.getDataset()).subscription;
     if (current.providerSubscriptionId && current.status !== "CANCELED") {
-      return { ok: false, error: "Stripe now manages this account. Refresh the admin page." };
+      return {
+        ok: false,
+        error: "Stripe now manages this account. Refresh the admin page.",
+      };
     }
     await repository.updateSubscription({
       plan,
@@ -99,31 +114,44 @@ async function grantComplimentaryPlan(
   } catch (error) {
     return {
       ok: false,
-      error: (error as Error).message || `Could not grant complimentary ${plan}.`,
+      error:
+        (error as Error).message || `Could not grant complimentary ${plan}.`,
     };
   }
 }
 
-export async function adminGrantComplimentaryPro(userId: string): Promise<ActionResult> {
+export async function adminGrantComplimentaryPro(
+  userId: string,
+): Promise<ActionResult> {
   return grantComplimentaryPlan(userId, "OWNER");
 }
 
-export async function adminGrantComplimentaryFleet(userId: string): Promise<ActionResult> {
+export async function adminGrantComplimentaryFleet(
+  userId: string,
+): Promise<ActionResult> {
   return grantComplimentaryPlan(userId, "FLEET");
 }
 
-export async function adminEndComplimentaryAccess(userId: string): Promise<ActionResult> {
+export async function adminEndComplimentaryAccess(
+  userId: string,
+): Promise<ActionResult> {
   try {
     const admin = await requireAdminSession();
     const account = await targetAccount(userId);
     if (account.accessSource !== "complimentary") {
-      return { ok: false, error: "This account does not have complimentary access." };
+      return {
+        ok: false,
+        error: "This account does not have complimentary access.",
+      };
     }
 
     const repository = getRepository(account.businessId);
     const current = (await repository.getDataset()).subscription;
     if (current.providerSubscriptionId || current.status !== "ACTIVE") {
-      return { ok: false, error: "This account's access changed. Refresh the admin page." };
+      return {
+        ok: false,
+        error: "This account's access changed. Refresh the admin page.",
+      };
     }
     await repository.updateSubscription({
       plan: "OWNER",
@@ -139,7 +167,10 @@ export async function adminEndComplimentaryAccess(userId: string): Promise<Actio
     revalidatePath("/admin");
     return { ok: true, id: account.userId };
   } catch (error) {
-    return { ok: false, error: (error as Error).message || "Could not end complimentary access." };
+    return {
+      ok: false,
+      error: (error as Error).message || "Could not end complimentary access.",
+    };
   }
 }
 
@@ -157,13 +188,22 @@ export async function adminResetAccountData(
       return { ok: false, error: `Type RESET ${account.email} to confirm.` };
     }
 
-    const storageKeys = await getAuthStore().resetBusinessData(account.userId, account.businessId);
+    const storageKeys = await getAuthStore().resetBusinessData(
+      account.userId,
+      account.businessId,
+    );
     await removeStoredDocuments(storageKeys);
-    console.info("[admin-account-reset]", { admin: admin.email, target: account.email });
+    console.info("[admin-account-reset]", {
+      admin: admin.email,
+      target: account.email,
+    });
     revalidatePath("/admin");
     return { ok: true, id: account.userId };
   } catch (error) {
-    return { ok: false, error: (error as Error).message || "Could not reset the account." };
+    return {
+      ok: false,
+      error: (error as Error).message || "Could not reset the account.",
+    };
   }
 }
 
@@ -180,24 +220,34 @@ export async function adminDeleteAccount(
     if (account.hasProviderSubscription) {
       return {
         ok: false,
-        error: "Cancel this account's Stripe subscription before deleting it so billing cannot continue.",
+        error:
+          "Cancel this account's Stripe subscription before deleting it so billing cannot continue.",
       };
     }
     if (confirmation.trim() !== account.email) {
       return { ok: false, error: "Type the account email exactly to confirm." };
     }
 
-    const deleted = await getAuthStore().deleteAccount(account.userId, account.businessId);
+    const deleted = await getAuthStore().deleteAccount(
+      account.userId,
+      account.businessId,
+    );
     await removeStoredDocuments(deleted.storageKeys);
     try {
-      await deleteSupabaseAuthUserByEmail(deleted.email);
+      await deleteAuthIdentityByEmail(deleted.email);
     } catch (error) {
-      console.error("[admin-account-delete] Supabase identity cleanup failed", error);
+      console.error("[admin-account-delete] Identity cleanup failed", error);
     }
-    console.info("[admin-account-delete]", { admin: admin.email, target: account.email });
+    console.info("[admin-account-delete]", {
+      admin: admin.email,
+      target: account.email,
+    });
     revalidatePath("/admin");
     return { ok: true, id: account.userId };
   } catch (error) {
-    return { ok: false, error: (error as Error).message || "Could not delete the account." };
+    return {
+      ok: false,
+      error: (error as Error).message || "Could not delete the account.",
+    };
   }
 }

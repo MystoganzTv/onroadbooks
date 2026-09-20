@@ -205,7 +205,7 @@ async function syncPrismaLoadExpenses(
 
   for (const spec of specs) {
     const id = loadExpenseId(load.id, spec.key);
-    const shouldPost = spec.amount > 0 && !(spec.key === "fuel" && detailedFuel > 0);
+    const shouldPost = load.costsPosted && spec.amount > 0 && !(spec.key === "fuel" && detailedFuel > 0);
 
     if (!shouldPost) {
       await tx.expense.deleteMany({ where: { id, businessId } });

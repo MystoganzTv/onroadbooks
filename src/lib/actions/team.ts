@@ -8,28 +8,38 @@ import { applicationUrl } from "@/lib/stripe";
 import { hasFleetAccess } from "@/lib/plans";
 import { memberInviteSchema, memberRoleSchema } from "@/lib/schemas";
 import {
-  deleteSupabaseAuthUserByEmail,
-  inviteSupabaseAuthUser,
-} from "@/lib/supabase/admin";
+  deleteAuthIdentityByEmail,
+  inviteAuthUser,
+} from "@/lib/auth/provider-admin";
 import type { ActionResult } from "./types";
 
 async function ownerWithFleet() {
   const session = await requirePermission("manage_team");
   const { subscription } = await getRepository(session.businessId).getDataset();
   if (!hasFleetAccess(subscription)) {
-    throw new Error("Access & Roles is included with an active OnRoad Fleet plan.");
+    throw new Error(
+      "Access & Roles is included with an active OnRoad Fleet plan.",
+    );
   }
   return session;
 }
 
 function failed(error: unknown, fallback: string): ActionResult {
-  return { ok: false, error: error instanceof Error ? error.message : fallback };
+  return {
+    ok: false,
+    error: error instanceof Error ? error.message : fallback,
+  };
 }
 
-export async function inviteMemberAction(values: unknown): Promise<ActionResult> {
+export async function inviteMemberAction(
+  values: unknown,
+): Promise<ActionResult> {
   const parsed = memberInviteSchema.safeParse(values);
   if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the invitation." };
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Check the invitation.",
+    };
   }
 
   let createdId: string | null = null;
@@ -49,10 +59,7 @@ export async function inviteMemberAction(values: unknown): Promise<ActionResult>
     createdId = member.id;
 
     try {
-      await inviteSupabaseAuthUser(
-        member.email,
-        `${applicationUrl()}/invite/accept`,
-      );
+      await inviteAuthUser(member.email, `${applicationUrl()}/invite/accept`);
     } catch (error) {
       // A failed email must not leave behind a ghost member that blocks a retry.
       await store.removeMember(member.id, session.businessId);
@@ -64,11 +71,18 @@ export async function inviteMemberAction(values: unknown): Promise<ActionResult>
     revalidatePath("/team");
     return { ok: true, id: member.id };
   } catch (error) {
-    return failed(error, createdId ? "The invitation could not be completed." : "Could not invite that member.");
+    return failed(
+      error,
+      createdId
+        ? "The invitation could not be completed."
+        : "Could not invite that member.",
+    );
   }
 }
 
-export async function updateMemberRoleAction(values: unknown): Promise<ActionResult> {
+export async function updateMemberRoleAction(
+  values: unknown,
+): Promise<ActionResult> {
   const parsed = memberRoleSchema.safeParse(values);
   if (!parsed.success) return { ok: false, error: "Choose a valid role." };
 
@@ -87,11 +101,15 @@ export async function updateMemberRoleAction(values: unknown): Promise<ActionRes
   }
 }
 
-export async function removeMemberAction(userId: string): Promise<ActionResult> {
+export async function removeMemberAction(
+  userId: string,
+): Promise<ActionResult> {
   try {
     const session = await ownerWithFleet();
     const store = getAuthStore();
-    const member = (await store.listMembers(session.businessId)).find((row) => row.id === userId);
+    const member = (await store.listMembers(session.businessId)).find(
+      (row) => row.id === userId,
+    );
     if (!member) return { ok: false, error: "That team member was not found." };
     const removed = await store.removeMember(userId, session.businessId);
 
@@ -99,11 +117,11 @@ export async function removeMemberAction(userId: string): Promise<ActionResult> 
     // request revalidates membership. Remove the Supabase identity as well so
     // existing auth sessions are revoked and this address can be invited again.
     try {
-      await deleteSupabaseAuthUserByEmail(removed.email);
+      await deleteAuthIdentityByEmail(removed.email);
     } catch (error) {
       // App access is already revoked. Do not restore it just because the
       // secondary auth cleanup failed; surface the failure in server logs.
-      console.error("[team-remove] Supabase identity cleanup failed", error);
+      console.error("[team-remove] Identity cleanup failed", error);
     }
     revalidatePath("/settings");
     revalidatePath("/team");

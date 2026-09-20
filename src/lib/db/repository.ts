@@ -1,8 +1,8 @@
 /**
  * Storage contract.
  *
- * Two implementations satisfy it: a local JSON store (zero-setup local
- * development) and a Prisma + PostgreSQL store (production).
+ * Implementations: local JSON for zero-setup development, Prisma/PostgreSQL
+ * for the legacy backend and Drizzle/Neon for the migration destination.
  * Application code only ever talks to this interface, so switching the
  * backing database is an environment change, not a refactor.
  */

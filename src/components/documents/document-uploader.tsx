@@ -22,6 +22,7 @@ import {
   formatBytes,
   isAcceptedType,
   MAX_DOCUMENT_BYTES,
+  MAX_FUNCTION_UPLOAD_BYTES,
   MAX_DOCUMENT_SOURCE_BYTES,
 } from "@/lib/documents";
 import {
@@ -86,7 +87,12 @@ export function DocumentUploader({
 
       for (const source of Array.from(files)) {
         if (source.size > MAX_DOCUMENT_SOURCE_BYTES) {
-          toast.error(interpolate(copy.tooLarge, { name: source.name, size: Math.round(MAX_DOCUMENT_SOURCE_BYTES / 1024 / 1024) }));
+          toast.error(
+            interpolate(copy.tooLarge, {
+              name: source.name,
+              size: Math.round(MAX_DOCUMENT_SOURCE_BYTES / 1024 / 1024),
+            }),
+          );
           continue;
         }
         if (!isAcceptedType(source.type)) {
@@ -94,13 +100,20 @@ export function DocumentUploader({
           continue;
         }
 
-        setProgress(source.type === "application/pdf" ? copy.checkingPdf : copy.optimizingImage);
+        setProgress(
+          source.type === "application/pdf"
+            ? copy.checkingPdf
+            : copy.optimizingImage,
+        );
         const file = await optimizeDocumentFile(source, (status) => {
           setProgress(optimizationLabel(status, copy));
         });
         if (file.size > MAX_DOCUMENT_BYTES) {
           toast.error(
-            interpolate(copy.stillTooLarge, { name: source.name, size: Math.round(MAX_DOCUMENT_BYTES / 1024 / 1024) }),
+            interpolate(copy.stillTooLarge, {
+              name: source.name,
+              size: Math.round(MAX_DOCUMENT_BYTES / 1024 / 1024),
+            }),
           );
           continue;
         }
@@ -119,13 +132,21 @@ export function DocumentUploader({
       }
 
       setProgress(copy.uploading);
-      await Promise.all(chosen.map((item) => uploadDocument(owner, entityId, item)))
+      await Promise.all(
+        chosen.map((item) => uploadDocument(owner, entityId, item)),
+      )
         .then((results) => {
           const failures = results.filter((r) => !r.ok);
-          if (failures.length) toast.error(failures[0].error ?? copy.uploadFailed);
+          if (failures.length)
+            toast.error(failures[0].error ?? copy.uploadFailed);
           const uploaded = results.length - failures.length;
           if (uploaded > 0) {
-            toast.success(interpolate(copy.attached, { count: uploaded, unit: uploaded === 1 ? copy.document : copy.documents }));
+            toast.success(
+              interpolate(copy.attached, {
+                count: uploaded,
+                unit: uploaded === 1 ? copy.document : copy.documents,
+              }),
+            );
             router.refresh();
           }
         })
@@ -140,7 +161,10 @@ export function DocumentUploader({
   return (
     <div className={cn("space-y-2", className)}>
       <div className="flex items-center gap-2">
-        <Select value={type} onValueChange={(value) => setType(value as DocumentType)}>
+        <Select
+          value={type}
+          onValueChange={(value) => setType(value as DocumentType)}
+        >
           <SelectTrigger className="w-[10.5rem]" aria-label={copy.documentType}>
             <SelectValue />
           </SelectTrigger>
@@ -184,7 +208,9 @@ export function DocumentUploader({
         )}
       >
         <Upload className="size-3.5" />
-        {interpolate(copy.dropZone, { size: Math.round(MAX_DOCUMENT_BYTES / 1024 / 1024) })}
+        {interpolate(copy.dropZone, {
+          size: Math.round(MAX_DOCUMENT_BYTES / 1024 / 1024),
+        })}
       </div>
 
       {/* Driven entirely by the Attach file button; sr-only keeps it in the
@@ -263,21 +289,76 @@ async function uploadDocument(
           upload: { bucket: string; path: string; token: string };
           ticket: string;
         }
+      | { strategy: "chunked"; chunkBytes: number; ticket: string }
       | { strategy: "multipart" }
       | { error?: string }
       | null;
-    if (!prepared.ok) return { ok: false, error: plan && "error" in plan ? plan.error : undefined };
+    if (!prepared.ok)
+      return {
+        ok: false,
+        error: plan && "error" in plan ? plan.error : undefined,
+      };
+
+    if (plan && "strategy" in plan && plan.strategy === "chunked") {
+      if (
+        !Number.isInteger(plan.chunkBytes) ||
+        plan.chunkBytes < 1 ||
+        plan.chunkBytes > MAX_FUNCTION_UPLOAD_BYTES
+      )
+        return { ok: false, error: "Invalid upload authorization." };
+      for (
+        let part = 0, offset = 0;
+        offset < item.file.size;
+        part++, offset += plan.chunkBytes
+      ) {
+        const uploaded = await fetch("/api/documents/upload/part", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/octet-stream",
+            "X-Document-Upload-Ticket": plan.ticket,
+            "X-Document-Part": String(part),
+          },
+          body: item.file.slice(offset, offset + plan.chunkBytes),
+        });
+        if (!uploaded.ok)
+          return {
+            ok: false,
+            error: "The document could not reach secure storage.",
+          };
+      }
+      const completed = await fetch("/api/documents/upload/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticket: plan.ticket }),
+      });
+      if (completed.ok) return { ok: true };
+      const result = (await completed.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      return {
+        ok: false,
+        error: result?.error ?? "The document could not be attached.",
+      };
+    }
 
     if (plan && "strategy" in plan && plan.strategy === "direct") {
       const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const key =
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-        ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      if (!url || !key) return { ok: false, error: "Secure document storage is not configured." };
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (!url || !key)
+        return {
+          ok: false,
+          error: "Secure document storage is not configured.",
+        };
 
       const { createClient } = await import("@supabase/supabase-js");
       const supabase = createClient(url, key, {
-        auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+          detectSessionInUrl: false,
+        },
       });
       const { error } = await supabase.storage
         .from(plan.upload.bucket)
@@ -286,7 +367,11 @@ async function uploadDocument(
           cacheControl: "3600",
           upsert: false,
         });
-      if (error) return { ok: false, error: "The document could not reach secure storage." };
+      if (error)
+        return {
+          ok: false,
+          error: "The document could not reach secure storage.",
+        };
 
       const completed = await fetch("/api/documents/upload/complete", {
         method: "POST",
@@ -294,15 +379,20 @@ async function uploadDocument(
         body: JSON.stringify({ ticket: plan.ticket }),
       });
       if (completed.ok) return { ok: true };
-      const result = (await completed.json().catch(() => null)) as { error?: string } | null;
-      return { ok: false, error: result?.error ?? "The document could not be attached." };
+      const result = (await completed.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      return {
+        ok: false,
+        error: result?.error ?? "The document could not be attached.",
+      };
     }
   } catch {
     return { ok: false, error: "Upload failed." };
   }
 
   // Local development keeps its filesystem adapter and uses the small
-  // multipart route; production never sends document bytes through Vercel.
+  // multipart route; R2 uses bounded parts through the authenticated server.
   const body = new FormData();
   body.set("file", item.file);
   body.set("type", item.type);
@@ -313,16 +403,24 @@ async function uploadDocument(
   try {
     const response = await fetch("/api/documents", { method: "POST", body });
     if (response.ok) return { ok: true };
-    const data = (await response.json().catch(() => null)) as { error?: string } | null;
+    const data = (await response.json().catch(() => null)) as {
+      error?: string;
+    } | null;
     return { ok: false, error: data?.error };
   } catch {
     return { ok: false, error: "Upload failed." };
   }
 }
 
-function optimizationLabel(progress: DocumentOptimizationProgress, copy: ReturnType<typeof useLanguage>["dictionary"]["documents"]): string {
+function optimizationLabel(
+  progress: DocumentOptimizationProgress,
+  copy: ReturnType<typeof useLanguage>["dictionary"]["documents"],
+): string {
   if (progress.stage === "page") {
-    return interpolate(copy.optimizingPdf, { page: progress.page ?? 0, pages: progress.pages ?? 0 });
+    return interpolate(copy.optimizingPdf, {
+      page: progress.page ?? 0,
+      pages: progress.pages ?? 0,
+    });
   }
   if (progress.stage === "saving") return copy.finishingPdf;
   if (progress.stage === "native-pdf") return copy.keepingPdf;
@@ -346,7 +444,9 @@ export async function uploadPending(
   pending: PendingUpload[],
 ): Promise<UploadOutcome> {
   if (pending.length === 0) return { uploaded: 0, failed: 0 };
-  const results = await Promise.all(pending.map((item) => uploadDocument(owner, entityId, item)));
+  const results = await Promise.all(
+    pending.map((item) => uploadDocument(owner, entityId, item)),
+  );
   const failures = results.filter((r) => !r.ok);
   return {
     uploaded: results.length - failures.length,

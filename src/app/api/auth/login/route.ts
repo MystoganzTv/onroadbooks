@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
+import { usingAuthJs, sameOriginRequest } from "@/lib/auth/provider";
 import { getAuthStore } from "@/lib/db";
 import { credentialsSchema } from "@/lib/schemas";
 import {
@@ -14,18 +15,51 @@ import {
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const parsed = credentialsSchema.safeParse(await request.json().catch(() => null));
+  if (!sameOriginRequest(request))
+    return NextResponse.json(
+      { error: "Cross-origin sign-in is refused." },
+      { status: 403 },
+    );
+  const parsed = credentialsSchema.safeParse(
+    await request.json().catch(() => null),
+  );
   if (!parsed.success) {
-    return NextResponse.json({ error: "Enter your email and password." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Enter your email and password." },
+      { status: 400 },
+    );
+  }
+
+  if (usingAuthJs()) {
+    try {
+      const { signIn } = await import("@/auth");
+      await signIn("credentials", {
+        ...parsed.data,
+        redirect: false,
+        redirectTo: "/dashboard",
+      });
+      (await cookies()).set(SESSION_COOKIE, "", { path: "/", maxAge: 0 });
+      return NextResponse.json({ ok: true });
+    } catch {
+      return NextResponse.json(
+        { error: "Email or password is incorrect." },
+        { status: 401 },
+      );
+    }
   }
 
   const user = await getAuthStore().findUserByEmail(parsed.data.email);
 
   // One message for both "no such account" and "wrong password", so the
   // response cannot be used to enumerate which emails exist.
-  const valid = user ? await verifyPassword(parsed.data.password, user.passwordHash) : false;
+  const valid = user
+    ? await verifyPassword(parsed.data.password, user.passwordHash)
+    : false;
   if (!user || !valid) {
-    return NextResponse.json({ error: "Email or password is incorrect." }, { status: 401 });
+    return NextResponse.json(
+      { error: "Email or password is incorrect." },
+      { status: 401 },
+    );
   }
 
   const token = await encodeSession({

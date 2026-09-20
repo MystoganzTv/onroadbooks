@@ -5,7 +5,7 @@ name: Nightly backup
 # `scripts/backup-database.ts` is the same script that runs on the owner's Mac,
 # so there is one backup format and one implementation: dump, encrypt with
 # AES-256-GCM, then decrypt it again and read it back with pg_restore, failing
-# the run unless all 19 application tables are present.
+# the run unless all 20 business tables (and the Auth.js tables for Neon) are present.
 #
 # The repository is PUBLIC, so the backup is never kept as a workflow artifact:
 # those are world-readable, and an encrypted ledger on the open internet is a
@@ -21,6 +21,16 @@ on:
     # on the 1st already contains that day's posted fixed costs.
     - cron: "10 8 * * *"
   workflow_dispatch:
+    inputs:
+      data_source:
+        description: Database to verify (configured uses the scheduled selection)
+        type: choice
+        options: [configured, postgres, neon]
+        default: configured
+      send_email:
+        description: Deliver the encrypted backup to the configured recipients
+        type: boolean
+        default: false
 
 concurrency:
   group: nightly-backup
@@ -33,6 +43,8 @@ jobs:
     timeout-minutes: 15
 
     env:
+      DATA_SOURCE: ${{ inputs.data_source != '' && inputs.data_source != 'configured' && inputs.data_source || vars.DATA_SOURCE || 'postgres' }}
+      NEON_DIRECT_URL: ${{ secrets.NEON_DIRECT_URL }}
       DIRECT_URL: ${{ secrets.DATABASE_URL }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
@@ -55,16 +67,16 @@ jobs:
           node-version: 22
           cache: npm
 
-      # The runner ships PostgreSQL 16 client tools; the script requires 17,
+      # Neon uses PostgreSQL 18; this client also dumps the legacy PostgreSQL 17 source,
       # because a client older than the server refuses the dump outright.
-      - name: PostgreSQL 17 client
+      - name: PostgreSQL 18 client
         run: |
           sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
           curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/pgdg.gpg
           sudo sed -i 's|deb |deb [signed-by=/usr/share/keyrings/pgdg.gpg] |' /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update -qq
-          sudo apt-get install -y -qq postgresql-client-17
-          echo "PG_BIN=/usr/lib/postgresql/17/bin" >> "$GITHUB_ENV"
+          sudo apt-get install -y -qq postgresql-client-18
+          echo "PG_BIN=/usr/lib/postgresql/18/bin" >> "$GITHUB_ENV"
 
       - name: Install
         run: npm ci
@@ -74,4 +86,5 @@ jobs:
 
       # Somewhere private, which a public repo's artifacts are not.
       - name: Mail it
+        if: github.event_name != 'workflow_dispatch' || inputs.send_email
         run: npm run backup:mail -- "$(ls -1 "$BACKUP_DIR"/*.dump.enc | head -1)"

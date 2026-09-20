@@ -25,7 +25,13 @@ import { localizeError } from "@/lib/i18n/errors";
  * the welcome flow, and plan pricing belongs on the public pricing page or in
  * settings -- neither should make account creation feel like a checkout.
  */
-export function SetupFlow({ locale }: { locale: AppLocale }) {
+export function SetupFlow({
+  locale,
+  googleConfigured,
+}: {
+  locale: AppLocale;
+  googleConfigured: boolean;
+}) {
   const router = useRouter();
   const copy = getWebDictionary(locale).auth;
   const fieldLabels = { name: copy.yourName, email: copy.email, password: copy.password };
@@ -102,7 +108,7 @@ export function SetupFlow({ locale }: { locale: AppLocale }) {
           noValidate
           className="space-y-4 rounded-lg border border-border bg-card p-5"
         >
-          <AuthOptions locale={locale} />
+          <AuthOptions locale={locale} googleConfigured={googleConfigured} />
 
           <div className="space-y-4">
             <div>

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { AuthCard } from "@/components/auth/auth-card";
 import { getSession } from "@/lib/auth";
+import { googleSignInConfigured } from "@/lib/auth/google-availability";
 import { safeNextPath } from "@/lib/auth/mobile-handoff";
 import { getWebDictionary } from "@/lib/i18n/dictionaries";
 import { getAppLocale } from "@/lib/i18n-server";
@@ -33,6 +34,7 @@ export default async function LoginPage({
     <AuthCard
       mode="login"
       locale={locale}
+      googleConfigured={googleSignInConfigured()}
       next={destination}
       initialError={
         error === "google"
@@ -41,9 +43,7 @@ export default async function LoginPage({
             ? copy.inviteInvalid
             : null
       }
-      initialNotice={
-        account === "deleted" ? copy.accountDeleted : null
-      }
+      initialNotice={account === "deleted" ? copy.accountDeleted : null}
     />
   );
 }

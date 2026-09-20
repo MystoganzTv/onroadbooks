@@ -1,0 +1,3702 @@
+{
+  "project": "OnRoadBooks",
+  "date": "2026-09-19",
+  "commit": "60aaa75192b498eb87766134877f2663b3df0177",
+  "scope": "Static source inventory; no production rows or credentials. Includes application, operational scripts and seed calls; no claim that deployed queries match this checkout.",
+  "imports": [
+    {
+      "file": "scripts/certify-production-invitations.ts",
+      "line": 4,
+      "statement": "import { createClient } from \"@supabase/supabase-js\";"
+    },
+    {
+      "file": "scripts/certify-production-storage.ts",
+      "line": 4,
+      "statement": "import { createClient } from \"@supabase/supabase-js\";"
+    },
+    {
+      "file": "scripts/certify-production-storage.ts",
+      "line": 7,
+      "statement": "import { SupabaseDocumentStorage } from \"../src/lib/storage/supabase\";"
+    },
+    {
+      "file": "src/app/api/auth/callback/route.ts",
+      "line": 4,
+      "statement": "import { completeSupabaseSignIn } from \"@/lib/auth/complete-supabase-sign-in\";"
+    },
+    {
+      "file": "src/app/api/auth/callback/route.ts",
+      "line": 10,
+      "statement": "import { createSupabaseServerClient } from \"@/lib/supabase/server\";"
+    },
+    {
+      "file": "src/app/api/auth/callback/route.ts",
+      "line": 11,
+      "statement": "import type { EmailOtpType } from \"@supabase/supabase-js\";"
+    },
+    {
+      "file": "src/app/api/auth/google/oauth/route.ts",
+      "line": 9,
+      "statement": "import { createSupabaseServerClient } from \"@/lib/supabase/server\";"
+    },
+    {
+      "file": "src/app/api/auth/google/route.ts",
+      "line": 7,
+      "statement": "import { completeSupabaseSignIn } from \"@/lib/auth/complete-supabase-sign-in\";"
+    },
+    {
+      "file": "src/app/api/auth/google/route.ts",
+      "line": 8,
+      "statement": "import { createSupabaseServerClient } from \"@/lib/supabase/server\";"
+    },
+    {
+      "file": "src/app/api/auth/invite/accept/route.ts",
+      "line": 11,
+      "statement": "import { createSupabaseServerClient } from \"@/lib/supabase/server\";"
+    },
+    {
+      "file": "src/app/api/mobile/team/[userId]/route.ts",
+      "line": 7,
+      "statement": "import { deleteSupabaseAuthUserByEmail } from \"@/lib/supabase/admin\";"
+    },
+    {
+      "file": "src/app/api/mobile/team/route.ts",
+      "line": 11,
+      "statement": "import { inviteSupabaseAuthUser } from \"@/lib/supabase/admin\";"
+    },
+    {
+      "file": "src/components/documents/document-uploader.tsx",
+      "line": 278,
+      "statement": "import(\"@supabase/supabase-js\")"
+    },
+    {
+      "file": "src/lib/actions/account.ts",
+      "line": 10,
+      "statement": "import { deleteSupabaseAuthUserByEmail } from \"@/lib/supabase/admin\";"
+    },
+    {
+      "file": "src/lib/actions/account.ts",
+      "line": 11,
+      "statement": "import { createSupabaseServerClient } from \"@/lib/supabase/server\";"
+    },
+    {
+      "file": "src/lib/actions/admin.ts",
+      "line": 11,
+      "statement": "import { deleteSupabaseAuthUserByEmail } from \"@/lib/supabase/admin\";"
+    },
+    {
+      "file": "src/lib/actions/team.ts",
+      "line": 10,
+      "statement": "import {\n  deleteSupabaseAuthUserByEmail,\n  inviteSupabaseAuthUser,\n} from \"@/lib/supabase/admin\";"
+    },
+    {
+      "file": "src/lib/auth/complete-supabase-sign-in.ts",
+      "line": 4,
+      "statement": "import type { User } from \"@supabase/supabase-js\";"
+    },
+    {
+      "file": "src/lib/storage/index.ts",
+      "line": 8,
+      "statement": "import { SupabaseDocumentStorage } from \"./supabase\";"
+    },
+    {
+      "file": "src/lib/storage/supabase.ts",
+      "line": 3,
+      "statement": "import { createClient } from \"@supabase/supabase-js\";"
+    },
+    {
+      "file": "src/lib/supabase/admin.ts",
+      "line": 3,
+      "statement": "import { createClient } from \"@supabase/supabase-js\";"
+    },
+    {
+      "file": "src/lib/supabase/server.ts",
+      "line": 3,
+      "statement": "import { createServerClient } from \"@supabase/ssr\";"
+    }
+  ],
+  "queries": [
+    {
+      "file": "prisma/seed.ts",
+      "line": 25,
+      "context": "main",
+      "table": "Document",
+      "operation": "deleteMany",
+      "query": "prisma.document.deleteMany()"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 26,
+      "context": "main",
+      "table": "ReserveTransaction",
+      "operation": "deleteMany",
+      "query": "prisma.reserveTransaction.deleteMany()"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 27,
+      "context": "main",
+      "table": "Settlement",
+      "operation": "deleteMany",
+      "query": "prisma.settlement.deleteMany()"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 28,
+      "context": "main",
+      "table": "DriverSettlement",
+      "operation": "deleteMany",
+      "query": "prisma.driverSettlement.deleteMany()"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 29,
+      "context": "main",
+      "table": "ReserveAccount",
+      "operation": "deleteMany",
+      "query": "prisma.reserveAccount.deleteMany()"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 30,
+      "context": "main",
+      "table": "FinancialGoal",
+      "operation": "deleteMany",
+      "query": "prisma.financialGoal.deleteMany()"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 31,
+      "context": "main",
+      "table": "Subscription",
+      "operation": "deleteMany",
+      "query": "prisma.subscription.deleteMany()"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 32,
+      "context": "main",
+      "table": "MaintenanceRecord",
+      "operation": "deleteMany",
+      "query": "prisma.maintenanceRecord.deleteMany()"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 33,
+      "context": "main",
+      "table": "FuelEntry",
+      "operation": "deleteMany",
+      "query": "prisma.fuelEntry.deleteMany()"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 34,
+      "context": "main",
+      "table": "Expense",
+      "operation": "deleteMany",
+      "query": "prisma.expense.deleteMany()"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 35,
+      "context": "main",
+      "table": "Load",
+      "operation": "deleteMany",
+      "query": "prisma.load.deleteMany()"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 36,
+      "context": "main",
+      "table": "Driver",
+      "operation": "deleteMany",
+      "query": "prisma.driver.deleteMany()"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 37,
+      "context": "main",
+      "table": "FinancialSettings",
+      "operation": "deleteMany",
+      "query": "prisma.financialSettings.deleteMany()"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 38,
+      "context": "main",
+      "table": "Truck",
+      "operation": "deleteMany",
+      "query": "prisma.truck.deleteMany()"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 39,
+      "context": "main",
+      "table": "User",
+      "operation": "deleteMany",
+      "query": "prisma.user.deleteMany()"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 40,
+      "context": "main",
+      "table": "Business",
+      "operation": "deleteMany",
+      "query": "prisma.business.deleteMany()"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 43,
+      "context": "main",
+      "table": "Business",
+      "operation": "create",
+      "query": "prisma.business.create({\n    data: {\n      name: dataset.business.name,\n      currency: dataset.business.currency,\n      settings: {\n        create: {\n          taxReservePct: dataset.settings.taxReservePct,\n          maintenanceReservePct: dataset.settings.maintenanceReservePct,\n          categoryBehavior: dataset.settings.categoryBehavior,\n          ratingGreatPerMile: dataset.settings.ratingGreatPerMile,\n          ratingGoodPerMile: dataset.settings.ratingGoodPerMile,\n          ratingMarginalPerMile: dataset.settings.ratingMarginalPerMile,\n          deadheadWarnPct: dataset.settings.deadheadWarnPct,\n          maintenanceWarnMiles: dataset.settings.maintenanceWarnMiles,\n          maintenanceWarnDays: dataset.settings.maintenanceWarnDays,\n        },\n      },\n      trucks: {\n        create: {\n          name: primary.name,\n          year: primary.year,\n          make: primary.make,\n          model: primary.model,\n          vin: primary.vin,\n          purchasePrice: primary.purchasePrice,\n          monthlyPayment: primary.monthlyPayment,\n          monthlyInsurance: primary.monthlyInsurance,\n          startingOdometer: primary.startingOdometer,\n          currentOdometer: primary.currentOdometer,\n        },\n      },\n    },\n    include: { trucks: true },\n  })"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 83,
+      "context": "main",
+      "table": "Load",
+      "operation": "create",
+      "query": "prisma.load.create({\n      data: {\n        businessId: business.id,\n        truckId,\n        date: toDate(load.date),\n        deliveryDate: load.deliveryDate ? toDate(load.deliveryDate) : null,\n        endingOdometer: load.endingOdometer,\n        originCity: load.originCity,\n        originState: load.originState,\n        destinationCity: load.destinationCity,\n        destinationState: load.destinationState,\n        broker: load.broker,\n        loadNumber: load.loadNumber,\n        equipmentType: load.equipmentType,\n        loadCapacity: load.loadCapacity,\n        equipmentLengthFt: load.equipmentLengthFt,\n        weightLbs: load.weightLbs,\n        commodity: load.commodity,\n        loadedMiles: load.loadedMiles,\n        deadheadMiles: load.deadheadMiles,\n        grossRate: load.grossRate,\n        fuelCost: load.fuelCost,\n        tolls: load.tolls,\n        dispatchFee: load.dispatchFee,\n        factoringFee: load.factoringFee,\n        otherExpenses: load.otherExpenses,\n        costsPosted: load.costsPosted,\n        status: load.status,\n        notes: load.notes,\n      },\n    })"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 123,
+      "context": "main",
+      "table": "Expense",
+      "operation": "create",
+      "query": "prisma.expense.create({\n      data: {\n        businessId: business.id,\n        truckId,\n        loadId: expense.loadId ? (loadIdMap.get(expense.loadId) ?? null) : null,\n        date: toDate(expense.date),\n        category: expense.category,\n        description: expense.description,\n        vendor: expense.vendor,\n        amount: expense.amount,\n        recurring: expense.recurring,\n        receiptNumber: expense.receiptNumber,\n        notes: expense.notes,\n      },\n    })"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 142,
+      "context": "main",
+      "table": "FuelEntry",
+      "operation": "createMany",
+      "query": "prisma.fuelEntry.createMany({\n    data: dataset.fuelEntries.map((entry) => ({\n      businessId: business.id,\n      truckId,\n      loadId: entry.loadId ? (loadIdMap.get(entry.loadId) ?? null) : null,\n      expenseId: entry.expenseId ? (expenseIdMap.get(entry.expenseId) ?? null) : null,\n      date: toDate(entry.date),\n      gallons: entry.gallons,\n      pricePerGallon: entry.pricePerGallon,\n      totalCost: entry.totalCost,\n      odometer: entry.odometer,\n      location: entry.location,\n      notes: entry.notes,\n    })),\n  })"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 159,
+      "context": "main",
+      "table": "MaintenanceRecord",
+      "operation": "createMany",
+      "query": "prisma.maintenanceRecord.createMany({\n    data: dataset.maintenanceRecords.map((record) => ({\n      businessId: business.id,\n      truckId,\n      type: record.type,\n      basis: record.basis,\n      serviceDate: toDate(record.serviceDate),\n      odometer: record.odometer,\n      cost: record.cost,\n      vendor: record.vendor,\n      nextServiceDate: record.nextServiceDate ? toDate(record.nextServiceDate) : null,\n      nextServiceOdometer: record.nextServiceOdometer,\n      expenseId: record.expenseId ? (expenseIdMap.get(record.expenseId) ?? null) : null,\n      notes: record.notes,\n    })),\n  })"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 183,
+      "context": "main",
+      "table": "FinancialGoal",
+      "operation": "create",
+      "query": "prisma.financialGoal.create({\n    data: {\n      businessId: business.id,\n      monthlyRevenueTarget: dataset.goals.monthlyRevenueTarget,\n      monthlyProfitTarget: dataset.goals.monthlyProfitTarget,\n      targetProfitPerMile: dataset.goals.targetProfitPerMile,\n      maxDeadheadPct: dataset.goals.maxDeadheadPct,\n      targetLoads: dataset.goals.targetLoads,\n      workingDaysPerWeek: dataset.goals.workingDaysPerWeek,\n      expectedMonthlyMiles: dataset.goals.expectedMonthlyMiles ?? 0,\n    },\n  })"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 196,
+      "context": "main",
+      "table": "Subscription",
+      "operation": "create",
+      "query": "prisma.subscription.create({\n    data: {\n      businessId: business.id,\n      plan: dataset.subscription.plan,\n      status: dataset.subscription.status,\n      currentPeriodEnd: dataset.subscription.currentPeriodEnd\n        ? toDate(dataset.subscription.currentPeriodEnd)\n        : null,\n    },\n  })"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 210,
+      "context": "main",
+      "table": "ReserveAccount",
+      "operation": "create",
+      "query": "prisma.reserveAccount.create({\n      data: {\n        businessId: business.id,\n        kind: account.kind,\n        name: account.name,\n        basis: account.basis,\n        // Null on the two built-ins on purpose: their rate lives in\n        // FinancialSettings, so a reserve percentage is stored once.\n        contributionPct: account.contributionPct,\n        targetBalance: account.targetBalance,\n        active: account.active,\n        sortOrder: account.sortOrder,\n      },\n    })"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 243,
+      "context": "main",
+      "table": "Settlement",
+      "operation": "create",
+      "query": "prisma.settlement.create({\n      data: {\n        businessId: business.id,\n        month: settlement.month,\n        half: settlement.half,\n        periodStart: toDate(settlement.periodStart),\n        periodEnd: toDate(settlement.periodEnd),\n        status: settlement.status,\n        closedAt: settlement.closedAt ? new Date(settlement.closedAt) : null,\n        snapshot: snapshot ?? undefined,\n        notes: settlement.notes,\n      },\n    })"
+    },
+    {
+      "file": "prisma/seed.ts",
+      "line": 260,
+      "context": "main",
+      "table": "ReserveTransaction",
+      "operation": "createMany",
+      "query": "prisma.reserveTransaction.createMany({\n    data: dataset.reserveTransactions.map((movement) => ({\n      businessId: business.id,\n      accountId: accountIdMap.get(movement.accountId) ?? movement.accountId,\n      date: toDate(movement.date),\n      type: movement.type,\n      amount: movement.amount,\n      description: movement.description,\n      settlementId: movement.settlementId\n        ? (settlementIdMap.get(movement.settlementId) ?? null)\n        : null,\n    })),\n  })"
+    },
+    {
+      "file": "scripts/certify-backup-restore.ts",
+      "line": 27,
+      "context": "fingerprint",
+      "table": null,
+      "operation": "$queryRawUnsafe",
+      "query": "client.$queryRawUnsafe<Array<{ count: bigint; checksum: string }>>(`\n    select\n      count(*)::bigint as count,\n      md5(coalesce(string_agg(row_to_json(t)::text, '' order by row_to_json(t)::text), '')) as checksum\n    from public.\"${table}\" t\n  `)"
+    },
+    {
+      "file": "scripts/certify-backup-restore.ts",
+      "line": 41,
+      "context": "verifyRestore",
+      "table": null,
+      "operation": "source.$executeRawUnsafe",
+      "query": "source.$executeRawUnsafe(\"set time zone 'UTC'\")"
+    },
+    {
+      "file": "scripts/certify-backup-restore.ts",
+      "line": 42,
+      "context": "verifyRestore",
+      "table": null,
+      "operation": "restored.$executeRawUnsafe",
+      "query": "restored.$executeRawUnsafe(\"set time zone 'UTC'\")"
+    },
+    {
+      "file": "scripts/certify-backup-restore.ts",
+      "line": 55,
+      "context": "verifyRestore",
+      "table": null,
+      "operation": "restored.$queryRaw",
+      "query": "restored.$queryRaw<Array<{ tables: bigint; protected: bigint }>>`\n      select\n        count(*)::bigint as tables,\n        count(*) filter (where c.relrowsecurity)::bigint as protected\n      from pg_class c\n      join pg_namespace n on n.oid = c.relnamespace\n      where n.nspname = 'public'\n        and c.relkind = 'r'\n        and c.relname in (${Prisma.join(APPLICATION_TABLES)})\n    `"
+    },
+    {
+      "file": "scripts/certify-production-database.ts",
+      "line": 53,
+      "context": "auditPublicSchema",
+      "table": null,
+      "operation": "prisma.$queryRaw",
+      "query": "prisma.$queryRaw<SecurityRow[]>`\n    select\n      c.relname as table_name,\n      c.relrowsecurity as rls_enabled,\n      has_table_privilege('anon', c.oid, 'SELECT') as anon_select,\n      has_table_privilege('authenticated', c.oid, 'SELECT') as authenticated_select,\n      has_table_privilege('anon', c.oid, 'INSERT') as anon_insert,\n      has_table_privilege('authenticated', c.oid, 'INSERT') as authenticated_insert,\n      has_table_privilege('anon', c.oid, 'UPDATE') as anon_update,\n      has_table_privilege('authenticated', c.oid, 'UPDATE') as authenticated_update,\n      has_table_privilege('anon', c.oid, 'DELETE') as anon_delete,\n      has_table_privilege('authenticated', c.oid, 'DELETE') as authenticated_delete,\n      has_table_privilege('service_role', c.oid, 'SELECT') as service_select,\n      has_table_privilege('service_role', c.oid, 'INSERT') as service_insert,\n      has_table_privilege('service_role', c.oid, 'UPDATE') as service_update,\n      has_table_privilege('service_role', c.oid, 'DELETE') as service_delete\n    from pg_class c\n    join pg_namespace n on n.oid = c.relnamespace\n    where n.nspname = 'public'\n      and c.relkind = 'r'\n      and c.relname in (${Prisma.join(APPLICATION_TABLES)})\n    order by c.relname\n  `"
+    },
+    {
+      "file": "scripts/certify-production-database.ts",
+      "line": 87,
+      "context": "auditPublicSchema",
+      "table": null,
+      "operation": "prisma.$queryRaw",
+      "query": "prisma.$queryRaw<Array<{\n    owner_name: string;\n    object_type: string;\n    grantee_name: string;\n    grants: bigint;\n  }>>`\n    select\n      owner.rolname as owner_name,\n      d.defaclobjtype::text as object_type,\n      grantee.rolname as grantee_name,\n      count(*)::bigint as grants\n    from pg_default_acl d\n    cross join lateral aclexplode(coalesce(d.defaclacl, acldefault(d.defaclobjtype, d.defaclrole))) a\n    join pg_roles owner on owner.oid = d.defaclrole\n    join pg_roles grantee on grantee.oid = a.grantee\n    join pg_namespace n on n.oid = d.defaclnamespace\n    where n.nspname = 'public'\n      and grantee.rolname in ('anon', 'authenticated', 'service_role')\n      and d.defaclobjtype in ('r', 'f', 'S')\n    group by owner.rolname, d.defaclobjtype, grantee.rolname\n    order by owner.rolname, d.defaclobjtype, grantee.rolname\n  `"
+    },
+    {
+      "file": "scripts/certify-production-database.ts",
+      "line": 118,
+      "context": "auditPublicSchema",
+      "table": null,
+      "operation": "prisma.$queryRaw",
+      "query": "prisma.$queryRaw<Array<{\n    version: string;\n    businesses: bigint;\n    users: bigint;\n    subscriptions: bigint;\n    provider_backed_subscriptions: bigint;\n    complimentary_subscriptions: bigint;\n  }>>`\n    select\n      current_setting('server_version') as version,\n      (select count(*) from public.\"Business\")::bigint as businesses,\n      (select count(*) from public.\"User\")::bigint as users,\n      (select count(*) from public.\"Subscription\")::bigint as subscriptions,\n      (\n        select count(*) from public.\"Subscription\"\n        where \"providerCustomerId\" is not null and \"providerSubscriptionId\" is not null\n      )::bigint as provider_backed_subscriptions,\n      (\n        select count(*) from public.\"Subscription\"\n        where \"providerCustomerId\" is null and \"providerSubscriptionId\" is null\n      )::bigint as complimentary_subscriptions\n  `"
+    },
+    {
+      "file": "scripts/certify-production-database.ts",
+      "line": 176,
+      "context": "certifyIsolatedImport",
+      "table": null,
+      "operation": "admin.$executeRawUnsafe",
+      "query": "admin.$executeRawUnsafe(`create schema \"${schema}\"`)"
+    },
+    {
+      "file": "scripts/certify-production-database.ts",
+      "line": 192,
+      "context": "certifyIsolatedImport",
+      "table": null,
+      "operation": "isolated.$queryRaw",
+      "query": "isolated.$queryRaw<Array<{ tables: bigint; protected: bigint }>>`\n        select\n          count(*)::bigint as tables,\n          count(*) filter (where c.relrowsecurity)::bigint as protected\n        from pg_class c\n        join pg_namespace n on n.oid = c.relnamespace\n        where n.nspname = current_schema()\n          and c.relkind = 'r'\n          and c.relname in (${Prisma.join(APPLICATION_TABLES)})\n      `"
+    },
+    {
+      "file": "scripts/certify-production-database.ts",
+      "line": 219,
+      "context": "certifyIsolatedImport",
+      "table": null,
+      "operation": "admin.$executeRawUnsafe",
+      "query": "admin.$executeRawUnsafe(`drop schema if exists \"${schema}\" cascade`)"
+    },
+    {
+      "file": "scripts/certify-production-invitations.ts",
+      "line": 31,
+      "context": "main",
+      "table": "Business",
+      "operation": "create",
+      "query": "prisma.business.create({\n    data: { name: \"Invitation Certification\", currency: \"USD\" },\n    select: { id: true },\n  })"
+    },
+    {
+      "file": "scripts/certify-production-invitations.ts",
+      "line": 36,
+      "context": "main",
+      "table": "User",
+      "operation": "create",
+      "query": "prisma.user.create({\n    data: {\n      businessId,\n      email,\n      name: \"Invitation Certification\",\n      passwordHash: \"invite$supabase\",\n      role: \"VIEWER\",\n      invitedAt: new Date(),\n      joinedAt: null,\n    },\n    select: { id: true },\n  })"
+    },
+    {
+      "file": "scripts/certify-production-invitations.ts",
+      "line": 81,
+      "context": "main",
+      "table": "User",
+      "operation": "findUniqueOrThrow",
+      "query": "prisma.user.findUniqueOrThrow({ where: { id: member.id } })"
+    },
+    {
+      "file": "scripts/certify-production-invitations.ts",
+      "line": 116,
+      "context": "(module)",
+      "table": "User",
+      "operation": "deleteMany",
+      "query": "prisma.user.deleteMany({ where: { businessId } })"
+    },
+    {
+      "file": "scripts/certify-production-invitations.ts",
+      "line": 117,
+      "context": "(module)",
+      "table": "Business",
+      "operation": "deleteMany",
+      "query": "prisma.business.deleteMany({ where: { id: businessId } })"
+    },
+    {
+      "file": "scripts/certify-production-storage.ts",
+      "line": 53,
+      "context": "createAccount",
+      "table": "User",
+      "operation": "findUniqueOrThrow",
+      "query": "prisma.user.findUniqueOrThrow({\n    where: { email },\n    select: { businessId: true },\n  })"
+    },
+    {
+      "file": "scripts/certify-production-storage.ts",
+      "line": 59,
+      "context": "createAccount",
+      "table": "Truck",
+      "operation": "findFirstOrThrow",
+      "query": "prisma.truck.findFirstOrThrow({\n    where: { businessId: user.businessId },\n    select: { id: true },\n  })"
+    },
+    {
+      "file": "scripts/certify-production-storage.ts",
+      "line": 200,
+      "context": "(module)",
+      "table": "User",
+      "operation": "deleteMany",
+      "query": "prisma.user.deleteMany({ where: { businessId: { in: createdBusinessIds } } })"
+    },
+    {
+      "file": "scripts/certify-production-storage.ts",
+      "line": 201,
+      "context": "(module)",
+      "table": "Business",
+      "operation": "deleteMany",
+      "query": "prisma.business.deleteMany({ where: { id: { in: createdBusinessIds } } })"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 71,
+      "context": "main",
+      "table": "Business",
+      "operation": "count",
+      "query": "prisma.business.count()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 83,
+      "context": "main",
+      "table": "Document",
+      "operation": "deleteMany",
+      "query": "prisma.document.deleteMany()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 84,
+      "context": "main",
+      "table": "ReserveTransaction",
+      "operation": "deleteMany",
+      "query": "prisma.reserveTransaction.deleteMany()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 85,
+      "context": "main",
+      "table": "Settlement",
+      "operation": "deleteMany",
+      "query": "prisma.settlement.deleteMany()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 86,
+      "context": "main",
+      "table": "DriverSettlementLine",
+      "operation": "deleteMany",
+      "query": "prisma.driverSettlementLine.deleteMany()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 87,
+      "context": "main",
+      "table": "DriverSettlement",
+      "operation": "deleteMany",
+      "query": "prisma.driverSettlement.deleteMany()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 88,
+      "context": "main",
+      "table": "MaintenanceRecord",
+      "operation": "deleteMany",
+      "query": "prisma.maintenanceRecord.deleteMany()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 89,
+      "context": "main",
+      "table": "FuelEntry",
+      "operation": "deleteMany",
+      "query": "prisma.fuelEntry.deleteMany()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 90,
+      "context": "main",
+      "table": "Expense",
+      "operation": "deleteMany",
+      "query": "prisma.expense.deleteMany()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 91,
+      "context": "main",
+      "table": "Load",
+      "operation": "deleteMany",
+      "query": "prisma.load.deleteMany()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 92,
+      "context": "main",
+      "table": "Driver",
+      "operation": "deleteMany",
+      "query": "prisma.driver.deleteMany()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 93,
+      "context": "main",
+      "table": "ReserveAccount",
+      "operation": "deleteMany",
+      "query": "prisma.reserveAccount.deleteMany()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 94,
+      "context": "main",
+      "table": "FinancialGoal",
+      "operation": "deleteMany",
+      "query": "prisma.financialGoal.deleteMany()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 95,
+      "context": "main",
+      "table": "Subscription",
+      "operation": "deleteMany",
+      "query": "prisma.subscription.deleteMany()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 96,
+      "context": "main",
+      "table": "FinancialSettings",
+      "operation": "deleteMany",
+      "query": "prisma.financialSettings.deleteMany()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 97,
+      "context": "main",
+      "table": "Truck",
+      "operation": "deleteMany",
+      "query": "prisma.truck.deleteMany()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 98,
+      "context": "main",
+      "table": "User",
+      "operation": "deleteMany",
+      "query": "prisma.user.deleteMany()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 99,
+      "context": "main",
+      "table": "Business",
+      "operation": "deleteMany",
+      "query": "prisma.business.deleteMany()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 103,
+      "context": "main",
+      "table": "Business",
+      "operation": "create",
+      "query": "prisma.business.create({\n    data: {\n      id: business.id,\n      name: business.name,\n      currency: business.currency,\n      createdAt: stamp(business.createdAt),\n    },\n  })"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 112,
+      "context": "main",
+      "table": "FinancialSettings",
+      "operation": "create",
+      "query": "prisma.financialSettings.create({\n    data: {\n      id: settings.id,\n      businessId: business.id,\n      taxReservePct: settings.taxReservePct,\n      maintenanceReservePct: settings.maintenanceReservePct,\n      categoryBehavior: settings.categoryBehavior,\n      ratingGreatPerMile: settings.ratingGreatPerMile,\n      ratingGoodPerMile: settings.ratingGoodPerMile,\n      ratingMarginalPerMile: settings.ratingMarginalPerMile,\n      deadheadWarnPct: settings.deadheadWarnPct,\n      maintenanceWarnMiles: settings.maintenanceWarnMiles,\n      maintenanceWarnDays: settings.maintenanceWarnDays,\n    },\n  })"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 128,
+      "context": "main",
+      "table": "FinancialGoal",
+      "operation": "create",
+      "query": "prisma.financialGoal.create({\n    data: {\n      id: goals.id,\n      businessId: business.id,\n      monthlyRevenueTarget: goals.monthlyRevenueTarget,\n      monthlyProfitTarget: goals.monthlyProfitTarget,\n      targetProfitPerMile: goals.targetProfitPerMile,\n      maxDeadheadPct: goals.maxDeadheadPct,\n      targetLoads: goals.targetLoads,\n      workingDaysPerWeek: goals.workingDaysPerWeek,\n    },\n  })"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 141,
+      "context": "main",
+      "table": "Subscription",
+      "operation": "create",
+      "query": "prisma.subscription.create({\n    data: {\n      id: subscription.id,\n      businessId: business.id,\n      plan: subscription.plan,\n      status: subscription.status,\n      currentPeriodEnd: subscription.currentPeriodEnd\n        ? day(subscription.currentPeriodEnd)\n        : null,\n      providerCustomerId: subscription.providerCustomerId,\n      providerSubscriptionId: subscription.providerSubscriptionId,\n      startedAt: stamp(subscription.startedAt),\n    },\n  })"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 160,
+      "context": "main",
+      "table": "User",
+      "operation": "create",
+      "query": "prisma.user.create({\n      data: {\n        id: user.id,\n        email: user.email,\n        name: user.name,\n        passwordHash: user.passwordHash,\n        role: user.role,\n        invitedAt: stamp(user.invitedAt),\n        joinedAt: user.joinedAt ? stamp(user.joinedAt) : null,\n        businessId: user.businessId,\n        createdAt: stamp(user.createdAt),\n      },\n    })"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 177,
+      "context": "main",
+      "table": "Truck",
+      "operation": "create",
+      "query": "prisma.truck.create({\n      data: {\n        id: truck.id,\n        businessId: business.id,\n        name: truck.name,\n        acquiredOn: truck.acquiredOn ? day(truck.acquiredOn) : null,\n        soldOn: truck.soldOn ? day(truck.soldOn) : null,\n        year: truck.year,\n        make: truck.make,\n        model: truck.model,\n        vin: truck.vin,\n        purchasePrice: truck.purchasePrice,\n        monthlyPayment: truck.monthlyPayment,\n        monthlyInsurance: truck.monthlyInsurance,\n        startingOdometer: truck.startingOdometer,\n        currentOdometer: truck.currentOdometer,\n        active: truck.active,\n        createdAt: stamp(truck.createdAt),\n      },\n    })"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 201,
+      "context": "main",
+      "table": "Driver",
+      "operation": "create",
+      "query": "prisma.driver.create({\n      data: {\n        id: driver.id,\n        businessId: business.id,\n        name: driver.name,\n        reference: driver.reference,\n        defaultTruckId: driver.defaultTruckId,\n        payType: driver.payType,\n        payRate: driver.payRate,\n        active: driver.active,\n        createdAt: stamp(driver.createdAt),\n      },\n    })"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 218,
+      "context": "main",
+      "table": "Load",
+      "operation": "create",
+      "query": "prisma.load.create({\n      data: {\n        id: load.id,\n        businessId: business.id,\n        truckId: load.truckId,\n        driverId: load.driverId,\n        date: day(load.date),\n        deliveryDate: load.deliveryDate ? day(load.deliveryDate) : null,\n        endingOdometer: load.endingOdometer,\n        originCity: load.originCity,\n        originState: load.originState,\n        destinationCity: load.destinationCity,\n        destinationState: load.destinationState,\n        broker: load.broker,\n        loadNumber: load.loadNumber,\n        equipmentType: load.equipmentType,\n        loadCapacity: load.loadCapacity,\n        equipmentLengthFt: load.equipmentLengthFt,\n        weightLbs: load.weightLbs,\n        commodity: load.commodity,\n        loadedMiles: load.loadedMiles,\n        deadheadMiles: load.deadheadMiles,\n        grossRate: load.grossRate,\n        fuelCost: load.fuelCost,\n        tolls: load.tolls,\n        dispatchFee: load.dispatchFee,\n        factoringFee: load.factoringFee,\n        otherExpenses: load.otherExpenses,\n        driverPay: load.driverPay,\n        // Carried across as-is. False on this ledger's historical loads, which\n        // is the whole reason the numbers do not move.\n        costsPosted: load.costsPosted,\n        status: load.status,\n        notes: load.notes,\n        createdAt: stamp(load.createdAt),\n      },\n    })"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 259,
+      "context": "main",
+      "table": "Expense",
+      "operation": "create",
+      "query": "prisma.expense.create({\n      data: {\n        id: expense.id,\n        businessId: business.id,\n        truckId: expense.truckId,\n        loadId: expense.loadId,\n        date: day(expense.date),\n        scope: expense.scope,\n        category: expense.category,\n        description: expense.description,\n        vendor: expense.vendor,\n        amount: expense.amount,\n        recurring: expense.recurring,\n        receiptNumber: expense.receiptNumber,\n        notes: expense.notes,\n        createdAt: stamp(expense.createdAt),\n      },\n    })"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 281,
+      "context": "main",
+      "table": "FuelEntry",
+      "operation": "create",
+      "query": "prisma.fuelEntry.create({\n      data: {\n        id: entry.id,\n        businessId: business.id,\n        truckId: entry.truckId,\n        loadId: entry.loadId,\n        date: day(entry.date),\n        gallons: entry.gallons,\n        pricePerGallon: entry.pricePerGallon,\n        totalCost: entry.totalCost,\n        odometer: entry.odometer,\n        location: entry.location,\n        // The mirror link the app relies on to count a purchase once.\n        expenseId: entry.expenseId,\n        notes: entry.notes,\n        createdAt: stamp(entry.createdAt),\n      },\n    })"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 303,
+      "context": "main",
+      "table": "MaintenanceRecord",
+      "operation": "create",
+      "query": "prisma.maintenanceRecord.create({\n      data: {\n        id: record.id,\n        businessId: business.id,\n        truckId: record.truckId,\n        type: record.type,\n        basis: record.basis,\n        serviceDate: day(record.serviceDate),\n        odometer: record.odometer,\n        cost: record.cost,\n        vendor: record.vendor,\n        nextServiceDate: record.nextServiceDate ? day(record.nextServiceDate) : null,\n        nextServiceOdometer: record.nextServiceOdometer,\n        expenseId: record.expenseId,\n        notes: record.notes,\n        createdAt: stamp(record.createdAt),\n      },\n    })"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 325,
+      "context": "main",
+      "table": "DriverSettlement",
+      "operation": "create",
+      "query": "prisma.driverSettlement.create({\n      data: {\n        id: settlement.id,\n        businessId: business.id,\n        driverId: settlement.driverId,\n        periodStart: day(settlement.periodStart),\n        periodEnd: day(settlement.periodEnd),\n        status: settlement.status,\n        paidOn: settlement.paidOn ? day(settlement.paidOn) : null,\n        notes: settlement.notes,\n        createdAt: stamp(settlement.createdAt),\n        lines: {\n          create: settlement.lines.map((line) => ({\n            id: line.id,\n            loadId: line.loadId,\n            truckId: line.truckId,\n            grossRevenue: line.grossRevenue,\n            loadedMiles: line.loadedMiles,\n            totalMiles: line.totalMiles,\n            payType: line.payType,\n            payRate: line.payRate,\n            payAmount: line.payAmount,\n            expenseId: line.expenseId,\n            createdAt: stamp(line.createdAt),\n          })),\n        },\n      },\n    })"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 357,
+      "context": "main",
+      "table": "ReserveAccount",
+      "operation": "create",
+      "query": "prisma.reserveAccount.create({\n      data: {\n        id: account.id,\n        businessId: business.id,\n        kind: account.kind,\n        name: account.name,\n        basis: account.basis,\n        contributionPct: account.contributionPct,\n        targetBalance: account.targetBalance,\n        active: account.active,\n        sortOrder: account.sortOrder,\n        createdAt: stamp(account.createdAt),\n      },\n    })"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 375,
+      "context": "main",
+      "table": "Settlement",
+      "operation": "create",
+      "query": "prisma.settlement.create({\n      data: {\n        id: settlement.id,\n        businessId: business.id,\n        month: settlement.month,\n        half: settlement.half,\n        periodStart: day(settlement.periodStart),\n        periodEnd: day(settlement.periodEnd),\n        status: settlement.status,\n        closedAt: stamp(settlement.closedAt),\n        // Ids are preserved, so the bucket ids inside a frozen snapshot still\n        // resolve here -- no remapping needed, unlike the reference seed.\n        snapshot: settlement.snapshot\n          ? (settlement.snapshot as unknown as Prisma.InputJsonValue)\n          : undefined,\n        notes: settlement.notes,\n        createdAt: stamp(settlement.createdAt),\n      },\n    })"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 398,
+      "context": "main",
+      "table": "ReserveTransaction",
+      "operation": "create",
+      "query": "prisma.reserveTransaction.create({\n      data: {\n        id: movement.id,\n        businessId: business.id,\n        accountId: movement.accountId,\n        date: day(movement.date),\n        type: movement.type,\n        amount: movement.amount,\n        description: movement.description,\n        settlementId: movement.settlementId,\n        createdAt: stamp(movement.createdAt),\n      },\n    })"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 417,
+      "context": "main",
+      "table": "Document",
+      "operation": "create",
+      "query": "prisma.document.create({\n      data: {\n        id: document.id,\n        businessId: business.id,\n        loadId: document.loadId,\n        expenseId: document.expenseId,\n        truckId: document.truckId,\n        maintenanceId: document.maintenanceId,\n        type: document.type,\n        label: document.label,\n        fileName: document.fileName,\n        contentType: document.contentType,\n        sizeBytes: document.sizeBytes,\n        storageKey: document.storageKey,\n        uploadedAt: stamp(document.uploadedAt),\n      },\n    })"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 437,
+      "context": "main",
+      "table": "Business",
+      "operation": "count",
+      "query": "prisma.business.count()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 438,
+      "context": "main",
+      "table": "User",
+      "operation": "count",
+      "query": "prisma.user.count()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 439,
+      "context": "main",
+      "table": "Truck",
+      "operation": "count",
+      "query": "prisma.truck.count()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 440,
+      "context": "main",
+      "table": "Load",
+      "operation": "count",
+      "query": "prisma.load.count()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 441,
+      "context": "main",
+      "table": "Expense",
+      "operation": "count",
+      "query": "prisma.expense.count()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 442,
+      "context": "main",
+      "table": "FuelEntry",
+      "operation": "count",
+      "query": "prisma.fuelEntry.count()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 443,
+      "context": "main",
+      "table": "MaintenanceRecord",
+      "operation": "count",
+      "query": "prisma.maintenanceRecord.count()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 444,
+      "context": "main",
+      "table": "Driver",
+      "operation": "count",
+      "query": "prisma.driver.count()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 445,
+      "context": "main",
+      "table": "DriverSettlement",
+      "operation": "count",
+      "query": "prisma.driverSettlement.count()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 446,
+      "context": "main",
+      "table": "DriverSettlementLine",
+      "operation": "count",
+      "query": "prisma.driverSettlementLine.count()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 447,
+      "context": "main",
+      "table": "Document",
+      "operation": "count",
+      "query": "prisma.document.count()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 448,
+      "context": "main",
+      "table": "ReserveAccount",
+      "operation": "count",
+      "query": "prisma.reserveAccount.count()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 449,
+      "context": "main",
+      "table": "Settlement",
+      "operation": "count",
+      "query": "prisma.settlement.count()"
+    },
+    {
+      "file": "scripts/import-json-to-postgres.ts",
+      "line": 450,
+      "context": "main",
+      "table": "ReserveTransaction",
+      "operation": "count",
+      "query": "prisma.reserveTransaction.count()"
+    },
+    {
+      "file": "scripts/postgres-smoke.ts",
+      "line": 37,
+      "context": "smokeThreeTruckLedger",
+      "table": "Business",
+      "operation": "create",
+      "query": "prisma.business.create({\n    data: { name: `Three-truck smoke ${Date.now()}`, currency: \"USD\" },\n  })"
+    },
+    {
+      "file": "scripts/postgres-smoke.ts",
+      "line": 261,
+      "context": "smokeThreeTruckLedger",
+      "table": "Business",
+      "operation": "delete",
+      "query": "prisma.business.delete({ where: { id: temporary.id } })"
+    },
+    {
+      "file": "scripts/postgres-smoke.ts",
+      "line": 266,
+      "context": "smokeAtomicLoanPayment",
+      "table": "Business",
+      "operation": "create",
+      "query": "prisma.business.create({\n    data: { name: `Loan-payment smoke ${Date.now()}`, currency: \"USD\" },\n  })"
+    },
+    {
+      "file": "scripts/postgres-smoke.ts",
+      "line": 347,
+      "context": "smokeAtomicLoanPayment",
+      "table": "Expense",
+      "operation": "count",
+      "query": "prisma.expense.count({ where: { businessId: temporary.id, splitGroupId: principal.splitGroupId } })"
+    },
+    {
+      "file": "scripts/postgres-smoke.ts",
+      "line": 352,
+      "context": "smokeAtomicLoanPayment",
+      "table": "Document",
+      "operation": "count",
+      "query": "prisma.document.count({ where: { id: document.id } })"
+    },
+    {
+      "file": "scripts/postgres-smoke.ts",
+      "line": 358,
+      "context": "smokeAtomicLoanPayment",
+      "table": "Business",
+      "operation": "delete",
+      "query": "prisma.business.delete({ where: { id: temporary.id } })"
+    },
+    {
+      "file": "scripts/postgres-smoke.ts",
+      "line": 363,
+      "context": "main",
+      "table": "Business",
+      "operation": "findFirst",
+      "query": "prisma.business.findFirst({ orderBy: { createdAt: \"asc\" } })"
+    },
+    {
+      "file": "scripts/postgres-smoke.ts",
+      "line": 372,
+      "context": "main",
+      "table": "ReserveAccount",
+      "operation": "findMany",
+      "query": "prisma.reserveAccount.findMany({\n    where: { businessId: business.id },\n  })"
+    },
+    {
+      "file": "scripts/postgres-smoke.ts",
+      "line": 393,
+      "context": "main",
+      "table": "ReserveTransaction",
+      "operation": "count",
+      "query": "prisma.reserveTransaction.count({\n    where: { businessId: business.id },\n  })"
+    },
+    {
+      "file": "scripts/postgres-smoke.ts",
+      "line": 429,
+      "context": "main",
+      "table": "ReserveTransaction",
+      "operation": "findMany",
+      "query": "prisma.reserveTransaction.findMany({\n    where: { settlementId: settlement.id },\n  })"
+    },
+    {
+      "file": "scripts/postgres-smoke.ts",
+      "line": 440,
+      "context": "main",
+      "table": "Settlement",
+      "operation": "findUniqueOrThrow",
+      "query": "prisma.settlement.findUniqueOrThrow({ where: { id: settlement.id } })"
+    },
+    {
+      "file": "scripts/postgres-smoke.ts",
+      "line": 444,
+      "context": "main",
+      "table": "ReserveTransaction",
+      "operation": "count",
+      "query": "prisma.reserveTransaction.count({ where: { businessId: business.id } })"
+    },
+    {
+      "file": "scripts/postgres-smoke.ts",
+      "line": 459,
+      "context": "main",
+      "table": "FuelEntry",
+      "operation": "findUniqueOrThrow",
+      "query": "prisma.fuelEntry.findUniqueOrThrow({ where: { id: fuel.id } })"
+    },
+    {
+      "file": "scripts/postgres-smoke.ts",
+      "line": 461,
+      "context": "main",
+      "table": "Expense",
+      "operation": "findUniqueOrThrow",
+      "query": "prisma.expense.findUniqueOrThrow({ where: { id: linked.expenseId! } })"
+    },
+    {
+      "file": "scripts/postgres-smoke.ts",
+      "line": 467,
+      "context": "main",
+      "table": "Expense",
+      "operation": "findUnique",
+      "query": "prisma.expense.findUnique({ where: { id: linked.expenseId! } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 140,
+      "context": "checkPostgresConnection",
+      "table": null,
+      "operation": "$queryRawUnsafe",
+      "query": "client.$queryRawUnsafe(\"select 1\")"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 197,
+      "context": "syncPrismaLoadExpenses",
+      "table": "FuelEntry",
+      "operation": "count",
+      "query": "tx.fuelEntry.count({ where: { loadId: load.id, businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 211,
+      "context": "syncPrismaLoadExpenses",
+      "table": "Expense",
+      "operation": "deleteMany",
+      "query": "tx.expense.deleteMany({ where: { id, businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 229,
+      "context": "syncPrismaLoadExpenses",
+      "table": "Expense",
+      "operation": "upsert",
+      "query": "tx.expense.upsert({ where: { id }, create: { id, ...values }, update: values })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 270,
+      "context": "ownedLoadId",
+      "table": "Load",
+      "operation": "findFirst",
+      "query": "client.load.findFirst({ where: { id, businessId }, select: { truckId: true } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 286,
+      "context": "ownedDriverId",
+      "table": "Driver",
+      "operation": "count",
+      "query": "client.driver.count({ where: { id, businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 303,
+      "context": "assertDocumentTargets",
+      "table": "Load",
+      "operation": "count",
+      "query": "client.load.count({ where: { id: input.loadId, businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 306,
+      "context": "assertDocumentTargets",
+      "table": "Expense",
+      "operation": "count",
+      "query": "client.expense.count({ where: { id: input.expenseId, businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 309,
+      "context": "assertDocumentTargets",
+      "table": "MaintenanceRecord",
+      "operation": "count",
+      "query": "client.maintenanceRecord.count({\n          where: { id: input.maintenanceId, businessId: business.id },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 328,
+      "context": "ensureReserveAccounts",
+      "table": "ReserveAccount",
+      "operation": "count",
+      "query": "client.reserveAccount.count({ where: { businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 331,
+      "context": "ensureReserveAccounts",
+      "table": "ReserveAccount",
+      "operation": "create",
+      "query": "client.reserveAccount.create({\n      data: {\n        businessId,\n        kind: account.kind,\n        name: account.name,\n        basis: account.basis,\n        contributionPct: account.contributionPct,\n        targetBalance: account.targetBalance,\n        active: account.active,\n        sortOrder: account.sortOrder,\n      },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 362,
+      "context": "listAccounts",
+      "table": "User",
+      "operation": "findMany",
+      "query": "client.user.findMany({\n      where: { businessId: { not: null }, role: \"OWNER\" },\n      orderBy: { createdAt: \"desc\" },\n      include: {\n        business: {\n          include: {\n            subscription: true,\n            trucks: { select: { active: true } },\n            loads: { orderBy: { createdAt: \"desc\" }, take: 1, select: { createdAt: true } },\n            expenses: { orderBy: { createdAt: \"desc\" }, take: 1, select: { createdAt: true } },\n            fuelEntries: { orderBy: { createdAt: \"desc\" }, take: 1, select: { createdAt: true } },\n            documents: { orderBy: { uploadedAt: \"desc\" }, take: 1, select: { uploadedAt: true } },\n            maintenance: { orderBy: { createdAt: \"desc\" }, take: 1, select: { createdAt: true } },\n            reserveTransactions: { orderBy: { createdAt: \"desc\" }, take: 1, select: { createdAt: true } },\n            settlements: { orderBy: { createdAt: \"desc\" }, take: 1, select: { createdAt: true } },\n            _count: {\n              select: {\n                trucks: true,\n                loads: true,\n                expenses: true,\n                fuelEntries: true,\n                documents: true,\n                maintenance: true,\n                reserveTransactions: true,\n                settlements: true,\n              },\n            },\n          },\n        },\n      },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 459,
+      "context": "countUsers",
+      "table": "User",
+      "operation": "count",
+      "query": "client.user.count()"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 464,
+      "context": "findUserByEmail",
+      "table": "User",
+      "operation": "findUnique",
+      "query": "client.user.findUnique({ where: { email: email.trim().toLowerCase() } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 470,
+      "context": "findUserById",
+      "table": "User",
+      "operation": "findUnique",
+      "query": "client.user.findUnique({ where: { id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 476,
+      "context": "listMembers",
+      "table": "User",
+      "operation": "findMany",
+      "query": "client.user.findMany({\n      where: { businessId },\n      orderBy: [{ role: \"asc\" }, { createdAt: \"asc\" }],\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 494,
+      "context": "createMember",
+      "table": "Business",
+      "operation": "findUnique",
+      "query": "client.business.findUnique({ where: { id: input.businessId }, select: { id: true } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 496,
+      "context": "createMember",
+      "table": "User",
+      "operation": "findUnique",
+      "query": "client.user.findUnique({ where: { email } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 500,
+      "context": "createMember",
+      "table": "User",
+      "operation": "create",
+      "query": "client.user.create({\n      data: {\n        businessId: input.businessId,\n        email,\n        name: input.name?.trim() || null,\n        passwordHash: \"invite$supabase\",\n        role: input.role,\n        invitedAt: now,\n        joinedAt: null,\n      },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 522,
+      "context": "updateMemberRole",
+      "table": "User",
+      "operation": "findFirst",
+      "query": "client.user.findFirst({ where: { id: userId, businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 525,
+      "context": "updateMemberRole",
+      "table": "User",
+      "operation": "update",
+      "query": "client.user.update({ where: { id: userId }, data: { role } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 533,
+      "context": "markMemberJoined",
+      "table": "User",
+      "operation": "findFirst",
+      "query": "client.user.findFirst({ where: { id: userId, businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 537,
+      "context": "markMemberJoined",
+      "table": "User",
+      "operation": "update",
+      "query": "client.user.update({ where: { id: userId }, data: { joinedAt: new Date() } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 545,
+      "context": "removeMember",
+      "table": "User",
+      "operation": "findFirst",
+      "query": "client.user.findFirst({ where: { id: userId, businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 548,
+      "context": "removeMember",
+      "table": "User",
+      "operation": "delete",
+      "query": "client.user.delete({ where: { id: userId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 564,
+      "context": "createOwner",
+      "table": "User",
+      "operation": "findUnique",
+      "query": "tx.user.findUnique({ where: { email } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 568,
+      "context": "createOwner",
+      "table": "Business",
+      "operation": "create",
+      "query": "tx.business.create({\n        data: {\n          name: input.businessName?.trim() || \"My Trucking Business\",\n          currency: \"USD\",\n          settings: { create: { categoryBehavior: defaultCategoryBehavior() } },\n          trucks: { create: { name: \"Truck 1\" } },\n          subscription: {\n            create: {\n              plan: input.plan ?? DEFAULT_PLAN,\n              status: \"TRIALING\",\n              startedAt: trialStartedAt,\n              currentPeriodEnd: toDate(trialEndsOn(trialStartedAt.toISOString())),\n            },\n          },\n        },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 585,
+      "context": "createOwner",
+      "table": "User",
+      "operation": "create",
+      "query": "tx.user.create({\n        data: {\n          email,\n          name: input.name?.trim() || null,\n          passwordHash: input.passwordHash,\n          businessId: business.id,\n          role: \"OWNER\",\n          joinedAt: trialStartedAt,\n        },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 606,
+      "context": "resetBusinessData",
+      "table": "User",
+      "operation": "findFirst",
+      "query": "tx.user.findFirst({ where: { id: userId, businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 610,
+      "context": "resetBusinessData",
+      "table": "Document",
+      "operation": "findMany",
+      "query": "tx.document.findMany({\n        where: { businessId },\n        select: { storageKey: true },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 615,
+      "context": "resetBusinessData",
+      "table": "Document",
+      "operation": "deleteMany",
+      "query": "tx.document.deleteMany({ where: { businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 616,
+      "context": "resetBusinessData",
+      "table": "FuelEntry",
+      "operation": "deleteMany",
+      "query": "tx.fuelEntry.deleteMany({ where: { businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 617,
+      "context": "resetBusinessData",
+      "table": "MaintenanceRecord",
+      "operation": "deleteMany",
+      "query": "tx.maintenanceRecord.deleteMany({ where: { businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 618,
+      "context": "resetBusinessData",
+      "table": "DriverSettlement",
+      "operation": "deleteMany",
+      "query": "tx.driverSettlement.deleteMany({ where: { businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 619,
+      "context": "resetBusinessData",
+      "table": "PaymentEvent",
+      "operation": "deleteMany",
+      "query": "tx.paymentEvent.deleteMany({ where: { businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 620,
+      "context": "resetBusinessData",
+      "table": "Expense",
+      "operation": "deleteMany",
+      "query": "tx.expense.deleteMany({ where: { businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 621,
+      "context": "resetBusinessData",
+      "table": "Load",
+      "operation": "deleteMany",
+      "query": "tx.load.deleteMany({ where: { businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 622,
+      "context": "resetBusinessData",
+      "table": "FinancialObligation",
+      "operation": "deleteMany",
+      "query": "tx.financialObligation.deleteMany({ where: { businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 623,
+      "context": "resetBusinessData",
+      "table": "Driver",
+      "operation": "deleteMany",
+      "query": "tx.driver.deleteMany({ where: { businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 624,
+      "context": "resetBusinessData",
+      "table": "Truck",
+      "operation": "deleteMany",
+      "query": "tx.truck.deleteMany({ where: { businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 625,
+      "context": "resetBusinessData",
+      "table": "ReserveTransaction",
+      "operation": "deleteMany",
+      "query": "tx.reserveTransaction.deleteMany({ where: { businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 626,
+      "context": "resetBusinessData",
+      "table": "Settlement",
+      "operation": "deleteMany",
+      "query": "tx.settlement.deleteMany({ where: { businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 627,
+      "context": "resetBusinessData",
+      "table": "ReserveAccount",
+      "operation": "deleteMany",
+      "query": "tx.reserveAccount.deleteMany({ where: { businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 628,
+      "context": "resetBusinessData",
+      "table": "FinancialGoal",
+      "operation": "deleteMany",
+      "query": "tx.financialGoal.deleteMany({ where: { businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 629,
+      "context": "resetBusinessData",
+      "table": "FinancialSettings",
+      "operation": "deleteMany",
+      "query": "tx.financialSettings.deleteMany({ where: { businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 631,
+      "context": "resetBusinessData",
+      "table": "Truck",
+      "operation": "create",
+      "query": "tx.truck.create({ data: { businessId, name: \"Truck 1\" } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 632,
+      "context": "resetBusinessData",
+      "table": "FinancialSettings",
+      "operation": "create",
+      "query": "tx.financialSettings.create({\n        data: { businessId, categoryBehavior: defaultCategoryBehavior() },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 636,
+      "context": "resetBusinessData",
+      "table": "FinancialGoal",
+      "operation": "create",
+      "query": "tx.financialGoal.create({\n        data: {\n          businessId,\n          monthlyRevenueTarget: goals.monthlyRevenueTarget,\n          monthlyProfitTarget: goals.monthlyProfitTarget,\n          targetProfitPerMile: goals.targetProfitPerMile,\n          maxDeadheadPct: goals.maxDeadheadPct,\n          targetLoads: goals.targetLoads,\n          workingDaysPerWeek: goals.workingDaysPerWeek,\n          expectedMonthlyMiles: goals.expectedMonthlyMiles ?? 0,\n        },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 649,
+      "context": "resetBusinessData",
+      "table": "ReserveAccount",
+      "operation": "create",
+      "query": "tx.reserveAccount.create({\n          data: {\n            businessId,\n            kind: account.kind,\n            name: account.name,\n            basis: account.basis,\n            contributionPct: account.contributionPct,\n            targetBalance: account.targetBalance,\n            active: account.active,\n            sortOrder: account.sortOrder,\n          },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 674,
+      "context": "deleteAccount",
+      "table": "User",
+      "operation": "findFirst",
+      "query": "tx.user.findFirst({ where: { id: userId, businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 678,
+      "context": "deleteAccount",
+      "table": "Document",
+      "operation": "findMany",
+      "query": "tx.document.findMany({\n        where: { businessId },\n        select: { storageKey: true },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 685,
+      "context": "deleteAccount",
+      "table": "User",
+      "operation": "deleteMany",
+      "query": "tx.user.deleteMany({ where: { businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 686,
+      "context": "deleteAccount",
+      "table": "Business",
+      "operation": "delete",
+      "query": "tx.business.delete({ where: { id: businessId } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 719,
+      "context": "business",
+      "table": "Business",
+      "operation": "findUnique",
+      "query": "client.business.findUnique({\n      where: { id: this.businessId },\n      include: {\n        settings: true,\n        trucks: { orderBy: [{ active: \"desc\" }, { name: \"asc\" }, { id: \"asc\" }] },\n      },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 728,
+      "context": "business",
+      "table": "Truck",
+      "operation": "create",
+      "query": "client.truck.create({\n        data: { businessId: existing.id, name: \"Truck 1\" },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 761,
+      "context": "getDataset",
+      "table": "Load",
+      "operation": "findMany",
+      "query": "client.load.findMany({\n        where: { businessId: business.id },\n        orderBy: [{ date: \"desc\" }, { id: \"desc\" }],\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 765,
+      "context": "getDataset",
+      "table": "Expense",
+      "operation": "findMany",
+      "query": "client.expense.findMany({\n        where: { businessId: business.id },\n        orderBy: [{ date: \"desc\" }, { id: \"desc\" }],\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 769,
+      "context": "getDataset",
+      "table": "FuelEntry",
+      "operation": "findMany",
+      "query": "client.fuelEntry.findMany({\n        where: { businessId: business.id },\n        orderBy: [{ date: \"desc\" }, { id: \"desc\" }],\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 773,
+      "context": "getDataset",
+      "table": "Document",
+      "operation": "findMany",
+      "query": "client.document.findMany({\n        where: { businessId: business.id },\n        orderBy: { uploadedAt: \"asc\" },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 777,
+      "context": "getDataset",
+      "table": "MaintenanceRecord",
+      "operation": "findMany",
+      "query": "client.maintenanceRecord.findMany({\n        where: { businessId: business.id },\n        orderBy: [{ serviceDate: \"desc\" }, { id: \"desc\" }],\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 781,
+      "context": "getDataset",
+      "table": "FinancialGoal",
+      "operation": "findUnique",
+      "query": "client.financialGoal.findUnique({ where: { businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 782,
+      "context": "getDataset",
+      "table": "Subscription",
+      "operation": "findUnique",
+      "query": "client.subscription.findUnique({ where: { businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 783,
+      "context": "getDataset",
+      "table": "ReserveAccount",
+      "operation": "findMany",
+      "query": "client.reserveAccount.findMany({\n        where: { businessId: business.id },\n        orderBy: [{ sortOrder: \"asc\" }, { id: \"asc\" }],\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 787,
+      "context": "getDataset",
+      "table": "ReserveTransaction",
+      "operation": "findMany",
+      "query": "client.reserveTransaction.findMany({\n        where: { businessId: business.id },\n        orderBy: [{ date: \"desc\" }, { id: \"desc\" }],\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 791,
+      "context": "getDataset",
+      "table": "Settlement",
+      "operation": "findMany",
+      "query": "client.settlement.findMany({\n        where: { businessId: business.id },\n        orderBy: [{ periodStart: \"desc\" }, { id: \"desc\" }],\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 795,
+      "context": "getDataset",
+      "table": "Driver",
+      "operation": "findMany",
+      "query": "client.driver.findMany({\n        where: { businessId: business.id },\n        orderBy: [{ active: \"desc\" }, { name: \"asc\" }, { id: \"asc\" }],\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 799,
+      "context": "getDataset",
+      "table": "DriverSettlement",
+      "operation": "findMany",
+      "query": "client.driverSettlement.findMany({\n        where: { businessId: business.id },\n        include: {\n          lines: { orderBy: [{ createdAt: \"asc\" }, { id: \"asc\" }] },\n          adjustments: { orderBy: [{ createdAt: \"asc\" }, { id: \"asc\" }] },\n        },\n        orderBy: [{ periodStart: \"desc\" }, { id: \"desc\" }],\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 807,
+      "context": "getDataset",
+      "table": "FinancialObligation",
+      "operation": "findMany",
+      "query": "client.financialObligation.findMany({\n        where: { businessId: business.id },\n        orderBy: [{ active: \"desc\" }, { name: \"asc\" }, { id: \"asc\" }],\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 811,
+      "context": "getDataset",
+      "table": "PaymentEvent",
+      "operation": "findMany",
+      "query": "client.paymentEvent.findMany({\n        where: { businessId: business.id },\n        orderBy: [{ date: \"desc\" }, { id: \"desc\" }],\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 826,
+      "context": "getDataset",
+      "table": "ReserveAccount",
+      "operation": "findMany",
+      "query": "client.reserveAccount.findMany({\n        where: { businessId: business.id },\n        orderBy: [{ sortOrder: \"asc\" }, { id: \"asc\" }],\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1250,
+      "context": "createLoad",
+      "table": "Load",
+      "operation": "create",
+      "query": "tx.load.create({\n        data: { ...this.loadData(input), businessId: business.id, truckId, driverId },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1255,
+      "context": "createLoad",
+      "table": "Truck",
+      "operation": "updateMany",
+      "query": "tx.truck.updateMany({\n          where: { id: truckId, businessId: business.id, currentOdometer: { lt: created.endingOdometer } },\n          data: { currentOdometer: created.endingOdometer },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1272,
+      "context": "updateLoad",
+      "table": "Load",
+      "operation": "findFirst",
+      "query": "tx.load.findFirst({ where: { id, businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1274,
+      "context": "updateLoad",
+      "table": "PaymentEvent",
+      "operation": "count",
+      "query": "tx.paymentEvent.count({ where: { loadId: id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1279,
+      "context": "updateLoad",
+      "table": "DriverSettlementLine",
+      "operation": "count",
+      "query": "tx.driverSettlementLine.count({ where: { loadId: id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1289,
+      "context": "updateLoad",
+      "table": "Expense",
+      "operation": "count",
+      "query": "tx.expense.count({\n            where: {\n              businessId: business.id,\n              loadId: id,\n              id: { notIn: generatedIds },\n              OR: [{ scope: \"BUSINESS\" }, { truckId: { not: truckId } }],\n            },\n          })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1297,
+      "context": "updateLoad",
+      "table": "FuelEntry",
+      "operation": "count",
+      "query": "tx.fuelEntry.count({\n            where: { businessId: business.id, loadId: id, truckId: { not: truckId } },\n          })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1307,
+      "context": "updateLoad",
+      "table": "Load",
+      "operation": "update",
+      "query": "tx.load.update({\n        where: { id },\n        data: { ...this.loadData(input), truckId, driverId },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1313,
+      "context": "updateLoad",
+      "table": "Truck",
+      "operation": "updateMany",
+      "query": "tx.truck.updateMany({\n          where: { id: truckId, businessId: business.id, currentOdometer: { lt: row.endingOdometer } },\n          data: { currentOdometer: row.endingOdometer },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1330,
+      "context": "updateLoadJurisdictionMiles",
+      "table": "Load",
+      "operation": "findFirst",
+      "query": "tx.load.findFirst({ where: { id, businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1338,
+      "context": "updateLoadJurisdictionMiles",
+      "table": "Load",
+      "operation": "update",
+      "query": "tx.load.update({\n        where: { id: existing.id },\n        data: { jurisdictionMiles: normalized as unknown as Prisma.InputJsonValue },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1352,
+      "context": "updateLoadExpense",
+      "table": "Expense",
+      "operation": "findFirst",
+      "query": "tx.expense.findFirst({\n        where: { id, businessId: business.id },\n        select: { loadId: true },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1364,
+      "context": "updateLoadExpense",
+      "table": "Load",
+      "operation": "findFirst",
+      "query": "tx.load.findFirst({\n        where: { id: expense.loadId, businessId: business.id },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1371,
+      "context": "updateLoadExpense",
+      "table": "Load",
+      "operation": "update",
+      "query": "tx.load.update({\n        where: { id: existing.id },\n        data: { [loadExpenseField(key)]: roundMoney(amount) },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1387,
+      "context": "deleteLoad",
+      "table": "Load",
+      "operation": "findFirst",
+      "query": "tx.load.findFirst({ where: { id, businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1389,
+      "context": "deleteLoad",
+      "table": "DriverSettlementLine",
+      "operation": "count",
+      "query": "tx.driverSettlementLine.count({ where: { loadId: id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1395,
+      "context": "deleteLoad",
+      "table": "Expense",
+      "operation": "deleteMany",
+      "query": "tx.expense.deleteMany({\n        where: {\n          businessId: business.id,\n          id: { in: LOAD_EXPENSE_KEYS.map((key) => loadExpenseId(id, key)) },\n        },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1401,
+      "context": "deleteLoad",
+      "table": "Load",
+      "operation": "delete",
+      "query": "tx.load.delete({ where: { id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1411,
+      "context": "createDriver",
+      "table": "Driver",
+      "operation": "create",
+      "query": "client.driver.create({\n      data: {\n        businessId: business.id,\n        name: input.name.trim(),\n        reference: input.reference?.trim() || null,\n        defaultTruckId,\n        payType: input.payType,\n        payRate: input.payRate,\n      },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1431,
+      "context": "updateDriver",
+      "table": "Driver",
+      "operation": "updateMany",
+      "query": "client.driver.updateMany({\n      where: { id, businessId: business.id },\n      data: {\n        name: input.name.trim(),\n        reference: input.reference?.trim() || null,\n        defaultTruckId,\n        payType: input.payType,\n        payRate: input.payRate,\n      },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1449,
+      "context": "setDriverActive",
+      "table": "Driver",
+      "operation": "updateMany",
+      "query": "client.driver.updateMany({\n      where: { id, businessId: business.id },\n      data: { active },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1462,
+      "context": "createDriverSettlement",
+      "table": "Driver",
+      "operation": "findFirst",
+      "query": "tx.driver.findFirst({\n        where: { id: input.driverId, businessId: business.id },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1466,
+      "context": "createDriverSettlement",
+      "table": "Load",
+      "operation": "findMany",
+      "query": "tx.load.findMany({\n        where: {\n          businessId: business.id,\n          driverId: driver.id,\n          date: { gte: toDate(input.periodStart), lte: toDate(input.periodEnd) },\n          driverSettlementLine: { is: null },\n        },\n        orderBy: [{ date: \"asc\" }, { id: \"asc\" }],\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1478,
+      "context": "createDriverSettlement",
+      "table": "DriverSettlement",
+      "operation": "create",
+      "query": "tx.driverSettlement.create({\n        data: {\n          businessId: business.id,\n          driverId: driver.id,\n          periodStart: toDate(input.periodStart),\n          periodEnd: toDate(input.periodEnd),\n          notes: input.notes?.trim() || null,\n          lines: {\n            create: loads.map((load) => ({\n              loadId: load.id,\n              truckId: load.truckId,\n              grossRevenue: load.grossRate,\n              loadedMiles: load.loadedMiles,\n              totalMiles: load.loadedMiles + load.deadheadMiles,\n              payType: driver.payType,\n              payRate: driver.payRate,\n              payAmount: calculateDriverPay(driver.payType, num(driver.payRate), {\n                grossRate: num(load.grossRate),\n                loadedMiles: load.loadedMiles,\n                deadheadMiles: load.deadheadMiles,\n              }),\n            })),\n          },\n        },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1518,
+      "context": "addDriverSettlementAdjustment",
+      "table": "DriverSettlement",
+      "operation": "findFirst",
+      "query": "client.driverSettlement.findFirst({\n      where: { id: settlementId, businessId: business.id },\n      include: { lines: true, adjustments: true },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1531,
+      "context": "addDriverSettlementAdjustment",
+      "table": "DriverSettlementAdjustment",
+      "operation": "create",
+      "query": "client.driverSettlementAdjustment.create({\n      data: {\n        settlementId,\n        type: input.type,\n        amount: input.amount,\n        reason: input.reason.trim(),\n      },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1552,
+      "context": "deleteDriverSettlementAdjustment",
+      "table": "DriverSettlement",
+      "operation": "findFirst",
+      "query": "client.driverSettlement.findFirst({\n      where: { id: settlementId, businessId: business.id },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1557,
+      "context": "deleteDriverSettlementAdjustment",
+      "table": "DriverSettlementAdjustment",
+      "operation": "deleteMany",
+      "query": "client.driverSettlementAdjustment.deleteMany({\n      where: { id: adjustmentId, settlementId },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1567,
+      "context": "payDriverSettlement",
+      "table": "DriverSettlement",
+      "operation": "findFirst",
+      "query": "tx.driverSettlement.findFirst({\n        where: { id, businessId: business.id },\n        include: { driver: true, lines: { include: { load: true } }, adjustments: true },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1620,
+      "context": "payDriverSettlement",
+      "table": "Expense",
+      "operation": "upsert",
+      "query": "tx.expense.upsert({\n            where: { id: expenseId },\n            create: {\n              id: expenseId,\n              businessId: business.id,\n              truckId: line.truckId,\n              scope: \"TRUCK\",\n              loadId: line.loadId,\n              date: toDate(paidOn),\n              category: \"DRIVER_PAY\",\n              description: `Driver pay · ${settlement.driver.name}`,\n              vendor: settlement.driver.name,\n              amount: allocatedPay,\n              recurring: false,\n              notes: `Net pay allocated from driver settlement ${settlement.id}.`,\n            },\n            update: {},\n          })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1639,
+      "context": "payDriverSettlement",
+      "table": "DriverSettlementLine",
+      "operation": "update",
+      "query": "tx.driverSettlementLine.update({\n          where: { id: line.id },\n          data: { expenseId: allocatedPay > 0 ? expenseId : null },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1643,
+      "context": "payDriverSettlement",
+      "table": "Load",
+      "operation": "update",
+      "query": "tx.load.update({\n          where: { id: line.loadId },\n          data: { driverPay: allocatedPay },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1648,
+      "context": "payDriverSettlement",
+      "table": "DriverSettlement",
+      "operation": "update",
+      "query": "tx.driverSettlement.update({\n        where: { id: settlement.id },\n        data: { status: \"PAID\", paidOn: toDate(paidOn) },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1660,
+      "context": "deleteDriverSettlement",
+      "table": "DriverSettlement",
+      "operation": "findFirst",
+      "query": "client.driverSettlement.findFirst({\n      where: { id, businessId: business.id },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1667,
+      "context": "deleteDriverSettlement",
+      "table": "DriverSettlement",
+      "operation": "delete",
+      "query": "client.driverSettlement.delete({ where: { id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1694,
+      "context": "createExpense",
+      "table": "Expense",
+      "operation": "create",
+      "query": "client.expense.create({\n      data: {\n        ...this.expenseData(input),\n        loadId,\n        businessId: business.id,\n        scope,\n        truckId,\n      },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1710,
+      "context": "updateExpense",
+      "table": "DriverSettlementLine",
+      "operation": "count",
+      "query": "client.driverSettlementLine.count({ where: { expenseId: id, settlement: { businessId: business.id } } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1714,
+      "context": "updateExpense",
+      "table": "FuelEntry",
+      "operation": "count",
+      "query": "client.fuelEntry.count({ where: { expenseId: id, businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1717,
+      "context": "updateExpense",
+      "table": "MaintenanceRecord",
+      "operation": "count",
+      "query": "client.maintenanceRecord.count({ where: { expenseId: id, businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1723,
+      "context": "updateExpense",
+      "table": "Expense",
+      "operation": "findFirst",
+      "query": "client.expense.findFirst({\n      where: { id, businessId: business.id },\n      select: { category: true, financialTreatment: true, splitGroupId: true },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1735,
+      "context": "updateExpense",
+      "table": "Expense",
+      "operation": "updateMany",
+      "query": "client.expense.updateMany({\n      where: { id, businessId: business.id },\n      data: {\n        ...this.expenseData(input),\n        financialTreatment:\n          input.financialTreatment ??\n          preservedTreatment ??\n          financialTreatmentForCategory(input.category),\n        loadId,\n        scope,\n        truckId,\n      },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1757,
+      "context": "deleteExpense",
+      "table": "Expense",
+      "operation": "findFirst",
+      "query": "tx.expense.findFirst({\n        where: { id, businessId: business.id },\n        select: { id: true, splitGroupId: true },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1763,
+      "context": "deleteExpense",
+      "table": "Expense",
+      "operation": "findMany",
+      "query": "tx.expense.findMany({\n            where: { businessId: business.id, splitGroupId: expense.splitGroupId },\n            select: { id: true },\n          })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1769,
+      "context": "deleteExpense",
+      "table": "DriverSettlementLine",
+      "operation": "count",
+      "query": "tx.driverSettlementLine.count({ where: { expenseId: { in: targetIds }, settlement: { businessId: business.id } } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1776,
+      "context": "deleteExpense",
+      "table": "FuelEntry",
+      "operation": "count",
+      "query": "tx.fuelEntry.count({ where: { expenseId: { in: targetIds }, businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1779,
+      "context": "deleteExpense",
+      "table": "Expense",
+      "operation": "deleteMany",
+      "query": "tx.expense.deleteMany({\n        where: { id: { in: targetIds }, businessId: business.id },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1799,
+      "context": "createFinancialObligation",
+      "table": "FinancialObligation",
+      "operation": "create",
+      "query": "tx.financialObligation.create({\n        data: {\n          businessId: business.id,\n          truckId,\n          name: input.name.trim(),\n          kind: input.kind,\n          counterparty: input.counterparty?.trim() || null,\n          startedOn: input.startedOn ? toDate(input.startedOn) : null,\n          endedOn: input.endedOn ? toDate(input.endedOn) : null,\n          startingBalance: input.startingBalance ?? null,\n          aprPercent: input.aprPercent ?? null,\n          paymentDueDay: input.paymentDueDay ?? null,\n          expectedMonthlyPayment: input.expectedMonthlyPayment ?? null,\n          active,\n        },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1816,
+      "context": "createFinancialObligation",
+      "table": "Truck",
+      "operation": "updateMany",
+      "query": "tx.truck.updateMany({\n          where: { id: truckId, businessId: business.id },\n          data: { financingConfirmedNone: null },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1838,
+      "context": "updateFinancialObligation",
+      "table": "FinancialObligation",
+      "operation": "findFirst",
+      "query": "tx.financialObligation.findFirst({\n        where: { id, businessId: business.id },\n        select: { id: true, kind: true },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1845,
+      "context": "updateFinancialObligation",
+      "table": "Expense",
+      "operation": "count",
+      "query": "tx.expense.count({ where: { businessId: business.id, obligationId: obligation.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1849,
+      "context": "updateFinancialObligation",
+      "table": "FinancialObligation",
+      "operation": "update",
+      "query": "tx.financialObligation.update({\n        where: { id: obligation.id },\n        data: {\n          truckId,\n          name: input.name.trim(),\n          kind: input.kind,\n          counterparty: input.counterparty?.trim() || null,\n          startedOn: input.startedOn ? toDate(input.startedOn) : null,\n          endedOn: input.endedOn ? toDate(input.endedOn) : null,\n          startingBalance: input.startingBalance ?? null,\n          aprPercent: input.aprPercent ?? null,\n          paymentDueDay: input.paymentDueDay ?? null,\n          expectedMonthlyPayment: input.expectedMonthlyPayment ?? null,\n          active,\n        },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1866,
+      "context": "updateFinancialObligation",
+      "table": "Truck",
+      "operation": "updateMany",
+      "query": "tx.truck.updateMany({\n          where: { id: truckId, businessId: business.id },\n          data: { financingConfirmedNone: null },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1882,
+      "context": "classifyDebtPayment",
+      "table": "Expense",
+      "operation": "findFirst",
+      "query": "tx.expense.findFirst({ where: { id, businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1901,
+      "context": "classifyDebtPayment",
+      "table": "FinancialObligation",
+      "operation": "create",
+      "query": "tx.financialObligation.create({\n          data: {\n            businessId: business.id,\n            truckId,\n            name: input.newObligation.name.trim(),\n            kind: input.newObligation.kind,\n            counterparty: input.newObligation.counterparty?.trim() || null,\n            startedOn: input.newObligation.startedOn\n              ? toDate(input.newObligation.startedOn)\n              : null,\n            endedOn: input.newObligation.endedOn ? toDate(input.newObligation.endedOn) : null,\n            startingBalance: input.newObligation.startingBalance ?? null,\n            aprPercent: input.newObligation.aprPercent ?? null,\n            paymentDueDay: input.newObligation.paymentDueDay ?? null,\n            expectedMonthlyPayment: input.newObligation.expectedMonthlyPayment ?? null,\n            active: input.newObligation.active ?? true,\n          },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1920,
+      "context": "classifyDebtPayment",
+      "table": "Truck",
+      "operation": "updateMany",
+      "query": "tx.truck.updateMany({\n            where: { id: truckId, businessId: business.id },\n            data: { financingConfirmedNone: null },\n          })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1928,
+      "context": "classifyDebtPayment",
+      "table": "FinancialObligation",
+      "operation": "findFirst",
+      "query": "tx.financialObligation.findFirst({\n            where: { id: obligationId, businessId: business.id },\n          })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1941,
+      "context": "classifyDebtPayment",
+      "table": "FinancialObligation",
+      "operation": "update",
+      "query": "tx.financialObligation.update({\n          where: { id: obligation.id },\n          data: {\n            name: input.obligationUpdate.name.trim(),\n            truckId,\n            startingBalance: input.obligationUpdate.startingBalance,\n            aprPercent: input.obligationUpdate.aprPercent,\n            paymentDueDay: input.obligationUpdate.paymentDueDay,\n            expectedMonthlyPayment: input.obligationUpdate.expectedMonthlyPayment ?? null,\n            active: input.obligationUpdate.active,\n          },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1954,
+      "context": "classifyDebtPayment",
+      "table": "Truck",
+      "operation": "updateMany",
+      "query": "tx.truck.updateMany({\n            where: { id: truckId, businessId: business.id },\n            data: { financingConfirmedNone: null },\n          })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1965,
+      "context": "classifyDebtPayment",
+      "table": "Expense",
+      "operation": "update",
+      "query": "tx.expense.update({\n          where: { id },\n          data: {\n            financialTreatment: \"DEBT_UNALLOCATED\",\n            obligationId,\n            ...(normalizedNotes !== undefined ? { notes: normalizedNotes } : {}),\n          },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1979,
+      "context": "classifyDebtPayment",
+      "table": "Expense",
+      "operation": "update",
+      "query": "tx.expense.update({\n          where: { id },\n          data: {\n            category: \"OPERATING_LEASE\",\n            financialTreatment: \"OPERATING\",\n            obligationId,\n            ...(normalizedNotes !== undefined ? { notes: normalizedNotes } : {}),\n          },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1994,
+      "context": "classifyDebtPayment",
+      "table": "Expense",
+      "operation": "findMany",
+      "query": "tx.expense.findMany({\n            where: { businessId: business.id, splitGroupId: expense.splitGroupId },\n          })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2026,
+      "context": "classifyDebtPayment",
+      "table": "Expense",
+      "operation": "update",
+      "query": "tx.expense.update({\n            where: { id: baseRow.id },\n            data: {\n              category: \"PRINCIPAL_PAYMENT\",\n              financialTreatment: \"PRINCIPAL\",\n              amount: principal,\n              obligationId,\n              description: baseDescription,\n              date: resolvedDate,\n              vendor: resolvedVendor,\n              recurring: resolvedRecurring,\n              notes: resolvedNotes,\n            },\n          })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2047,
+      "context": "classifyDebtPayment",
+      "table": "Expense",
+      "operation": "update",
+      "query": "tx.expense.update({\n                where: { id: existingInterest.id },\n                data: {\n                  category: \"INTEREST_EXPENSE\",\n                  financialTreatment: \"INTEREST\",\n                  amount: interest,\n                  obligationId,\n                  description: `${baseDescription} · interest`,\n                  date: resolvedDate,\n                  vendor: resolvedVendor,\n                  recurring: resolvedRecurring,\n                  notes: resolvedNotes,\n                },\n              })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2063,
+      "context": "classifyDebtPayment",
+      "table": "Expense",
+      "operation": "create",
+      "query": "tx.expense.create({\n                data: {\n                  businessId: business.id,\n                  truckId: baseRow.truckId,\n                  scope: baseRow.scope,\n                  loadId: baseRow.loadId,\n                  date: resolvedDate,\n                  category: \"INTEREST_EXPENSE\",\n                  financialTreatment: \"INTEREST\",\n                  obligationId,\n                  splitGroupId,\n                  description: `${baseDescription} · interest`,\n                  vendor: resolvedVendor,\n                  amount: interest,\n                  recurring: resolvedRecurring,\n                  notes: resolvedNotes,\n                },\n              })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2085,
+      "context": "classifyDebtPayment",
+      "table": "Expense",
+      "operation": "update",
+      "query": "tx.expense.update({\n            where: { id: baseRow.id },\n            data: {\n              category: \"INTEREST_EXPENSE\",\n              financialTreatment: \"INTEREST\",\n              amount: interest,\n              obligationId,\n              description: `${baseDescription} · interest`,\n              date: resolvedDate,\n              vendor: resolvedVendor,\n              recurring: resolvedRecurring,\n              notes: resolvedNotes,\n            },\n          })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2102,
+      "context": "classifyDebtPayment",
+      "table": "Expense",
+      "operation": "deleteMany",
+      "query": "tx.expense.deleteMany({\n          where: {\n            businessId: business.id,\n            splitGroupId,\n            id: { notIn: keptIds },\n          },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2115,
+      "context": "classifyDebtPayment",
+      "table": "Expense",
+      "operation": "update",
+      "query": "tx.expense.update({\n          where: { id },\n          data: {\n            category: \"INTEREST_EXPENSE\",\n            financialTreatment: \"INTEREST\",\n            amount: interest,\n            obligationId,\n            splitGroupId,\n            notes: resolvedNotes,\n          },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2128,
+      "context": "classifyDebtPayment",
+      "table": "Expense",
+      "operation": "update",
+      "query": "tx.expense.update({\n        where: { id },\n        data: {\n          category: \"PRINCIPAL_PAYMENT\",\n          financialTreatment: \"PRINCIPAL\",\n          amount: principal,\n          obligationId,\n          splitGroupId,\n          notes: resolvedNotes,\n        },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2140,
+      "context": "classifyDebtPayment",
+      "table": "Expense",
+      "operation": "create",
+      "query": "tx.expense.create({\n        data: {\n          businessId: business.id,\n          truckId: expense.truckId,\n          scope: expense.scope,\n          loadId: expense.loadId,\n          date: expense.date,\n          category: \"INTEREST_EXPENSE\",\n          financialTreatment: \"INTEREST\",\n          obligationId,\n          splitGroupId,\n          description: `${expense.description} · interest`,\n          vendor: expense.vendor,\n          amount: interest,\n          recurring: expense.recurring,\n          notes: resolvedNotes,\n        },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2168,
+      "context": "createPaymentEvent",
+      "table": "Load",
+      "operation": "findFirst",
+      "query": "tx.load.findFirst({ where: { id: input.loadId, businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2170,
+      "context": "createPaymentEvent",
+      "table": "PaymentEvent",
+      "operation": "findMany",
+      "query": "tx.paymentEvent.findMany({ where: { loadId: load.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2176,
+      "context": "createPaymentEvent",
+      "table": "PaymentEvent",
+      "operation": "create",
+      "query": "tx.paymentEvent.create({\n        data: {\n          businessId: business.id,\n          loadId: load.id,\n          date: toDate(input.date),\n          amount: roundMoney(input.amount),\n          method: input.method?.trim() || null,\n          reference: input.reference?.trim() || null,\n          notes: input.notes?.trim() || null,\n        },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2188,
+      "context": "createPaymentEvent",
+      "table": "Load",
+      "operation": "update",
+      "query": "tx.load.update({\n        where: { id: load.id },\n        data: {\n          status: fullyPaid ? \"PAID\" : \"INVOICED\",\n          invoicePaidDate: fullyPaid ? toDate(input.date) : null,\n        },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2224,
+      "context": "createFuelEntry",
+      "table": "FuelEntry",
+      "operation": "create",
+      "query": "tx.fuelEntry.create({\n        data: { ...data, businessId: business.id, truckId },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2231,
+      "context": "createFuelEntry",
+      "table": "Expense",
+      "operation": "create",
+      "query": "tx.expense.create({\n        data: {\n          businessId: business.id,\n          truckId,\n          loadId: data.loadId,\n          date: data.date,\n          category: \"FUEL\",\n          description: fuelDescription(input.gallons, input.pricePerGallon),\n          vendor: data.location,\n          amount: data.totalCost,\n          recurring: false,\n        },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2244,
+      "context": "createFuelEntry",
+      "table": "FuelEntry",
+      "operation": "update",
+      "query": "tx.fuelEntry.update({ where: { id: created.id }, data: { expenseId: mirror.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2246,
+      "context": "createFuelEntry",
+      "table": "Load",
+      "operation": "findFirst",
+      "query": "tx.load.findFirst({\n          where: { id: data.loadId, businessId: business.id },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2252,
+      "context": "createFuelEntry",
+      "table": "Truck",
+      "operation": "updateMany",
+      "query": "tx.truck.updateMany({\n          where: { id: truckId, currentOdometer: { lt: data.odometer } },\n          data: { currentOdometer: data.odometer },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2274,
+      "context": "updateFuelEntry",
+      "table": "FuelEntry",
+      "operation": "findFirst",
+      "query": "tx.fuelEntry.findFirst({ where: { id, businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2276,
+      "context": "updateFuelEntry",
+      "table": "FuelEntry",
+      "operation": "updateMany",
+      "query": "tx.fuelEntry.updateMany({\n        where: { id, businessId: business.id },\n        data: { ...data, truckId },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2293,
+      "context": "updateFuelEntry",
+      "table": "Expense",
+      "operation": "updateMany",
+      "query": "tx.expense.updateMany({\n          where: { id: existing.expenseId, businessId: business.id },\n          data: mirror,\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2298,
+      "context": "updateFuelEntry",
+      "table": "Expense",
+      "operation": "create",
+      "query": "tx.expense.create({\n          data: {\n            ...mirror,\n            businessId: business.id,\n            category: \"FUEL\",\n            recurring: false,\n          },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2306,
+      "context": "updateFuelEntry",
+      "table": "FuelEntry",
+      "operation": "updateMany",
+      "query": "tx.fuelEntry.updateMany({\n          where: { id, businessId: business.id },\n          data: { expenseId: created.id },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2312,
+      "context": "updateFuelEntry",
+      "table": "Truck",
+      "operation": "updateMany",
+      "query": "tx.truck.updateMany({\n          where: { id: truckId, businessId: business.id, currentOdometer: { lt: data.odometer } },\n          data: { currentOdometer: data.odometer },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2318,
+      "context": "updateFuelEntry",
+      "table": "Load",
+      "operation": "findFirst",
+      "query": "tx.load.findFirst({ where: { id: loadId!, businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2331,
+      "context": "deleteFuelEntry",
+      "table": "FuelEntry",
+      "operation": "findFirst",
+      "query": "tx.fuelEntry.findFirst({ where: { id, businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2333,
+      "context": "deleteFuelEntry",
+      "table": "FuelEntry",
+      "operation": "deleteMany",
+      "query": "tx.fuelEntry.deleteMany({ where: { id, businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2337,
+      "context": "deleteFuelEntry",
+      "table": "Expense",
+      "operation": "deleteMany",
+      "query": "tx.expense.deleteMany({\n          where: { id: existing.expenseId, businessId: business.id },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2342,
+      "context": "deleteFuelEntry",
+      "table": "Load",
+      "operation": "findFirst",
+      "query": "tx.load.findFirst({\n          where: { id: existing.loadId, businessId: business.id },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2377,
+      "context": "createMaintenance",
+      "table": "Expense",
+      "operation": "create",
+      "query": "tx.expense.create({\n          data: {\n            businessId: business.id,\n            truckId,\n            date: data.serviceDate,\n            category: maintenanceExpenseCategory(input.type),\n            description: `${prettyMaintenance(input.type)}${data.vendor ? ` - ${data.vendor}` : \"\"}`,\n            vendor: data.vendor,\n            amount: data.cost,\n            recurring: false,\n            notes: \"Logged from the maintenance service record.\",\n          },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2394,
+      "context": "createMaintenance",
+      "table": "Truck",
+      "operation": "updateMany",
+      "query": "tx.truck.updateMany({\n          where: { id: truckId, currentOdometer: { lt: data.odometer } },\n          data: { currentOdometer: data.odometer },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2400,
+      "context": "createMaintenance",
+      "table": "MaintenanceRecord",
+      "operation": "create",
+      "query": "tx.maintenanceRecord.create({\n        data: { ...data, businessId: business.id, truckId, expenseId },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2414,
+      "context": "updateMaintenance",
+      "table": "MaintenanceRecord",
+      "operation": "findFirst",
+      "query": "tx.maintenanceRecord.findFirst({\n        where: { id, businessId: business.id },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2429,
+      "context": "updateMaintenance",
+      "table": "Expense",
+      "operation": "updateMany",
+      "query": "tx.expense.updateMany({\n            where: { id: expenseId, businessId: business.id },\n            data: payload,\n          })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2434,
+      "context": "updateMaintenance",
+      "table": "Expense",
+      "operation": "create",
+      "query": "tx.expense.create({\n            data: {\n              ...payload,\n              businessId: business.id,\n              truckId: existing.truckId,\n              recurring: false,\n              notes: \"Logged from the maintenance service record.\",\n            },\n          })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2446,
+      "context": "updateMaintenance",
+      "table": "Expense",
+      "operation": "deleteMany",
+      "query": "tx.expense.deleteMany({ where: { id: expenseId, businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2450,
+      "context": "updateMaintenance",
+      "table": "MaintenanceRecord",
+      "operation": "updateMany",
+      "query": "tx.maintenanceRecord.updateMany({\n        where: { id, businessId: business.id },\n        data: { ...data, expenseId },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2465,
+      "context": "deleteMaintenance",
+      "table": "MaintenanceRecord",
+      "operation": "findFirst",
+      "query": "tx.maintenanceRecord.findFirst({\n        where: { id, businessId: business.id },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2469,
+      "context": "deleteMaintenance",
+      "table": "MaintenanceRecord",
+      "operation": "deleteMany",
+      "query": "tx.maintenanceRecord.deleteMany({ where: { id, businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2471,
+      "context": "deleteMaintenance",
+      "table": "Expense",
+      "operation": "deleteMany",
+      "query": "tx.expense.deleteMany({\n          where: { id: existing.expenseId, businessId: business.id },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2484,
+      "context": "createDocument",
+      "table": "Document",
+      "operation": "create",
+      "query": "client.document.create({\n      data: {\n        businessId: business.id,\n        loadId: input.loadId ?? null,\n        expenseId: input.expenseId ?? null,\n        truckId: input.truckId ?? null,\n        maintenanceId: input.maintenanceId ?? null,\n        type: input.type,\n        label: input.label.trim() || input.fileName,\n        fileName: input.fileName,\n        contentType: input.contentType,\n        sizeBytes: input.sizeBytes,\n        storageKey: input.storageKey,\n      },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2505,
+      "context": "deleteDocument",
+      "table": "Document",
+      "operation": "findFirst",
+      "query": "client.document.findFirst({\n      where: { id, businessId: business.id },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2509,
+      "context": "deleteDocument",
+      "table": "Document",
+      "operation": "deleteMany",
+      "query": "client.document.deleteMany({ where: { id, businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2516,
+      "context": "updateSettings",
+      "table": "FinancialSettings",
+      "operation": "upsert",
+      "query": "client.financialSettings.upsert({\n      where: { businessId: business.id },\n      create: {\n        businessId: business.id,\n        taxReservePct: input.taxReservePct,\n        maintenanceReservePct: input.maintenanceReservePct,\n        categoryBehavior: input.categoryBehavior ?? defaultCategoryBehavior(),\n        ratingGreatPerMile: input.ratingGreatPerMile,\n        ratingGoodPerMile: input.ratingGoodPerMile,\n        ratingMarginalPerMile: input.ratingMarginalPerMile,\n        deadheadWarnPct: input.deadheadWarnPct,\n        maintenanceWarnMiles: Math.round(input.maintenanceWarnMiles),\n        maintenanceWarnDays: Math.round(input.maintenanceWarnDays),\n        iftaTaxRates: (input.iftaTaxRates ?? {}) as Prisma.InputJsonValue,\n        fleetOverheadAllocation: input.fleetOverheadAllocation ?? \"UNALLOCATED\",\n      },\n      update: {\n        taxReservePct: input.taxReservePct,\n        maintenanceReservePct: input.maintenanceReservePct,\n        ...(input.categoryBehavior ? { categoryBehavior: input.categoryBehavior } : {}),\n        ratingGreatPerMile: input.ratingGreatPerMile,\n        ratingGoodPerMile: input.ratingGoodPerMile,\n        ratingMarginalPerMile: input.ratingMarginalPerMile,\n        deadheadWarnPct: input.deadheadWarnPct,\n        maintenanceWarnMiles: Math.round(input.maintenanceWarnMiles),\n        maintenanceWarnDays: Math.round(input.maintenanceWarnDays),\n        ...(input.iftaTaxRates\n          ? { iftaTaxRates: input.iftaTaxRates as Prisma.InputJsonValue }\n          : {}),\n        ...(input.fleetOverheadAllocation\n          ? { fleetOverheadAllocation: input.fleetOverheadAllocation }\n          : {}),\n      },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2556,
+      "context": "updateBusiness",
+      "table": "Business",
+      "operation": "update",
+      "query": "client.business.update({\n      where: { id: business.id },\n      data: { name: input.name, currency: input.currency },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2568,
+      "context": "createTruck",
+      "table": "Truck",
+      "operation": "findFirst",
+      "query": "client.truck.findFirst({\n      where: { businessId: business.id, active: true, name },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2573,
+      "context": "createTruck",
+      "table": "Truck",
+      "operation": "create",
+      "query": "client.truck.create({\n      data: {\n        businessId: business.id,\n        name,\n        acquiredOn: input.acquiredOn ? toDate(input.acquiredOn) : null,\n        year: input.year ?? null,\n        make: input.make ?? null,\n        model: input.model ?? null,\n        vin: input.vin ?? null,\n        purchasePrice: input.purchasePrice ?? null,\n        monthlyPayment: input.monthlyPayment ?? null,\n        monthlyInsurance: input.monthlyInsurance ?? null,\n        financingConfirmedNone: null,\n        operatingCostExemptions: {},\n        axleCount: input.axleCount ?? null,\n        registeredGrossWeightLbs: input.registeredGrossWeightLbs ?? null,\n        operatesInMultipleIftaJurisdictions:\n          input.operatesInMultipleIftaJurisdictions ?? null,\n        iftaReportingEnabled: input.iftaReportingEnabled ?? null,\n        startingOdometer: input.startingOdometer,\n        currentOdometer: input.currentOdometer,\n      },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2607,
+      "context": "updateTruck",
+      "table": "Truck",
+      "operation": "updateMany",
+      "query": "client.truck.updateMany({\n      where: { id: targetId, businessId: business.id },\n      data: {\n        name: input.name.trim(),\n        ...(input.acquiredOn === undefined\n          ? {}\n          : { acquiredOn: input.acquiredOn ? toDate(input.acquiredOn) : null }),\n        year: input.year ?? null,\n        make: input.make ?? null,\n        model: input.model ?? null,\n        vin: input.vin ?? null,\n        purchasePrice: input.purchasePrice ?? null,\n        monthlyPayment: input.monthlyPayment ?? null,\n        monthlyInsurance: input.monthlyInsurance ?? null,\n        ...((input.monthlyPayment ?? 0) > 0\n          ? { financingConfirmedNone: null }\n          : {}),\n        ...(input.axleCount === undefined ? {} : { axleCount: input.axleCount }),\n        ...(input.registeredGrossWeightLbs === undefined\n          ? {}\n          : { registeredGrossWeightLbs: input.registeredGrossWeightLbs }),\n        ...(input.operatesInMultipleIftaJurisdictions === undefined\n          ? {}\n          : {\n              operatesInMultipleIftaJurisdictions:\n                input.operatesInMultipleIftaJurisdictions,\n            }),\n        ...(input.iftaReportingEnabled === undefined\n          ? {}\n          : { iftaReportingEnabled: input.iftaReportingEnabled }),\n        startingOdometer: input.startingOdometer,\n        currentOdometer: input.currentOdometer,\n      },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2653,
+      "context": "setTruckFinancingConfirmedNone",
+      "table": "Truck",
+      "operation": "updateMany",
+      "query": "client.truck.updateMany({\n      where: { id, businessId: business.id },\n      data: { financingConfirmedNone: value },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2669,
+      "context": "setTruckOperatingCostExemptions",
+      "table": "Truck",
+      "operation": "updateMany",
+      "query": "client.truck.updateMany({\n      where: { id, businessId: business.id },\n      data: { operatingCostExemptions: exemptions as Prisma.InputJsonValue },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2683,
+      "context": "archiveTruck",
+      "table": "Truck",
+      "operation": "count",
+      "query": "client.truck.count({ where: { businessId: business.id, active: true } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2687,
+      "context": "archiveTruck",
+      "table": "Truck",
+      "operation": "updateMany",
+      "query": "client.truck.updateMany({\n      where: { id, businessId: business.id },\n      data: { active: false, soldOn: soldOn ? toDate(soldOn) : null },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2700,
+      "context": "restoreTruck",
+      "table": "Truck",
+      "operation": "updateMany",
+      "query": "client.truck.updateMany({\n      where: { id, businessId: business.id },\n      data: { active: true, soldOn: null },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2725,
+      "context": "updateSubscription",
+      "table": "Subscription",
+      "operation": "upsert",
+      "query": "client.subscription.upsert({\n      where: { businessId: business.id },\n      create: { businessId: business.id, ...data },\n      update: data,\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2745,
+      "context": "updateGoals",
+      "table": "FinancialGoal",
+      "operation": "upsert",
+      "query": "client.financialGoal.upsert({\n      where: { businessId: business.id },\n      create: { businessId: business.id, ...data },\n      update: data,\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2759,
+      "context": "createReserveAccount",
+      "table": "ReserveAccount",
+      "operation": "count",
+      "query": "client.reserveAccount.count({ where: { businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2760,
+      "context": "createReserveAccount",
+      "table": "ReserveAccount",
+      "operation": "create",
+      "query": "client.reserveAccount.create({\n      data: {\n        businessId: business.id,\n        kind: input.kind,\n        name: input.name.trim(),\n        basis: input.basis,\n        contributionPct: input.contributionPct ?? null,\n        targetBalance: input.targetBalance ?? null,\n        active: input.active ?? true,\n        sortOrder: count,\n      },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2780,
+      "context": "updateReserveAccount",
+      "table": "ReserveAccount",
+      "operation": "findFirst",
+      "query": "client.reserveAccount.findFirst({\n      where: { id, businessId: business.id },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2785,
+      "context": "updateReserveAccount",
+      "table": "ReserveAccount",
+      "operation": "update",
+      "query": "client.reserveAccount.update({\n      where: { id },\n      data: {\n        name: input.name.trim(),\n        basis: input.basis,\n        contributionPct:\n          existing.kind === \"TAX\" || existing.kind === \"MAINTENANCE\"\n            ? null\n            : (input.contributionPct ?? null),\n        targetBalance: input.targetBalance ?? null,\n        active: input.active ?? existing.active,\n      },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2806,
+      "context": "deleteReserveAccount",
+      "table": "ReserveAccount",
+      "operation": "findFirst",
+      "query": "client.reserveAccount.findFirst({\n      where: { id, businessId: business.id },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2813,
+      "context": "deleteReserveAccount",
+      "table": "ReserveAccount",
+      "operation": "delete",
+      "query": "client.reserveAccount.delete({ where: { id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2819,
+      "context": "createReserveTransaction",
+      "table": "ReserveAccount",
+      "operation": "findFirst",
+      "query": "client.reserveAccount.findFirst({\n      where: { id: input.accountId, businessId: business.id },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2832,
+      "context": "createReserveTransaction",
+      "table": "ReserveTransaction",
+      "operation": "create",
+      "query": "client.reserveTransaction.create({\n      data: {\n        businessId: business.id,\n        accountId: input.accountId,\n        date: toDate(input.date),\n        type: input.type,\n        amount: signed,\n        description: input.description.trim(),\n      },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2859,
+      "context": "deleteReserveTransaction",
+      "table": "ReserveTransaction",
+      "operation": "findFirst",
+      "query": "client.reserveTransaction.findFirst({\n      where: { id, businessId: business.id },\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2868,
+      "context": "deleteReserveTransaction",
+      "table": "ReserveTransaction",
+      "operation": "delete",
+      "query": "client.reserveTransaction.delete({ where: { id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2882,
+      "context": "ensureSettlement",
+      "table": "Settlement",
+      "operation": "upsert",
+      "query": "client.settlement.upsert({\n      where: { businessId_month_half: { businessId: business.id, month, half } },\n      create: {\n        businessId: business.id,\n        month,\n        half,\n        periodStart: toDate(periodStart),\n        periodEnd: toDate(periodEnd),\n        status: \"OPEN\",\n      },\n      update: {},\n    })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2900,
+      "context": "closeSettlement",
+      "table": "Settlement",
+      "operation": "findFirst",
+      "query": "client.settlement.findFirst({ where: { id, businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2905,
+      "context": "closeSettlement",
+      "table": "Settlement",
+      "operation": "update",
+      "query": "tx.settlement.update({\n        where: { id },\n        data: {\n          status: \"CLOSED\",\n          closedAt: new Date(),\n          // Frozen on purpose: a closed settlement is a statement of what the\n          // owner settled on, not a live query.\n          snapshot: input.snapshot as unknown as object,\n          notes: input.notes?.trim() || existing.notes,\n        },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2920,
+      "context": "closeSettlement",
+      "table": "ReserveAccount",
+      "operation": "findMany",
+      "query": "tx.reserveAccount.findMany({\n            where: { businessId: business.id },\n            select: { id: true },\n          })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2931,
+      "context": "closeSettlement",
+      "table": "ReserveTransaction",
+      "operation": "create",
+      "query": "tx.reserveTransaction.create({\n          data: {\n            businessId: business.id,\n            accountId: contribution.accountId,\n            date: existing.periodEnd,\n            type: \"CONTRIBUTION\",\n            amount,\n            description: contribution.description,\n            settlementId: id,\n          },\n        })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2951,
+      "context": "reopenSettlement",
+      "table": "Settlement",
+      "operation": "findFirst",
+      "query": "client.settlement.findFirst({ where: { id, businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2959,
+      "context": "reopenSettlement",
+      "table": "ReserveTransaction",
+      "operation": "deleteMany",
+      "query": "tx.reserveTransaction.deleteMany({ where: { settlementId: id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2960,
+      "context": "reopenSettlement",
+      "table": "Settlement",
+      "operation": "update",
+      "query": "tx.settlement.update({\n        where: { id },\n        data: { status: \"OPEN\", closedAt: null, snapshot: Prisma.DbNull },\n      })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2972,
+      "context": "updateSettlementNotes",
+      "table": "Settlement",
+      "operation": "findFirst",
+      "query": "client.settlement.findFirst({ where: { id, businessId: business.id } })"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2974,
+      "context": "updateSettlementNotes",
+      "table": "Settlement",
+      "operation": "update",
+      "query": "client.settlement.update({ where: { id }, data: { notes: notes?.trim() || null } })"
+    }
+  ],
+  "transactions": [
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 563,
+      "context": "createOwner",
+      "options": "default"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 605,
+      "context": "resetBusinessData",
+      "options": "default"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 673,
+      "context": "deleteAccount",
+      "options": "default"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1248,
+      "context": "createLoad",
+      "options": "default"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1270,
+      "context": "updateLoad",
+      "options": "default"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1329,
+      "context": "updateLoadJurisdictionMiles",
+      "options": "default"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1351,
+      "context": "updateLoadExpense",
+      "options": "default"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1386,
+      "context": "deleteLoad",
+      "options": "default"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1461,
+      "context": "createDriverSettlement",
+      "options": "default"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1566,
+      "context": "payDriverSettlement",
+      "options": "default"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1756,
+      "context": "deleteExpense",
+      "options": "{ isolationLevel: \"Serializable\" }"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1798,
+      "context": "createFinancialObligation",
+      "options": "default"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1837,
+      "context": "updateFinancialObligation",
+      "options": "{ isolationLevel: \"Serializable\" }"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 1881,
+      "context": "classifyDebtPayment",
+      "options": "{ isolationLevel: \"Serializable\" }"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2167,
+      "context": "createPaymentEvent",
+      "options": "{ isolationLevel: \"Serializable\" }"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2223,
+      "context": "createFuelEntry",
+      "options": "default"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2273,
+      "context": "updateFuelEntry",
+      "options": "default"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2330,
+      "context": "deleteFuelEntry",
+      "options": "default"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2373,
+      "context": "createMaintenance",
+      "options": "default"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2413,
+      "context": "updateMaintenance",
+      "options": "default"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2464,
+      "context": "deleteMaintenance",
+      "options": "default"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2904,
+      "context": "closeSettlement",
+      "options": "default"
+    },
+    {
+      "file": "src/lib/db/prisma-store.ts",
+      "line": 2958,
+      "context": "reopenSettlement",
+      "options": "default"
+    }
+  ],
+  "consumers": [
+    {
+      "file": "src/app/(app)/admin/page.tsx",
+      "line": 22,
+      "call": "getAuthStore",
+      "context": "AdminPage"
+    },
+    {
+      "file": "src/app/(app)/analytics/brokers/page.tsx",
+      "line": 77,
+      "call": "getDataset",
+      "context": "BrokersPage"
+    },
+    {
+      "file": "src/app/(app)/analytics/cost-per-mile/page.tsx",
+      "line": 65,
+      "call": "getDataset",
+      "context": "CostPerMilePage"
+    },
+    {
+      "file": "src/app/(app)/analytics/lanes/page.tsx",
+      "line": 65,
+      "call": "getDataset",
+      "context": "LanesPage"
+    },
+    {
+      "file": "src/app/(app)/calculator/page.tsx",
+      "line": 67,
+      "call": "getDataset",
+      "context": "CalculatorPage"
+    },
+    {
+      "file": "src/app/(app)/dashboard/page.tsx",
+      "line": 138,
+      "call": "getDataset",
+      "context": "DashboardPage"
+    },
+    {
+      "file": "src/app/(app)/driver-settlements/[id]/page.tsx",
+      "line": 37,
+      "call": "getDataset",
+      "context": "DriverSettlementDetailPage"
+    },
+    {
+      "file": "src/app/(app)/driver-settlements/page.tsx",
+      "line": 40,
+      "call": "getDataset",
+      "context": "DriverSettlementsPage"
+    },
+    {
+      "file": "src/app/(app)/drivers/[id]/page.tsx",
+      "line": 42,
+      "call": "getDataset",
+      "context": "DriverProfilePage"
+    },
+    {
+      "file": "src/app/(app)/drivers/page.tsx",
+      "line": 32,
+      "call": "getDataset",
+      "context": "DriversPage"
+    },
+    {
+      "file": "src/app/(app)/expenses/page.tsx",
+      "line": 47,
+      "call": "getDataset",
+      "context": "ExpensesPage"
+    },
+    {
+      "file": "src/app/(app)/financing/page.tsx",
+      "line": 33,
+      "call": "getDataset",
+      "context": "FinancingPage"
+    },
+    {
+      "file": "src/app/(app)/fleet/[truckId]/page.tsx",
+      "line": 74,
+      "call": "getDataset",
+      "context": "FleetUnitPage"
+    },
+    {
+      "file": "src/app/(app)/fleet/page.tsx",
+      "line": 72,
+      "call": "getDataset",
+      "context": "FleetPage"
+    },
+    {
+      "file": "src/app/(app)/fuel/page.tsx",
+      "line": 63,
+      "call": "getDataset",
+      "context": "FuelPage"
+    },
+    {
+      "file": "src/app/(app)/ifta/page.tsx",
+      "line": 84,
+      "call": "getDataset",
+      "context": "IftaPage"
+    },
+    {
+      "file": "src/app/(app)/invoices/page.tsx",
+      "line": 37,
+      "call": "getDataset",
+      "context": "InvoicesPage"
+    },
+    {
+      "file": "src/app/(app)/layout.tsx",
+      "line": 13,
+      "call": "getDataset",
+      "context": "AppLayout"
+    },
+    {
+      "file": "src/app/(app)/loads/[id]/page.tsx",
+      "line": 60,
+      "call": "getDataset",
+      "context": "LoadDetailPage"
+    },
+    {
+      "file": "src/app/(app)/loads/page.tsx",
+      "line": 54,
+      "call": "getDataset",
+      "context": "LoadsPage"
+    },
+    {
+      "file": "src/app/(app)/plans/page.tsx",
+      "line": 30,
+      "call": "getDataset",
+      "context": "PlansPage"
+    },
+    {
+      "file": "src/app/(app)/reports/page.tsx",
+      "line": 91,
+      "call": "getDataset",
+      "context": "ReportsPage"
+    },
+    {
+      "file": "src/app/(app)/reserves/page.tsx",
+      "line": 78,
+      "call": "getDataset",
+      "context": "ReservesPage"
+    },
+    {
+      "file": "src/app/(app)/settings/page.tsx",
+      "line": 49,
+      "call": "getDataset",
+      "context": "SettingsPage"
+    },
+    {
+      "file": "src/app/(app)/settings/page.tsx",
+      "line": 50,
+      "call": "getAuthStore",
+      "context": "SettingsPage"
+    },
+    {
+      "file": "src/app/(app)/settings/page.tsx",
+      "line": 67,
+      "call": "getAuthStore",
+      "context": "SettingsPage"
+    },
+    {
+      "file": "src/app/(app)/settlements/page.tsx",
+      "line": 68,
+      "call": "getDataset",
+      "context": "SettlementsPage"
+    },
+    {
+      "file": "src/app/(app)/truck/page.tsx",
+      "line": 56,
+      "call": "getDataset",
+      "context": "TruckPage"
+    },
+    {
+      "file": "src/app/api/auth/callback/route.ts",
+      "line": 31,
+      "call": "createSupabaseServerClient",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/auth/google/oauth/route.ts",
+      "line": 26,
+      "call": "createSupabaseServerClient",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/auth/google/route.ts",
+      "line": 51,
+      "call": "createSupabaseServerClient",
+      "context": "POST"
+    },
+    {
+      "file": "src/app/api/auth/invite/accept/route.ts",
+      "line": 42,
+      "call": "createSupabaseServerClient",
+      "context": "POST"
+    },
+    {
+      "file": "src/app/api/auth/invite/accept/route.ts",
+      "line": 56,
+      "call": "getAuthStore",
+      "context": "POST"
+    },
+    {
+      "file": "src/app/api/auth/login/route.ts",
+      "line": 22,
+      "call": "getAuthStore",
+      "context": "POST"
+    },
+    {
+      "file": "src/app/api/auth/setup/route.ts",
+      "line": 19,
+      "call": "getAuthStore",
+      "context": "POST"
+    },
+    {
+      "file": "src/app/api/documents/[id]/route.ts",
+      "line": 21,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/documents/[id]/route.ts",
+      "line": 34,
+      "call": "getDocumentStorage",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/documents/[id]/route.ts",
+      "line": 79,
+      "call": "getRepository",
+      "context": "DELETE"
+    },
+    {
+      "file": "src/app/api/documents/[id]/route.ts",
+      "line": 106,
+      "call": "getDocumentStorage",
+      "context": "DELETE"
+    },
+    {
+      "file": "src/app/api/documents/route.ts",
+      "line": 37,
+      "call": "getRepository",
+      "context": "POST"
+    },
+    {
+      "file": "src/app/api/documents/route.ts",
+      "line": 109,
+      "call": "getDocumentStorage",
+      "context": "POST"
+    },
+    {
+      "file": "src/app/api/documents/upload/complete/route.ts",
+      "line": 50,
+      "call": "getRepository",
+      "context": "POST"
+    },
+    {
+      "file": "src/app/api/documents/upload/complete/route.ts",
+      "line": 58,
+      "call": "getDocumentStorage",
+      "context": "POST"
+    },
+    {
+      "file": "src/app/api/documents/upload/prepare/route.ts",
+      "line": 31,
+      "call": "getRepository",
+      "context": "POST"
+    },
+    {
+      "file": "src/app/api/documents/upload/prepare/route.ts",
+      "line": 35,
+      "call": "getDocumentStorage",
+      "context": "POST"
+    },
+    {
+      "file": "src/app/api/export/[report]/route.ts",
+      "line": 37,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/export/driver-settlement/[id]/route.ts",
+      "line": 18,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/export/ifta/route.ts",
+      "line": 18,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/export/invoice/[id]/route.ts",
+      "line": 12,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/export/year-end/route.ts",
+      "line": 15,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/analytics/route.ts",
+      "line": 33,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/auth/exchange/route.ts",
+      "line": 36,
+      "call": "getAuthStore",
+      "context": "POST"
+    },
+    {
+      "file": "src/app/api/mobile/calculator/route.ts",
+      "line": 65,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/dashboard/route.ts",
+      "line": 55,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/documents/route.ts",
+      "line": 74,
+      "call": "getRepository",
+      "context": "POST"
+    },
+    {
+      "file": "src/app/api/mobile/documents/route.ts",
+      "line": 93,
+      "call": "getDocumentStorage",
+      "context": "POST"
+    },
+    {
+      "file": "src/app/api/mobile/driver-settlements/[id]/route.ts",
+      "line": 31,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/driver-settlements/route.ts",
+      "line": 28,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/drivers/route.ts",
+      "line": 24,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/expenses/[id]/debt-payment/route.ts",
+      "line": 29,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/expenses/[id]/route.ts",
+      "line": 24,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/expenses/[id]/route.ts",
+      "line": 87,
+      "call": "getRepository",
+      "context": "PATCH"
+    },
+    {
+      "file": "src/app/api/mobile/expenses/[id]/route.ts",
+      "line": 144,
+      "call": "getRepository",
+      "context": "DELETE"
+    },
+    {
+      "file": "src/app/api/mobile/expenses/route.ts",
+      "line": 23,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/fleet/route.ts",
+      "line": 27,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/fuel/[id]/route.ts",
+      "line": 21,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/fuel/[id]/route.ts",
+      "line": 71,
+      "call": "getRepository",
+      "context": "PATCH"
+    },
+    {
+      "file": "src/app/api/mobile/fuel/[id]/route.ts",
+      "line": 118,
+      "call": "getRepository",
+      "context": "DELETE"
+    },
+    {
+      "file": "src/app/api/mobile/fuel/route.ts",
+      "line": 28,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/ifta/route.ts",
+      "line": 29,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/invoices/route.ts",
+      "line": 25,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/loads/[id]/route.ts",
+      "line": 28,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/loads/[id]/route.ts",
+      "line": 131,
+      "call": "getRepository",
+      "context": "PATCH"
+    },
+    {
+      "file": "src/app/api/mobile/loads/[id]/route.ts",
+      "line": 171,
+      "call": "getRepository",
+      "context": "DELETE"
+    },
+    {
+      "file": "src/app/api/mobile/loads/route.ts",
+      "line": 29,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/login/route.ts",
+      "line": 23,
+      "call": "getAuthStore",
+      "context": "POST"
+    },
+    {
+      "file": "src/app/api/mobile/reports/[report]/route.ts",
+      "line": 48,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/reserves/route.ts",
+      "line": 32,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/settlements/route.ts",
+      "line": 38,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/team/[userId]/route.ts",
+      "line": 39,
+      "call": "getAuthStore",
+      "context": "PATCH"
+    },
+    {
+      "file": "src/app/api/mobile/team/[userId]/route.ts",
+      "line": 68,
+      "call": "getAuthStore",
+      "context": "DELETE"
+    },
+    {
+      "file": "src/app/api/mobile/team/[userId]/route.ts",
+      "line": 75,
+      "call": "deleteSupabaseAuthUserByEmail",
+      "context": "DELETE"
+    },
+    {
+      "file": "src/app/api/mobile/team/route.ts",
+      "line": 29,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/team/route.ts",
+      "line": 39,
+      "call": "getAuthStore",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/team/route.ts",
+      "line": 85,
+      "call": "getAuthStore",
+      "context": "POST"
+    },
+    {
+      "file": "src/app/api/mobile/team/route.ts",
+      "line": 102,
+      "call": "inviteSupabaseAuthUser",
+      "context": "POST"
+    },
+    {
+      "file": "src/app/api/mobile/truck/route.ts",
+      "line": 25,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/mobile/year-end/route.ts",
+      "line": 20,
+      "call": "getRepository",
+      "context": "GET"
+    },
+    {
+      "file": "src/app/api/rate-con/scan/route.ts",
+      "line": 68,
+      "call": "getRepository",
+      "context": "POST"
+    },
+    {
+      "file": "src/app/welcome/page.tsx",
+      "line": 29,
+      "call": "getRepository",
+      "context": "WelcomePage"
+    },
+    {
+      "file": "src/lib/actions/account.ts",
+      "line": 15,
+      "call": "getDocumentStorage",
+      "context": "removeStoredDocuments"
+    },
+    {
+      "file": "src/lib/actions/account.ts",
+      "line": 29,
+      "call": "getAuthStore",
+      "context": "resetAccountData"
+    },
+    {
+      "file": "src/lib/actions/account.ts",
+      "line": 48,
+      "call": "getAuthStore",
+      "context": "deleteCurrentAccount"
+    },
+    {
+      "file": "src/lib/actions/account.ts",
+      "line": 56,
+      "call": "createSupabaseServerClient",
+      "context": "deleteCurrentAccount"
+    },
+    {
+      "file": "src/lib/actions/account.ts",
+      "line": 62,
+      "call": "deleteSupabaseAuthUserByEmail",
+      "context": "deleteCurrentAccount"
+    },
+    {
+      "file": "src/lib/actions/admin.ts",
+      "line": 50,
+      "call": "getAuthStore",
+      "context": "targetAccount"
+    },
+    {
+      "file": "src/lib/actions/admin.ts",
+      "line": 56,
+      "call": "getDocumentStorage",
+      "context": "removeStoredDocuments"
+    },
+    {
+      "file": "src/lib/actions/admin.ts",
+      "line": 78,
+      "call": "getRepository",
+      "context": "grantComplimentaryPlan"
+    },
+    {
+      "file": "src/lib/actions/admin.ts",
+      "line": 123,
+      "call": "getRepository",
+      "context": "adminEndComplimentaryAccess"
+    },
+    {
+      "file": "src/lib/actions/admin.ts",
+      "line": 160,
+      "call": "getAuthStore",
+      "context": "adminResetAccountData"
+    },
+    {
+      "file": "src/lib/actions/admin.ts",
+      "line": 190,
+      "call": "getAuthStore",
+      "context": "adminDeleteAccount"
+    },
+    {
+      "file": "src/lib/actions/admin.ts",
+      "line": 193,
+      "call": "deleteSupabaseAuthUserByEmail",
+      "context": "adminDeleteAccount"
+    },
+    {
+      "file": "src/lib/actions/billing.ts",
+      "line": 32,
+      "call": "getRepository",
+      "context": "createCheckoutAction"
+    },
+    {
+      "file": "src/lib/actions/billing.ts",
+      "line": 93,
+      "call": "getRepository",
+      "context": "openBillingPortalAction"
+    },
+    {
+      "file": "src/lib/actions/bookkeeping.ts",
+      "line": 33,
+      "call": "getRepository",
+      "context": "addMonthlyExpensesAction"
+    },
+    {
+      "file": "src/lib/actions/expenses.ts",
+      "line": 30,
+      "call": "getRepository",
+      "context": "updateLoadExpenseAction"
+    },
+    {
+      "file": "src/lib/actions/expenses.ts",
+      "line": 53,
+      "call": "getRepository",
+      "context": "createExpenseAction"
+    },
+    {
+      "file": "src/lib/actions/expenses.ts",
+      "line": 71,
+      "call": "getRepository",
+      "context": "updateExpenseAction"
+    },
+    {
+      "file": "src/lib/actions/expenses.ts",
+      "line": 84,
+      "call": "getRepository",
+      "context": "deleteExpenseAction"
+    },
+    {
+      "file": "src/lib/actions/expenses.ts",
+      "line": 105,
+      "call": "getRepository",
+      "context": "classifyDebtPaymentAction"
+    },
+    {
+      "file": "src/lib/actions/financing.ts",
+      "line": 29,
+      "call": "getRepository",
+      "context": "createFinancialObligationAction"
+    },
+    {
+      "file": "src/lib/actions/financing.ts",
+      "line": 54,
+      "call": "getRepository",
+      "context": "updateFinancialObligationAction"
+    },
+    {
+      "file": "src/lib/actions/fuel.ts",
+      "line": 25,
+      "call": "getRepository",
+      "context": "createFuelEntryAction"
+    },
+    {
+      "file": "src/lib/actions/fuel.ts",
+      "line": 40,
+      "call": "getRepository",
+      "context": "updateFuelEntryAction"
+    },
+    {
+      "file": "src/lib/actions/fuel.ts",
+      "line": 50,
+      "call": "getRepository",
+      "context": "deleteFuelEntryAction"
+    },
+    {
+      "file": "src/lib/actions/guards.ts",
+      "line": 25,
+      "call": "getRepository",
+      "context": "repositoryWith"
+    },
+    {
+      "file": "src/lib/actions/ifta.ts",
+      "line": 16,
+      "call": "getRepository",
+      "context": "saveIftaRatesAction"
+    },
+    {
+      "file": "src/lib/actions/ifta.ts",
+      "line": 42,
+      "call": "getRepository",
+      "context": "saveLoadIftaMilesAction"
+    },
+    {
+      "file": "src/lib/actions/invoices.ts",
+      "line": 31,
+      "call": "getRepository",
+      "context": "issueInvoiceAction"
+    },
+    {
+      "file": "src/lib/actions/invoices.ts",
+      "line": 54,
+      "call": "getRepository",
+      "context": "markInvoicePaidAction"
+    },
+    {
+      "file": "src/lib/actions/invoices.ts",
+      "line": 84,
+      "call": "getRepository",
+      "context": "recordInvoicePaymentAction"
+    },
+    {
+      "file": "src/lib/actions/invoices.ts",
+      "line": 98,
+      "call": "getRepository",
+      "context": "voidInvoiceAction"
+    },
+    {
+      "file": "src/lib/actions/loads.ts",
+      "line": 88,
+      "call": "getRepository",
+      "context": "createLoadAction"
+    },
+    {
+      "file": "src/lib/actions/loads.ts",
+      "line": 112,
+      "call": "getRepository",
+      "context": "updateLoadAction"
+    },
+    {
+      "file": "src/lib/actions/loads.ts",
+      "line": 126,
+      "call": "getRepository",
+      "context": "updateLoadStatusAction"
+    },
+    {
+      "file": "src/lib/actions/loads.ts",
+      "line": 142,
+      "call": "getRepository",
+      "context": "deleteLoadAction"
+    },
+    {
+      "file": "src/lib/actions/maintenance.ts",
+      "line": 29,
+      "call": "getRepository",
+      "context": "createMaintenanceAction"
+    },
+    {
+      "file": "src/lib/actions/maintenance.ts",
+      "line": 58,
+      "call": "getRepository",
+      "context": "updateMaintenanceAction"
+    },
+    {
+      "file": "src/lib/actions/maintenance.ts",
+      "line": 75,
+      "call": "getRepository",
+      "context": "deleteMaintenanceAction"
+    },
+    {
+      "file": "src/lib/actions/settings.ts",
+      "line": 21,
+      "call": "getRepository",
+      "context": "updateSettingsAction"
+    },
+    {
+      "file": "src/lib/actions/settings.ts",
+      "line": 54,
+      "call": "getRepository",
+      "context": "updateTruckAction"
+    },
+    {
+      "file": "src/lib/actions/team.ts",
+      "line": 18,
+      "call": "getRepository",
+      "context": "ownerWithFleet"
+    },
+    {
+      "file": "src/lib/actions/team.ts",
+      "line": 42,
+      "call": "getAuthStore",
+      "context": "inviteMemberAction"
+    },
+    {
+      "file": "src/lib/actions/team.ts",
+      "line": 52,
+      "call": "inviteSupabaseAuthUser",
+      "context": "inviteMemberAction"
+    },
+    {
+      "file": "src/lib/actions/team.ts",
+      "line": 77,
+      "call": "getAuthStore",
+      "context": "updateMemberRoleAction"
+    },
+    {
+      "file": "src/lib/actions/team.ts",
+      "line": 93,
+      "call": "getAuthStore",
+      "context": "removeMemberAction"
+    },
+    {
+      "file": "src/lib/actions/team.ts",
+      "line": 102,
+      "call": "deleteSupabaseAuthUserByEmail",
+      "context": "removeMemberAction"
+    },
+    {
+      "file": "src/lib/actions/trucks.ts",
+      "line": 43,
+      "call": "getRepository",
+      "context": "createTruckAction"
+    },
+    {
+      "file": "src/lib/actions/trucks.ts",
+      "line": 70,
+      "call": "getRepository",
+      "context": "updateTruckByIdAction"
+    },
+    {
+      "file": "src/lib/actions/trucks.ts",
+      "line": 93,
+      "call": "getRepository",
+      "context": "updateTruckFinancingConfirmationAction"
+    },
+    {
+      "file": "src/lib/actions/trucks.ts",
+      "line": 138,
+      "call": "getRepository",
+      "context": "updateTruckOperatingCostExemptionsAction"
+    },
+    {
+      "file": "src/lib/actions/trucks.ts",
+      "line": 169,
+      "call": "getRepository",
+      "context": "archiveTruckAction"
+    },
+    {
+      "file": "src/lib/actions/trucks.ts",
+      "line": 182,
+      "call": "getRepository",
+      "context": "restoreTruckAction"
+    },
+    {
+      "file": "src/lib/auth/complete-supabase-sign-in.ts",
+      "line": 31,
+      "call": "getAuthStore",
+      "context": "completeSupabaseSignIn"
+    },
+    {
+      "file": "src/lib/auth/index.ts",
+      "line": 23,
+      "call": "getAuthStore",
+      "context": "(module)"
+    },
+    {
+      "file": "src/lib/auth/index.ts",
+      "line": 56,
+      "call": "getDataset",
+      "context": "requireWritableSession"
+    },
+    {
+      "file": "src/lib/auth/index.ts",
+      "line": 86,
+      "call": "getAuthStore",
+      "context": "needsSetup"
+    },
+    {
+      "file": "src/lib/auth/mobile.ts",
+      "line": 40,
+      "call": "getAuthStore",
+      "context": "getMobileSession"
+    },
+    {
+      "file": "src/lib/auth/mobile.ts",
+      "line": 78,
+      "call": "getRepository",
+      "context": "requireMobileWrite"
+    },
+    {
+      "file": "src/lib/auth/mobile.ts",
+      "line": 126,
+      "call": "getRepository",
+      "context": "requireMobileTeamManage"
+    },
+    {
+      "file": "src/lib/billing.ts",
+      "line": 65,
+      "call": "getRepository",
+      "context": "syncStripeSubscription"
+    },
+    {
+      "file": "src/lib/db/index.ts",
+      "line": 52,
+      "call": "getRepository",
+      "context": "(module)"
+    },
+    {
+      "file": "src/lib/jobs/post-recurring-expenses.ts",
+      "line": 48,
+      "call": "getAuthStore",
+      "context": "postDueRecurringExpenses"
+    },
+    {
+      "file": "src/lib/jobs/post-recurring-expenses.ts",
+      "line": 53,
+      "call": "getRepository",
+      "context": "postDueRecurringExpenses"
+    },
+    {
+      "file": "src/lib/operational-health.ts",
+      "line": 65,
+      "call": "getDocumentStorage",
+      "context": "buildHealthReport"
+    },
+    {
+      "file": "src/lib/storage/index.ts",
+      "line": 96,
+      "call": "getDocumentStorage",
+      "context": "storageBackend"
+    }
+  ]
+}

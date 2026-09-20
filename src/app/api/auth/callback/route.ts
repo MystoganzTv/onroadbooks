@@ -1,3 +1,4 @@
+import { usingAuthJs } from "@/lib/auth/provider";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -13,24 +14,34 @@ import type { EmailOtpType } from "@supabase/supabase-js";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
+  if (usingAuthJs())
+    return NextResponse.redirect(new URL("/login?error=invite", request.url));
   const url = new URL(request.url);
   const cookieStore = await cookies();
   const code = url.searchParams.get("code");
   const tokenHash = url.searchParams.get("token_hash");
   const otpType = url.searchParams.get("type") as EmailOtpType | null;
-  const isInvitation = otpType === "invite" || url.searchParams.get("invited") === "1";
-  const next = code && !isInvitation
-    ? safeNextPath(cookieStore.get(GOOGLE_OAUTH_NEXT_COOKIE)?.value)
-    : null;
+  const isInvitation =
+    otpType === "invite" || url.searchParams.get("invited") === "1";
+  const next =
+    code && !isInvitation
+      ? safeNextPath(cookieStore.get(GOOGLE_OAUTH_NEXT_COOKIE)?.value)
+      : null;
   cookieStore.set(GOOGLE_OAUTH_NEXT_COOKIE, "", googleOAuthCookie(0));
   if (!code && (!tokenHash || !otpType)) {
-    return NextResponse.redirect(new URL(`/login?error=${isInvitation ? "invite" : "google"}`, request.url));
+    return NextResponse.redirect(
+      new URL(
+        `/login?error=${isInvitation ? "invite" : "google"}`,
+        request.url,
+      ),
+    );
   }
 
   try {
     const supabase = await createSupabaseServerClient();
     if (code) {
-      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+      const { error: exchangeError } =
+        await supabase.auth.exchangeCodeForSession(code);
       if (exchangeError) throw exchangeError;
     } else {
       const { error: verifyError } = await supabase.auth.verifyOtp({
@@ -42,11 +53,19 @@ export async function GET(request: Request) {
 
     const { data, error: userError } = await supabase.auth.getUser();
     const oauthUser = data.user;
-    if (userError || !oauthUser) throw userError ?? new Error("Google did not return a user.");
-    const { redirectTo } = await completeSupabaseSignIn(oauthUser, { isInvitation });
+    if (userError || !oauthUser)
+      throw userError ?? new Error("Google did not return a user.");
+    const { redirectTo } = await completeSupabaseSignIn(oauthUser, {
+      isInvitation,
+    });
 
     return NextResponse.redirect(new URL(next ?? redirectTo, request.url));
   } catch {
-    return NextResponse.redirect(new URL(`/login?error=${isInvitation ? "invite" : "google"}`, request.url));
+    return NextResponse.redirect(
+      new URL(
+        `/login?error=${isInvitation ? "invite" : "google"}`,
+        request.url,
+      ),
+    );
   }
 }

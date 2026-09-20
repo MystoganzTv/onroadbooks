@@ -37,42 +37,56 @@ export const APPLICATION_TABLES = [
  */
 export function databaseUrl(source: string): string {
   const url = new URL(source);
-  for (const parameter of ["schema", "pgbouncer", "connection_limit", "pool_timeout"]) {
+  for (const parameter of [
+    "schema",
+    "pgbouncer",
+    "connection_limit",
+    "pool_timeout",
+  ]) {
     url.searchParams.delete(parameter);
   }
   return url.toString();
 }
 
 /**
- * Production runs PostgreSQL 17. Client tools older than the server refuse the
+ * Supabase uses PostgreSQL 17 and Neon uses 18. Older client tools refuse the
  * dump outright, and macOS ships an ancient `pg_dump` on the default PATH, so
  * look through Homebrew's keg first and verify the major version before use.
  */
-export function pgBinary(name: string): string {
+export function pgBinary(name: string, minimumMajor = 17): string {
   const configured = process.env.PG_BIN?.trim();
-  const candidates = [
-    configured ? path.join(configured, name) : null,
-    `/opt/homebrew/opt/postgresql@17/bin/${name}`,
-    `/usr/local/opt/postgresql@17/bin/${name}`,
-    name,
-  ].filter((candidate): candidate is string => Boolean(candidate));
+  const candidates = configured
+    ? [path.join(configured, name)]
+    : [
+        `/opt/homebrew/opt/postgresql@18/bin/${name}`,
+        `/usr/local/opt/postgresql@18/bin/${name}`,
+        `/opt/homebrew/opt/libpq/bin/${name}`,
+        `/usr/local/opt/libpq/bin/${name}`,
+        `/opt/homebrew/opt/postgresql@17/bin/${name}`,
+        `/usr/local/opt/postgresql@17/bin/${name}`,
+        name,
+      ].filter((candidate): candidate is string => Boolean(candidate));
 
   for (const candidate of candidates) {
     const result = spawnSync(candidate, ["--version"], { encoding: "utf8" });
     const major = Number(result.stdout?.match(/(\d+)(?:\.\d+)?/)?.[1] ?? 0);
-    if (result.status === 0 && major >= 17) return candidate;
+    if (result.status === 0 && major >= minimumMajor) return candidate;
   }
-  throw new Error(`PostgreSQL 17 tooling is required (${name} was not found).`);
+  throw new Error(
+    `PostgreSQL ${minimumMajor}+ tooling is required (${name}${configured ? " in PG_BIN" : ""} was not found).`,
+  );
 }
 
 /**
  * Run a tool and fail loudly. Output is captured rather than inherited so a
  * connection string in an error message never lands in a terminal scrollback
- * unless the command actually failed.
+ * even when a command fails.
  */
 export function run(binary: string, args: string[], label: string): void {
   const result = spawnSync(binary, args, { encoding: "utf8", stdio: "pipe" });
   if (result.status !== 0) {
-    throw new Error(`${label} failed\n${result.stdout ?? ""}\n${result.stderr ?? ""}`);
+    throw new Error(
+      `${label} failed (exit ${result.status ?? "unknown"}); output withheld to protect connection credentials.`,
+    );
   }
 }

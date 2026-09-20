@@ -1,0 +1,27 @@
+{
+  "deployment": "dpl_BCh4b53AGrJWvd3SUK539Ha6jr81",
+  "branch": "br-cool-voice-awsmqv6a",
+  "checks": [
+    "anonymous dashboard redirects to login",
+    "two isolated workspaces created through deployed signup",
+    "protected web routes render",
+    "Auth.js Secure HttpOnly session issued",
+    "incorrect password and foreign origin refused",
+    "mobile PKCE handoff, exchange and dashboard",
+    "expense write persists in Neon and tenant isolation holds",
+    "10 MB upload through Vercel chunks and real R2",
+    "private signed download preserves exact bytes and refuses unsigned access",
+    "document removal cleans real R2 object",
+    "logout revokes web cookie; password login works",
+    "deleted user loses web and mobile access",
+    "real Google OAuth over HTTPS opens the existing workspace without duplicating users"
+  ],
+  "passed": true,
+  "originalRowsPreserved": true,
+  "finishedAt": "2026-09-20T18:53:43.004Z",
+  "googleHttps": {
+    "passed": true,
+    "dataVerificationReport": "phase-9-google-data-report.json",
+    "checkedAt": "2026-09-20T19:03:12.444Z"
+  }
+}

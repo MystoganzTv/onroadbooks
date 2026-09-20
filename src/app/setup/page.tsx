@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { SetupFlow } from "@/components/auth/setup-flow";
 import { getSession } from "@/lib/auth";
+import { googleSignInConfigured } from "@/lib/auth/google-availability";
 import { getWebDictionary } from "@/lib/i18n/dictionaries";
 import { getAppLocale } from "@/lib/i18n-server";
 
@@ -18,5 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function SetupPage() {
   if (await getSession()) redirect("/dashboard");
   const locale = await getAppLocale();
-  return <SetupFlow locale={locale} />;
+  return (
+    <SetupFlow locale={locale} googleConfigured={googleSignInConfigured()} />
+  );
 }

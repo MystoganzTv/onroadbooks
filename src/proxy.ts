@@ -54,7 +54,9 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+  if (
+    PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+  ) {
     return NextResponse.next();
   }
 
@@ -62,7 +64,16 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (request.cookies.get(SESSION_COOKIE)?.value) {
+  const hasAuthJsCookie =
+    process.env.AUTH_PROVIDER === "authjs" &&
+    request.cookies
+      .getAll()
+      .some(
+        (cookie) =>
+          /^(?:__Secure-)?authjs\.session-token(?:\.\d+)?$/.test(cookie.name) &&
+          cookie.value,
+      );
+  if (hasAuthJsCookie || request.cookies.get(SESSION_COOKIE)?.value) {
     return NextResponse.next();
   }
 
