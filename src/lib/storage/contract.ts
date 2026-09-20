@@ -11,13 +11,7 @@ export interface DocumentStorage {
   put(key: string, data: Buffer, contentType: string): Promise<string>;
   get(key: string): Promise<Buffer | null>;
   remove(key: string): Promise<void>;
-  /** Present for object stores that support browser-to-storage uploads. */
-  createSignedUpload?(key: string): Promise<{
-    bucket: string;
-    path: string;
-    token: string;
-  }>;
-  /** Confirms that a direct upload actually landed before metadata is filed. */
+  /** Confirms the stored bytes before metadata is filed. */
   info?(
     key: string,
   ): Promise<{ sizeBytes: number; contentType: string | null } | null>;

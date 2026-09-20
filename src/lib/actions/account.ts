@@ -5,10 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
 import { getAuthStore } from "@/lib/db";
 import { getDocumentStorage } from "@/lib/storage";
-import {
-  clearWebSessions,
-  deleteAuthIdentityByEmail,
-} from "@/lib/auth/provider-admin";
+import { clearWebSessions } from "@/lib/auth/provider-admin";
 import type { ActionResult } from "./types";
 
 async function removeStoredDocuments(keys: string[]): Promise<void> {
@@ -61,18 +58,12 @@ export async function deleteCurrentAccount(
     );
     await removeStoredDocuments(deleted.storageKeys);
 
-    // The app session is authoritative and is cleared first. Supabase Auth is
-    // cleaned up server-side as well; failure there cannot restore deleted
-    // ledger data or make the now-missing app user valid again.
+    // Identity/invitation rows were removed by FK cascade. Clear the browser
+    // session as well; every other session reloads the now-missing user.
     try {
       await clearWebSessions();
     } catch (error) {
       console.error("[account-delete] Session revocation failed", error);
-    }
-    try {
-      await deleteAuthIdentityByEmail(deleted.email);
-    } catch (error) {
-      console.error("[account-delete] Identity cleanup failed", error);
     }
 
     return { ok: true, id: "deleted" };

@@ -18,7 +18,7 @@ export const runtime = "nodejs";
 /**
  * Uploads one document and files it against a load, expense, truck or
  * maintenance record. The bytes go to the storage adapter (local disk now,
- * Supabase Storage later) and only the metadata lands in the database.
+ * private R2 in production) and only the metadata lands in the database.
  */
 /**
  * Route handlers get none of the Origin checking Next.js applies to server

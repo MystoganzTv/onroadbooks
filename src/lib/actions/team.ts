@@ -7,10 +7,7 @@ import { getAuthStore, getRepository } from "@/lib/db";
 import { applicationUrl } from "@/lib/stripe";
 import { hasFleetAccess } from "@/lib/plans";
 import { memberInviteSchema, memberRoleSchema } from "@/lib/schemas";
-import {
-  deleteAuthIdentityByEmail,
-  inviteAuthUser,
-} from "@/lib/auth/provider-admin";
+import { inviteAuthUser } from "@/lib/auth/provider-admin";
 import type { ActionResult } from "./types";
 
 async function ownerWithFleet() {
@@ -111,18 +108,11 @@ export async function removeMemberAction(
       (row) => row.id === userId,
     );
     if (!member) return { ok: false, error: "That team member was not found." };
-    const removed = await store.removeMember(userId, session.businessId);
+    await store.removeMember(userId, session.businessId);
 
-    // Removing the app row revokes OnRoad access immediately because every
-    // request revalidates membership. Remove the Supabase identity as well so
-    // existing auth sessions are revoked and this address can be invited again.
-    try {
-      await deleteAuthIdentityByEmail(removed.email);
-    } catch (error) {
-      // App access is already revoked. Do not restore it just because the
-      // secondary auth cleanup failed; surface the failure in server logs.
-      console.error("[team-remove] Identity cleanup failed", error);
-    }
+    // Deleting the member cascades to identities and invitations. Every
+    // request reloads membership, so existing sessions lose access immediately.
+
     revalidatePath("/settings");
     revalidatePath("/team");
     return { ok: true, id: userId };

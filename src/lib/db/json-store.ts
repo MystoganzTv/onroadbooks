@@ -848,7 +848,7 @@ export class JsonAuthStore implements AuthStore {
         businessId: input.businessId,
         email,
         name: input.name?.trim() || null,
-        passwordHash: "invite$supabase",
+        passwordHash: "invite$pending",
         role: input.role,
         invitedAt: now,
         joinedAt: null,

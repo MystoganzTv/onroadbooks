@@ -22,7 +22,7 @@ it("Google availability follows the active provider without requiring a public c
   }
   process.env.AUTH_PROVIDER = "legacy";
   process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID = "legacy-client-id";
-  assert.equal(googleSignInConfigured(), true);
+  assert.equal(googleSignInConfigured(), false);
   delete process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   assert.equal(googleSignInConfigured(), false);
 });

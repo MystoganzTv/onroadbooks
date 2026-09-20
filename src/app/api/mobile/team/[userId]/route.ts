@@ -4,7 +4,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireMobileTeamManage } from "@/lib/auth/mobile";
 import { getAuthStore } from "@/lib/db";
 import { memberRoleSchema } from "@/lib/schemas";
-import { deleteAuthIdentityByEmail } from "@/lib/auth/provider-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,9 +67,8 @@ export async function PATCH(
 
 /**
  * Remove a member -- same order as `removeMemberAction`: drop the app row
- * first (that alone revokes access, since every request revalidates
- * membership), then best-effort clean up the Supabase identity so the email
- * can be invited again and any existing session is revoked too.
+ * first. Identity/invitation rows cascade and every request revalidates
+ * membership, so the removed member immediately loses web and mobile access.
  */
 export async function DELETE(
   request: NextRequest,
@@ -92,12 +90,8 @@ export async function DELETE(
     );
 
   try {
-    const removed = await store.removeMember(userId, gate.session.businessId);
-    try {
-      await deleteAuthIdentityByEmail(removed.email);
-    } catch (error) {
-      console.error("[mobile-team-remove] Identity cleanup failed", error);
-    }
+    await store.removeMember(userId, gate.session.businessId);
+
     revalidatePath("/settings");
     return NextResponse.json({ id: userId });
   } catch (error) {

@@ -8,7 +8,7 @@ import { getAuthSecret } from "./session";
  * Signing in on the phone with Google, without a second Google client.
  *
  * The app opens the real web sign-in page inside an
- * `ASWebAuthenticationSession`, so Google, the nonce, Supabase and the
+ * `ASWebAuthenticationSession`, so Google, the nonce, Auth.js and the
  * registered JavaScript origin are the ones that already work in a browser --
  * nothing about identity is reimplemented for iOS.
  *

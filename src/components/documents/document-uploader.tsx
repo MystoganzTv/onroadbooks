@@ -284,11 +284,6 @@ async function uploadDocument(
       body: JSON.stringify(metadata),
     });
     const plan = (await prepared.json().catch(() => null)) as
-      | {
-          strategy: "direct";
-          upload: { bucket: string; path: string; token: string };
-          ticket: string;
-        }
       | { strategy: "chunked"; chunkBytes: number; ticket: string }
       | { strategy: "multipart" }
       | { error?: string }
@@ -326,53 +321,6 @@ async function uploadDocument(
             error: "The document could not reach secure storage.",
           };
       }
-      const completed = await fetch("/api/documents/upload/complete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticket: plan.ticket }),
-      });
-      if (completed.ok) return { ok: true };
-      const result = (await completed.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-      return {
-        ok: false,
-        error: result?.error ?? "The document could not be attached.",
-      };
-    }
-
-    if (plan && "strategy" in plan && plan.strategy === "direct") {
-      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const key =
-        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      if (!url || !key)
-        return {
-          ok: false,
-          error: "Secure document storage is not configured.",
-        };
-
-      const { createClient } = await import("@supabase/supabase-js");
-      const supabase = createClient(url, key, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-          detectSessionInUrl: false,
-        },
-      });
-      const { error } = await supabase.storage
-        .from(plan.upload.bucket)
-        .uploadToSignedUrl(plan.upload.path, plan.upload.token, item.file, {
-          contentType: item.file.type,
-          cacheControl: "3600",
-          upsert: false,
-        });
-      if (error)
-        return {
-          ok: false,
-          error: "The document could not reach secure storage.",
-        };
-
       const completed = await fetch("/api/documents/upload/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -64,14 +64,14 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              `script-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/client${process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'"}`,
-              "style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style",
+              `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'"}`,
+              "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self' data:",
-              // Document bytes go straight to a short-lived Supabase signed
-              // upload URL; auth and all application APIs remain same-origin.
-              "connect-src 'self' https://*.supabase.co https://auth.onroadbooks.com https://accounts.google.com/gsi/",
-              "frame-src https://accounts.google.com/gsi/",
+              // Uploads and auth requests use the application server. Google
+              // OAuth and signed downloads use top-level navigation.
+              "connect-src 'self'",
+              "frame-src 'none'",
               "worker-src 'self' blob:",
               "object-src 'none'",
               "base-uri 'self'",

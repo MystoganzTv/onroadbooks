@@ -18,9 +18,7 @@ function configureIntegrations() {
   process.env.STRIPE_PRICE_SOLO_MONTHLY = "price_solo";
   process.env.STRIPE_PRICE_PRO_MONTHLY = "price_pro";
   process.env.STRIPE_PRICE_FLEET_MONTHLY = "price_fleet";
-  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_health";
-  process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID = "google-health.apps.example.com";
+  process.env.AUTH_PROVIDER = "legacy";
 }
 
 describe("operational health", () => {
@@ -48,5 +46,22 @@ describe("operational health", () => {
     assert.equal(report.status, "degraded");
     assert.equal(report.checks.database.status, "error");
     assert.equal(report.checks.storage.status, "error");
+    assert.equal(report.checks.auth.status, "error");
+  });
+
+  it("requires server credentials for Google and invitation delivery with Auth.js", async () => {
+    delete process.env.VERCEL_ENV;
+    process.env.DATA_SOURCE = "json";
+    process.env.DOCUMENT_STORAGE = "local";
+    configureIntegrations();
+    process.env.AUTH_PROVIDER = "authjs";
+    const keys = ["AUTH_SECRET", "AUTH_GOOGLE_ID", "AUTH_GOOGLE_SECRET", "RESEND_API_KEY"];
+    for (const key of keys) process.env[key] = "configured-for-health-test";
+    assert.equal((await buildHealthReport()).checks.auth.status, "ok");
+    for (const key of keys) {
+      delete process.env[key];
+      assert.equal((await buildHealthReport()).checks.auth.status, "error", key);
+      process.env[key] = "configured-for-health-test";
+    }
   });
 });

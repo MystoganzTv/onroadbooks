@@ -8,7 +8,6 @@ import { isPlatformAdminEmail } from "@/lib/platform-admin";
 import { sendOperationalTestAlert } from "@/lib/operations";
 import { getDocumentStorage } from "@/lib/storage";
 import { getStripe, stripePriceId, stripeSecretLivemode } from "@/lib/stripe";
-import { deleteAuthIdentityByEmail } from "@/lib/auth/provider-admin";
 import type { PlanId } from "@/lib/types";
 import type { ActionResult } from "./types";
 
@@ -233,11 +232,7 @@ export async function adminDeleteAccount(
       account.businessId,
     );
     await removeStoredDocuments(deleted.storageKeys);
-    try {
-      await deleteAuthIdentityByEmail(deleted.email);
-    } catch (error) {
-      console.error("[admin-account-delete] Identity cleanup failed", error);
-    }
+
     console.info("[admin-account-delete]", {
       admin: admin.email,
       target: account.email,

@@ -42,7 +42,7 @@ export async function POST(request: Request) {
   if (refusal) return response({ error: refusal.error }, refusal.status);
 
   const storage = getDocumentStorage();
-  if (!storage.createSignedUpload && !storage.chunkedUploads) {
+  if (!storage.chunkedUploads) {
     return response({ strategy: "multipart" });
   }
 
@@ -64,14 +64,11 @@ export async function POST(request: Request) {
       contentType: parsed.data.contentType,
       sizeBytes: parsed.data.sizeBytes,
     });
-    if (storage.chunkedUploads)
-      return response({
-        strategy: "chunked",
-        chunkBytes: DOCUMENT_CHUNK_BYTES,
-        ticket,
-      });
-    const upload = await storage.createSignedUpload!(storageKey);
-    return response({ strategy: "direct", upload, ticket });
+    return response({
+      strategy: "chunked",
+      chunkBytes: DOCUMENT_CHUNK_BYTES,
+      ticket,
+    });
   } catch {
     return response(
       { error: "Could not prepare secure document storage." },

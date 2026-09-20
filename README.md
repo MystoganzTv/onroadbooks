@@ -126,8 +126,8 @@ counted exactly once.
 **Documents** -- receipts and paperwork attach to loads (Rate Confirmation, BOL,
 POD, Invoice, Other), expenses (Receipt, Invoice, Other), every fleet truck
 (Registration, Insurance, Title, Inspection) and maintenance records. The browser
-optimizes large images and scanned PDFs, then uploads the result directly to
-private Supabase Storage with a short-lived signed URL. The stored-file limit is
+optimizes large images and scanned PDFs, then uploads bounded parts through Next.js to
+private Cloudflare R2. Downloads use short-lived signed URLs. The stored-file limit is
 10 MB; searchable/native PDFs are preserved instead of being rasterized.
 
 **Accountant exports** -- native CSV, XLSX and PDF for Loads, Expenses, Fuel,
@@ -271,7 +271,7 @@ src/
     actions/               server actions (create / update / delete)
     auth/                  scrypt passwords, signed cookie sessions
     db/                    repository interface + JSON and Prisma stores
-    storage/               document storage adapter (local / Supabase)
+    storage/               document storage adapter (local / R2)
     plans.ts               the plan catalogue, in code (ADR-0017)
     marketing/             landing page copy and figures
     seed/                  deterministic reference fixture for tests and local QA
@@ -353,12 +353,11 @@ against each other.
 
 Documents follow the same pattern as rows. `lib/storage/` defines a
 `DocumentStorage` adapter; local development ships `LocalDocumentStorage`, which writes to
-`data/uploads/` and serves through `/api/documents/[id]`. `SupabaseDocumentStorage`
-is selected by `DOCUMENT_STORAGE=supabase`; it talks to the Storage REST API
-with plain `fetch`. Certification scripts cover signed upload, metadata lookup,
-signed download, tenant isolation, byte verification and deletion; run them
-against the selected production project after each deployment. Only metadata
-lives in the database, so moving buckets never touches application code.
+`data/uploads/` and serves through `/api/documents/[id]`. `R2DocumentStorage`
+is selected by `DOCUMENT_STORAGE=r2`; private server credentials authorize
+bounded uploads through Next.js. Certification covers immutable uploads,
+metadata, signed downloads, tenant isolation, byte verification and deletion.
+Only metadata lives in the database. Unknown storage selectors fail closed.
 
 `Document` rows carry four optional owner columns (`loadId`, `expenseId`,
 `truckId`, `maintenanceId`) with exactly one set, which is why one upload path
@@ -371,35 +370,23 @@ paginated PDF renderers all consume that definition.
 
 ---
 
-## Switching to PostgreSQL / Supabase
+## Production database and authentication
 
-The app talks to a `Repository` interface, never to a database directly. Two
-implementations exist: `JsonRepository` (default) and `PrismaRepository`.
+Production uses `DrizzleRepository` with `DATA_SOURCE=neon`, `AUTH_PROVIDER=authjs`
+and `DOCUMENT_STORAGE=r2`. Set `NEON_DATABASE_URL` to a pooled connection and
+`NEON_DIRECT_URL` to the direct endpoint. Missing Neon configuration fails closed.
+Development and previews need a separate branch; never reuse production secrets.
+See [.env.example](.env.example) for Google, Auth.js, R2 and email configuration.
 
-```bash
-# .env
-DATA_SOURCE="postgres"
-DATABASE_URL="postgresql://postgres.<ref>:<pw>@aws-0-<region>.pooler.supabase.com:6543/postgres?pgbouncer=true"
-DIRECT_URL="postgresql://postgres.<ref>:<pw>@aws-0-<region>.pooler.supabase.com:5432/postgres"
-```
+Schema changes belong in `src/db/schema/` and versioned `drizzle/` migrations.
+Run `npm run db:drizzle:generate`, review the SQL, and apply it to development with
+`npm run db:drizzle:migrate`. Production builds apply migrations and verify the
+catalog and migration journal before building the app. Never seed production.
 
-```bash
-npm run db:generate   # regenerate the client
-npm run db:migrate:deploy # create/update tables from versioned migrations
-npm run db:harden     # keep the ledger private from the Supabase Data API
-npm run db:seed       # load the local QA reference fixture
-```
-
-Schema changes are migration-first. Edit `prisma/schema.prisma`, create a
-reviewable migration with `npm run db:migrate:create -- --name <change>`, then
-apply it locally with `npm run db:migrate:dev`. Commit the schema and migration
-together. `prisma db push` is deliberately not a package script: production
-deployments run `prisma migrate deploy`, harden Data API access, and fail before
-the Next.js build if the resulting database differs from the Prisma schema.
-
-No application code changes. If `DATA_SOURCE` is anything other than `postgres`,
-or `DATABASE_URL` is not a Postgres URL, the app falls back to the JSON store
-rather than failing to boot.
+`JsonRepository` remains available for local development. `PrismaRepository`
+(`DATA_SOURCE=postgres`) is a generic PostgreSQL reference implementation used by
+contract tests. Historical migration scripts and reports remain available for
+recovery, but the running application has no Supabase client or dependency.
 
 ### Fleet
 
@@ -428,12 +415,12 @@ single-truck ledger written before any of this upgrades in place -- covered by
 | `npm run db:migrate:deploy` | apply pending migrations in CI, staging or production |
 | `npm run db:migrate:status` | report applied and pending migrations |
 | `npm run db:migrate:verify` | fail when the live schema differs from `schema.prisma` |
-| `npm run db:harden` | enable RLS and revoke Supabase Data API grants |
+| `npm run db:harden` | harden the optional Prisma reference database |
 | `npm run db:seed` | seed Postgres with the local QA reference fixture |
 | `npm run smoke:postgres` | check the Prisma store against a live database |
 | `npm run certify:database` | audit production RLS/Data API and run an isolated import + Postgres smoke test |
 | `npm run certify:storage` | exercise production upload/download/delete and cross-workspace isolation |
-| `npm run certify:invitations` | exercise verified Supabase invitation acceptance and replay protection |
+| `npm run certify:invitations` | certify Auth.js invitations (live email requires explicit flags) |
 | `npm run certify:backup-restore` | restore a production logical backup into disposable local PostgreSQL and compare it |
 
 ---
@@ -541,7 +528,7 @@ scratch directory.
 
 `.github/workflows/ci.yml` runs types, lint, unit tests, Playwright and a production build on
 every push and pull request, and then a second job against a real Postgres
-service: deploy migrations, reapply Supabase hardening, verify schema parity,
+service: deploy migrations, reapply database hardening, verify schema parity,
 then run `npm run db:seed` and `npm run smoke:postgres`. That
 last one is `scripts/postgres-smoke.ts`, which asserts what only a server can
 prove -- that every reserve bucket handed out is a row, that closing a
@@ -568,14 +555,14 @@ configuration is incomplete, and synchronization failures are logged and can
 be forwarded immediately to the operations alert webhook.
 
 Fleet workspaces include individual sign-ins and Owner/Admin/Bookkeeper/Dispatcher
-roles, email invitations through Supabase Auth, drivers, load assignment and
+roles, email invitations through Auth.js and Resend, drivers, load assignment and
 frozen driver-pay statements. `/setup` creates the first workspace owner;
 additional people join through `/invite/accept`. Existing Viewer rows remain
 read-only for compatibility but the role cannot be assigned again.
 
-The Supabase storage adapter is selected by `DOCUMENT_STORAGE=supabase`. Its
-signed upload, metadata lookup, signed download, byte-for-byte verification and
-cleanup flow has been exercised against the live project. CI drives the safe,
-deterministic browser flows against local adapters; Google, email delivery and
-Stripe-hosted pages remain deployment smoke checks because CI must not create
-real identities, send email or enter payment details.
+The R2 storage adapter is selected by `DOCUMENT_STORAGE=r2`. Its private
+upload/download, tenant isolation, byte verification and cleanup have been
+certified against Cloudflare and the production deployment. CI exercises Auth.js,
+Drizzle and the R2 protocol with disposable databases and storage. Real Google,
+email delivery and Stripe-hosted pages remain separate deployment checks; CI does
+not create external identities, send email or enter payment details.
