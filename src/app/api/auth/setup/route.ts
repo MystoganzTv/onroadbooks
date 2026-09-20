@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
+import { usingAuthJs, sameOriginRequest } from "@/lib/auth/provider";
 import { getAuthStore } from "@/lib/db";
 import { DEFAULT_PLAN } from "@/lib/plans";
 import { setupSchema } from "@/lib/schemas";
@@ -16,6 +17,11 @@ export const runtime = "nodejs";
 
 /** Creates the owner account. Only ever available while no user exists. */
 export async function POST(request: Request) {
+  if (!sameOriginRequest(request))
+    return NextResponse.json(
+      { error: "Cross-origin signup is refused." },
+      { status: 403 },
+    );
   const store = getAuthStore();
 
   const parsed = setupSchema.safeParse(await request.json().catch(() => null));
@@ -35,6 +41,18 @@ export async function POST(request: Request) {
       plan: parsed.data.plan ?? DEFAULT_PLAN,
     });
 
+    if (usingAuthJs()) {
+      const { signIn } = await import("@/auth");
+      await signIn("credentials", {
+        email: user.email,
+        password: parsed.data.password,
+        redirect: false,
+        redirectTo: "/welcome",
+      });
+      (await cookies()).set(SESSION_COOKIE, "", { path: "/", maxAge: 0 });
+      return NextResponse.json({ ok: true }, { status: 201 });
+    }
+
     const token = await encodeSession({
       userId: user.id,
       businessId: user.businessId,
@@ -45,7 +63,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Could not create the account." },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Could not create the account.",
+      },
       { status: 400 },
     );
   }

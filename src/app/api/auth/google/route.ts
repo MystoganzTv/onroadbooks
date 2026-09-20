@@ -1,3 +1,4 @@
+import { usingAuthJs } from "@/lib/auth/provider";
 import { randomBytes } from "node:crypto";
 
 import { cookies } from "next/headers";
@@ -11,7 +12,9 @@ export const runtime = "nodejs";
 
 const GOOGLE_NONCE_COOKIE = "onroad_google_nonce";
 const NONCE_MAX_AGE_SECONDS = 5 * 60;
-const credentialSchema = z.object({ credential: z.string().min(1).max(20_000) });
+const credentialSchema = z.object({
+  credential: z.string().min(1).max(20_000),
+});
 
 function nonceCookie(maxAge = NONCE_MAX_AGE_SECONDS) {
   return {
@@ -25,6 +28,11 @@ function nonceCookie(maxAge = NONCE_MAX_AGE_SECONDS) {
 
 /** Issue a short-lived nonce that is also bound to this browser by cookie. */
 export async function GET() {
+  if (usingAuthJs())
+    return NextResponse.json(
+      { error: "Use the Google OAuth sign-in link." },
+      { status: 410 },
+    );
   const nonce = randomBytes(32).toString("base64url");
   (await cookies()).set(GOOGLE_NONCE_COOKIE, nonce, nonceCookie());
   return NextResponse.json(
@@ -35,6 +43,11 @@ export async function GET() {
 
 /** Exchange a Google Identity Services ID token for Supabase and app sessions. */
 export async function POST(request: Request) {
+  if (usingAuthJs())
+    return NextResponse.json(
+      { error: "Use the Google OAuth sign-in link." },
+      { status: 410 },
+    );
   const cookieStore = await cookies();
 
   try {
@@ -55,7 +68,8 @@ export async function POST(request: Request) {
       nonce,
     });
 
-    if (error || !data.user) throw error ?? new Error("Google did not return a user.");
+    if (error || !data.user)
+      throw error ?? new Error("Google did not return a user.");
     const { redirectTo } = await completeSupabaseSignIn(data.user);
 
     return NextResponse.json({ redirectTo });

@@ -1,3 +1,5 @@
+import { usingAuthJs, sameOriginRequest } from "@/lib/auth/provider";
+import { invitationCredentials } from "@/lib/auth/identity-store";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -22,31 +24,61 @@ function response(error: string, status: number) {
   );
 }
 
-function sameOrigin(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  if (!origin) return true;
-  try {
-    return new URL(origin).host === new URL(request.url).host;
-  } catch {
-    return false;
-  }
-}
-
 export async function POST(request: Request) {
   try {
-    if (!sameOrigin(request)) return response("Cross-origin invitation requests are refused.", 403);
+    if (!sameOriginRequest(request))
+      return response("Cross-origin invitation requests are refused.", 403);
 
-    const parsed = invitationSessionSchema.safeParse(await request.json().catch(() => null));
-    if (!parsed.success) return response("The invitation link is missing its verification session.", 400);
+    if (usingAuthJs()) {
+      if (!sameOriginRequest(request))
+        return response("Cross-origin invitation requests are refused.", 403);
+      const parsed = invitationCredentials.safeParse(
+        await request.json().catch(() => null),
+      );
+      if (!parsed.success)
+        return response(
+          "Use a valid invitation and a password of at least 10 characters.",
+          400,
+        );
+      try {
+        const { signIn } = await import("@/auth");
+        await signIn("invitation", {
+          ...parsed.data,
+          redirect: false,
+          redirectTo: "/dashboard?team=joined",
+        });
+        (await cookies()).set(SESSION_COOKIE, "", { path: "/", maxAge: 0 });
+        return NextResponse.json(
+          { ok: true },
+          { headers: { "Cache-Control": "private, no-store" } },
+        );
+      } catch {
+        return response(
+          "This invitation is invalid, expired or already used.",
+          401,
+        );
+      }
+    }
+
+    const parsed = invitationSessionSchema.safeParse(
+      await request.json().catch(() => null),
+    );
+    if (!parsed.success)
+      return response(
+        "The invitation link is missing its verification session.",
+        400,
+      );
 
     const supabase = await createSupabaseServerClient();
-    const { error: sessionError } = "code" in parsed.data
-      ? await supabase.auth.exchangeCodeForSession(parsed.data.code)
-      : await supabase.auth.setSession({
-          access_token: parsed.data.accessToken,
-          refresh_token: parsed.data.refreshToken,
-        });
-    if (sessionError) return response("The invitation session is invalid or expired.", 401);
+    const { error: sessionError } =
+      "code" in parsed.data
+        ? await supabase.auth.exchangeCodeForSession(parsed.data.code)
+        : await supabase.auth.setSession({
+            access_token: parsed.data.accessToken,
+            refresh_token: parsed.data.refreshToken,
+          });
+    if (sessionError)
+      return response("The invitation session is invalid or expired.", 401);
 
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user?.email) {

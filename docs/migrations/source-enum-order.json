@@ -1,0 +1,30 @@
+{
+  "ExpenseCategory": [
+    "FUEL",
+    "TOLLS",
+    "INSURANCE",
+    "TRUCK_PAYMENT",
+    "MAINTENANCE",
+    "REPAIRS",
+    "PARKING",
+    "DISPATCH",
+    "FACTORING",
+    "ELD",
+    "PERMITS",
+    "REGISTRATION",
+    "OFFICE",
+    "PHONE",
+    "ACCOUNTING",
+    "OTHER",
+    "DRIVER_PAY",
+    "INTEREST_EXPENSE",
+    "PRINCIPAL_PAYMENT",
+    "OPERATING_LEASE"
+  ],
+  "PlanId": [
+    "INDIVIDUAL",
+    "FLEET",
+    "SOLO",
+    "OWNER"
+  ]
+}

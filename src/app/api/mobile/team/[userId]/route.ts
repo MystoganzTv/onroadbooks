@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireMobileTeamManage } from "@/lib/auth/mobile";
 import { getAuthStore } from "@/lib/db";
 import { memberRoleSchema } from "@/lib/schemas";
-import { deleteSupabaseAuthUserByEmail } from "@/lib/supabase/admin";
+import { deleteAuthIdentityByEmail } from "@/lib/auth/provider-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +19,8 @@ export async function PATCH(
   { params }: { params: Promise<{ userId: string }> },
 ) {
   const gate = await requireMobileTeamManage(request);
-  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+  if (!gate.ok)
+    return NextResponse.json({ error: gate.error }, { status: gate.status });
 
   const { userId } = await params;
 
@@ -27,12 +28,21 @@ export async function PATCH(
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Expected a JSON body." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Expected a JSON body." },
+      { status: 400 },
+    );
   }
 
-  const parsed = memberRoleSchema.safeParse({ ...(body as Record<string, unknown>), userId });
+  const parsed = memberRoleSchema.safeParse({
+    ...(body as Record<string, unknown>),
+    userId,
+  });
   if (!parsed.success) {
-    return NextResponse.json({ error: "Choose a valid role." }, { status: 422 });
+    return NextResponse.json(
+      { error: "Choose a valid role." },
+      { status: 422 },
+    );
   }
 
   try {
@@ -45,7 +55,12 @@ export async function PATCH(
     return NextResponse.json({ id: member.id });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Could not update that role." },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Could not update that role.",
+      },
       { status: 400 },
     );
   }
@@ -62,25 +77,37 @@ export async function DELETE(
   { params }: { params: Promise<{ userId: string }> },
 ) {
   const gate = await requireMobileTeamManage(request);
-  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+  if (!gate.ok)
+    return NextResponse.json({ error: gate.error }, { status: gate.status });
 
   const { userId } = await params;
   const store = getAuthStore();
-  const member = (await store.listMembers(gate.session.businessId)).find((row) => row.id === userId);
-  if (!member) return NextResponse.json({ error: "That team member was not found." }, { status: 404 });
+  const member = (await store.listMembers(gate.session.businessId)).find(
+    (row) => row.id === userId,
+  );
+  if (!member)
+    return NextResponse.json(
+      { error: "That team member was not found." },
+      { status: 404 },
+    );
 
   try {
     const removed = await store.removeMember(userId, gate.session.businessId);
     try {
-      await deleteSupabaseAuthUserByEmail(removed.email);
+      await deleteAuthIdentityByEmail(removed.email);
     } catch (error) {
-      console.error("[mobile-team-remove] Supabase identity cleanup failed", error);
+      console.error("[mobile-team-remove] Identity cleanup failed", error);
     }
     revalidatePath("/settings");
     return NextResponse.json({ id: userId });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Could not remove that member." },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Could not remove that member.",
+      },
       { status: 400 },
     );
   }

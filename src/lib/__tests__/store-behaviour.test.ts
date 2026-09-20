@@ -1,6 +1,6 @@
 /**
- * Behavioural contract for the storage layer, exercised against the JSON
- * store.
+ * Behavioural contract for the storage layer, exercised against JSON by default and
+ * against Prisma and Drizzle through test:database.
  *
  * These are the rules the Postgres store also has to keep, and they are the
  * ones that quietly break money: a fuel purchase must appear in the ledger
@@ -32,6 +32,8 @@ import { after, before, describe, it } from "node:test";
 import { buildSeedDataset, FIXTURE_BUSINESS } from "../seed/seed-data";
 import { hasFleetAccess } from "../plans";
 import type {
+  Repository,
+  AuthStore,
   ExpenseInput,
   FuelEntryInput,
   LoadInput,
@@ -45,7 +47,12 @@ const ORIGINAL_CWD = process.cwd();
 const DATA_FILE = path.join(SANDBOX, "data", "onroad-books.json");
 const BUSINESS = FIXTURE_BUSINESS.id;
 
-type StoreModule = typeof import("../db/json-store");
+const SQL_BACKEND = process.env.ONROAD_TEST_BACKEND;
+type StoreModule = {
+  JsonRepository: new (businessId: string) => Repository;
+  JsonAuthStore: new () => AuthStore;
+  fuelExpenseId: (id: string) => string;
+};
 
 let store: StoreModule;
 let repo: InstanceType<StoreModule["JsonRepository"]>;
@@ -60,13 +67,29 @@ before(async () => {
   mkdirSync(path.dirname(DATA_FILE), { recursive: true });
   writeFileSync(DATA_FILE, JSON.stringify(buildSeedDataset(), null, 2), "utf8");
   store = await import("../db/json-store");
+  if (SQL_BACKEND === "drizzle" || SQL_BACKEND === "prisma") {
+    const fixture = await new store.JsonRepository(BUSINESS).getDataset();
+    const { seedDatabaseFixture } = await import("../../../scripts/lib/database-test-fixture");
+    await seedDatabaseFixture(process.env.DATABASE_URL!, fixture);
+    if (SQL_BACKEND === "drizzle") {
+      const { DrizzleRepository, DrizzleAuthStore } = await import("../db/drizzle-store");
+      store = { JsonRepository: DrizzleRepository, JsonAuthStore: DrizzleAuthStore, fuelExpenseId: store.fuelExpenseId };
+    } else {
+      const { PrismaRepository, PrismaAuthStore } = await import("../db/prisma-store");
+      store = { JsonRepository: PrismaRepository, JsonAuthStore: PrismaAuthStore, fuelExpenseId: store.fuelExpenseId };
+    }
+  }
   fuelExpenseId = store.fuelExpenseId;
   repo = new store.JsonRepository(BUSINESS);
   auth = new store.JsonAuthStore();
 });
 
-after(() => {
+after(async () => {
   process.chdir(ORIGINAL_CWD);
+  if (SQL_BACKEND === "drizzle") {
+    const { closeNeonDatabase } = await import("../../db");
+    await closeNeonDatabase();
+  }
 });
 
 const fuel = (over: Partial<FuelEntryInput> = {}): FuelEntryInput => ({
@@ -186,7 +209,8 @@ describe("business scoping", () => {
 describe("fuel <-> expense mirror", () => {
   it("creates, updates and removes the ledger row with the entry", async () => {
     const entry = await repo.createFuelEntry(fuel({ totalCost: 180, gallons: 50 }));
-    assert.equal(entry.expenseId, fuelExpenseId(entry.id));
+    assert.ok(entry.expenseId);
+    if (!SQL_BACKEND) assert.equal(entry.expenseId, fuelExpenseId(entry.id));
 
     let expenses = (await repo.getDataset()).expenses;
     const created = expenses.find((e) => e.id === entry.expenseId);
@@ -639,7 +663,46 @@ describe("settings", () => {
   });
 });
 
-describe("accounts", () => {
+describe("SQL accounts and workspace lifecycle", { skip: !SQL_BACKEND }, () => {
+  it("links Google by subject and consumes expiring invitations only once", {skip:SQL_BACKEND!=="drizzle"}, async()=>{
+    const {getNeonDatabase}=await import("../../db");
+    const {authRepositoryContract}=await import("../../../scripts/lib/auth-repository-contract");
+    await authRepositoryContract(getNeonDatabase());
+  });
+
+  it("rolls back a losing signup and prevents concurrent double payment", async () => {
+    const { Client } = await import("pg");
+    const client = new Client({connectionString:process.env.DATABASE_URL});
+    await client.connect();
+    try {
+      const before = Number((await client.query('SELECT count(*) FROM "Business"')).rows[0].count);
+      const input = {email:"race-owner@example.test", passwordHash:"scrypt$contract-only"};
+      const signups = await Promise.allSettled([auth.createOwner(input),auth.createOwner(input)]);
+      assert.equal(signups.filter(result=>result.status==="fulfilled").length,1);
+      assert.equal(Number((await client.query('SELECT count(*) FROM "Business"')).rows[0].count),before+1);
+      const owner = await auth.findUserByEmail(input.email);
+      assert.ok(owner);
+      const racingRepo = new store.JsonRepository(owner.businessId);
+      const load = await racingRepo.createLoad(loadInput({invoiceNumber:"RACE-1",invoiceDate:"2026-08-20",grossRate:100}));
+      const payment = {loadId:load.id,date:"2026-08-20",amount:100};
+      const results = await Promise.allSettled([racingRepo.createPaymentEvent(payment),racingRepo.createPaymentEvent(payment)]);
+      assert.equal(results.filter(result=>result.status==="fulfilled").length,1);
+      const after = await racingRepo.getDataset();
+      assert.equal(after.paymentEvents.length,1);
+      assert.equal(after.paymentEvents[0].amount,100);
+      assert.equal(after.loads[0].status,"PAID");
+      await auth.deleteAccount(owner.id,owner.businessId);
+      assert.equal(Number((await client.query('SELECT count(*) FROM "Business"')).rows[0].count),before);
+    } finally {await client.end();}
+  });
+
+  it("preserves credentials, roles, financial statements and business isolation", async () => {
+    const { accountRepositoryContract } = await import("../../../scripts/lib/account-repository-contract");
+    await accountRepositoryContract(auth, (id) => new store.JsonRepository(id));
+  });
+});
+
+describe("JSON accounts", { skip: Boolean(SQL_BACKEND) }, () => {
   it("creates one owner and refuses a duplicate email", async () => {
     assert.equal(await auth.countUsers(), 0);
 
@@ -753,7 +816,7 @@ describe("accounts", () => {
     }
   });
 
-  it("resets only ledger data, then invalidates the owner when the account is deleted", async () => {
+  it("resets only ledger data, then invalidates the owner when the account is deleted", { skip: Boolean(SQL_BACKEND) }, async () => {
     const original = readFileSync(DATA_FILE, "utf8");
     try {
       const owner = await auth.findUserByEmail("owner@example.com");
@@ -787,7 +850,7 @@ describe("accounts", () => {
  * A ledger written by an older build must open, not crash -- and must not be
  * silently replaced by seed data.
  */
-describe("upgrading an older ledger", () => {
+describe("upgrading an older ledger", { skip: Boolean(SQL_BACKEND) }, () => {
   const legacyDir = mkdtempSync(path.join(tmpdir(), "onroad-books-legacy-"));
 
   before(() => {
@@ -865,7 +928,7 @@ describe("upgrading an older ledger", () => {
   });
 });
 
-describe("an unreadable ledger", () => {
+describe("an unreadable ledger", { skip: Boolean(SQL_BACKEND) }, () => {
   const brokenDir = mkdtempSync(path.join(tmpdir(), "onroad-books-broken-"));
 
   before(() => {
@@ -1077,7 +1140,7 @@ describe("which truck a row belongs to", () => {
     assert.equal(entry.truckId, second.id);
 
     const after = await repo.getDataset();
-    const mirror = after.expenses.find((e) => e.id === fuelExpenseId(entry.id));
+    const mirror = after.expenses.find((e) => e.id === entry.expenseId);
     assert.equal(mirror?.truckId, second.id, "the ledger row follows the fill-up");
     assert.equal(
       after.trucks.find((t) => t.id === second.id)!.currentOdometer,

@@ -1,0 +1,24 @@
+import { pgEnum } from "drizzle-orm/pg-core";
+
+export const paymentStatus = pgEnum("PaymentStatus", ["PENDING","INVOICED","PAID"]);
+export const equipmentType = pgEnum("EquipmentType", ["BOX_TRUCK","DRY_VAN","REEFER","FLATBED","POWER_ONLY","SPRINTER_VAN","OTHER"]);
+export const loadCapacity = pgEnum("LoadCapacity", ["FULL","PARTIAL"]);
+export const expenseBehavior = pgEnum("ExpenseBehavior", ["FIXED","VARIABLE"]);
+export const expenseScope = pgEnum("ExpenseScope", ["TRUCK","BUSINESS"]);
+export const financialTreatment = pgEnum("FinancialTreatment", ["OPERATING","INTEREST","PRINCIPAL","DEBT_UNALLOCATED"]);
+export const financialObligationKind = pgEnum("FinancialObligationKind", ["LOAN","OPERATING_LEASE","UNKNOWN"]);
+export const documentType = pgEnum("DocumentType", ["RATE_CONFIRMATION","BOL","POD","INVOICE","RECEIPT","REGISTRATION","INSURANCE","TITLE","INSPECTION","OTHER"]);
+export const maintenanceType = pgEnum("MaintenanceType", ["OIL_CHANGE","OIL_FILTER","FUEL_FILTER","TIRES","BRAKES","TRANSMISSION","COOLANT","BATTERY","DOT_INSPECTION","STATE_INSPECTION","REGISTRATION","INSURANCE","OTHER"]);
+export const maintenanceBasis = pgEnum("MaintenanceBasis", ["DATE","MILEAGE","BOTH"]);
+export const reserveKind = pgEnum("ReserveKind", ["TAX","MAINTENANCE","EMERGENCY","CUSTOM"]);
+export const reserveBasis = pgEnum("ReserveBasis", ["OPERATING_PROFIT","GROSS_REVENUE"]);
+export const reserveTransactionType = pgEnum("ReserveTransactionType", ["CONTRIBUTION","WITHDRAWAL","ADJUSTMENT"]);
+export const settlementHalf = pgEnum("SettlementHalf", ["FIRST","SECOND"]);
+export const settlementStatus = pgEnum("SettlementStatus", ["OPEN","CLOSED"]);
+export const driverPayType = pgEnum("DriverPayType", ["PERCENT_GROSS","PER_LOADED_MILE","PER_TOTAL_MILE","FLAT_PER_LOAD"]);
+export const driverSettlementStatus = pgEnum("DriverSettlementStatus", ["DRAFT","PAID"]);
+export const driverSettlementAdjustmentType = pgEnum("DriverSettlementAdjustmentType", ["ACCESSORIAL_PAY","REIMBURSEMENT","DEDUCTION","ADVANCE","OTHER_EARNING"]);
+export const planId = pgEnum("PlanId", ["INDIVIDUAL","FLEET","SOLO","OWNER"]);
+export const subscriptionStatus = pgEnum("SubscriptionStatus", ["TRIALING","ACTIVE","PAST_DUE","CANCELED"]);
+export const expenseCategory = pgEnum("ExpenseCategory", ["FUEL","TOLLS","INSURANCE","TRUCK_PAYMENT","MAINTENANCE","REPAIRS","PARKING","DISPATCH","FACTORING","ELD","PERMITS","REGISTRATION","OFFICE","PHONE","ACCOUNTING","OTHER","DRIVER_PAY","INTEREST_EXPENSE","PRINCIPAL_PAYMENT","OPERATING_LEASE"]);
+export const memberRole = pgEnum("MemberRole", ["OWNER","ADMIN","BOOKKEEPER","DISPATCHER","VIEWER"]);

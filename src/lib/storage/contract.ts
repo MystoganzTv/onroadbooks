@@ -3,6 +3,8 @@
  * without a cycle through the adapter selector in ./index.ts.
  */
 export interface DocumentStorage {
+  /** Server-mediated, bounded uploads backed by immutable object keys. */
+  readonly chunkedUploads?: boolean;
   /** Read-only dependency probe for operational readiness checks. */
   healthcheck?(): Promise<void>;
   /** Persists bytes and returns the key needed to read them back. */
@@ -16,7 +18,9 @@ export interface DocumentStorage {
     token: string;
   }>;
   /** Confirms that a direct upload actually landed before metadata is filed. */
-  info?(key: string): Promise<{ sizeBytes: number; contentType: string | null } | null>;
+  info?(
+    key: string,
+  ): Promise<{ sizeBytes: number; contentType: string | null } | null>;
   /** Avoids Vercel's response-body ceiling when serving a stored document. */
   createSignedDownloadUrl?(key: string, downloadName?: string): Promise<string>;
 }

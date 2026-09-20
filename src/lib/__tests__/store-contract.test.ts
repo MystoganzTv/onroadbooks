@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { JsonRepository, JsonAuthStore } from "../db/json-store";
+import { DrizzleRepository, DrizzleAuthStore } from "../db/drizzle-store";
 import { PrismaRepository, PrismaAuthStore } from "../db/prisma-store";
 
 /**
@@ -19,20 +20,25 @@ function methodsOf(ctor: new (...args: never[]) => object): string[] {
 }
 
 describe("store parity", () => {
-  it("both repositories expose exactly the same public methods", () => {
+  it("all repositories expose exactly the same public methods", () => {
     const json = methodsOf(JsonRepository).filter((m) => !m.startsWith("assertScope"));
     const prisma = methodsOf(PrismaRepository).filter(
       (m) => !["business", "loadData", "expenseData", "fuelData", "maintenanceData"].includes(m),
     );
+    const drizzle = methodsOf(DrizzleRepository).filter(
+      (m) => !["business", "loadData", "expenseData", "fuelData", "maintenanceData"].includes(m),
+    );
     assert.deepEqual(json, prisma);
+    assert.deepEqual(prisma, drizzle);
   });
 
-  it("both auth stores expose exactly the same public methods", () => {
+  it("all auth stores expose exactly the same public methods", () => {
     assert.deepEqual(methodsOf(JsonAuthStore), methodsOf(PrismaAuthStore));
+    assert.deepEqual(methodsOf(PrismaAuthStore), methodsOf(DrizzleAuthStore));
   });
 
-  it("both repositories require a businessId", () => {
-    for (const Ctor of [JsonRepository, PrismaRepository]) {
+  it("all repositories require a businessId", () => {
+    for (const Ctor of [JsonRepository, PrismaRepository, DrizzleRepository]) {
       assert.equal(Ctor.length, 1, `${Ctor.name} should take a businessId`);
     }
   });

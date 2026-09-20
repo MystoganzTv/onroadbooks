@@ -1,7 +1,9 @@
 import "server-only";
 
+import { usingAuthJs } from "@/lib/auth/provider";
 import { checkPostgresConnection } from "@/lib/db/prisma-store";
-import { usingPostgres } from "@/lib/db";
+import { checkNeonDatabase } from "@/db";
+import { usingNeon, usingPostgres } from "@/lib/db";
 import { stripeBillingConfigured } from "@/lib/stripe";
 import { getDocumentStorage, storageBackend } from "@/lib/storage";
 import { operationalLog } from "@/lib/operations";
@@ -20,7 +22,10 @@ export interface HealthReport {
   };
 }
 
-async function timedCheck(name: string, check: () => Promise<void>): Promise<HealthCheck> {
+async function timedCheck(
+  name: string,
+  check: () => Promise<void>,
+): Promise<HealthCheck> {
   const startedAt = Date.now();
   let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -53,27 +58,44 @@ function configured(value: unknown): boolean {
 export async function buildHealthReport(): Promise<HealthReport> {
   const production = process.env.VERCEL_ENV === "production";
   const databaseModeOk = usingPostgres() || !production;
-  const currentStorage = storageBackend();
-  const storageModeOk = currentStorage === "supabase" || !production;
 
   const [database, storage] = await Promise.all([
     databaseModeOk
-      ? timedCheck("database", usingPostgres() ? checkPostgresConnection : async () => undefined)
+      ? timedCheck(
+          "database",
+          usingNeon()
+            ? async () => {
+                await checkNeonDatabase();
+              }
+            : usingPostgres()
+              ? checkPostgresConnection
+              : async () => undefined,
+        )
       : Promise.resolve<HealthCheck>({ status: "error" }),
-    storageModeOk
-      ? timedCheck("storage", async () => {
-          await getDocumentStorage().healthcheck?.();
-        })
-      : Promise.resolve<HealthCheck>({ status: "error" }),
+    timedCheck("storage", async () => {
+      if (production && storageBackend() === "local")
+        throw new Error("Production requires private object storage.");
+      await getDocumentStorage().healthcheck?.();
+    }),
   ]);
 
-  const billing: HealthCheck = { status: stripeBillingConfigured() ? "ok" : "error" };
+  const billing: HealthCheck = {
+    status: stripeBillingConfigured() ? "ok" : "error",
+  };
   const auth: HealthCheck = {
-    status: [
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-    ].every(configured)
+    status: (usingAuthJs()
+      ? [
+          process.env.AUTH_SECRET,
+          process.env.AUTH_GOOGLE_ID,
+          process.env.AUTH_GOOGLE_SECRET,
+          process.env.RESEND_API_KEY,
+        ]
+      : [
+          process.env.NEXT_PUBLIC_SUPABASE_URL,
+          process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+          process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+        ]
+    ).every(configured)
       ? "ok"
       : "error",
   };

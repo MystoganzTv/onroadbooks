@@ -1,28 +1,27 @@
 import { spawnSync } from "node:child_process";
-
+import { productionBuildPlan } from "./lib/deployment-plan.mjs";
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-
-function run(command, args) {
-  const result = spawnSync(command, args, {
-    cwd: process.cwd(),
-    env: process.env,
-    stdio: "inherit",
-  });
-
-  if (result.error) throw result.error;
-  if (result.status !== 0) process.exit(result.status ?? 1);
+try {
+  const plan = productionBuildPlan(process.env);
+  console.log(
+    plan.length > 1
+      ? "Applying and verifying migrations for the configured production backend..."
+      : "Skipping production database migrations outside Vercel Production.",
+  );
+  for (const script of plan) {
+    const result = spawnSync(npm, ["run", script], {
+      cwd: process.cwd(),
+      env: process.env,
+      stdio: "inherit",
+    });
+    if (result.error) throw result.error;
+    if (result.status !== 0) process.exit(result.status ?? 1);
+  }
+} catch (error) {
+  console.error(
+    error instanceof Error
+      ? error.message
+      : "Production build configuration failed.",
+  );
+  process.exitCode = 1;
 }
-
-const isVercelProduction =
-  process.env.VERCEL === "1" && process.env.VERCEL_ENV === "production";
-
-if (isVercelProduction) {
-  console.log("Applying and verifying production database migrations before build...");
-  run(npm, ["run", "db:migrate:deploy"]);
-  run(npm, ["run", "db:harden"]);
-  run(npm, ["run", "db:migrate:verify"]);
-} else {
-  console.log("Skipping production database migrations outside Vercel Production.");
-}
-
-run(npm, ["run", "build"]);

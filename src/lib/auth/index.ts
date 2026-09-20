@@ -8,12 +8,34 @@ import { getAuthStore, getDataset } from "@/lib/db";
 import { canWrite, trialState } from "@/lib/plans";
 import { permissionRefusal, roleCan, type Permission } from "@/lib/roles";
 import { todayISO } from "@/lib/periods";
+import { usingAuthJs, allowLegacyWebSessions } from "./provider";
 import { decodeSession, SESSION_COOKIE, type SessionPayload } from "./session";
 
 /** The signed-in user, or null. Never throws. */
 export const getSession = cache(async (): Promise<SessionPayload | null> => {
   try {
     const store = await cookies();
+    if (usingAuthJs()) {
+      const { auth } = await import("@/auth");
+      const current = await auth();
+      if (current?.user?.id) {
+        const user = await getAuthStore().findUserById(current.user.id);
+        if (!user || (user.role !== "OWNER" && !user.joinedAt)) return null;
+        return {
+          userId: user.id,
+          businessId: user.businessId,
+          email: user.email,
+          role: user.role,
+          exp: Math.floor(Date.parse(current.expires) / 1000),
+        };
+      }
+      const hasAuthJsCookie = store
+        .getAll()
+        .some((cookie) =>
+          /^(?:__Secure-)?authjs\.session-token(?:\.\d+)?$/.test(cookie.name),
+        );
+      if (hasAuthJsCookie || !allowLegacyWebSessions()) return null;
+    }
     const session = await decodeSession(store.get(SESSION_COOKIE)?.value);
     if (!session) return null;
 
@@ -21,7 +43,11 @@ export const getSession = cache(async (): Promise<SessionPayload | null> => {
     // the authoritative owner row so deletion immediately revokes every app
     // session, including cookies held by another browser.
     const owner = await getAuthStore().findUserById(session.userId);
-    if (!owner || owner.businessId !== session.businessId || owner.email !== session.email) {
+    if (
+      !owner ||
+      owner.businessId !== session.businessId ||
+      owner.email !== session.email
+    ) {
       return null;
     }
     return {
@@ -64,15 +90,19 @@ export async function requireWritableSession(
     );
   }
   const role = session.role ?? "VIEWER";
-  if (!roleCan(role, permission)) throw new Error(permissionRefusal(role, permission));
+  if (!roleCan(role, permission))
+    throw new Error(permissionRefusal(role, permission));
   return session;
 }
 
 /** Role gate for ownership actions that must remain available when billing lapses. */
-export async function requirePermission(permission: Permission): Promise<SessionPayload> {
+export async function requirePermission(
+  permission: Permission,
+): Promise<SessionPayload> {
   const session = await requireSession();
   const role = session.role ?? "VIEWER";
-  if (!roleCan(role, permission)) throw new Error(permissionRefusal(role, permission));
+  if (!roleCan(role, permission))
+    throw new Error(permissionRefusal(role, permission));
   return session;
 }
 

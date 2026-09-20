@@ -33,13 +33,14 @@ function GoogleMark() {
 export function AuthOptions({
   next = null,
   locale,
+  googleConfigured,
 }: {
   next?: string | null;
   locale: AppLocale;
+  googleConfigured: boolean;
 }) {
   const copy = getWebDictionary(locale).auth;
   const query = next ? `?next=${encodeURIComponent(next)}` : "";
-  const googleConfigured = Boolean(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);
   const googleHref = `/api/auth/google/oauth${query}`;
 
   return (
@@ -55,7 +56,9 @@ export function AuthOptions({
       </a>
 
       {!googleConfigured ? (
-        <p className="text-center text-2xs text-neg">{copy.googleNotConfigured}</p>
+        <p className="text-center text-2xs text-neg">
+          {copy.googleNotConfigured}
+        </p>
       ) : null}
 
       <div className="flex items-center gap-3 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">

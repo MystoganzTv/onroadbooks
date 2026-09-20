@@ -33,9 +33,8 @@ export async function GET(
   const inline = !download && isInlineSafe(document.contentType);
   const storage = getDocumentStorage();
 
-  // Supabase serves the bytes itself through a one-minute signed URL. This
-  // keeps both large uploads and large downloads outside Vercel Functions'
-  // 4.5 MB request/response envelope.
+  // Private object storage serves downloads through a one-minute signed URL.
+  // Authorization remains here; large responses do not pass through Vercel.
   if (storage.createSignedDownloadUrl) {
     try {
       const signedUrl = await storage.createSignedDownloadUrl(

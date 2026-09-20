@@ -8,7 +8,7 @@ import { hasFleetAccess } from "@/lib/plans";
 import { roleCan } from "@/lib/roles";
 import { memberInviteSchema } from "@/lib/schemas";
 import { applicationUrl } from "@/lib/stripe";
-import { inviteSupabaseAuthUser } from "@/lib/supabase/admin";
+import { inviteAuthUser } from "@/lib/auth/provider-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +24,8 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: NextRequest) {
   const session = await getMobileSession(request);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const repository = getRepository(session.businessId);
   const { subscription } = await repository.getDataset();
@@ -41,14 +42,16 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(
     {
       canManage: roleCan(role, "manage_team"),
-      members: members.map(({ id, email, name, role: memberRole, joinedAt, invitedAt }) => ({
-        id,
-        email,
-        name,
-        role: memberRole,
-        joinedAt,
-        invitedAt,
-      })),
+      members: members.map(
+        ({ id, email, name, role: memberRole, joinedAt, invitedAt }) => ({
+          id,
+          email,
+          name,
+          role: memberRole,
+          joinedAt,
+          invitedAt,
+        }),
+      ),
     },
     { headers: { "Cache-Control": "no-store, max-age=0" } },
   );
@@ -56,30 +59,40 @@ export async function GET(request: NextRequest) {
 
 /**
  * Invite a collaborator from the phone -- same `memberInviteSchema`, same
- * `createMember` + `inviteSupabaseAuthUser` pair, same rollback if the email
+ * `createMember` + `inviteAuthUser` pair, same rollback if the email
  * never sends, as `inviteMemberAction` in `lib/actions/team.ts`.
  */
 export async function POST(request: NextRequest) {
   const gate = await requireMobileTeamManage(request);
-  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+  if (!gate.ok)
+    return NextResponse.json({ error: gate.error }, { status: gate.status });
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Expected a JSON body." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Expected a JSON body." },
+      { status: 400 },
+    );
   }
 
   const parsed = memberInviteSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Check the highlighted fields.", fieldErrors: fieldErrorsFrom(parsed.error.issues) },
+      {
+        error: "Check the highlighted fields.",
+        fieldErrors: fieldErrorsFrom(parsed.error.issues),
+      },
       { status: 422 },
     );
   }
 
   if (parsed.data.email.toLowerCase() === gate.session.email.toLowerCase()) {
-    return NextResponse.json({ error: "You are already the workspace owner." }, { status: 422 });
+    return NextResponse.json(
+      { error: "You are already the workspace owner." },
+      { status: 422 },
+    );
   }
 
   const store = getAuthStore();
@@ -93,18 +106,28 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Could not invite that member." },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Could not invite that member.",
+      },
       { status: 400 },
     );
   }
 
   try {
-    await inviteSupabaseAuthUser(member.email, `${applicationUrl()}/invite/accept`);
+    await inviteAuthUser(member.email, `${applicationUrl()}/invite/accept`);
   } catch (error) {
     // A failed email must not leave behind a ghost member that blocks a retry.
     await store.removeMember(member.id, gate.session.businessId);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "The invitation could not be completed." },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "The invitation could not be completed.",
+      },
       { status: 400 },
     );
   }

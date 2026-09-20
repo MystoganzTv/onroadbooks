@@ -6,6 +6,7 @@ const isolatedData = path.join(process.cwd(), ".e2e-data");
 
 export default defineConfig({
   testDir: "./e2e",
+  testIgnore: "**/database-backend.spec.ts",
   fullyParallel: false,
   workers: 1,
   forbidOnly: Boolean(process.env.CI),
@@ -25,11 +26,13 @@ export default defineConfig({
     env: {
       ...process.env,
       DATA_SOURCE: "json",
+      AUTH_PROVIDER: "legacy",
       DOCUMENT_STORAGE: "local",
       ONROAD_DATA_DIR: isolatedData,
       AUTH_SECRET: "e2e-only-session-secret-longer-than-32-characters",
       NEXT_PUBLIC_APP_URL: baseURL,
       NEXT_PUBLIC_GOOGLE_CLIENT_ID: "",
+      RESEND_API_KEY: "",
       STRIPE_SECRET_KEY: "",
       STRIPE_WEBHOOK_SECRET: "",
       STRIPE_PRICE_SOLO_MONTHLY: "",

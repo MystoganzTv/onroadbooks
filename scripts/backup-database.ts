@@ -1,12 +1,19 @@
-import { createCipheriv, createDecipheriv, randomBytes, scrypt } from "node:crypto";
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import { promisify } from "node:util";
 
 import { config as loadEnv } from "dotenv";
 
+import { encrypt, decrypt } from "./lib/backup-crypto";
 import { APPLICATION_TABLES, databaseUrl, pgBinary, run } from "./lib/postgres";
 
 // A scheduled backup gets no shell of its own, and only the Prisma CLI reads
@@ -18,11 +25,9 @@ loadEnv();
 /**
  * Nightly logical backup of the production ledger, encrypted at rest.
  *
- * The Supabase project is on the free plan, which includes no daily backup and
- * no point-in-time recovery -- the books of every customer sit on a database
- * with nothing behind it, and a ledger has already been lost once. This script
- * is the floor under that, not a replacement for it: it recovers yesterday's
- * state, never the last five minutes. Supabase Pro is still what buys PITR.
+ * Independent logical archives protect the ledger during provider migration.
+ * DATA_SOURCE=neon selects NEON_DIRECT_URL and includes the private Auth.js
+ * tables and Drizzle migration journal. Legacy backups retain their format.
  *
  * The dump is real customer financial data, so it never touches disk in the
  * clear for longer than the seconds it takes to encrypt it, the destination is
@@ -34,65 +39,32 @@ loadEnv();
  *   npm run backup -- --decrypt <file> --out ledger.dump
  *
  * Environment, read from the shell or from `.env.local` / `.env`:
- * DIRECT_URL or DATABASE_URL, and BACKUP_PASSPHRASE -- lose the passphrase and
+ * NEON_DIRECT_URL (Neon), DIRECT_URL or DATABASE_URL (legacy), and
+ * BACKUP_PASSPHRASE -- lose the passphrase and
  * the backups are gone with it, so keep it where the laptop is not.
- * Optional: BACKUP_DIR (default ~/OnRoadBooksBackups), BACKUP_KEEP_DAYS (30).
+ * Optional: BACKUP_DIR (default ~/OnRoadBooksBackups), BACKUP_KEEP_DAYS (30),
+ * PG_BIN (client binaries with a major version >= the source server).
  */
 
-const MAGIC = Buffer.from("ORBK1");
-const SALT_BYTES = 32;
-const IV_BYTES = 12;
-const TAG_BYTES = 16;
-/** scrypt at these parameters costs ~100ms and 32MB -- cheap once a night,
- *  expensive a few billion times for anyone holding a stolen file. */
-const SCRYPT = { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
-/** Age alone must never empty the folder: a laptop left off for two months
- *  would otherwise prune its way to nothing on the next run. */
+/** Never prune below seven verified archives. */
 const ALWAYS_KEEP = 7;
 const FILE_PATTERN = /^onroadbooks-\d{8}T\d{6}Z\.dump\.enc$/;
-
-const scryptAsync = promisify(scrypt) as (
-  password: string,
-  salt: Buffer,
-  keylen: number,
-  options: typeof SCRYPT,
-) => Promise<Buffer>;
 
 function passphrase(): string {
   const value = process.env.BACKUP_PASSPHRASE ?? "";
   if (value.length < 12) {
-    throw new Error("BACKUP_PASSPHRASE must be set and at least 12 characters.");
+    throw new Error(
+      "BACKUP_PASSPHRASE must be set and at least 12 characters.",
+    );
   }
   return value;
 }
 
 function stamp(now: Date): string {
-  return now.toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
-}
-
-async function encrypt(plaintext: Buffer, secret: string): Promise<Buffer> {
-  const salt = randomBytes(SALT_BYTES);
-  const iv = randomBytes(IV_BYTES);
-  const key = await scryptAsync(secret, salt, 32, SCRYPT);
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
-  const body = Buffer.concat([cipher.update(plaintext), cipher.final()]);
-  return Buffer.concat([MAGIC, salt, iv, body, cipher.getAuthTag()]);
-}
-
-/** Throws if the file was truncated, corrupted or encrypted with another
- *  passphrase -- GCM authenticates, so a silent half-restore is impossible. */
-async function decrypt(blob: Buffer, secret: string): Promise<Buffer> {
-  const header = MAGIC.length + SALT_BYTES + IV_BYTES;
-  if (blob.length <= header + TAG_BYTES || !blob.subarray(0, MAGIC.length).equals(MAGIC)) {
-    throw new Error("Not an OnRoad Books backup file.");
-  }
-  const salt = blob.subarray(MAGIC.length, MAGIC.length + SALT_BYTES);
-  const iv = blob.subarray(MAGIC.length + SALT_BYTES, header);
-  const body = blob.subarray(header, blob.length - TAG_BYTES);
-  const key = await scryptAsync(secret, salt, 32, SCRYPT);
-  const decipher = createDecipheriv("aes-256-gcm", key, iv);
-  decipher.setAuthTag(blob.subarray(blob.length - TAG_BYTES));
-  return Buffer.concat([decipher.update(body), decipher.final()]);
+  return now
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d+Z$/, "Z");
 }
 
 /**
@@ -101,24 +73,52 @@ async function decrypt(blob: Buffer, secret: string): Promise<Buffer> {
  * made it in -- a dump that silently skipped a table restores without error
  * and loses the data anyway.
  */
-async function verify(file: string, secret: string): Promise<number> {
+async function verify(
+  file: string,
+  secret: string,
+  requireAuth = false,
+): Promise<number> {
   const blob = await readFile(file);
   const plaintext = await decrypt(blob, secret);
   const workDir = await mkdtemp(path.join(tmpdir(), "onroadbooks-verify-"));
   try {
     const dumpPath = path.join(workDir, "backup.dump");
     await writeFile(dumpPath, plaintext, { mode: 0o600 });
-    const listing = spawnSync(pgBinary("pg_restore"), ["--list", dumpPath], { encoding: "utf8" });
+    const listing = spawnSync(pgBinary("pg_restore"), ["--list", dumpPath], {
+      encoding: "utf8",
+    });
     if (listing.status !== 0) {
-      throw new Error(`backup is not a readable archive\n${listing.stderr ?? ""}`);
+      throw new Error(
+        `backup is not a readable archive\n${listing.stderr ?? ""}`,
+      );
     }
     const missing = APPLICATION_TABLES.filter(
-      (table) => !new RegExp(`TABLE DATA public "?${table}"?\\s`).test(listing.stdout ?? ""),
+      (table) =>
+        !new RegExp(`TABLE DATA public "?${table}"?\\s`).test(
+          listing.stdout ?? "",
+        ),
     );
     if (missing.length > 0) {
       throw new Error(`backup is missing tables: ${missing.join(", ")}`);
     }
-    return APPLICATION_TABLES.length;
+    const containsAuth = /SCHEMA - onroad_auth\s/.test(listing.stdout ?? "");
+    if (requireAuth || containsAuth) {
+      for (const table of ["Identity", "Invitation"]) {
+        if (
+          !new RegExp(`TABLE DATA onroad_auth "?${table}"?\\s`).test(
+            listing.stdout ?? "",
+          )
+        ) {
+          throw new Error(`backup is missing auth table: ${table}`);
+        }
+      }
+    }
+    if (
+      (requireAuth || containsAuth) &&
+      !/TABLE DATA drizzle __drizzle_migrations\s/.test(listing.stdout ?? "")
+    )
+      throw new Error("backup is missing the Drizzle migration journal");
+    return APPLICATION_TABLES.length + (containsAuth ? 2 : 0);
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }
@@ -126,7 +126,10 @@ async function verify(file: string, secret: string): Promise<number> {
 
 /** Age-based, newest-first, and never below ALWAYS_KEEP. */
 async function prune(directory: string, keepDays: number): Promise<number> {
-  const names = (await readdir(directory)).filter((name) => FILE_PATTERN.test(name)).sort().reverse();
+  const names = (await readdir(directory))
+    .filter((name) => FILE_PATTERN.test(name))
+    .sort()
+    .reverse();
   const cutoff = Date.now() - keepDays * 24 * 60 * 60 * 1000;
   let pruned = 0;
   for (const name of names.slice(ALWAYS_KEEP)) {
@@ -140,49 +143,74 @@ async function prune(directory: string, keepDays: number): Promise<number> {
 }
 
 async function destination(): Promise<string> {
-  const directory = path.resolve(process.env.BACKUP_DIR?.trim() || path.join(homedir(), "OnRoadBooksBackups"));
+  const directory = path.resolve(
+    process.env.BACKUP_DIR?.trim() ||
+      path.join(homedir(), "OnRoadBooksBackups"),
+  );
   const repository = path.resolve(process.cwd());
-  if (directory === repository || directory.startsWith(`${repository}${path.sep}`)) {
-    throw new Error("Refusing to write backups inside the repository -- set BACKUP_DIR elsewhere.");
+  if (
+    directory === repository ||
+    directory.startsWith(`${repository}${path.sep}`)
+  ) {
+    throw new Error(
+      "Refusing to write backups inside the repository -- set BACKUP_DIR elsewhere.",
+    );
   }
   await mkdir(directory, { recursive: true, mode: 0o700 });
   return directory;
 }
 
 async function create(): Promise<void> {
-  const configuredUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
+  const neon = process.env.DATA_SOURCE === "neon";
+  const configuredUrl = neon
+    ? process.env.NEON_DIRECT_URL
+    : process.env.DIRECT_URL || process.env.DATABASE_URL;
   if (!configuredUrl?.startsWith("postgres")) {
-    throw new Error("DIRECT_URL or DATABASE_URL is required");
+    throw new Error(
+      neon
+        ? "NEON_DIRECT_URL is required for a Neon backup"
+        : "DIRECT_URL or DATABASE_URL is required",
+    );
   }
   const secret = passphrase();
   const directory = await destination();
   const keepDays = Number(process.env.BACKUP_KEEP_DAYS ?? 30);
 
   const workDir = await mkdtemp(path.join(tmpdir(), "onroadbooks-backup-"));
-  const file = path.join(directory, `onroadbooks-${stamp(new Date())}.dump.enc`);
+  const file = path.join(
+    directory,
+    `onroadbooks-${stamp(new Date())}.dump.enc`,
+  );
   try {
     const dumpPath = path.join(workDir, "ledger.dump");
     run(
-      pgBinary("pg_dump"),
+      pgBinary("pg_dump", neon ? 18 : 17),
       [
-        "--dbname", databaseUrl(configuredUrl),
+        "--dbname",
+        databaseUrl(configuredUrl),
         "--format=custom",
-        "--file", dumpPath,
+        "--file",
+        dumpPath,
         "--schema=public",
+        ...(neon ? ["--schema=onroad_auth", "--schema=drizzle"] : []),
         "--no-owner",
         "--no-privileges",
       ],
       "logical backup",
     );
-    await writeFile(file, await encrypt(await readFile(dumpPath), secret), { mode: 0o600 });
+    await writeFile(file, await encrypt(await readFile(dumpPath), secret), {
+      mode: 0o600,
+    });
   } finally {
     // The plaintext dump dies with the temporary directory, success or not.
     await rm(workDir, { recursive: true, force: true });
   }
 
-  const tables = await verify(file, secret);
+  const tables = await verify(file, secret, neon);
   const pruned = await prune(directory, keepDays);
-  const retained = (await readdir(directory)).filter((name) => FILE_PATTERN.test(name)).length;
+  const retained = (await readdir(directory)).filter((name) =>
+    FILE_PATTERN.test(name),
+  ).length;
 
   console.log("Database backup:", {
     file: path.basename(file),
@@ -212,13 +240,18 @@ async function main(): Promise<void> {
   const toDecrypt = flag("--decrypt");
   if (toDecrypt) {
     const out = flag("--out");
-    if (!out) throw new Error("--decrypt requires --out <path for the plaintext dump>");
-    const plaintext = await decrypt(await readFile(path.resolve(toDecrypt)), passphrase());
+    if (!out)
+      throw new Error("--decrypt requires --out <path for the plaintext dump>");
+    const plaintext = await decrypt(
+      await readFile(path.resolve(toDecrypt)),
+      passphrase(),
+    );
     await writeFile(path.resolve(out), plaintext, { mode: 0o600 });
     console.log("Backup decrypted:", {
       out: path.resolve(out),
       restore: `pg_restore --dbname <target> --no-owner --no-privileges ${out}`,
-      warning: "plaintext production data -- delete it once the restore is done",
+      warning:
+        "plaintext production data -- delete it once the restore is done",
     });
     return;
   }
@@ -227,6 +260,9 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  console.error("Database backup failed:", error instanceof Error ? error.message : error);
+  console.error(
+    "Database backup failed:",
+    error instanceof Error ? error.message : error,
+  );
   process.exitCode = 1;
 });

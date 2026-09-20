@@ -52,7 +52,7 @@ export function documentTypeShort(id: string, locale: AppLocale = "en"): string 
   return item ? (locale === "es" ? item.shortEs : item.short) : "Doc";
 }
 
-/** Final stored-file limit; production uploads bypass the Vercel Function body. */
+/** Final stored-file limit; R2 uploads use bounded server requests. */
 export const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
 
 /** Large scans may enter the browser optimizer, but never reach our server. */

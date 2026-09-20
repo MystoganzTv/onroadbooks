@@ -1,3 +1,4 @@
+import { usingAuthJs } from "@/lib/auth/provider";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -14,6 +15,24 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const next = safeNextPath(requestUrl.searchParams.get("next"));
+  if (usingAuthJs()) {
+    if (!process.env.AUTH_GOOGLE_ID || !process.env.AUTH_GOOGLE_SECRET)
+      return NextResponse.redirect(
+        new URL("/login?error=google", requestUrl.origin),
+      );
+    try {
+      const { signIn } = await import("@/auth");
+      const destination = await signIn("google", {
+        redirect: false,
+        redirectTo: next ?? "/api/auth/complete",
+      });
+      return NextResponse.redirect(destination);
+    } catch {
+      return NextResponse.redirect(
+        new URL("/login?error=google", requestUrl.origin),
+      );
+    }
+  }
   const cookieStore = await cookies();
 
   if (next) {
@@ -33,13 +52,16 @@ export async function GET(request: Request) {
       },
     });
 
-    if (error || !data.url) throw error ?? new Error("Google did not return an OAuth URL.");
+    if (error || !data.url)
+      throw error ?? new Error("Google did not return an OAuth URL.");
     return NextResponse.redirect(data.url);
   } catch (error) {
     cookieStore.set(GOOGLE_OAUTH_NEXT_COOKIE, "", googleOAuthCookie(0));
     console.error("[auth:google] OAuth initialization failed", {
       error: error instanceof Error ? error.message : String(error),
     });
-    return NextResponse.redirect(new URL("/login?error=google", requestUrl.origin));
+    return NextResponse.redirect(
+      new URL("/login?error=google", requestUrl.origin),
+    );
   }
 }

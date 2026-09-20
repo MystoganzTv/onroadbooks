@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
+import { DOCUMENT_CHUNK_BYTES } from "@/lib/storage/chunked-upload";
 import { encodeDocumentUploadTicket } from "@/lib/document-upload-ticket";
 import {
   documentUploadMetadataSchema,
@@ -23,23 +24,34 @@ function response(body: object, status = 200) {
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return response({ error: "Not signed in." }, 401);
-  if (!isSameOriginRequest(request)) return response({ error: "Cross-origin uploads are refused." }, 403);
+  if (!isSameOriginRequest(request))
+    return response({ error: "Cross-origin uploads are refused." }, 403);
 
-  const parsed = documentUploadMetadataSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return response({ error: "Missing or invalid document details." }, 400);
+  const parsed = documentUploadMetadataSchema.safeParse(
+    await request.json().catch(() => null),
+  );
+  if (!parsed.success)
+    return response({ error: "Missing or invalid document details." }, 400);
 
   const dataset = await getRepository(session.businessId).getDataset();
-  const refusal = documentUploadRefusal(dataset, session.role ?? "VIEWER", parsed.data);
+  const refusal = documentUploadRefusal(
+    dataset,
+    session.role ?? "VIEWER",
+    parsed.data,
+  );
   if (refusal) return response({ error: refusal.error }, refusal.status);
 
   const storage = getDocumentStorage();
-  if (!storage.createSignedUpload) {
+  if (!storage.createSignedUpload && !storage.chunkedUploads) {
     return response({ strategy: "multipart" });
   }
 
   try {
-    const storageKey = buildStorageKey(parsed.data.owner, parsed.data.entityId, parsed.data.fileName);
-    const upload = await storage.createSignedUpload(storageKey);
+    const storageKey = buildStorageKey(
+      parsed.data.owner,
+      parsed.data.entityId,
+      parsed.data.fileName,
+    );
     const ticket = await encodeDocumentUploadTicket({
       userId: session.userId,
       businessId: session.businessId,
@@ -52,8 +64,18 @@ export async function POST(request: Request) {
       contentType: parsed.data.contentType,
       sizeBytes: parsed.data.sizeBytes,
     });
+    if (storage.chunkedUploads)
+      return response({
+        strategy: "chunked",
+        chunkBytes: DOCUMENT_CHUNK_BYTES,
+        ticket,
+      });
+    const upload = await storage.createSignedUpload!(storageKey);
     return response({ strategy: "direct", upload, ticket });
   } catch {
-    return response({ error: "Could not prepare secure document storage." }, 500);
+    return response(
+      { error: "Could not prepare secure document storage." },
+      500,
+    );
   }
 }

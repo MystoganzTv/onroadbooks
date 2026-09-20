@@ -26,6 +26,7 @@ export function AuthCard({
   initialNotice = null,
   next = null,
   locale,
+  googleConfigured,
 }: {
   mode: "login" | "setup";
   initialError?: string | null;
@@ -33,6 +34,7 @@ export function AuthCard({
   /** Already validated as a path on this site by `safeNextPath`. */
   next?: string | null;
   locale: AppLocale;
+  googleConfigured: boolean;
 }) {
   const router = useRouter();
   const isSetup = mode === "setup";
@@ -114,7 +116,11 @@ export function AuthCard({
           noValidate
           className="space-y-4 px-6 py-5"
         >
-          <AuthOptions next={next} locale={locale} />
+          <AuthOptions
+            next={next}
+            locale={locale}
+            googleConfigured={googleConfigured}
+          />
 
           {isSetup ? (
             <>

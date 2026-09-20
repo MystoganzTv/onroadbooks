@@ -3,10 +3,9 @@
 ## Health and uptime
 
 `GET /api/health` is public so an external monitor can reach it when sessions,
-the database, or Supabase are unhealthy. It is never cached.
+the database, authentication, or object storage are unhealthy. It is never cached.
 
-- `200` and `status: "ok"`: application configuration, PostgreSQL, Supabase
-  Storage, Stripe Billing, and Supabase Auth are ready.
+- `200` and `status: "ok"`: the selected database and private object storage respond, and billing/authentication configuration is present. This is a readiness probe, not an end-to-end OAuth or email-delivery certification.
 - `503` and `status: "degraded"`: at least one required dependency failed or
   production fell back to JSON/local-disk persistence.
 - The response names the failed component but does not expose credentials,
@@ -112,10 +111,7 @@ The PostgreSQL CI job starts from an empty database and runs, in order:
 
 That proves the committed migration history can recreate the declared schema.
 Vercel uses `scripts/vercel-build.mjs`. Preview builds compile without touching
-production. A Production build first applies pending migrations, re-applies the
-idempotent Supabase RLS/Data API hardening, and verifies there is no schema
-drift. Only then does `next build` run, so code that needs a new column cannot
-be promoted before that column exists.
+production. A Production build uses exactly one migration system. The legacy `postgres` mode runs Prisma migrations, Supabase hardening and Prisma schema verification. `DATA_SOURCE=neon` requires matching Neon runtime/direct endpoints, applies Drizzle migrations and runs `db:drizzle:verify` against both business and private auth schemas plus migration hashes. Only then does `next build` run. Preview/local builds apply no migrations automatically.
 
 Production schema changes must remain backward-compatible with the currently
 running deployment. Use expand/contract changes: add nullable columns/tables
@@ -138,9 +134,7 @@ uses for auth mail and error alerts. No bucket and no new vendor.
 
 **Never add `upload-artifact` to that workflow while the repository is public.**
 
-Four repository secrets: `DATABASE_URL`, `BACKUP_PASSPHRASE` (the same
-passphrase as the local backups, so one secret opens either copy),
-`RESEND_API_KEY` and `BACKUP_EMAIL`.
+Repository secrets: `DATABASE_URL` for the legacy backend, `BACKUP_PASSPHRASE`, `RESEND_API_KEY` and `BACKUP_EMAIL`. At the Neon cutover, add `NEON_DIRECT_URL` and set the repository variable `DATA_SOURCE=neon` in the same maintenance window as the application switch. Missing Neon credentials fail the backup; there is no fallback to the legacy database. The job installs PostgreSQL 18 clients, compatible with both the old PostgreSQL 17 source and Neon 18. Do not rotate the backup passphrase during this transition.
 
 `scripts/lib/backup-email.ts` refuses to send anything past 38 MB rather than
 mailing half a ledger. The day that throws is the day nightly backups need
@@ -165,19 +159,18 @@ advice. The accountant files; we hand them the file.
 
 ## Database backups
 
-Supabase's free plan includes no daily backup and no point-in-time recovery, so
-the ledger is backed up by us, on a schedule, or it is not backed up at all:
+The independent encrypted logical backup runs against the selected backend:
 
 ```bash
 npm run backup
 ```
 
-Each run dumps the production `public` schema, encrypts it with AES-256-GCM
+Each run dumps `public`; Neon also includes `onroad_auth` and `drizzle`. It encrypts the archive with AES-256-GCM
 under a scrypt key derived from `BACKUP_PASSPHRASE`, writes
 `onroadbooks-<UTC timestamp>.dump.enc` into `BACKUP_DIR` (default
 `~/OnRoadBooksBackups`, and never inside this repository), then decrypts what
 it just wrote and reads its table of contents back with `pg_restore` to prove
-all 19 application tables are in it. A run that cannot prove that fails.
+all 20 business tables are in it. Neon archives must also contain Identity, Invitation and the Drizzle migration journal. A run that cannot prove that fails.
 
 Old files are pruned past `BACKUP_KEEP_DAYS` (default 30), except that the
 seven newest always survive -- a machine left off for two months must not
@@ -198,10 +191,7 @@ rm /tmp/ledger.dump
 `npm run backup -- --verify <file>` re-checks an existing backup without
 producing a new one; run it on the oldest file you keep, not just the newest.
 
-Two limits worth saying out loud. This recovers last night, not the last five
-minutes -- only Supabase Pro's PITR does that. And it covers the application
-database only: Supabase Auth identities and Storage objects have their own
-provider export procedures and are not in this file.
+This logical archive recovers its snapshot, not later writes. Any provider point-in-time recovery is a separate capability. Neon archives include the new Auth.js identity links and invitation hashes; legacy Supabase Auth identities and object bytes (Supabase or R2) require separate export/backup. On macOS, configure PostgreSQL 18 tools through a persistent `PG_BIN` before scheduling Neon backups; temporary verification tools under `/tmp` are not a permanent installation.
 
 ## Backup restoration drill
 
