@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireWritableSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
 import { duplicateInvoiceNumber, invoiceIssuePatch } from "@/lib/invoices";
-import { invoiceSchema, paymentEventSchema } from "@/lib/schemas";
+import { invoiceSchema } from "@/lib/schemas";
 import { fieldErrorsFrom, type ActionResult } from "./types";
 
 function revalidateInvoicePaths(loadId: string) {
@@ -44,28 +44,6 @@ export async function issueInvoiceAction(loadId: string, values: unknown): Promi
     return { ok: true, id: loadId };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Could not issue invoice." };
-  }
-}
-
-export async function recordInvoicePaymentAction(values: unknown): Promise<ActionResult> {
-  const parsed = paymentEventSchema.safeParse(values);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      error: parsed.error.issues[0]?.message ?? "Check the payment.",
-      fieldErrors: fieldErrorsFrom(parsed.error.issues),
-    };
-  }
-  try {
-    const session = await requireWritableSession("manage_finances");
-    const event = await getRepository(session.businessId).createPaymentEvent(parsed.data);
-    revalidateInvoicePaths(event.loadId);
-    return { ok: true, id: event.id };
-  } catch (error) {
-    return {
-      ok: false,
-      error: error instanceof Error ? error.message : "Could not record payment.",
-    };
   }
 }
 

@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { Fuel } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 import { CategoryBreakdown } from "@/components/expenses/category-breakdown";
 import { ExpenseFormDialog } from "@/components/expenses/expense-form-dialog";
@@ -81,6 +84,8 @@ export default async function ExpensesPage({
           unit: periodExpenses.length === 1 ? copy.entry : copy.entries,
         })}
         actions={
+          <div className="flex flex-wrap gap-2">
+          <Button asChild size="sm" variant="outline"><Link href="/fuel"><Fuel />{getWebDictionary(locale).fuel.title}</Link></Button>
           <ExpenseFormDialog
             loads={periodLoads}
             trucks={trucks}
@@ -88,6 +93,7 @@ export default async function ExpensesPage({
             defaultDate={defaultEntryDate(period)}
             categoryBehavior={settings.categoryBehavior}
           />
+          </div>
         }
       />
 

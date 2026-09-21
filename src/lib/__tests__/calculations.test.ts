@@ -160,7 +160,7 @@ describe("summarizePeriod", () => {
     assert.equal(s.loadCount, 2);
   });
 
-  it("separates earned revenue, dated collections, receivables and debt service", () => {
+  it("counts each recorded load as received income on its date regardless of legacy status", () => {
     const s = summarizePeriod(
       [
         load({
@@ -195,19 +195,19 @@ describe("summarizePeriod", () => {
     );
 
     assert.equal(s.bookedRevenue, 3400);
-    assert.equal(s.collectedRevenue, 1800);
-    assert.equal(s.accountsReceivable, 2500);
-    assert.equal(s.unallocatedCollectedRevenue, 900);
+    assert.equal(s.collectedRevenue, 3400);
+    assert.equal(s.accountsReceivable, 0);
+    assert.equal(s.unallocatedCollectedRevenue, 0);
     assert.equal(s.operatingExpenses, 400);
     assert.equal(s.operatingProfit, 3000);
     assert.equal(s.interestExpense, 100);
     assert.equal(s.principalPayment, 600);
     assert.equal(s.unallocatedDebtService, 200);
     assert.equal(s.debtService, 900);
-    assert.equal(s.cashAfterDebtService, 500);
+    assert.equal(s.cashAfterDebtService, 2100);
   });
 
-  it("keeps a partial payment as cash while leaving only the balance in receivables", () => {
+  it("does not add legacy partial payments to income or create a pending balance", () => {
     const invoice = load({
       id: "partial",
       grossRate: 2500,
@@ -235,9 +235,9 @@ describe("summarizePeriod", () => {
       payments,
     );
     assert.equal(summary.bookedRevenue, 2500);
-    assert.equal(summary.collectedRevenue, 900);
-    assert.equal(summary.accountsReceivable, 1600);
-    assert.equal(summary.cashAfterDebtService, 900);
+    assert.equal(summary.collectedRevenue, 2500);
+    assert.equal(summary.accountsReceivable, 0);
+    assert.equal(summary.cashAfterDebtService, 2500);
   });
 
   it("halves sum exactly to the full month", () => {

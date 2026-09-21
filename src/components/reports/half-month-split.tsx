@@ -52,8 +52,6 @@ export function HalfMonthSplit({ halves, monthLabel }: HalfMonthSplitProps) {
 
               <dl className="mt-3 space-y-1 text-xs">
                 <Line label={copy.bookedRevenue} value={formatMoney(summary.bookedRevenue)} />
-                <Line label={copy.collectedRevenue} value={formatMoney(summary.collectedRevenue)} />
-                <Line label={copy.accountsReceivable} value={formatMoney(summary.accountsReceivable)} />
                 <Line
                   label={copy.businessExpenses}
                   value={`-${formatMoney(summary.operatingExpenses)}`}

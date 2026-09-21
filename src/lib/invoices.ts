@@ -14,12 +14,10 @@ export function invoicePaymentSummary(
 ): InvoicePaymentSummary {
   const events = paymentEvents.filter((event) => event.loadId === load.id);
   const legacyPaid = events.length === 0 && load.status === "PAID";
-  const collected = legacyPaid
-    ? load.grossRate
-    : roundMoney(events.reduce((total, event) => total + event.amount, 0));
+  const collected = roundMoney(load.grossRate);
   return {
     collected,
-    balance: Math.max(0, roundMoney(load.grossRate - collected)),
+    balance: 0,
     eventCount: events.length,
     legacyPaid,
   };
@@ -102,11 +100,9 @@ export function nextInvoiceNumber(loads: Load[], date: string): string {
   return `${prefix}${String(highest + 1).padStart(4, "0")}`;
 }
 
-export function invoiceAgeDays(load: Load, today = new Date()): number | null {
-  if (!load.invoiceDueDate || load.status === "PAID") return null;
-  const due = new Date(`${load.invoiceDueDate}T00:00:00Z`);
-  const current = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
-  return Math.floor((current - due.getTime()) / 86_400_000);
+/** Invoice dates describe the document; reported loads have no pending collection. */
+export function invoiceAgeDays(_load: Load, _today = new Date()): number | null {
+  return null;
 }
 
 export function invoiceIsOverdue(load: Load, today = new Date()): boolean {

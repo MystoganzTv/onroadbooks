@@ -23,6 +23,7 @@ import {
 } from "./sidebar-groups";
 import { ROLE_DEFINITIONS } from "@/lib/roles";
 import type { MemberRole } from "@/lib/types";
+import { useViewMode } from "./view-mode-provider";
 import { useLanguage } from "./language-provider";
 import { localizedNavGroup, localizedNavItem } from "./nav-copy";
 
@@ -47,7 +48,10 @@ export function SidebarNav({
   onNavigate,
 }: SidebarNavProps) {
   const pathname = usePathname();
-  const { locale, copy } = useLanguage();
+  const { locale, copy, dictionary } = useLanguage();
+  const { mode } = useViewMode();
+  const simple = mode === "simple";
+  const [moreToolsOpen, setMoreToolsOpen] = React.useState(false);
   const navId = React.useId();
   const settingsActive =
     pathname === "/settings" || pathname.startsWith("/settings/");
@@ -57,9 +61,16 @@ export function SidebarNav({
       (item) =>
         (hasFleet || !item.fleetOnly) &&
         (isAdmin || !item.adminOnly) &&
+        (item.requires !== "IFTA" || navAvailability(item, readiness).enabled) &&
         isNavVisibleToRole(item, role),
     ),
   })).filter((group) => group.items.length > 0);
+  const primaryPaths = ["/dashboard", "/loads", "/expenses"];
+  const allItems = visibleGroups.flatMap((group) => group.items);
+  const groups = simple ? [
+    { label: "primary", items: primaryPaths.flatMap((href) => allItems.filter((item) => item.href === href)) },
+    { label: "moreTools", items: allItems.filter((item) => !primaryPaths.includes(item.href)) },
+  ] : visibleGroups;
   // Every group is open until it is deliberately closed, and navigating never
   // reopens one. The nav used to force the active group open on every route
   // change, which meant a group you had just collapsed sprang back the moment
@@ -83,8 +94,9 @@ export function SidebarNav({
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-2" aria-label={copy.mainNavigation}>
-        {visibleGroups.map((group) => {
-          const expanded = !collapsed.includes(group.label);
+        {groups.map((group) => {
+          const primary = simple && group.label === "primary";
+          const expanded = simple ? primary || moreToolsOpen : !collapsed.includes(group.label);
           const holdsCurrentPage = group.items.some((item) =>
             isNavActive(item, pathname),
           );
@@ -92,11 +104,11 @@ export function SidebarNav({
 
           return (
             <div key={group.label}>
-              <button
+              {!primary && <button
                 type="button"
                 aria-expanded={expanded}
                 aria-controls={groupId}
-                onClick={() => toggleGroup(group.label)}
+                onClick={() => simple ? setMoreToolsOpen((value) => !value) : toggleGroup(group.label)}
                 className={cn(
                   "flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left text-2xs font-semibold uppercase tracking-[0.14em] transition-colors",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
@@ -106,7 +118,7 @@ export function SidebarNav({
                 )}
               >
                 <span className="flex min-w-0 items-center gap-1.5">
-                  <span className="truncate">{localizedNavGroup(group.label, copy)}</span>
+                  <span className="truncate">{simple ? dictionary.viewMode.moreTools : localizedNavGroup(group.label, copy)}</span>
                   {holdsCurrentPage && !expanded ? (
                     <span
                       aria-hidden="true"
@@ -121,11 +133,11 @@ export function SidebarNav({
                     expanded ? "rotate-180" : "rotate-0",
                   )}
                 />
-              </button>
+              </button>}
               <ul id={groupId} hidden={!expanded} className="mt-0.5 space-y-0.5">
                 {group.items.map((item) => {
                   const active = isNavActive(item, pathname);
-                  const availability = navAvailability(item, readiness);
+                  const availability = primary ? { enabled: true } : navAvailability(item, readiness);
                   const content = (
                     <>
                       <item.icon
@@ -135,7 +147,7 @@ export function SidebarNav({
                         )}
                       />
                       <span className="truncate">
-                        {localizedNavItem(item.href, item.label, copy)}
+                        {simple && item.href === "/dashboard" ? dictionary.viewMode.home : localizedNavItem(item.href, item.label, copy)}
                       </span>
                       {!availability.enabled && availability.badge ? (
                         <span className="ml-auto shrink-0 rounded border border-sidebar-border px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide">

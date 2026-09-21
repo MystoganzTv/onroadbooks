@@ -12,6 +12,7 @@ import { SidebarNav } from "./sidebar-nav";
 import { DisplayMenu } from "./display-menu";
 import { isNavActive, PRIMARY_NAV, type NavigationReadiness } from "./nav-items";
 import type { MemberRole } from "@/lib/types";
+import { useViewMode } from "./view-mode-provider";
 import { useLanguage } from "./language-provider";
 import { localizedNavItem } from "./nav-copy";
 
@@ -36,10 +37,12 @@ export function AppShell({
 }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const pathname = usePathname();
-  const { copy } = useLanguage();
+  const { copy, dictionary } = useLanguage();
+  const { mode } = useViewMode();
 
   const currentItem = PRIMARY_NAV.find((item) => isNavActive(item, pathname));
-  const current = currentItem
+  const current = mode === "simple" && pathname === "/dashboard" ? dictionary.viewMode.home
+    : currentItem
     ? localizedNavItem(currentItem.href, currentItem.label, copy)
     : APP_NAME;
 

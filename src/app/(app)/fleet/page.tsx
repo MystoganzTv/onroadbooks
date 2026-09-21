@@ -232,12 +232,6 @@ export default async function FleetPage({
               </span>
             </div>
             <Line label={copy.lessDebt} value={-fleet.debtService} />
-            {fleet.unallocatedCollectedRevenue > 0 ? (
-              <Line
-                label={copy.missingPaymentDate}
-                value={fleet.unallocatedCollectedRevenue}
-              />
-            ) : null}
             <div className="flex items-center justify-between border-t border-border pt-2 font-semibold">
               <span>{copy.cashAfterDebt}</span>
               <span className={cn("tnum", fleet.cashAfterDebtService >= 0 ? "text-pos" : "text-neg")}>

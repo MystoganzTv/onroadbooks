@@ -30,7 +30,6 @@ import {
 } from "@/lib/finance/brokers";
 import {
   formatMiles,
-  formatMoney,
   formatMoneyCompact,
   formatPercent,
   formatRateValue,
@@ -201,13 +200,6 @@ export default async function BrokersPage({
                     <TableRow key={broker.broker}>
                       <TableCell className="font-medium">
                         <span className="block truncate">{broker.broker === "No broker" ? copy.noBroker : broker.broker}</span>
-                        {broker.outstanding > 0 ? (
-                          <span className="text-2xs text-warn tnum">
-                            {interpolate(copy.amountOutstanding, {
-                              amount: formatMoney(broker.outstanding),
-                            })}
-                          </span>
-                        ) : null}
                       </TableCell>
                       <TableCell className="text-right tnum">{broker.loadCount}</TableCell>
                       <TableCell className="text-right tnum">

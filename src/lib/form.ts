@@ -46,6 +46,11 @@ export function focusFirstError(formId: string): void {
   const first = form.querySelector<HTMLElement>('[aria-invalid="true"]');
   const target = first ?? form.querySelector<HTMLElement>("[data-error-anchor]");
   if (!target) return;
+  let parent = target.parentElement;
+  while (parent && parent !== form) {
+    if (parent instanceof HTMLDetailsElement) parent.open = true;
+    parent = parent.parentElement;
+  }
   target.scrollIntoView({ block: "center", behavior: "smooth" });
   target.focus({ preventScroll: true });
 }

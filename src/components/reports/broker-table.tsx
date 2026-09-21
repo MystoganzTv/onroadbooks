@@ -77,7 +77,6 @@ export function BrokerTable({
                   <TableHead className="text-right">{copy.contributionProfit}</TableHead>
                   <TableHead className="text-right">{copy.contributionPerMile}</TableHead>
                   <TableHead>{copy.rating}</TableHead>
-                  <TableHead className="text-right">{copy.outstanding}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -126,14 +125,6 @@ export function BrokerTable({
                     </TableCell>
                     <TableCell>
                       <RatingBadge rating={broker.rating} />
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        "text-right tnum",
-                        broker.outstanding > 0 ? "text-warn" : "text-muted-foreground",
-                      )}
-                    >
-                      {broker.outstanding > 0 ? formatMoney(broker.outstanding) : "--"}
                     </TableCell>
                   </TableRow>
                 ))}

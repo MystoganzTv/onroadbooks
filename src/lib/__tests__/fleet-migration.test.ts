@@ -80,15 +80,15 @@ describe("August 2026 after the fleet migration", () => {
   const august = resolvePeriod("2026-08", "full");
   const summary = summarizePeriod(dataset.loads, dataset.expenses, august, dataset.settings);
 
-  it("separates booked performance from collected cash", () => {
+  it("uses reported loads as received income, including legacy unpaid statuses", () => {
     assert.equal(summary.bookedRevenue, 9795);
-    assert.equal(summary.collectedRevenue, 6275);
-    assert.equal(summary.accountsReceivable, 3520);
+    assert.equal(summary.collectedRevenue, 9795);
+    assert.equal(summary.accountsReceivable, 0);
     assert.equal(summary.operatingExpenses, 4858.9);
     assert.equal(summary.operatingProfit, 4936.1);
     assert.equal(summary.unallocatedDebtService, 1285);
     assert.equal(summary.debtService, 1285);
-    assert.equal(summary.cashAfterDebtService, 131.1);
+    assert.equal(summary.cashAfterDebtService, 3651.1);
   });
 
   it("separates actual operating cost per mile from debt cash burden", () => {
@@ -105,13 +105,13 @@ describe("August 2026 after the fleet migration", () => {
     assert.equal(summary.totalMiles, 3332);
   });
 
-  it("keeps unpaid invoices out of Safe to Pay Yourself", () => {
+  it("calculates available money from recorded income less expenses, debt and reserves", () => {
     const pay = calculateSafeOwnerPay(
       summary,
       resolveReserveRules(dataset.settings, dataset.reserveAccounts),
     );
     assert.equal(pay.reserveTotal, 1672.87);
-    assert.equal(pay.safeToPay, -1541.77);
+    assert.equal(pay.safeToPay, 1978.23);
   });
 
   it("still splits a month into halves that sum back to it", () => {
@@ -359,15 +359,14 @@ describe("calculateFleetSummary", () => {
     );
   });
 
-  it("uses collected cash, never booked revenue, for Cash After Debt Service", () => {
+  it("uses recorded load income without requiring payment dates", () => {
     const overall = summarizePeriod(loads, expenses, august, settings);
-    assert.equal(fleetSummary.collectedRevenue, 0);
-    // These fixtures are legacy PAID rows without payment dates: paid status
-    // is preserved, but no cash period is silently invented.
+    assert.equal(fleetSummary.collectedRevenue, 18000);
+    // Legacy payment dates are irrelevant: the load date records receipt.
     assert.equal(fleetSummary.accountsReceivable, 0);
-    assert.equal(fleetSummary.unallocatedCollectedRevenue, 18000);
+    assert.equal(fleetSummary.unallocatedCollectedRevenue, 0);
     assert.equal(fleetSummary.cashAfterDebtService, overall.cashAfterDebtService);
-    assert.equal(fleetSummary.cashAfterDebtService, -11500);
+    assert.equal(fleetSummary.cashAfterDebtService, 6500);
   });
 
   it("reports the overhead allocation separately from any unit's own cost", () => {

@@ -13,6 +13,8 @@ import {
   duplicateInvoiceNumber,
   invoiceIssueOutcome,
   invoiceIssuePatch,
+  invoicePaymentSummary,
+  invoiceAgeDays,
   nextInvoiceNumber,
 } from "../invoices";
 import { freightMarket } from "../markets";
@@ -192,6 +194,21 @@ describe("IFTA applicability", () => {
 });
 
 describe("issuing an invoice", () => {
+  it("treats recorded loads as received without counting old events twice", () => {
+    const dataset = buildSeedDataset();
+    const original = dataset.loads[0];
+    for (const status of ["PENDING", "INVOICED", "PAID"] as const) {
+      const load = { ...original, status, grossRate: 1000, invoiceDueDate: "2020-01-01" };
+      const events = [{ id: "legacy", businessId: load.businessId, loadId: load.id, date: "2026-09-20", amount: 400, method: null, reference: null, notes: null, createdAt: "" }];
+      const before = JSON.stringify({ load, events });
+      const payment = invoicePaymentSummary(load, events);
+      assert.equal(payment.collected, 1000);
+      assert.equal(payment.balance, 0);
+      assert.equal(invoiceAgeDays(load), null);
+      assert.equal(JSON.stringify({ load, events }), before);
+    }
+  });
+
   it("does not un-collect a load that was already paid", () => {
     // Quick-pay and factoring both land the money before the paperwork. The
     // bug this replaces flipped such a load back to INVOICED, which moved

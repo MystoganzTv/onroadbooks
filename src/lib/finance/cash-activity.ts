@@ -18,24 +18,13 @@ export interface CashActivity {
 export function calculateCashActivity(
   loads: Load[],
   expenses: Expense[],
-  paymentEvents: PaymentEvent[],
+  _paymentEvents: PaymentEvent[],
   range: DateRange,
 ): CashActivity {
-  const includedLoadIds = new Set(loads.map((load) => load.id));
-  const relevantEvents = paymentEvents.filter((event) => includedLoadIds.has(event.loadId));
-  const eventLoadIds = new Set(relevantEvents.map((event) => event.loadId));
+  // A reported load is already received income. Legacy payment events are
+  // retained for history and must not count that income a second time.
   const collectedRevenue = roundMoney(
-    sum(relevantEvents.filter((event) => inRange(event.date, range)), (event) => event.amount) +
-      sum(
-        loads.filter(
-          (load) =>
-            !eventLoadIds.has(load.id) &&
-            load.status === "PAID" &&
-            Boolean(load.invoicePaidDate) &&
-            inRange(load.invoicePaidDate!, range),
-        ),
-        (load) => load.grossRate,
-      ),
+    sum(loads.filter((load) => inRange(load.date, range)), (load) => load.grossRate),
   );
   const rows = expenses.filter((expense) => inRange(expense.date, range));
   const totalFor = (treatment: ReturnType<typeof financialTreatmentOf>) =>

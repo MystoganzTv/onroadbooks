@@ -77,7 +77,6 @@ function coverTable(dataset: Dataset, period: Period, businessName: string): Rep
     ["", ""],
     ["Booked Revenue", money(summary.bookedRevenue)],
     ["Collected Revenue", money(summary.collectedRevenue)],
-    ["Accounts Receivable", money(summary.accountsReceivable)],
     ["Operating expenses", money(summary.operatingExpenses)],
     ["Operating Profit", money(summary.operatingProfit)],
     ["Interest Expense", money(summary.interestExpense)],
@@ -132,7 +131,6 @@ function monthlyTrendsTable(dataset: Dataset, year: number, businessName: string
       label,
       money(summary.bookedRevenue),
       money(summary.collectedRevenue),
-      money(summary.accountsReceivable),
       money(summary.operatingExpenses),
       money(summary.operatingProfit),
       money(summary.debtService),
@@ -150,7 +148,6 @@ function monthlyTrendsTable(dataset: Dataset, year: number, businessName: string
       "Month",
       "You Earned",
       "Collected",
-      "Still Owed",
       "Business Expenses",
       "Business Made",
       "Debt Payments",
@@ -186,13 +183,7 @@ function reviewChecksTable(dataset: Dataset, period: Period, businessName: strin
     dataset.settings,
     dataset.paymentEvents,
   );
-  const paymentLoadIds = new Set(dataset.paymentEvents.map((event) => event.loadId));
-  const paidWithoutDate = loads.filter(
-    (load) => load.status === "PAID" && !load.invoicePaidDate && !paymentLoadIds.has(load.id),
-  );
-  const paidWithoutDateAmount = paidWithoutDate.reduce((sum, load) => sum + load.grossRate, 0);
   const missingCustomer = loads.filter((load) => !load.billToName?.trim() && !load.broker?.trim());
-  const missingInvoice = loads.filter((load) => !load.invoiceNumber?.trim());
   const iftaRelevant = fleetIftaApplicability(dataset.trucks.filter((truck) => truck.active)) === "LIKELY_REQUIRED";
   const missingIftaLoads = iftaRelevant
     ? loads.filter((load) => load.loadedMiles + load.deadheadMiles > 0 && load.jurisdictionMiles.length === 0)
@@ -213,30 +204,6 @@ function reviewChecksTable(dataset: Dataset, period: Period, businessName: strin
     : { status: "OK", what: okWhat, records: 0, amount: 0, why: "No exception found for this period.", action: "No action needed.", route: "" };
 
   const checks: ReviewCheck[] = [
-    issue(
-      paidWithoutDate.length > 0,
-      {
-        what: `${displayMoney(paidWithoutDateAmount)} NEEDS A PAYMENT DATE`,
-        records: paidWithoutDate.length,
-        amount: money(paidWithoutDateAmount),
-        why: "These loads are marked paid, but OnRoad cannot place the cash in the month it arrived.",
-        action: "Record the date each payment reached the business.",
-        route: "/invoices",
-      },
-      "Payment dates are complete.",
-    ),
-    issue(
-      missingInvoice.length > 0,
-      {
-        what: `${missingInvoice.length} LOAD${missingInvoice.length === 1 ? "" : "S"} NEED${missingInvoice.length === 1 ? "S" : ""} AN INVOICE`,
-        records: missingInvoice.length,
-        amount: money(missingInvoice.reduce((sum, load) => sum + load.grossRate, 0)),
-        why: "Uninvoiced work can delay collection and makes the receivables trail incomplete.",
-        action: "Create the missing invoices or confirm that they are not billable.",
-        route: "/invoices",
-      },
-      "Every load has an invoice.",
-    ),
     issue(
       missingCustomer.length > 0,
       {

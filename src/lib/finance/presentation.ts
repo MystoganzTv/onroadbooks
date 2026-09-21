@@ -130,7 +130,7 @@ export function selectOwnerMoneyPresentation(facts: OwnerMoneyFacts): OwnerMoney
       label: "You collected",
       canonicalTerm: "collectedRevenue",
       value: money(facts.collectedRevenue, "Cash collections are not known for this period."),
-      explanation: "Cash with a recorded payment date",
+      explanation: "Income recorded on the load date",
       tone: "info",
     },
     stillWaiting: {

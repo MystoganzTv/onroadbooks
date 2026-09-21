@@ -1190,7 +1190,7 @@ describe("calculateDaySnapshot", () => {
 });
 
 describe("cash activity and monthly planning", () => {
-  it("keeps day-one operations and day-one cash on their own dates", () => {
+  it("does not count historical payment events as new load income", () => {
     const cash = calculateCashActivity(
       [load({ id: "old", date: "2026-07-20", grossRate: 2500, status: "INVOICED" })],
       [
@@ -1210,10 +1210,10 @@ describe("cash activity and monthly planning", () => {
       }],
       { start: "2026-08-01", end: "2026-08-01" },
     );
-    assert.equal(cash.collectedRevenue, 1000);
+    assert.equal(cash.collectedRevenue, 0);
     assert.equal(cash.operatingCashOutflows, 800);
     assert.equal(cash.principalPayment, 600);
-    assert.equal(cash.netCashActivity, -400);
+    assert.equal(cash.netCashActivity, -1400);
   });
 
   it("adds financing only to cash break-even and coverage", () => {
@@ -1423,9 +1423,9 @@ describe("settlements", () => {
       settings,
       accounts,
     );
-    assert.equal(snapshot.calculationVersion, 3);
+    assert.equal(snapshot.calculationVersion, 4);
     assert.equal(snapshot.bookedRevenue, snapshot.grossRevenue);
-    assert.equal(snapshot.collectedRevenue, 0);
+    assert.equal(snapshot.collectedRevenue, snapshot.grossRevenue);
     assert.equal(snapshot.debtService, 1200);
     assert.equal(snapshot.reserves.length, 3);
     assert.equal(snapshot.reserves[0].pct, 20);

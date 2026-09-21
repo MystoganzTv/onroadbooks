@@ -11,7 +11,7 @@ import type { ExpenseCategoryId, FinancialTreatment } from "../types";
  * preserve any closed snapshot written by an earlier version.
  */
 
-export const FINANCIAL_MODEL_VERSION = 3 as const;
+export const FINANCIAL_MODEL_VERSION = 4 as const;
 export const LEGACY_FINANCIAL_MODEL_VERSION = 1 as const;
 
 /** Financing rows excluded from Operating Expenses and reported below it. */
@@ -76,20 +76,20 @@ export const FINANCIAL_TERMS = {
   bookedRevenue: {
     label: "Booked Revenue",
     definition:
-      "Revenue earned from loads assigned to the reporting period, whether or not the customer has paid. OnRoad Books currently assigns a load to its operational date so historical periods do not move when an invoice is paid.",
+      "Received income recorded through loads, assigned to the load date. Registering a load confirms the income; no separate collection step is required.",
     basis: "Gross rates for loads whose load date is inside the performance period.",
   },
   collectedRevenue: {
     label: "Collected Revenue",
     definition:
-      "Cash received from customers. A paid status without a recorded payment date remains paid operationally but is not guessed into a cash period.",
-    basis: "Payment-event amounts dated inside the cash period; legacy fully-paid invoices use their recorded invoice-paid date only when no payment events exist.",
+      "Received income recorded through loads. Equal to recorded revenue; invoice status and legacy payment events do not change the total.",
+    basis: "Gross rates for loads dated inside the reporting period, counted once.",
   },
   accountsReceivable: {
     label: "Accounts Receivable",
     definition:
-      "Booked revenue that has not been collected. It affects performance but is not cash available to spend.",
-    basis: "For loads in the performance period: Gross Rate minus all recorded payment events, floored at zero; legacy PAID invoices without events remain fully paid.",
+      "Legacy compatibility field. New live reports do not track customer receivables.",
+    basis: "Zero in model v4; previously closed snapshots retain their original figures.",
   },
   directTripCosts: {
     label: "Direct Trip Costs",

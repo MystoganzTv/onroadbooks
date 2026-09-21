@@ -468,11 +468,11 @@ export interface PeriodSummary {
   calculationVersion: number;
   /** Performance-basis revenue, independent of payment status. */
   bookedRevenue: number;
-  /** Cash-basis revenue, assigned by the recorded payment date. */
+  /** Received income recorded once on the load date (model v4). */
   collectedRevenue: number;
-  /** Booked revenue in this period that remains unpaid. */
+  /** Legacy field; always zero in live model v4 reports. */
   accountsReceivable: number;
-  /** Paid loads that have no payment date and therefore are not guessed into cash. */
+  /** Legacy field; always zero in live model v4 reports. */
   unallocatedCollectedRevenue: number;
   interestExpense: number;
   principalPayment: number;

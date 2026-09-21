@@ -52,13 +52,13 @@ describe("the year-end packet", () => {
       dataset.settings,
       dataset.paymentEvents,
     );
-    const sum = (column: number) => monthly.rows.reduce((total, row) => total + Number(row[column] ?? 0), 0);
-    assert.equal(Number(sum(1).toFixed(2)), Number(annual.bookedRevenue.toFixed(2)));
-    assert.equal(Number(sum(2).toFixed(2)), Number(annual.collectedRevenue.toFixed(2)));
-    assert.equal(Number(sum(4).toFixed(2)), Number(annual.operatingExpenses.toFixed(2)));
-    assert.equal(Number(sum(5).toFixed(2)), Number(annual.operatingProfit.toFixed(2)));
-    assert.equal(Number(sum(6).toFixed(2)), Number(annual.debtService.toFixed(2)));
-    assert.equal(Number(sum(7).toFixed(2)), Number(annual.cashAfterDebtService.toFixed(2)));
+    const sum = (label: string) => monthly.rows.reduce((total, row) => total + Number(row[monthly.columns.indexOf(label)] ?? 0), 0);
+    assert.equal(Number(sum("You Earned").toFixed(2)), Number(annual.bookedRevenue.toFixed(2)));
+    assert.equal(Number(sum("Collected").toFixed(2)), Number(annual.collectedRevenue.toFixed(2)));
+    assert.equal(Number(sum("Business Expenses").toFixed(2)), Number(annual.operatingExpenses.toFixed(2)));
+    assert.equal(Number(sum("Business Made").toFixed(2)), Number(annual.operatingProfit.toFixed(2)));
+    assert.equal(Number(sum("Debt Payments").toFixed(2)), Number(annual.debtService.toFixed(2)));
+    assert.equal(Number(sum("Cash After Debt").toFixed(2)), Number(annual.cashAfterDebtService.toFixed(2)));
   });
 
   it("turns incomplete data into an explained next action", () => {
@@ -95,7 +95,7 @@ describe("the year-end packet", () => {
     );
     assert.equal(value("Booked Revenue"), Number(summary.bookedRevenue.toFixed(2)));
     assert.equal(value("Collected Revenue"), Number(summary.collectedRevenue.toFixed(2)));
-    assert.equal(value("Accounts Receivable"), Number(summary.accountsReceivable.toFixed(2)));
+    assert.equal(value("Accounts Receivable"), undefined);
     assert.equal(value("Operating expenses"), Number(summary.operatingExpenses.toFixed(2)));
     assert.equal(value("Operating Profit"), Number(summary.operatingProfit.toFixed(2)));
     assert.equal(value("Debt Service"), Number(summary.debtService.toFixed(2)));
@@ -104,7 +104,7 @@ describe("the year-end packet", () => {
     assert.equal(value("Total miles"), Math.round(summary.totalMiles));
   });
 
-  it("splits revenue into collected and still owed", () => {
+  it("reports load income as received without pending balances", () => {
     const summary = summarizePeriod(
       dataset.loads,
       dataset.expenses,
@@ -112,7 +112,8 @@ describe("the year-end packet", () => {
       dataset.settings,
     );
     assert.equal(Number(value("Collected Revenue")), summary.collectedRevenue);
-    assert.equal(Number(value("Accounts Receivable")), summary.accountsReceivable);
+    assert.equal(value("Accounts Receivable"), undefined);
+    assert.equal(summary.collectedRevenue, summary.bookedRevenue);
     assert.equal(Number(value("Booked Revenue")), summary.bookedRevenue);
   });
 

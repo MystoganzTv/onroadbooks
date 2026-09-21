@@ -54,7 +54,6 @@ export function SettlementDetail({ view }: { view: SettlementView }) {
   });
   const problems = currentModel
     ? selectActionableFinancialProblems({
-        unallocatedCollectedRevenue: figures.unallocatedCollectedRevenue ?? 0,
         unallocatedDebtService: figures.unallocatedDebtService ?? 0,
       })
     : [];
@@ -109,7 +108,7 @@ export function SettlementDetail({ view }: { view: SettlementView }) {
         </CardHeader>
 
         <CardContent className="p-0">
-          <div className="grid border-t border-border sm:grid-cols-2 xl:grid-cols-4 xl:divide-x xl:divide-border">
+          <div className="grid border-t border-border sm:grid-cols-2 xl:grid-cols-3 xl:divide-x xl:divide-border">
             <PrimaryAnswer label={copy.truckEarned} question={copy.earnedQuestion} value={answers.earned.value} tone="info" note={interpolate(copy.earnedNote, {
               count: figures.loadCount,
               unit: figures.loadCount === 1 ? copy.load : copy.loads.toLowerCase(),
@@ -119,7 +118,6 @@ export function SettlementDetail({ view }: { view: SettlementView }) {
               margin: formatPercent(bookedRevenue > 0 ? (figures.operatingProfit / bookedRevenue) * 100 : 0),
             })} />
             <PrimaryAnswer label={copy.cashCollected} question={copy.collectedQuestion} value={answers.collected.value} tone="info" note={copy.cashWithDate} />
-            <PrimaryAnswer label={copy.stillWaiting} question={copy.waitingQuestion} value={answers.stillWaiting.value} tone="warning" note={copy.waitingNote} />
           </div>
 
           <div className="grid gap-px border-t border-border bg-border sm:grid-cols-3">
@@ -172,7 +170,6 @@ export function SettlementDetail({ view }: { view: SettlementView }) {
               <dl className="divide-y divide-border/70">
                 <DetailRow label={currentModel ? copy.bookedRevenue : copy.grossLegacy} value={bookedRevenue} />
                 <DetailRow label={copy.collectedRevenue} value={currentModel ? (figures.collectedRevenue ?? null) : null} />
-                <DetailRow label={copy.accountsReceivable} value={currentModel ? (figures.accountsReceivable ?? null) : null} />
                 <DetailRow label={copy.operatingExpenses} value={figures.operatingExpenses} negative />
                 <DetailRow label={copy.operatingProfit} value={figures.operatingProfit} strong />
                 <DetailRow label={copy.interestExpense} value={currentModel ? (figures.interestExpense ?? null) : null} />

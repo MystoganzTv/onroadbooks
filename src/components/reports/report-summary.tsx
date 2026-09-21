@@ -48,20 +48,6 @@ export function ReportSummary({
       emphasis: true,
     },
     {
-      label: copy.collectedRevenue,
-      current: formatMoney(current.collectedRevenue),
-      previous: formatMoney(previous.collectedRevenue),
-      delta: pctChange(current.collectedRevenue, previous.collectedRevenue),
-      emphasis: true,
-    },
-    {
-      label: copy.accountsReceivable,
-      current: formatMoney(current.accountsReceivable),
-      previous: formatMoney(previous.accountsReceivable),
-      delta: pctChange(current.accountsReceivable, previous.accountsReceivable),
-      higherIsBetter: false,
-    },
-    {
       label: copy.businessExpenses,
       current: formatMoney(current.operatingExpenses),
       previous: formatMoney(previous.operatingExpenses),

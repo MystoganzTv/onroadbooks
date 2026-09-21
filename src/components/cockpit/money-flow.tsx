@@ -39,7 +39,6 @@ export function MoneyFlow({
       ? (ownerPay.operatingProfit / ownerPay.bookedRevenue) * 100
       : 0,
   });
-  const answers = presentation.answers;
   const revenue = ownerPay.bookedRevenue;
   const width = (value: number) =>
     revenue > 0 ? `${Math.max(1.5, Math.min(100, (Math.abs(value) / revenue) * 100))}%` : "1.5%";
@@ -58,9 +57,7 @@ export function MoneyFlow({
   const fundingGap = presentation.cashFundingGap.state === "KNOWN"
     ? presentation.cashFundingGap.amount
     : null;
-  const stillWaiting = answers.stillWaiting.value.state === "KNOWN"
-    ? answers.stillWaiting.value.amount
-    : null;
+
 
   if (revenue <= 0 && ownerPay.operatingExpenses <= 0) {
     return (
@@ -129,16 +126,6 @@ export function MoneyFlow({
         <div>
           <FlowHeading label={copy.cashHeading} />
           <FlowRow label={copy.youCollected} question={copy.howMuchCollect} value={ownerPay.collectedRevenue} tone="info" width={width(ownerPay.collectedRevenue)} />
-          {stillWaiting !== null && stillWaiting > 0 ? (
-            <FlowRow
-              label={copy.waitingRecorded}
-              question={copy.howMuchWaiting}
-              value={stillWaiting}
-              tone="warning"
-              width={width(stillWaiting)}
-              note={copy.notAvailableCash}
-            />
-          ) : null}
           <FlowRow label={copy.businessExpenses} question={copy.howMuchSpend} value={-ownerPay.operatingExpenses} tone="negative" width={width(ownerPay.operatingExpenses)} />
           <FlowRow label={copy.debtPayments} question={copy.howMuchDebt} value={-ownerPay.debtService} tone="negative" width={width(ownerPay.debtService)} />
 
@@ -187,7 +174,6 @@ export function MoneyFlow({
         <dl className="grid gap-px border-t border-border bg-border/70 sm:grid-cols-2 lg:grid-cols-4">
           <Detail label={copy.bookedRevenue} value={ownerPay.bookedRevenue} />
           <Detail label={copy.collectedRevenue} value={ownerPay.collectedRevenue} />
-          <Detail label={copy.accountsReceivable} value={ownerPay.accountsReceivable} />
           <Detail label={copy.operatingProfit} value={ownerPay.operatingProfit} />
           <Detail label={copy.interestExpense} value={ownerPay.interestExpense} />
           <Detail label={copy.principalPayment} value={ownerPay.principalPayment} />

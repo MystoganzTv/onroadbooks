@@ -233,7 +233,7 @@ test.describe.serial("critical browser flows", () => {
     await expect(summary).toContainText("$700.00");
     await expect(summary).toContainText("$494.50");
     await expect(page.getByRole("heading", { name: "Business health", exact: true })).toHaveCount(0);
-    await expect(page.getByText("Profit is not your bank balance.", { exact: false })).toBeVisible();
+    await expect(page.getByText("Each recorded load counts as income received.", { exact: false })).toBeVisible();
     await page.screenshot({ path: "/tmp/onroad-dashboard-simple.png", fullPage: true });
 
     await page.getByRole("button", { name: "View details", exact: true }).click();
@@ -277,6 +277,75 @@ test.describe.serial("critical browser flows", () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     expect(await fs.readFile(dataFile, "utf8")).toBe(datasetBefore);
     expect(browserErrors).toEqual([]);
+  });
+
+  test("simple forms preserve optional data and record received income without a collection step", async ({ page }) => {
+    const before = await readDataset();
+    try {
+      await login(page);
+      await page.goto("/loads?month=2026-08&period=month");
+      await page.getByRole("button", { name: "Simple", exact: true }).click();
+      await expect(page.getByRole("button", { name: "Simple", exact: true })).toHaveAttribute("aria-pressed", "true");
+      const nav = page.getByRole("navigation", { name: "Main navigation" });
+      await expect(nav.getByRole("link")).toHaveCount(3);
+      await expect(nav.getByRole("link", { name: "Payments", exact: true })).toHaveCount(0);
+      await nav.getByRole("button", { name: "More tools" }).click();
+      await expect(nav.getByRole("link", { name: "Fuel", exact: true })).toBeVisible();
+      await nav.getByRole("button", { name: "More tools" }).click();
+      await page.getByRole("button", { name: "Add load", exact: true }).first().click();
+      const dialog = page.getByRole("dialog", { name: "Add load" });
+      await expect(dialog.locator("#load-broker")).toBeHidden();
+      await expect(dialog.getByText("Status", { exact: true })).toHaveCount(0);
+      await dialog.locator("#load-date").fill("2026-08-31");
+      await dialog.locator("#load-origin-city").fill("Richmond");
+      await dialog.locator("#load-origin-state").fill("VA");
+      await dialog.locator("#load-destination-city").fill("Baltimore");
+      await dialog.locator("#load-destination-state").fill("MD");
+      await dialog.locator("#load-loaded").fill("150");
+      await dialog.locator("#load-rate").fill("900");
+      await page.screenshot({ path: "/tmp/onroad-load-form-simple.png" });
+      await dialog.getByRole("button", { name: "Add load", exact: true }).click();
+      await expect(dialog).toBeHidden();
+      const dataset = JSON.parse(await fs.readFile(dataFile, "utf8"));
+      const load = dataset.loads.find((row: { originCity: string }) => row.originCity === "Richmond");
+      expect(load.invoiceNumber).toBeNull();
+      await page.goto(`/loads/${load.id}`);
+      await page.getByRole("button", { name: "Edit", exact: true }).click();
+      const edit = page.getByRole("dialog", { name: "Edit load" });
+      await edit.getByText("Delivery, customer and other details", { exact: true }).click();
+      await edit.locator("#load-broker").fill("Keep this broker");
+      await edit.locator("#load-delivery-date").fill("2026-08-30");
+      await edit.getByText("Delivery, customer and other details", { exact: true }).click();
+      await edit.getByRole("button", { name: "Save changes", exact: true }).click();
+      await expect(edit.locator("#load-delivery-date")).toBeVisible();
+      await edit.locator("#load-delivery-date").fill("2026-09-01");
+      await edit.getByRole("button", { name: "Detailed", exact: true }).click();
+      await expect(edit.getByRole("button", { name: "Detailed", exact: true })).toHaveAttribute("aria-pressed", "true");
+      await expect(edit.locator("#load-broker")).toHaveValue("Keep this broker");
+      await edit.getByRole("button", { name: "Simple", exact: true }).click();
+      await expect(edit.locator("#load-broker")).toBeHidden();
+      await edit.getByRole("button", { name: "Save changes", exact: true }).click();
+      await expect(edit).toBeHidden();
+      await expect(page.getByText(/Keep this broker/).first()).toBeVisible();
+      await expect(page.getByRole("button", { name: "Record payment", exact: true })).toHaveCount(0);
+      await expect(page.getByText("Remaining balance", { exact: true })).toHaveCount(0);
+      const saved = JSON.parse(await fs.readFile(dataFile, "utf8"));
+      expect(saved.paymentEvents).toHaveLength(0);
+      await page.goto("/dashboard?month=2026-08&period=month");
+      await expect(page.getByRole("region", { name: "Period summary" })).toContainText("$1,600.00");
+      await expect(page.getByText("Income received", { exact: true })).toBeVisible();
+      await expect(page.getByText("$1,600.00", { exact: true })).toHaveCount(2);
+      await expect(page.getByRole("button", { name: "Record payment", exact: true })).toHaveCount(0);
+      await page.goto("/invoices");
+      await expect(page.getByRole("heading", { name: "Invoices", exact: true })).toBeVisible();
+      await expect(page.getByText("Accounts receivable", { exact: true })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Record payment", exact: true })).toHaveCount(0);
+      expect(JSON.parse(await fs.readFile(dataFile, "utf8"))).toEqual(saved);
+      await page.goto("/expenses");
+      await expect(page.getByRole("link", { name: "Fuel", exact: true })).toBeVisible();
+    } finally {
+      await writeDataset(before);
+    }
   });
 
   test("owner manages a loan payment as one editable and deletable transaction", async ({ page }) => {
@@ -983,7 +1052,7 @@ test.describe.serial("critical browser flows", () => {
     await expect(page.getByRole("heading", { name: "Your cash" })).toBeVisible();
     await expect(page.getByText("You earned", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("Your business made", { exact: true }).first()).toBeVisible();
-    await expect(page.getByText("Collected", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Income received", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("Business expenses", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("Available to you", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("When cash is available", { exact: true }).first()).toBeVisible();

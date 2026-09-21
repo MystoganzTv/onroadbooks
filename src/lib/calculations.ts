@@ -250,58 +250,17 @@ export function summarizePeriod(
   expenses: Expense[],
   range: DateRange,
   settings?: FinancialSettings,
-  paymentEvents: PaymentEvent[] = [],
+  _paymentEvents: PaymentEvent[] = [],
 ): PeriodSummary {
   const periodLoads = loadsInPeriod(loads, range);
   const periodExpenses = expensesInPeriod(expenses, range);
 
   const bookedRevenue = roundMoney(sum(periodLoads, (l) => l.grossRate));
-  // Collections belong to the day cash arrived, not to the operational date
-  // of the load. A legacy PAID row with no date stays paid but is not guessed
-  // into this or any other cash period.
-  const includedLoadIds = new Set(loads.map((load) => load.id));
-  const relevantPaymentEvents = paymentEvents.filter((event) => includedLoadIds.has(event.loadId));
-  const eventsByLoad = new Map<string, PaymentEvent[]>();
-  for (const event of relevantPaymentEvents) {
-    const events = eventsByLoad.get(event.loadId) ?? [];
-    events.push(event);
-    eventsByLoad.set(event.loadId, events);
-  }
-  const eventCollections = sum(
-    relevantPaymentEvents.filter((event) => inRange(event.date, range)),
-    (event) => event.amount,
-  );
-  const legacyCollections = sum(
-    loads.filter(
-      (load) =>
-        !eventsByLoad.has(load.id) &&
-        load.status === "PAID" &&
-        Boolean(load.invoicePaidDate) &&
-        inRange(load.invoicePaidDate!, range),
-    ),
-    (load) => load.grossRate,
-  );
-  const collectedRevenue = roundMoney(eventCollections + legacyCollections);
-  const accountsReceivable = roundMoney(
-    sum(
-      periodLoads,
-      (load) => {
-        const events = eventsByLoad.get(load.id);
-        if (!events) return load.status === "PAID" ? 0 : load.grossRate;
-        const paid = sum(events, (event) => event.amount);
-        return Math.max(0, roundMoney(load.grossRate - paid));
-      },
-    ),
-  );
-  const unallocatedCollectedRevenue = roundMoney(
-    sum(
-      periodLoads.filter(
-        (load) =>
-          !eventsByLoad.has(load.id) && load.status === "PAID" && !load.invoicePaidDate,
-      ),
-      (load) => load.grossRate,
-    ),
-  );
+  // Recording a load records received income on the load date. Historical
+  // statuses/payment events remain stored, but never add or withhold income.
+  const collectedRevenue = bookedRevenue;
+  const accountsReceivable = 0;
+  const unallocatedCollectedRevenue = 0;
 
   const operatingExpenseRows = periodExpenses.filter((expense) =>
     financialTreatmentOf(expense) === "OPERATING",
@@ -497,12 +456,7 @@ export function brokerPerformance(
         tripProfit,
         profitPerMile,
         revenuePerLoadedMile: div(revenue, loadedMiles),
-        outstanding: roundMoney(
-          sum(
-            group.filter((l) => l.status !== "PAID"),
-            (l) => l.grossRate,
-          ),
-        ),
+        outstanding: 0,
         rating: rateLoad(profitPerMile, thresholds),
       } satisfies BrokerPerformance;
     })
@@ -716,15 +670,9 @@ export function truckLifetime(dataset: Dataset, truck: Truck): TruckLifetime {
   );
 
   const totalRevenue = roundMoney(sum(loads, (l) => l.grossRate));
-  const collectedRevenue = roundMoney(
-    sum(loads.filter((load) => load.status === "PAID" && Boolean(load.invoicePaidDate)), (load) => load.grossRate),
-  );
-  const accountsReceivable = roundMoney(
-    sum(loads.filter((load) => load.status !== "PAID"), (load) => load.grossRate),
-  );
-  const unallocatedCollectedRevenue = roundMoney(
-    sum(loads.filter((load) => load.status === "PAID" && !load.invoicePaidDate), (load) => load.grossRate),
-  );
+  const collectedRevenue = totalRevenue;
+  const accountsReceivable = 0;
+  const unallocatedCollectedRevenue = 0;
   const totalExpenses = roundMoney(
     sum(expenses.filter((expense) => financialTreatmentOf(expense) === "OPERATING"), (e) => e.amount),
   );

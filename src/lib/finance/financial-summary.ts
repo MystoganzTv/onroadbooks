@@ -1,9 +1,9 @@
 /**
  * The canonical period-level financial answer.
  *
- * Performance uses Booked Revenue. Liquidity uses Payment Events (with a
- * read-only legacy fallback). Reserves use their configured performance base,
- * while Safe to Pay Yourself is always capped by collected cash.
+ * Each reported load is received income on its load date. Historical payment
+ * events remain stored but do not add income. Reserves use their configured
+ * base; available money subtracts operating expenses, debt and reserves.
  */
 import { summarizePeriod } from "../calculations";
 import type {

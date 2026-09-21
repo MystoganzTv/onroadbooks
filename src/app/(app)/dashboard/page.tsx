@@ -29,7 +29,6 @@ import { ExpenseFormDialog } from "@/components/expenses/expense-form-dialog";
 import { LoadFormDialog } from "@/components/loads/load-form-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import {
-  ActionableProblemBanner,
   ActionableProblemList,
 } from "@/components/shared/actionable-problem";
 import { PlanGate } from "@/components/shared/plan-gate";
@@ -198,13 +197,6 @@ export default async function DashboardPage({
     ratingThresholds,
     settings.deadheadWarnPct,
   );
-  const loadsWithPaymentEvents = new Set(paymentEvents.map((event) => event.loadId));
-  const missingPaymentDateCount = periodLoads.filter(
-    (load) =>
-      load.status === "PAID" &&
-      !load.invoicePaidDate &&
-      !loadsWithPaymentEvents.has(load.id),
-  ).length;
   const periodExpenses = expensesInPeriod(expenses, period);
   const categories = categoryTotals(periodExpenses.filter(isOperatingExpense), settings);
   // Split by whether the cost's date has arrived. What is due but still
@@ -248,13 +240,9 @@ export default async function DashboardPage({
     safeToPay: cockpit && ownerPlanning ? summary.safeToPay : null,
   });
   const actionableProblems = selectActionableFinancialProblems({
-    unallocatedCollectedRevenue: summary.unallocatedCollectedRevenue,
-    missingPaymentDateCount,
     unallocatedDebtService: ownerPlanning ? summary.unallocatedDebtService : 0,
     reserveFundingGap: cockpit && ownerPlanning ? reserveFundingGap : 0,
   });
-  const paymentDateProblem = actionableProblems.find((problem) => problem.id === "payment-dates");
-  const secondaryProblems = actionableProblems.filter((problem) => problem.id !== "payment-dates");
   const maintenanceReserve = reserveBalanceFor(balances, "MAINTENANCE");
   // Health is reported for one unit at a time, because "miles remaining" is a
   // fact about a specific odometer.
@@ -372,7 +360,6 @@ export default async function DashboardPage({
         <div className="sm:ml-auto"><ViewModeToggle /></div>
       </div>
 
-      {paymentDateProblem ? <ActionableProblemBanner problem={paymentDateProblem} /> : null}
 
       <BookkeepingAlerts
         dueCount={monthlyDue.length}
@@ -383,12 +370,11 @@ export default async function DashboardPage({
         monthLabel={locale === "es" ? localizedMonthName(period.month) : monthLabel(period.month)}
         truckId={truckId}
       />
-      <ActionableProblemList problems={secondaryProblems} />
+      <ActionableProblemList problems={actionableProblems} />
 
       <ModeView simple={
         <>
           <SimpleOverview summary={summary} presentation={moneyPresentation} dictionary={dictionary} showOwnerPlanning={ownerPlanning} />
-          {roleCan(role, "manage_finances") ? <Button asChild variant="outline" size="sm"><Link href="/invoices">{dictionary.viewMode.recordCollection}</Link></Button> : null}
           <RecentLoads loads={periodLoads.slice(0, 8)} simple />
           <p className="text-xs text-muted-foreground">{dictionary.viewMode.tripProfitHint}</p>
         </>

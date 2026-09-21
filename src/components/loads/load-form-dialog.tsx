@@ -7,6 +7,9 @@ import { AlertTriangle, ArrowUpRight, Loader2, Plus, Trash2 } from "lucide-react
 import { toast } from "sonner";
 
 import { localizedClientError } from "@/lib/i18n/errors";
+import { ViewModeToggle } from "@/components/shared/view-mode";
+import { useViewMode } from "@/components/shell/view-mode-provider";
+import { FormSection } from "@/components/shared/form-section";
 import { useLanguage } from "@/components/shell/language-provider";
 
 import { Button } from "@/components/ui/button";
@@ -292,6 +295,8 @@ export function LoadFormDialog({
 }: LoadFormDialogProps) {
   const router = useRouter();
   const { locale, dictionary } = useLanguage();
+  const { mode } = useViewMode();
+  const simple = mode === "simple";
   const copy = dictionary.loads;
   const isEdit = Boolean(load);
   const prefillKey = JSON.stringify(prefill ?? null);
@@ -359,14 +364,15 @@ export function LoadFormDialog({
     initialAttachmentsRef.current = initialAttachments;
   }, [initialAttachments]);
 
+  const initialKey = JSON.stringify(initial);
   React.useEffect(() => {
     if (open) {
-      setValues(initial);
+      setValues(JSON.parse(initialKey) as FormState);
       setErrors({});
       setAttachments(initialAttachmentsRef.current ?? []);
       setLocationOverrides({ origin: false, destination: false });
     }
-  }, [open, initial]);
+  }, [open, initialKey]);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -444,7 +450,7 @@ export function LoadFormDialog({
       factoringFee: toNumber(values.factoringFee),
       otherExpenses: toNumber(values.otherExpenses),
       costsPosted: true,
-      // Retain legacy payment data when editing; collection is recorded in invoices.
+      // Preserve legacy metadata. Reporting a load already records its income.
       status: load?.status ?? "PENDING",
       jurisdictionMiles: values.jurisdictionMiles.map((row) => ({
         jurisdiction: row.jurisdiction,
@@ -507,6 +513,7 @@ export function LoadFormDialog({
         router.refresh();
       } else {
         setErrors(result.fieldErrors ?? {});
+        requestAnimationFrame(() => focusFirstError("load-form"));
         toast.error(localizedClientError(result.error));
       }
     });
@@ -533,6 +540,7 @@ export function LoadFormDialog({
           <DialogDescription>
             {copy.formDescription}
           </DialogDescription>
+          <ViewModeToggle />
         </DialogHeader>
 
         <DialogBody>
@@ -582,7 +590,6 @@ export function LoadFormDialog({
               </Field>
             ) : null}
 
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <Field label={copy.pickupDate} htmlFor="load-date" required error={errors.date}>
                 <Input
                   id="load-date"
@@ -593,34 +600,86 @@ export function LoadFormDialog({
                   required
                 />
               </Field>
-              <Field label={copy.deliveryDate} htmlFor="load-delivery-date" error={errors.deliveryDate}>
-                <Input
-                  id="load-delivery-date"
-                  type="date"
-                  min={values.date || undefined}
-                  value={values.deliveryDate}
-                  onChange={(e) => set("deliveryDate", e.target.value)}
-                  aria-invalid={Boolean(errors.deliveryDate)}
-                />
-              </Field>
-              <Field label={copy.broker} htmlFor="load-broker" error={errors.broker}>
-                <Input
-                  id="load-broker"
-                  list="broker-list"
-                  maxLength={120}
-                  aria-invalid={Boolean(errors.broker)}
-                  value={values.broker}
-                  onChange={(e) => set("broker", e.target.value)}
-                  placeholder={copy.optional}
-                />
-                <datalist id="broker-list">
-                  {brokers.map((broker) => (
-                    <option key={broker} value={broker} />
-                  ))}
-                </datalist>
-              </Field>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
+              <LocationFields
+                id="load-origin"
+                label={copy.originCity}
+                city={values.originCity}
+                state={values.originState}
+                cityError={errors.originCity}
+                stateError={errors.originState}
+                enabled={open}
+                manualConfirmed={locationOverrides.origin}
+                onCityChange={(value) => set("originCity", value)}
+                onStateChange={(value) => set("originState", value)}
+                onManualConfirmedChange={setOriginLocationOverride}
+              />
+              <LocationFields
+                id="load-destination"
+                label={copy.destinationCity}
+                city={values.destinationCity}
+                state={values.destinationState}
+                cityError={errors.destinationCity}
+                stateError={errors.destinationState}
+                enabled={open}
+                manualConfirmed={locationOverrides.destination}
+                onCityChange={(value) => set("destinationCity", value)}
+                onStateChange={(value) => set("destinationState", value)}
+                onManualConfirmedChange={setDestinationLocationOverride}
+              />
             </div>
 
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <Field
+                label={copy.loadedMiles}
+                htmlFor="load-loaded"
+                required
+                error={errors.loadedMiles}
+              >
+                <Input
+                  id="load-loaded"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  step={1}
+                  value={values.loadedMiles}
+                  onChange={(e) => set("loadedMiles", e.target.value)}
+                  aria-invalid={Boolean(errors.loadedMiles)}
+                  required
+                />
+              </Field>
+              <Field
+                label={copy.deadheadMiles}
+                htmlFor="load-deadhead"
+                required
+                error={errors.deadheadMiles}
+              >
+                <Input
+                  id="load-deadhead"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  step={1}
+                  value={values.deadheadMiles}
+                  onChange={(e) => set("deadheadMiles", e.target.value)}
+                  aria-invalid={Boolean(errors.deadheadMiles)}
+                  required
+                />
+              </Field>
+              <Field label={copy.grossRate} htmlFor="load-rate" required error={errors.grossRate}>
+                <Input
+                  id="load-rate"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.01"
+                  value={values.grossRate}
+                  onChange={(e) => set("grossRate", e.target.value)}
+                  aria-invalid={Boolean(errors.grossRate)}
+                  required
+                />
+              </Field>
+            </div>
             {scheduleConflicts.length > 0 ? (
               <div
                 className="flex gap-3 rounded-lg border border-warn/35 bg-warn-soft/45 p-3"
@@ -686,35 +745,86 @@ export function LoadFormDialog({
               </div>
             ) : null}
 
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
-              <LocationFields
-                id="load-origin"
-                label={copy.originCity}
-                city={values.originCity}
-                state={values.originState}
-                cityError={errors.originCity}
-                stateError={errors.originState}
-                enabled={open}
-                manualConfirmed={locationOverrides.origin}
-                onCityChange={(value) => set("originCity", value)}
-                onStateChange={(value) => set("originState", value)}
-                onManualConfirmedChange={setOriginLocationOverride}
+            {/* Live calculation strip -- the reason this form is fast. */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-md border border-border bg-surface-sunken px-3 py-2.5 sm:grid-cols-3">
+              <Calc label={copy.totalMiles} value={formatMiles(totalMiles)} />
+              {!simple && <Calc label={copy.perLoaded} value={formatRateValue(div(grossRate, loadedMiles))} />}
+              {!simple && <Calc label={copy.perTotal} value={formatRateValue(div(grossRate, totalMiles))} />}
+              <Calc label={copy.directTripCosts} value={formatMoney(tripExpenses)} />
+              <Calc
+                label={copy.contributionProfit}
+                value={formatMoney(tripProfit)}
+                tone={tripProfit >= 0 ? "pos" : "neg"}
               />
-              <LocationFields
-                id="load-destination"
-                label={copy.destinationCity}
-                city={values.destinationCity}
-                state={values.destinationState}
-                cityError={errors.destinationCity}
-                stateError={errors.destinationState}
-                enabled={open}
-                manualConfirmed={locationOverrides.destination}
-                onCityChange={(value) => set("destinationCity", value)}
-                onStateChange={(value) => set("destinationState", value)}
-                onManualConfirmedChange={setDestinationLocationOverride}
-              />
+              {!simple && <Calc
+                label={copy.contributionPerMile}
+                value={formatRateValue(profitPerMile)}
+                tone={tripProfit >= 0 ? "pos" : "neg"}
+              />}
             </div>
 
+            {!simple && grossRate > 0 && totalMiles > 0 ? (
+              <RatingPreview rating={rating} profitPerMile={profitPerMile} />
+            ) : null}
+
+            <FormSection title={dictionary.viewMode.loadDetails} expanded={!simple}>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label={copy.deliveryDate} htmlFor="load-delivery-date" error={errors.deliveryDate}>
+                <Input
+                  id="load-delivery-date"
+                  type="date"
+                  min={values.date || undefined}
+                  value={values.deliveryDate}
+                  onChange={(e) => set("deliveryDate", e.target.value)}
+                  aria-invalid={Boolean(errors.deliveryDate)}
+                />
+              </Field>
+              <Field label={copy.broker} htmlFor="load-broker" error={errors.broker}>
+                <Input
+                  id="load-broker"
+                  list="broker-list"
+                  maxLength={120}
+                  aria-invalid={Boolean(errors.broker)}
+                  value={values.broker}
+                  onChange={(e) => set("broker", e.target.value)}
+                  placeholder={copy.optional}
+                />
+                <datalist id="broker-list">
+                  {brokers.map((broker) => (
+                    <option key={broker} value={broker} />
+                  ))}
+                </datalist>
+              </Field>
+              <Field label={copy.loadNumberLabel} htmlFor="load-number" error={errors.loadNumber}>
+                <Input
+                  id="load-number"
+                  maxLength={60}
+                  aria-invalid={Boolean(errors.loadNumber)}
+                  value={values.loadNumber}
+                  onChange={(e) => set("loadNumber", e.target.value)}
+                  placeholder={copy.optional}
+                />
+              </Field>
+              <Field
+                label={copy.endingOdometer}
+                htmlFor="load-ending-odometer"
+                error={errors.endingOdometer}
+                hint={copy.actualDashboard}
+              >
+                <Input
+                  id="load-ending-odometer"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={5_000_000}
+                  step={1}
+                  value={values.endingOdometer}
+                  onChange={(e) => set("endingOdometer", e.target.value)}
+                  aria-invalid={Boolean(errors.endingOdometer)}
+                  placeholder={copy.optional}
+                />
+              </Field>
+            </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
               <Field label={copy.equipment} htmlFor="load-equipment" className="sm:col-span-2">
                 <Select
@@ -792,87 +902,21 @@ export function LoadFormDialog({
               </Field>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-              <Field
-                label={copy.loadedMiles}
-                htmlFor="load-loaded"
-                required
-                error={errors.loadedMiles}
-              >
-                <Input
-                  id="load-loaded"
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  step={1}
-                  value={values.loadedMiles}
-                  onChange={(e) => set("loadedMiles", e.target.value)}
-                  aria-invalid={Boolean(errors.loadedMiles)}
-                  required
-                />
-              </Field>
-              <Field
-                label={copy.deadheadMiles}
-                htmlFor="load-deadhead"
-                required
-                error={errors.deadheadMiles}
-              >
-                <Input
-                  id="load-deadhead"
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  step={1}
-                  value={values.deadheadMiles}
-                  onChange={(e) => set("deadheadMiles", e.target.value)}
-                  aria-invalid={Boolean(errors.deadheadMiles)}
-                  required
-                />
-              </Field>
-              <Field
-                label={copy.endingOdometer}
-                htmlFor="load-ending-odometer"
-                error={errors.endingOdometer}
-                hint={copy.actualDashboard}
-              >
-                <Input
-                  id="load-ending-odometer"
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  max={5_000_000}
-                  step={1}
-                  value={values.endingOdometer}
-                  onChange={(e) => set("endingOdometer", e.target.value)}
-                  aria-invalid={Boolean(errors.endingOdometer)}
-                  placeholder={copy.optional}
-                />
-              </Field>
-              <Field label={copy.grossRate} htmlFor="load-rate" required error={errors.grossRate}>
-                <Input
-                  id="load-rate"
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="0.01"
-                  value={values.grossRate}
-                  onChange={(e) => set("grossRate", e.target.value)}
-                  aria-invalid={Boolean(errors.grossRate)}
-                  required
-                />
-              </Field>
-              <Field label={copy.loadNumberLabel} htmlFor="load-number" error={errors.loadNumber}>
-                <Input
-                  id="load-number"
-                  maxLength={60}
-                  aria-invalid={Boolean(errors.loadNumber)}
-                  value={values.loadNumber}
-                  onChange={(e) => set("loadNumber", e.target.value)}
-                  placeholder={copy.optional}
-                />
-              </Field>
-            </div>
+            <Field label={copy.notes} htmlFor="load-notes" error={errors.notes}>
+              <Textarea
+                id="load-notes"
+                maxLength={2000}
+                aria-invalid={Boolean(errors.notes)}
+                value={values.notes}
+                onChange={(e) => set("notes", e.target.value)}
+                placeholder={copy.notesPlaceholder}
+                rows={2}
+              />
+            </Field>
 
+            </FormSection>
+
+            <FormSection title={copy.directTripCosts} expanded={!simple}>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               <Field label={copy.tripFuel} htmlFor="load-fuel" error={errors.fuelCost}>
                 <Input
@@ -940,6 +984,9 @@ export function LoadFormDialog({
               {copy.costsAutomatic}
             </p>
 
+            </FormSection>
+
+            <FormSection title={copy.iftaMiles} expanded={!simple}>
             <div className="space-y-2 rounded-md border border-border p-3">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
@@ -1045,44 +1092,13 @@ export function LoadFormDialog({
                 {interpolate(copy.assignedMiles, { assigned: formatMiles(assignedJurisdictionMiles), total: formatMiles(totalMiles) })}
               </p>
               {errors.jurisdictionMiles ? (
-                <p className="text-2xs text-neg">{errors.jurisdictionMiles}</p>
+                <p className="text-2xs text-neg" data-error-anchor tabIndex={-1} role="alert">{errors.jurisdictionMiles}</p>
               ) : null}
             </div>
 
-            <Field label={copy.notes} htmlFor="load-notes" error={errors.notes}>
-              <Textarea
-                id="load-notes"
-                maxLength={2000}
-                aria-invalid={Boolean(errors.notes)}
-                value={values.notes}
-                onChange={(e) => set("notes", e.target.value)}
-                placeholder={copy.notesPlaceholder}
-                rows={2}
-              />
-            </Field>
+            </FormSection>
 
-            {/* Live calculation strip -- the reason this form is fast. */}
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-md border border-border bg-surface-sunken px-3 py-2.5 sm:grid-cols-3">
-              <Calc label={copy.totalMiles} value={formatMiles(totalMiles)} />
-              <Calc label={copy.perLoaded} value={formatRateValue(div(grossRate, loadedMiles))} />
-              <Calc label={copy.perTotal} value={formatRateValue(div(grossRate, totalMiles))} />
-              <Calc label={copy.directTripCosts} value={formatMoney(tripExpenses)} />
-              <Calc
-                label={copy.contributionProfit}
-                value={formatMoney(tripProfit)}
-                tone={tripProfit >= 0 ? "pos" : "neg"}
-              />
-              <Calc
-                label={copy.contributionPerMile}
-                value={formatRateValue(profitPerMile)}
-                tone={tripProfit >= 0 ? "pos" : "neg"}
-              />
-            </div>
-
-            {grossRate > 0 && totalMiles > 0 ? (
-              <RatingPreview rating={rating} profitPerMile={profitPerMile} />
-            ) : null}
-
+            <FormSection title={copy.documents} expanded={!simple}>
             <div className="space-y-2 border-t border-border pt-3">
               <p className="label-xs">{copy.documents}</p>
               {isEdit ? (
@@ -1098,6 +1114,8 @@ export function LoadFormDialog({
                 />
               )}
             </div>
+            </FormSection>
+
           </form>
         </DialogBody>
 
