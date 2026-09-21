@@ -348,6 +348,42 @@ test.describe.serial("critical browser flows", () => {
     }
   });
 
+  test("expenses opt into monthly recurrence and dashboard avoids bookkeeping and reserve alarms", async ({ page }) => {
+    const before = await readDataset();
+    try {
+      await login(page);
+      await page.goto("/expenses?month=2026-08&period=month");
+      await page.getByRole("button", { name: "Add expense", exact: true }).first().click();
+      const form = page.getByRole("dialog", { name: "Add expense" });
+      const recurring = form.getByRole("switch", { name: "Recurring", exact: true });
+      await expect(recurring).not.toBeChecked();
+      await form.locator("#expense-date").fill("2026-08-20");
+      await form.locator("#expense-amount").fill("75");
+      await form.locator("#expense-description").fill("E2E monthly subscription");
+      await recurring.check();
+      await form.getByRole("button", { name: "Add expense", exact: true }).click();
+      await expect(form).toBeHidden();
+      const row = page.getByRole("row").filter({ hasText: "E2E monthly subscription" });
+      await row.getByRole("button", { name: "Edit expense", exact: true }).click();
+      const edit = page.getByRole("dialog", { name: "Edit expense" });
+      await expect(edit.getByRole("switch", { name: "Recurring", exact: true })).toBeChecked();
+      await edit.getByRole("switch", { name: "Recurring", exact: true }).uncheck();
+      await edit.getByRole("button", { name: "Save changes", exact: true }).click();
+      await expect(edit).toBeHidden();
+      const saved = JSON.parse(await fs.readFile(dataFile, "utf8"));
+      expect(saved.expenses.find((expense: { description: string }) => expense.description === "E2E monthly subscription").recurring).toBe(false);
+      await page.goto("/dashboard?month=2026-09&period=month");
+      await expect(page.getByText("Bookkeeping check", { exact: true })).toHaveCount(0);
+      await expect(page.getByText(/reserve funding is behind target/i)).toHaveCount(0);
+      await page.getByRole("button", { name: "Simple", exact: true }).click();
+      await expect(page.getByRole("button", { name: "Simple", exact: true })).toHaveAttribute("aria-pressed", "true");
+      await expect(page.getByText("Bookkeeping check", { exact: true })).toHaveCount(0);
+      await expect(page.getByText(/reserve funding is behind target/i)).toHaveCount(0);
+    } finally {
+      await writeDataset(before);
+    }
+  });
+
   test("owner manages a loan payment as one editable and deletable transaction", async ({ page }) => {
     const datasetBeforeTest = await readDataset();
     await login(page);

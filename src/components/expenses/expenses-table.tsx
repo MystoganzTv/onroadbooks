@@ -52,6 +52,7 @@ import { formatLocaleDate } from "@/lib/i18n-format";
 import { interpolate } from "@/lib/i18n/dictionaries";
 import type { Expense, ExpenseBehavior, FinancialObligation, LoadWithMetrics, Truck } from "@/lib/types";
 import type { ExpenseMirrorSource } from "@/lib/mirrored-expenses";
+import { isMonthlyRecurringExpense } from "@/lib/recurring-expenses";
 import { cn } from "@/lib/utils";
 import { ExpenseFormDialog } from "./expense-form-dialog";
 import { LoadExpenseFormDialog } from "./load-expense-form-dialog";
@@ -380,7 +381,7 @@ export function ExpensesTable({
                         </button>
                       ) : null}
                       {expense.description}
-                      {expense.recurring ? (
+                      {isMonthlyRecurringExpense(expense) ? (
                         <Repeat
                           className="ml-1.5 inline size-3 text-muted-foreground"
                           aria-label={copy.recurring}

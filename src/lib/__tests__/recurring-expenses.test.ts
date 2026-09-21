@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { dueRecurringExpenses, recurringExpenseSuggestions } from "../recurring-expenses";
+import { dueRecurringExpenses, recurringExpenseSuggestions, optedInRecurringNotes } from "../recurring-expenses";
 import { buildSeedDataset } from "../seed/seed-data";
 
 describe("recurring expense suggestions", () => {
-  it("reuses truck payment, insurance, and prior monthly templates", () => {
+  it("repeats prior expenses explicitly marked as monthly templates", () => {
     const dataset = buildSeedDataset();
     const truck = dataset.trucks[0];
     const suggestions = recurringExpenseSuggestions(dataset, "2026-09", truck.id);
@@ -24,6 +24,44 @@ describe("recurring expense suggestions", () => {
       1,
       "truck details and the prior template must not create duplicate payments",
     );
+  });
+
+  it("never creates expenses from truck estimates or ordinary one-time entries", () => {
+    const dataset = buildSeedDataset();
+    dataset.expenses = [];
+    assert.ok(dataset.trucks[0].monthlyPayment! > 0);
+    assert.deepEqual(recurringExpenseSuggestions(dataset, "2026-09"), []);
+    const ordinary = { ...buildSeedDataset().expenses[0], recurring: false };
+    dataset.expenses.push(ordinary);
+    assert.deepEqual(recurringExpenseSuggestions(dataset, "2026-09"), []);
+  });
+
+  it("does not perpetuate old automatic truck templates without an explicit opt-in", () => {
+    const dataset = buildSeedDataset();
+    const expense = { ...dataset.expenses[0], date: "2026-08-01", recurring: true,
+      notes: "Added from Truck details because no recurring ledger expense exists. Posted automatically on 2026-08-01." };
+    dataset.expenses = [expense];
+    assert.deepEqual(recurringExpenseSuggestions(dataset, "2026-09"), []);
+    expense.notes = optedInRecurringNotes(expense.notes);
+    assert.equal(recurringExpenseSuggestions(dataset, "2026-09").length, 1);
+    assert.equal(optedInRecurringNotes("Keep my own notes"), "Keep my own notes");
+  });
+
+  it("uses the chosen monthly day, keeps the original day after February, and stops when switched off", () => {
+    const dataset = buildSeedDataset();
+    const original = { ...dataset.expenses[0], id: "monthly", date: "2026-01-31", recurring: true, amount: 123, notes: null };
+    dataset.expenses = [original];
+    assert.deepEqual(dueRecurringExpenses(dataset, "2026-02", "2026-02-27"), []);
+    const february = dueRecurringExpenses(dataset, "2026-02", "2026-02-28");
+    assert.equal(february.length, 1);
+    assert.equal(february[0].date, "2026-02-28");
+    dataset.expenses.push({ ...original, id: "february", date: february[0].date, amount: 150 });
+    assert.equal(dueRecurringExpenses(dataset, "2026-02", "2026-02-28").length, 0);
+    const march = recurringExpenseSuggestions(dataset, "2026-03");
+    assert.equal(march[0].date, "2026-03-31");
+    assert.equal(march[0].amount, 150);
+    dataset.expenses[1].recurring = false;
+    assert.deepEqual(recurringExpenseSuggestions(dataset, "2026-03"), []);
   });
 
   it("does not suggest a monthly cost already present in the target month", () => {

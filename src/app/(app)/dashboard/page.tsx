@@ -22,7 +22,6 @@ import { TodayCashCard } from "@/components/cockpit/today-cash-card";
 import { PlanningCard } from "@/components/cockpit/planning-card";
 import { TruckHealthPanel } from "@/components/cockpit/truck-health-panel";
 import { MiniStat } from "@/components/dashboard/mini-stat";
-import { BookkeepingAlerts } from "@/components/dashboard/bookkeeping-alerts";
 import { PeriodControls } from "@/components/dashboard/period-controls";
 import { RecentLoads } from "@/components/dashboard/recent-loads";
 import { ExpenseFormDialog } from "@/components/expenses/expense-form-dialog";
@@ -94,8 +93,7 @@ import {
   truckFromSearchParams,
   type SearchParams,
 } from "@/lib/period-params";
-import { defaultEntryDate, monthLabel, previousPeriod, todayISO } from "@/lib/periods";
-import { recurringExpenseSuggestions } from "@/lib/recurring-expenses";
+import { defaultEntryDate, previousPeriod, todayISO } from "@/lib/periods";
 import { roleCan } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { getWebDictionary } from "@/lib/i18n/dictionaries";
@@ -199,13 +197,6 @@ export default async function DashboardPage({
   );
   const periodExpenses = expensesInPeriod(expenses, period);
   const categories = categoryTotals(periodExpenses.filter(isOperatingExpense), settings);
-  // Split by whether the cost's date has arrived. What is due but still
-  // missing is a real gap in the books; what is merely dated later this month
-  // is not late, it is scheduled -- the nightly job posts it on its day.
-  const monthlySuggestions = recurringExpenseSuggestions(dataset, period.month, truckId);
-  const monthlyDue = monthlySuggestions.filter((suggestion) => suggestion.date <= today);
-  const monthlyScheduled = monthlySuggestions.filter((suggestion) => suggestion.date > today);
-
   const costBasis = calculateTrueCostPerMile(loads, expenses, period, settings, period.label);
   const deadhead = calculateDeadheadCost(summary, costBasis, settings, goals.maxDeadheadPct);
   const goalProgress = calculateGoalProgress(summary, goals, period);
@@ -230,10 +221,6 @@ export default async function DashboardPage({
   const balances = ownerPlanning
     ? calculateReserveBalances(reserveAccounts, reserveTransactions, period)
     : [];
-  const reserveFundingGap = balances.reduce((gap, balance) => {
-    const target = balance.account.targetBalance ?? 0;
-    return gap + Math.max(target - balance.balance, 0);
-  }, 0);
   const moneyPresentation = selectOwnerMoneyPresentation({
     ...summary,
     reserveTotal: cockpit && ownerPlanning ? summary.reserveTotal : null,
@@ -241,7 +228,6 @@ export default async function DashboardPage({
   });
   const actionableProblems = selectActionableFinancialProblems({
     unallocatedDebtService: ownerPlanning ? summary.unallocatedDebtService : 0,
-    reserveFundingGap: cockpit && ownerPlanning ? reserveFundingGap : 0,
   });
   const maintenanceReserve = reserveBalanceFor(balances, "MAINTENANCE");
   // Health is reported for one unit at a time, because "miles remaining" is a
@@ -361,15 +347,6 @@ export default async function DashboardPage({
       </div>
 
 
-      <BookkeepingAlerts
-        dueCount={monthlyDue.length}
-        dueTotal={monthlyDue.reduce((total, expense) => total + expense.amount, 0)}
-        scheduledCount={monthlyScheduled.length}
-        scheduledTotal={monthlyScheduled.reduce((total, expense) => total + expense.amount, 0)}
-        month={period.month}
-        monthLabel={locale === "es" ? localizedMonthName(period.month) : monthLabel(period.month)}
-        truckId={truckId}
-      />
       <ActionableProblemList problems={actionableProblems} />
 
       <ModeView simple={
@@ -557,15 +534,4 @@ export default async function DashboardPage({
       </ModeView>
     </div>
   );
-}
-
-function localizedMonthName(monthValue: string): string {
-  const [year, month] = monthValue.split("-").map(Number);
-  return new Intl.DateTimeFormat("es-US", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  })
-    .format(new Date(Date.UTC(year, month - 1, 1)))
-    .replace(/^./, (character) => character.toUpperCase());
 }

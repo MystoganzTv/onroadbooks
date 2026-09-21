@@ -14,8 +14,8 @@ export interface RecurringPostingResult {
 }
 
 /**
- * Posts this month's fixed costs -- the truck note, insurance, and any expense
- * the owner marked as recurring -- into every workspace that is due one.
+ * Posts only expenses the user explicitly marked as recurring, once their
+ * monthly date arrives. Truck-profile estimates never create ledger entries.
  *
  * Three rules keep this safe to run unattended:
  *
@@ -62,12 +62,7 @@ export async function postDueRecurringExpenses(
       if (due.length === 0) continue;
 
       for (const suggestion of due) {
-        await repository.createExpense({
-          ...suggestion,
-          notes: suggestion.notes
-            ? `${suggestion.notes} Posted automatically on ${today}.`
-            : `Posted automatically on ${today} from your monthly fixed costs.`,
-        });
+        await repository.createExpense(suggestion);
         result.expensesPosted += 1;
       }
       result.businessesPosted += 1;

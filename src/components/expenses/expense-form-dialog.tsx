@@ -42,6 +42,7 @@ import { behaviorOf, categoryLabel, EXPENSE_CATEGORIES } from "@/lib/categories"
 import { formatMoney } from "@/lib/formatters";
 import { formatLocaleDate } from "@/lib/i18n-format";
 import { todayISO } from "@/lib/periods";
+import { isMonthlyRecurringExpense, optedInRecurringNotes } from "@/lib/recurring-expenses";
 import { expenseSchema } from "@/lib/schemas";
 import { DocumentList } from "@/components/documents/document-list";
 import { orderedTrucks } from "@/lib/fleet";
@@ -154,7 +155,7 @@ export function ExpenseFormDialog({
             vendor: expense.vendor ?? "",
             amount: String(expense.amount),
             loadId: expense.loadId ?? "none",
-            recurring: expense.recurring,
+            recurring: isMonthlyRecurringExpense(expense),
             receiptNumber: expense.receiptNumber ?? "",
             notes: expense.notes ?? "",
           }
@@ -238,7 +239,7 @@ export function ExpenseFormDialog({
       receiptNumber: isFinancingPayment
         ? (expense?.receiptNumber ?? null)
         : (values.receiptNumber || null),
-      notes: values.notes || null,
+      notes: (values.recurring ? optedInRecurringNotes(values.notes) : values.notes) || null,
     };
 
     const parsed = expenseSchema.safeParse(payload);
@@ -338,6 +339,24 @@ export function ExpenseFormDialog({
                 />
               </Field>
             </div>
+
+            <div className="flex items-center justify-between rounded-md border border-border bg-surface-sunken px-3 py-2">
+              <div>
+                <Label htmlFor="expense-recurring" className="normal-case tracking-normal text-foreground">
+                  {copy.recurringExpense}
+                </Label>
+                <p id="expense-recurring-hint" className="mt-0.5 max-w-md text-2xs text-muted-foreground">
+                  {copy.recurringDescription}
+                </p>
+              </div>
+              <Switch
+                id="expense-recurring"
+                aria-describedby="expense-recurring-hint"
+                checked={values.recurring}
+                onCheckedChange={(checked) => set("recurring", checked)}
+              />
+            </div>
+
 
             {showCharge ? (
               <Field
@@ -462,22 +481,6 @@ export function ExpenseFormDialog({
                 />
               </Field>
             ) : null}
-
-            <div className="flex items-center justify-between rounded-md border border-border bg-surface-sunken px-3 py-2">
-              <div>
-                <Label htmlFor="expense-recurring" className="normal-case tracking-normal text-foreground">
-                  {copy.recurringExpense}
-                </Label>
-                <p className="mt-0.5 text-2xs text-muted-foreground">
-                  {copy.recurringDescription}
-                </p>
-              </div>
-              <Switch
-                id="expense-recurring"
-                checked={values.recurring}
-                onCheckedChange={(checked) => set("recurring", checked)}
-              />
-            </div>
 
             <Field
               label={copy.notes}
