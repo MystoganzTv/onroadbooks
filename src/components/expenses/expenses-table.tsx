@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { localizedClientError } from "@/lib/i18n/errors";
+import { useViewMode } from "@/components/shell/view-mode-provider";
 import { useLanguage } from "@/components/shell/language-provider";
 
 import { ConfirmDelete } from "@/components/shared/confirm-delete";
@@ -89,6 +90,8 @@ export function ExpensesTable({
   obligations = [],
 }: ExpensesTableProps) {
   const router = useRouter();
+  const { mode } = useViewMode();
+  const simple = mode === "simple";
   const { locale, dictionary } = useLanguage();
   const copy = dictionary.expenses;
   const [search, setSearch] = React.useState("");
@@ -200,9 +203,9 @@ export function ExpensesTable({
 
   const columns: { key: SortKey; label: string; numeric?: boolean }[] = [
     { key: "date", label: copy.date },
-    { key: "category", label: copy.category },
+    ...(!simple ? [{ key: "category" as const, label: copy.category }] : []),
     { key: "description", label: copy.description },
-    { key: "vendor", label: copy.vendor },
+    ...(!simple ? [{ key: "vendor" as const, label: copy.vendor }] : []),
     { key: "amount", label: copy.amount, numeric: true },
   ];
 
@@ -221,7 +224,7 @@ export function ExpensesTable({
         </div>
 
         <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger className="w-[11.5rem]" aria-label={copy.filterCategory}>
+          <SelectTrigger className="w-full sm:w-[11.5rem]" aria-label={copy.filterCategory}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -234,8 +237,8 @@ export function ExpensesTable({
           </SelectContent>
         </Select>
 
-        <Select value={behavior} onValueChange={setBehavior}>
-          <SelectTrigger className="w-[10.5rem]" aria-label={copy.filterBehavior}>
+        {!simple ? <Select value={behavior} onValueChange={setBehavior}>
+          <SelectTrigger className="w-full sm:w-[10.5rem]" aria-label={copy.filterBehavior}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -243,7 +246,7 @@ export function ExpensesTable({
             <SelectItem value="FIXED">{copy.fixedOnly}</SelectItem>
             <SelectItem value="VARIABLE">{copy.variableOnly}</SelectItem>
           </SelectContent>
-        </Select>
+        </Select> : null}
 
         {hasFilters ? (
           <Button
@@ -355,7 +358,7 @@ export function ExpensesTable({
                     <TableCell className="text-muted-foreground">
                       {formatLocaleDate(expense.date, locale, { month: "short", day: "numeric" })}
                     </TableCell>
-                    <TableCell>
+                    {!simple ? <TableCell>
                       <span className="inline-flex items-center gap-1.5">
                         <span
                           className="size-2 shrink-0 rounded-[2px]"
@@ -367,8 +370,8 @@ export function ExpensesTable({
                           {isFixed ? copy.fixed : copy.variable}
                         </Badge>
                       </span>
-                    </TableCell>
-                    <TableCell className="max-w-[20rem] truncate">
+                    </TableCell> : null}
+                    <TableCell className={simple ? "min-w-24 max-w-64 whitespace-normal break-words" : "max-w-[20rem] truncate"}>
                       {paymentGroupId ? (
                         <button
                           type="button"
@@ -381,6 +384,7 @@ export function ExpensesTable({
                         </button>
                       ) : null}
                       {expense.description}
+                      {simple ? <span className="block text-xs text-muted-foreground">{isPaymentGroup ? copy.loanPayment : categoryLabel(expense.category, locale)}</span> : null}
                       {isMonthlyRecurringExpense(expense) ? (
                         <Repeat
                           className="ml-1.5 inline size-3 text-muted-foreground"
@@ -419,9 +423,9 @@ export function ExpensesTable({
                         </span>
                       ) : null}
                     </TableCell>
-                    <TableCell className="max-w-[13rem] truncate text-muted-foreground">
+                    {!simple ? <TableCell className="max-w-[13rem] truncate text-muted-foreground">
                       {expense.vendor ?? "--"}
-                    </TableCell>
+                    </TableCell> : null}
                     <TableCell className="text-right tnum font-medium text-neg">
                       -{formatMoney(displayAmount)}
                     </TableCell>
@@ -535,7 +539,7 @@ export function ExpensesTable({
                   {paymentExpanded ? visiblePaymentRows.map((row) => (
                     <TableRow key={row.id} className="bg-surface-sunken/45 hover:bg-surface-sunken/65">
                       <TableCell />
-                      <TableCell colSpan={3} className="pl-8 text-xs text-muted-foreground">
+                      <TableCell colSpan={simple ? 1 : 3} className="pl-8 text-xs text-muted-foreground">
                         <span className="font-medium text-foreground">
                           {row.financialTreatment === "INTEREST" ? copy.interest : copy.principal}
                         </span>
@@ -555,7 +559,7 @@ export function ExpensesTable({
             <TableFooter>
               <TableRow className="hover:bg-transparent">
                 <TableCell
-                  colSpan={4}
+                  colSpan={simple ? 2 : 4}
                   className="text-2xs uppercase tracking-wider text-muted-foreground"
                 >
                   {copy.total}

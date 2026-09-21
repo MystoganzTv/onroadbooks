@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { localizedClientError } from "@/lib/i18n/errors";
+import { useViewMode } from "@/components/shell/view-mode-provider";
 import { useLanguage } from "@/components/shell/language-provider";
 
 import { ConfirmDelete } from "@/components/shared/confirm-delete";
@@ -52,6 +53,8 @@ export function FuelTable({
   hasLoadEstimates = false,
 }: FuelTableProps) {
   const router = useRouter();
+  const { mode } = useViewMode();
+  const simple = mode === "simple";
   const { locale, dictionary } = useLanguage();
   const copy = dictionary.fuel;
   const common = dictionary.common;
@@ -125,7 +128,7 @@ export function FuelTable({
 
   return (
     <div className="rounded-lg border border-border bg-card">
-      <TableWrapper>
+      <TableWrapper className={simple ? "[&_thead_tr>*:nth-child(3)]:hidden [&_thead_tr>*:nth-child(4)]:hidden [&_thead_tr>*:nth-child(6)]:hidden [&_thead_tr>*:nth-child(7)]:hidden [&_tbody_tr>*:nth-child(3)]:hidden [&_tbody_tr>*:nth-child(4)]:hidden [&_tbody_tr>*:nth-child(6)]:hidden [&_tbody_tr>*:nth-child(7)]:hidden" : undefined}>
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -148,8 +151,9 @@ export function FuelTable({
                   <TableCell className="text-muted-foreground">
                     {formatLocaleDate(entry.date, locale, { month: "short", day: "numeric" })}
                   </TableCell>
-                  <TableCell className="max-w-[12.5rem] truncate">
+                  <TableCell className={simple ? "min-w-24 max-w-64 whitespace-normal break-words" : "max-w-[12.5rem] truncate"}>
                     {entry.location ?? "--"}
+                    {simple ? <span className="block text-xs text-muted-foreground">{formatNumber(entry.gallons, 1)} gal</span> : null}
                   </TableCell>
                   <TableCell className="text-right tnum">
                     {formatNumber(entry.gallons, 1)}
@@ -211,16 +215,16 @@ export function FuelTable({
               >
                 {copy.total}
               </TableCell>
-              <TableCell className="text-right tnum font-semibold">
+              {!simple ? <><TableCell className="text-right tnum font-semibold">
                 {formatNumber(totals.gallons, 1)}
               </TableCell>
               <TableCell className="text-right tnum text-muted-foreground">
                 ${div(totals.cost, totals.gallons).toFixed(3)}
-              </TableCell>
+              </TableCell></> : null}
               <TableCell className="text-right tnum font-semibold text-neg">
                 -{formatMoney(totals.cost)}
               </TableCell>
-              <TableCell colSpan={3} />
+              <TableCell colSpan={simple ? 1 : 3} />
             </TableRow>
           </TableFooter>
         </Table>

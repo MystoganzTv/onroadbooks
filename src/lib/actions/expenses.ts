@@ -115,3 +115,13 @@ export async function classifyDebtPaymentAction(
     };
   }
 }
+
+export async function stopRecurringExpenseAction(id: string): Promise<ActionResult> {
+  try {
+    await getRepository((await requireWritableSession("manage_expenses")).businessId).stopRecurringExpense(id);
+    revalidateAll();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not stop the recurring expense." };
+  }
+}

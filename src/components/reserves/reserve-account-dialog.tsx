@@ -20,6 +20,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -71,6 +72,7 @@ export function ReserveAccountDialog({
   const [pending, startTransition] = React.useTransition();
   const [errors, setErrors] = React.useState<Record<string, string>>({});
 
+  const [active, setActive] = React.useState(account?.active ?? false);
   const [name, setName] = React.useState(account?.name ?? "");
   const [basis, setBasis] = React.useState<ReserveBasis>(account?.basis ?? "GROSS_REVENUE");
   const [pct, setPct] = React.useState(
@@ -82,6 +84,7 @@ export function ReserveAccountDialog({
 
   React.useEffect(() => {
     if (!open) return;
+    setActive(account?.active ?? false);
     setName(account?.name ?? "");
     setBasis(account?.basis ?? "GROSS_REVENUE");
     setPct(account?.contributionPct != null ? String(account.contributionPct) : "");
@@ -97,7 +100,7 @@ export function ReserveAccountDialog({
       basis,
       contributionPct: builtIn ? null : pct === "" ? 0 : toNumber(pct),
       targetBalance: target === "" ? null : toNumber(target),
-      active: account?.active ?? true,
+      active,
     };
 
     const parsed = reserveAccountSchema.safeParse(payload);
@@ -130,7 +133,7 @@ export function ReserveAccountDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button size="sm" variant={account ? "ghost" : "default"}>
+          <Button size="sm" variant={account ? "ghost" : "outline"} aria-label={account ? copy.editBucket : undefined}>
             {account ? <Pencil className="size-3.5" /> : <Plus className="size-4" />}
             {account ? "" : copy.newBucket}
           </Button>
@@ -156,6 +159,11 @@ export function ReserveAccountDialog({
               />
             </Field>
 
+            <div className="flex items-start justify-between gap-3 rounded-lg border border-border p-3">
+              <div><label htmlFor="reserve-planning" className="text-sm font-medium">{copy.planningEnabled}</label><p className="mt-1 text-xs text-muted-foreground">{copy.planningHint}</p></div>
+              <Switch id="reserve-planning" checked={active} onCheckedChange={setActive} />
+            </div>
+            {active ? <>
             <Field label={copy.chargedAgainst} htmlFor="bucket-basis" error={errors.basis}>
               <Select value={basis} onValueChange={(value) => setBasis(value as ReserveBasis)}>
                 <SelectTrigger id="bucket-basis">
@@ -189,6 +197,7 @@ export function ReserveAccountDialog({
               </Field>
             )}
 
+            </> : null}
             <Field
               label={copy.targetBalance}
               htmlFor="bucket-target"

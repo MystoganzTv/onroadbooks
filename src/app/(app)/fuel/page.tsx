@@ -7,6 +7,8 @@ import { PeriodControls } from "@/components/dashboard/period-controls";
 import { FuelFormDialog } from "@/components/fuel/fuel-form-dialog";
 import { FuelTable } from "@/components/fuel/fuel-table";
 import { LoadFuelEstimates } from "@/components/fuel/load-fuel-estimates";
+import { ViewModeToggle } from "@/components/shared/view-mode";
+import { getViewMode } from "@/lib/view-mode-server";
 import { PageHeader } from "@/components/shared/page-header";
 import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,7 +53,8 @@ export default async function FuelPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const [params, session, locale] = await Promise.all([searchParams, requireSession(), getAppLocale()]);
+  const [params, session, locale, mode] = await Promise.all([searchParams, requireSession(), getAppLocale(), getViewMode()]);
+  const simple = mode === "simple";
   const copy = getWebDictionary(locale).fuel;
   const {
     trucks,
@@ -114,30 +117,32 @@ export default async function FuelPage({
       <div className="flex flex-wrap items-center gap-2">
         <PeriodControls period={period} />
         <TruckSwitcher trucks={orderedTrucks(trucks)} selectedId={truckId} />
+        <div className="sm:ml-auto"><ViewModeToggle /></div>
       </div>
 
       <section
         aria-label={copy.summaryLabel}
-        className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
+        className={simple ? "grid grid-cols-2 gap-3 sm:grid-cols-3" : "grid grid-cols-2 gap-3 lg:grid-cols-5"}
       >
         <MiniStat
+          className={simple ? "col-span-2 sm:col-span-1" : undefined}
           label={copy.fuelCost}
           value={formatMoneyCompact(summary.fuelExpense)}
           tone="negative"
           sub={interpolate(copy.expenseShare, { share: formatPercent(fuelShare), detailed: formatMoneyCompact(fuel.totalCost) })}
         />
         <MiniStat label={copy.totalGallons} value={formatGallons(fuel.totalGallons)} />
-        <MiniStat
+        {!simple ? <MiniStat
           label={copy.averagePrice}
           value={formatPricePerGallon(fuel.averagePricePerGallon)}
-        />
+        /> : null}
         <MiniStat
           label={copy.fuelPerMile}
           value={formatRate(div(summary.fuelExpense, summary.totalMiles))}
-          tone="warning"
+          tone="neutral"
           sub={interpolate(copy.allFuelCosts, { miles: formatNumber(summary.totalMiles) })}
         />
-        <MiniStat
+        {!simple ? <MiniStat
           label="MPG"
           value={fuel.milesPerGallon ? fuel.milesPerGallon.toFixed(1) : "--"}
           tone={fuel.milesPerGallon && fuel.milesPerGallon >= 8.5 ? "positive" : "neutral"}
@@ -146,7 +151,7 @@ export default async function FuelPage({
               ? interpolate(copy.odometerMiles, { miles: formatNumber(fuel.odometerMiles) })
               : copy.needsReadings
           }
-        />
+        /> : null}
       </section>
 
       <LoadFuelEstimates
@@ -173,7 +178,7 @@ export default async function FuelPage({
         hasLoadEstimates={loadFuelEstimates.length > 0}
       />
 
-      <Card className="border-dashed">
+      {!simple ? <Card className="border-dashed">
         <CardHeader>
           <div className="flex items-center gap-2">
             <Gauge className="size-3.5 text-muted-foreground" />
@@ -184,14 +189,14 @@ export default async function FuelPage({
           <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">
             {copy.mpgDescription}
           </p>
-          <p className="mt-2 max-w-3xl text-xs leading-relaxed text-muted-foreground">
+          {trucks.some((truck) => truck.iftaReportingEnabled === true) ? <p className="mt-2 max-w-3xl text-xs leading-relaxed text-muted-foreground">
             {copy.iftaDifference}{" "}
             <Link href="/ifta" className="text-primary underline underline-offset-2">
               IFTA
             </Link>{" "}
-          </p>
+          </p> : null}
         </CardContent>
-      </Card>
+      </Card> : null}
     </div>
   );
 }

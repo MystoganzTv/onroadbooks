@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { dueRecurringExpenses, recurringExpenseSuggestions, optedInRecurringNotes } from "../recurring-expenses";
+import { activeRecurringExpenses, recurringSeriesExpenseIds, dueRecurringExpenses, recurringExpenseSuggestions, optedInRecurringNotes } from "../recurring-expenses";
 import { buildSeedDataset } from "../seed/seed-data";
 
 describe("recurring expense suggestions", () => {
@@ -173,5 +173,28 @@ describe("dueRecurringExpenses", () => {
     const after = dueRecurringExpenses(dataset, "2026-09", "2026-09-30", truck.id);
     assert.equal(after.some((item) => item.category === "TRUCK_PAYMENT"), false);
     assert.equal(after.length, before.length - 1);
+  });
+});
+
+describe("recurring schedule management", () => {
+  it("uses the latest amount and original monthly day, and excludes disabled or legacy series", () => {
+    const base = { ...buildSeedDataset().expenses[0], notes: null, description: "Managed insurance", recurring: true, date: "2026-01-31", id: "jan", amount: 100 };
+    const feb = { ...base, id: "feb", date: "2026-02-28", amount: 125 };
+    const rows = [base, feb];
+    assert.deepEqual(activeRecurringExpenses(rows, "2026-03-03"), [{ id: "feb", description: base.description, amount: 125, truckId: base.truckId, nextDate: "2026-03-31" }]);
+    assert.deepEqual(activeRecurringExpenses([base, { ...feb, recurring: false }], "2026-03-03"), []);
+    assert.deepEqual(activeRecurringExpenses([{ ...base, notes: "Added from Truck details because no recurring ledger expense exists." }], "2026-03-03"), []);
+    assert.equal(activeRecurringExpenses([base], "2026-01-01")[0].nextDate, "2026-02-28");
+  });
+
+  it("stops a split series as one payment without including the same description on another truck", () => {
+    const base = { ...buildSeedDataset().expenses[0], category: "PRINCIPAL_PAYMENT" as const, financialTreatment: "PRINCIPAL" as const, description: "Monthly note", splitGroupId: "split-one", id: "principal", recurring: true, amount: 500, notes: null };
+    const interest = { ...base, id: "interest", category: "INTEREST_EXPENSE" as const, financialTreatment: "INTEREST" as const, description: "Monthly note · interest", amount: 13 };
+    const other = { ...base, id: "other", truckId: "other-truck", splitGroupId: "other-split" };
+    assert.deepEqual(recurringSeriesExpenseIds([base, interest, other], "interest"), ["principal", "interest"]);
+    const schedule = activeRecurringExpenses([base, interest], "2026-09-01");
+    assert.equal(schedule.length, 1);
+    assert.equal(schedule[0].amount, 513);
+    assert.throws(() => recurringSeriesExpenseIds([base], "missing"), /does not belong/);
   });
 });

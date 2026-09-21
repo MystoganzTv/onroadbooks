@@ -9,6 +9,10 @@ import {
 import { ReserveTransactionDialog } from "@/components/reserves/reserve-transaction-dialog";
 import { MiniStat } from "@/components/dashboard/mini-stat";
 import { PeriodControls } from "@/components/dashboard/period-controls";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { ViewModeToggle } from "@/components/shared/view-mode";
+import { getViewMode } from "@/lib/view-mode-server";
 import { PageHeader } from "@/components/shared/page-header";
 import { PlanGate } from "@/components/shared/plan-gate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,12 +52,14 @@ export default async function ReservesPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const [params, session, locale] = await Promise.all([
+  const [params, session, locale, mode] = await Promise.all([
     searchParams,
     requireSession(),
     getAppLocale(),
+    getViewMode(),
   ]);
   const copy = getWebDictionary(locale).reserves;
+  const simple = mode === "simple";
   if (!roleCan(session.role ?? "VIEWER", "manage_owner_finances")) {
     return (
       <div className="space-y-4 p-4 lg:p-6">
@@ -130,9 +136,9 @@ export default async function ReservesPage({
         }
       />
 
-      <PeriodControls period={period} />
+      <div className="flex flex-wrap items-center gap-2"><PeriodControls period={period} /><div className="sm:ml-auto"><ViewModeToggle /></div></div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-y border-border py-3">
+      {!simple && activeTruckCount > 1 ? <div className="flex flex-wrap items-center justify-between gap-3 border-y border-border py-3">
         <div className="flex min-w-0 items-center gap-2.5">
           <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-info-soft text-info">
             <Building2 className="size-4" />
@@ -150,20 +156,21 @@ export default async function ReservesPage({
             unit: activeTruckCount === 1 ? copy.truck : copy.trucks,
           })}
         </span>
-      </div>
+      </div> : null}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className={simple ? "grid grid-cols-2 gap-3 sm:grid-cols-3" : "grid grid-cols-2 gap-3 lg:grid-cols-5"}>
         <MiniStat
+          className={simple ? "col-span-2 sm:col-span-1" : undefined}
           label={copy.companyBalance}
           value={formatMoneyCompact(total)}
           sub={copy.allBuckets}
         />
-        <MiniStat
+        {!simple ? <MiniStat
           label={copy.suggestedSetAside}
           value={formatMoneyCompact(ownerPay.reserveTotal)}
           sub={interpolate(copy.wholeFleetPeriod, { period: periodLabel })}
-          tone="warning"
-        />
+          tone="neutral"
+        /> : null}
         <MiniStat
           label={copy.added}
           value={formatMoneyCompact(periodIn)}
@@ -174,13 +181,13 @@ export default async function ReservesPage({
           label={copy.takenOut}
           value={formatMoneyCompact(periodOut)}
           sub={interpolate(copy.companyPeriod, { period: periodLabel })}
-          tone="warning"
+          tone="neutral"
         />
-        <MiniStat
+        {!simple ? <MiniStat
           label={copy.buckets}
           value={String(balances.filter((b) => b.account.active).length)}
           sub={getWebDictionary(locale).common.active.toLowerCase()}
-        />
+        /> : null}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -196,14 +203,14 @@ export default async function ReservesPage({
             <Card key={balance.account.id} className="min-w-0">
               <CardHeader className="flex-wrap">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Landmark className="size-3.5 text-muted-foreground" />
                     <CardTitle>{reserveName(balance.account.kind, balance.account.name)}</CardTitle>
-                    <span className="rounded-full border border-border bg-surface-sunken px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {!simple ? <span className="rounded-full border border-border bg-surface-sunken px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                       {balance.account.kind === "MAINTENANCE" ? copy.fleetTotal : copy.companyWide}
-                    </span>
+                    </span> : null}
                   </div>
-                  <p className="mt-0.5 text-2xs text-muted-foreground">
+                  {!simple ? <p className="mt-0.5 text-2xs text-muted-foreground">
                     {rule && rule.pct > 0
                       ? interpolate(copy.automaticRule, {
                           percent: formatPercent(rule.pct, rule.pct % 1 === 0 ? 0 : 1),
@@ -213,7 +220,7 @@ export default async function ReservesPage({
                               : copy.bookedRevenue,
                         })
                       : copy.noAutomaticContribution}
-                  </p>
+                  </p> : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   <ReserveAccountDialog account={balance.account} />
@@ -241,21 +248,21 @@ export default async function ReservesPage({
                       </p>
                     </div>
                     <div className="text-right text-2xs text-muted-foreground tnum">
-                      <p className="text-warn">
+                      {!simple ? <p className="text-muted-foreground">
                         {interpolate(copy.suggested, {
                           amount: formatMoney(recommendation?.amount ?? 0),
                         })}
-                      </p>
+                      </p> : null}
                       <p className="text-pos">
                         {interpolate(copy.moneyIn, { amount: formatMoney(balance.contributions) })}
                       </p>
-                      <p className="text-warn">
+                      <p className="text-muted-foreground">
                         {interpolate(copy.moneyOut, { amount: formatMoney(balance.withdrawals) })}
                       </p>
                     </div>
                   </div>
 
-                  {balance.account.targetBalance ? (
+                  {!simple && balance.account.targetBalance ? (
                     <div className="mt-3">
                       <div className="h-2 w-full overflow-hidden rounded-full bg-surface-sunken">
                         <div
@@ -282,7 +289,7 @@ export default async function ReservesPage({
                   ) : null}
                 </div>
 
-                {balance.account.kind === "MAINTENANCE" && maintenanceByTruck.length > 0 ? (
+                {!simple && balance.account.kind === "MAINTENANCE" && maintenanceByTruck.length > 0 ? (
                   <div className="border-t border-border">
                     <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -340,7 +347,7 @@ export default async function ReservesPage({
                             <p className="text-2xs uppercase tracking-wide text-muted-foreground">
                               {copy.setAside}
                             </p>
-                            <p className="text-sm font-semibold text-warn tnum">
+                            <p className="text-sm font-semibold text-muted-foreground tnum">
                               {formatMoney(unit.suggestedReserve)}
                             </p>
                           </div>
@@ -367,12 +374,9 @@ export default async function ReservesPage({
                       accounts={reserveAccounts}
                       defaultAccountId={balance.account.id}
                       trigger={
-                        <button
-                          type="button"
-                          className="text-2xs font-medium text-primary underline-offset-2 hover:underline focus-ring"
-                        >
+                        <Button variant="outline" size="sm">
                           {copy.add}
-                        </button>
+                        </Button>
                       }
                     />
                   </div>
@@ -395,14 +399,14 @@ export default async function ReservesPage({
                                 month: "short",
                                 day: "numeric",
                               })}
-                              {txn.settlementId ? ` · ${copy.fromClosedSettlement}` : ""}
+                              {txn.settlementId ? <> · <Link className="text-primary underline" href="/reports/settlements">{copy.fromClosedSettlement}</Link></> : null}
                             </p>
                           </div>
                           <div className="flex shrink-0 items-center gap-1">
                             <span
                               className={cn(
                                 "tnum text-xs font-medium",
-                                txn.amount >= 0 ? "text-pos" : "text-warn",
+                                txn.amount >= 0 ? "text-pos" : "text-muted-foreground",
                               )}
                             >
                               {txn.amount >= 0 ? "+" : "-"}

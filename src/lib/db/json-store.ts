@@ -1,3 +1,4 @@
+import { recurringSeriesExpenseIds } from "../recurring-expenses";
 import "server-only";
 
 import { promises as fs } from "node:fs";
@@ -1381,6 +1382,13 @@ export class JsonRepository implements Repository {
       dataset.expenses.push(...inputs.slice(1).map((row) =>
         expenseFromInput(row, dataset, newId("exp"), updated.createdAt)));
       return updated;
+    }, this.businessId);
+  }
+
+  async stopRecurringExpense(id: string): Promise<void> {
+    return mutate((dataset) => {
+      const ids = new Set(recurringSeriesExpenseIds(dataset.expenses, id));
+      for (const expense of dataset.expenses) if (ids.has(expense.id)) expense.recurring = false;
     }, this.businessId);
   }
 

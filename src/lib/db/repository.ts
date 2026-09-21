@@ -353,6 +353,7 @@ export interface Repository {
   createExpense(input: ExpenseInput): Promise<Expense>;
   updateExpense(id: string, input: ExpenseInput): Promise<Expense>;
   deleteExpense(id: string): Promise<void>;
+  stopRecurringExpense(id: string): Promise<void>;
 
   createFinancialObligation(input: FinancialObligationInput): Promise<FinancialObligation>;
   updateFinancialObligation(id: string, input: FinancialObligationInput): Promise<FinancialObligation>;

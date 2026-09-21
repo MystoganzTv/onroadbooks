@@ -308,7 +308,7 @@ export function ExpenseFormDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button size="sm" variant="outline">
+          <Button size="sm">
             <Plus />
             {copy.addExpense}
           </Button>

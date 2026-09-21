@@ -2,6 +2,8 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
+import { buildSeedDataset } from "../src/lib/seed/seed-data";
+import type { Dataset } from "../src/lib/types";
 
 const dataDir = path.join(process.cwd(), ".e2e-data");
 const dataFile = path.join(dataDir, "onroad-books.json");
@@ -417,6 +419,112 @@ test.describe.serial("critical browser flows", () => {
       await expect(page.getByRole("button", { name: "Simple", exact: true })).toHaveAttribute("aria-pressed", "true");
       await expect(page.getByText("Bookkeeping check", { exact: true })).toHaveCount(0);
       await expect(page.getByText(/reserve funding is behind target/i)).toHaveCount(0);
+    } finally {
+      await writeDataset(before);
+    }
+  });
+
+  test("simple money screens manage recurrence, manual reserves and saved history", async ({ page }) => {
+    test.setTimeout(90_000);
+    const before = await readDataset();
+    const fixture = JSON.parse(JSON.stringify(before)) as Dataset;
+    const seed = buildSeedDataset();
+    const truckId = fixture.trucks[0].id;
+    const sample = { ...seed.expenses[0], businessId: fixture.business.id, truckId, loadId: null, notes: null, recurring: true,
+      id: "managed-monthly", date: "2026-08-31", category: "INSURANCE" as const, financialTreatment: "OPERATING" as const,
+      splitGroupId: null, obligationId: null, description: "Managed monthly insurance", amount: 125 };
+    fixture.expenses.push(sample);
+    fixture.fuelEntries = [{ ...seed.fuelEntries[0], id: "simple-fuel", businessId: fixture.business.id, truckId, expenseId: null, loadId: null,
+      date: "2026-08-20", location: "Alexandria fuel station with a long name" }];
+    fixture.settlements = [{ ...seed.settlements[0], id: "archived-owner", businessId: fixture.business.id, month: "2024-01", periodStart: "2024-01-01", periodEnd: "2024-01-15" }];
+    fixture.financialObligations = [{ id: "simple-loan", businessId: fixture.business.id, truckId,
+      name: "Truck financing with a descriptive name", kind: "LOAN", counterparty: "Example lender", startedOn: "2026-01-01", endedOn: null,
+      startingBalance: 10000, aprPercent: 7.5, paymentDueDay: 20, expectedMonthlyPayment: 513, active: true, createdAt: "2026-01-01T00:00:00.000Z" }];
+    fixture.trucks.forEach((truck) => { truck.iftaReportingEnabled = false; });
+    await writeDataset(fixture);
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    try {
+      await login(page);
+      await page.goto("/expenses?month=2026-08&period=month");
+      await page.getByRole("button", { name: "Simple", exact: true }).click();
+      await expect(page.getByText("Total recorded", { exact: true })).toBeVisible();
+      await expect(page.getByRole("columnheader", { name: /Vendor/ })).toHaveCount(0);
+      await page.getByRole("button", { name: /Recurring expenses/ }).click();
+      const schedules = page.getByRole("dialog", { name: "Recurring expenses", exact: true });
+      const scheduledRow = schedules.getByRole("listitem").filter({ hasText: sample.description });
+      await expect(scheduledRow).toContainText("$125.00");
+      await scheduledRow.getByRole("button", { name: "Stop repeating" }).click();
+      await expect(scheduledRow).toHaveCount(0);
+      await page.keyboard.press("Escape");
+      const afterStop = JSON.parse(await fs.readFile(dataFile, "utf8")) as Dataset;
+      expect(afterStop.expenses.find((row) => row.id === sample.id)).toEqual({ ...sample, recurring: false });
+      expect(afterStop.settlements).toEqual(fixture.settlements);
+
+      await page.goto("/reserves");
+      await expect(page.getByText(/Close a settlement and/)).toHaveCount(0);
+      await page.getByRole("button", { name: "New bucket", exact: true }).click();
+      const bucket = page.getByRole("dialog", { name: "New reserve bucket" });
+      await bucket.locator("#bucket-name").fill("Manual savings");
+      await expect(bucket.getByRole("switch", { name: "Include in reserve suggestions" })).not.toBeChecked();
+      await bucket.getByRole("button", { name: "Create bucket", exact: true }).click();
+      await expect(bucket).toBeHidden();
+      // Card uses shared semantic markup; scope the add action through its heading's card.
+      const savings = page.getByRole("heading", { name: "Manual savings", exact: true }).locator("xpath=../..").locator("xpath=..").locator("xpath=..");
+      await savings.getByRole("button", { name: "Add", exact: true }).click();
+      const movement = page.getByRole("dialog", { name: "Record a reserve movement" });
+      await movement.locator("#txn-amount").fill("300");
+      await movement.locator("#txn-description").fill("Money set aside manually");
+      await movement.getByRole("button", { name: "Record movement", exact: true }).click();
+      await expect(movement).toBeHidden();
+      await expect(savings).toContainText("$300");
+      await savings.getByRole("button", { name: "Add", exact: true }).click();
+      await movement.locator("#txn-type").click();
+      await page.getByRole("option", { name: "Withdrawal", exact: true }).click();
+      await movement.locator("#txn-amount").fill("50");
+      await movement.locator("#txn-description").fill("Money taken out manually");
+      await movement.getByRole("button", { name: "Record movement", exact: true }).click();
+      await expect(movement).toBeHidden();
+      await expect(savings).toContainText("$250");
+
+      await page.goto("/reports?month=2026-08&period=month");
+      await page.getByRole("link", { name: "Saved statements" }).click();
+      await expect(page).toHaveURL(/\/reports\/settlements$/);
+      await expect(page.getByRole("heading", { name: "Saved statements" })).toBeVisible();
+      await expect(page.getByText(/2024/).first()).toBeVisible();
+      await expect(page.getByRole("button", { name: /Close settlement|Reopen/ })).toHaveCount(0);
+      expect((JSON.parse(await fs.readFile(dataFile, "utf8")) as Dataset).settlements).toEqual(fixture.settlements);
+
+      for (const width of [390, 1280]) {
+        await page.setViewportSize({ width, height: 900 });
+        for (const route of ["expenses", "financing", "fuel", "reports", "reserves"]) {
+          await page.goto(`/${route}?month=2026-08&period=month`);
+          await expect(page.getByRole("button", { name: "Simple", exact: true })).toHaveAttribute("aria-pressed", "true");
+          expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+          await expect(page.locator('[data-nextjs-dialog]')).toHaveCount(0);
+          await page.screenshot({ caret: "initial", path: `/tmp/onroad-simple-${route}-${width}.png`, fullPage: true });
+          await page.getByRole("button", { name: "Detailed", exact: true }).click();
+          await expect(page.getByRole("button", { name: "Detailed", exact: true })).toHaveAttribute("aria-pressed", "true");
+          expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+          if (route === "fuel") await expect(page.locator('main a[href="/ifta"]')).toHaveCount(0);
+          await page.getByRole("button", { name: "Simple", exact: true }).click();
+          await expect(page.getByRole("button", { name: "Simple", exact: true })).toHaveAttribute("aria-pressed", "true");
+          await expect(page.getByRole("button", { name: "Simple", exact: true })).toBeEnabled();
+        }
+      }
+      await page.goto("/reports?month=2026-08&period=month");
+      await page.emulateMedia({ media: "print" });
+      await expect(page.getByText("Actual cost / mile", { exact: true }).first()).toBeVisible();
+      await page.pdf({ path: "/tmp/onroad-simple-report.pdf", format: "A4", printBackground: true });
+      await page.emulateMedia({ media: "screen" });
+      await page.context().addCookies([{ name: "onroadbooks.locale", value: "es", url: "http://127.0.0.1:4173" }]);
+      await page.setViewportSize({ width: 390, height: 900 });
+      for (const route of ["expenses", "financing", "fuel", "reports", "reserves"]) {
+        await page.goto(`/${route}?month=2026-08&period=month`);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+        await page.screenshot({ caret: "initial", path: `/tmp/onroad-simple-${route}-es.png`, fullPage: true });
+      }
+      expect(errors).toEqual([]);
     } finally {
       await writeDataset(before);
     }

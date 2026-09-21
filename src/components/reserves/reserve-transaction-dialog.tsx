@@ -35,7 +35,7 @@ import { todayISO } from "@/lib/periods";
 import type { ReserveAccount, ReserveTransactionType } from "@/lib/types";
 import { toNumber } from "@/lib/utils";
 
-/** Record a movement in a bucket by hand. Contributions also post automatically when a settlement closes. */
+/** Record money set aside or taken out, independently of period closeouts. */
 export function ReserveTransactionDialog({
   accounts,
   defaultAccountId,

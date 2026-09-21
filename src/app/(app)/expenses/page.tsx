@@ -3,6 +3,12 @@ import Link from "next/link";
 import { Fuel } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+import { RecurringExpensesDialog } from "@/components/expenses/recurring-expenses-dialog";
+import { ViewModeToggle } from "@/components/shared/view-mode";
+import { getViewMode } from "@/lib/view-mode-server";
+import { activeRecurringExpenses } from "@/lib/recurring-expenses";
+import { roleCan } from "@/lib/roles";
+import { todayISO } from "@/lib/periods";
 import { CategoryBreakdown } from "@/components/expenses/category-breakdown";
 import { ExpenseFormDialog } from "@/components/expenses/expense-form-dialog";
 import { ExpensesTable } from "@/components/expenses/expenses-table";
@@ -44,7 +50,8 @@ export default async function ExpensesPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const [params, session, locale] = await Promise.all([searchParams, requireSession(), getAppLocale()]);
+  const [params, session, locale, mode] = await Promise.all([searchParams, requireSession(), getAppLocale(), getViewMode()]);
+  const simple = mode === "simple";
   const copy = getWebDictionary(locale).expenses;
   const { trucks, loads, expenses, fuelEntries, maintenanceRecords, documents, settings, financialObligations, paymentEvents } = await getDataset(
     session.businessId,
@@ -83,8 +90,9 @@ export default async function ExpensesPage({
           unit: periodExpenses.length === 1 ? copy.entry : copy.entries,
         })}
         actions={
-          <div className="flex flex-wrap gap-2">
+          <>
           <Button asChild size="sm" variant="outline"><Link href="/fuel"><Fuel />{getWebDictionary(locale).fuel.title}</Link></Button>
+          <RecurringExpensesDialog schedules={activeRecurringExpenses(scopedExpenses, todayISO())} trucks={trucks} canManage={roleCan(session.role ?? "VIEWER", "manage_expenses")} />
           <ExpenseFormDialog
             loads={periodLoads}
             trucks={trucks}
@@ -92,30 +100,33 @@ export default async function ExpensesPage({
             defaultDate={defaultEntryDate(period)}
             categoryBehavior={settings.categoryBehavior}
           />
-          </div>
+          </>
         }
       />
 
       <div className="flex flex-wrap items-center gap-2">
         <PeriodControls period={period} />
         <TruckSwitcher trucks={orderedTrucks(trucks)} selectedId={scopeTruckId} />
+        <div className="sm:ml-auto"><ViewModeToggle /></div>
       </div>
 
       <section
         aria-label={copy.summaryLabel}
-        className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
+        className={simple ? "grid grid-cols-2 gap-3" : "grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6"}
       >
-        <MiniStat
+        {simple ? <MiniStat label={copy.totalRecorded} value={formatMoneyCompact(summary.operatingExpenses + summary.debtService)} /> : null}
+        {!simple || summary.debtService > 0 ? <MiniStat
           label={copy.operatingExpenses}
           value={formatMoneyCompact(summary.operatingExpenses)}
           tone="negative"
-        />
-        <MiniStat
+        /> : null}
+        {!simple || summary.debtService > 0 ? <MiniStat
           label={copy.debtService}
           value={formatMoneyCompact(summary.debtService)}
           tone={summary.debtService > 0 ? "negative" : "neutral"}
           sub={copy.debtServiceDetail}
-        />
+        /> : null}
+        {!simple ? <>
         <MiniStat
           label={copy.fixed}
           value={formatMoneyCompact(summary.fixedExpenses)}
@@ -129,6 +140,7 @@ export default async function ExpensesPage({
           tone="warning"
         />
         <MiniStat label={copy.fuel} value={formatMoneyCompact(summary.fuelExpense)} />
+        </> : null}
         <MiniStat
           label={copy.actualCostPerMile}
           value={formatRate(summary.costPerMile)}
@@ -138,7 +150,7 @@ export default async function ExpensesPage({
       </section>
 
 
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className={simple ? "space-y-4" : "grid gap-4 xl:grid-cols-3"}>
         <div className="min-w-0 xl:col-span-2">
           <ExpensesTable
             expenses={periodExpenses}
@@ -152,12 +164,12 @@ export default async function ExpensesPage({
             obligations={financialObligations}
           />
         </div>
-        <CategoryBreakdown
+        {!simple ? <CategoryBreakdown
           categories={categories}
           total={summary.operatingExpenses}
           locale={locale}
           copy={copy}
-        />
+        /> : null}
       </div>
     </div>
   );

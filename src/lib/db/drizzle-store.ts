@@ -1,3 +1,4 @@
+import { recurringSeriesExpenseIds } from "../recurring-expenses";
 import "server-only";
 
 import {
@@ -2466,6 +2467,16 @@ export class DrizzleRepository implements Repository {
     });
     const dataset = await this.getDataset();
     return dataset.expenses.find((e) => e.id === id)!;
+  }
+
+  async stopRecurringExpense(id: string): Promise<void> {
+    const client = await this.clientProvider();
+    const business = await this.business(client);
+    await client.transaction(async (tx) => {
+      const rows = await tx.query.expense.findMany({ where: eq(s.expense.businessId, business.id) });
+      const ids = recurringSeriesExpenseIds(rows, id);
+      await tx.update(s.expense).set({ recurring: false }).where(and(eq(s.expense.businessId, business.id), inArray(s.expense.id, ids)));
+    }, { isolationLevel: "serializable" });
   }
 
   async deleteExpense(id: string): Promise<void> {

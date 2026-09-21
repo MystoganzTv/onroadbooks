@@ -1,3 +1,4 @@
+import { recurringSeriesExpenseIds } from "../recurring-expenses";
 import "server-only";
 
 import type { Prisma } from "@/generated/prisma";
@@ -1753,6 +1754,16 @@ export class PrismaRepository implements Repository {
     });
     const dataset = await this.getDataset();
     return dataset.expenses.find((e) => e.id === id)!;
+  }
+
+  async stopRecurringExpense(id: string): Promise<void> {
+    const client = await getClient();
+    const business = await this.business(client);
+    await client.$transaction(async (tx) => {
+      const rows = await tx.expense.findMany({ where: { businessId: business.id } });
+      const ids = recurringSeriesExpenseIds(rows, id);
+      await tx.expense.updateMany({ where: { businessId: business.id, id: { in: ids } }, data: { recurring: false } });
+    }, { isolationLevel: "Serializable" });
   }
 
   async deleteExpense(id: string): Promise<void> {

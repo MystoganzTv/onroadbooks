@@ -24,6 +24,7 @@ interface Row {
 }
 
 interface ReportSummaryProps {
+  simple?: boolean;
   current: PeriodSummary;
   previous: PeriodSummary;
   currentLabel: string;
@@ -32,6 +33,7 @@ interface ReportSummaryProps {
 
 /** Side-by-side statement: this period vs the one before it. */
 export function ReportSummary({
+  simple = false,
   current,
   previous,
   currentLabel,
@@ -151,21 +153,21 @@ export function ReportSummary({
         </span>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-4 border-b border-border px-4 py-2 text-2xs uppercase tracking-wider text-muted-foreground">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-x-4 border-b border-border px-4 py-2 text-2xs uppercase tracking-wider text-muted-foreground">
           <span>{copy.metric}</span>
           <span className="text-right">{currentLabel}</span>
           <span className="hidden text-right sm:block">{previousLabel}</span>
           <span className="text-right">{copy.change}</span>
         </div>
         <ul className="divide-y divide-border/70">
-          {rows.map((row) => (
+          {rows.map((row, index) => (
             <li
               key={row.label}
-              className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-4 px-4 py-1.5"
+              className={cn("grid grid-cols-[minmax(0,1fr)_auto_auto] sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-x-2 px-4 py-2 sm:gap-x-4", simple && index > 4 && "hidden print:grid")}
             >
               <span
                 className={cn(
-                  "truncate text-sm",
+                  "min-w-0 break-words text-sm",
                   row.emphasis ? "font-medium text-foreground" : "text-foreground/85",
                 )}
               >

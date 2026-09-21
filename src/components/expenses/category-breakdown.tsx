@@ -10,13 +10,14 @@ import { interpolate, type WebDictionary } from "@/lib/i18n/dictionaries";
 import type { CategoryTotal } from "@/lib/types";
 
 interface CategoryBreakdownProps {
+  showChart?: boolean;
   categories: CategoryTotal[];
   total: number;
   locale: AppLocale;
   copy: WebDictionary["expenses"];
 }
 
-export function CategoryBreakdown({ categories, total, locale, copy }: CategoryBreakdownProps) {
+export function CategoryBreakdown({ categories, total, locale, copy, showChart = true }: CategoryBreakdownProps) {
   if (categories.length === 0) {
     return (
       <Card>
@@ -43,7 +44,7 @@ export function CategoryBreakdown({ categories, total, locale, copy }: CategoryB
       </CardHeader>
       <CardContent className="space-y-4 p-4">
         <div className="print:hidden">
-          <CategoryDonut data={categories} total={total} />
+          {showChart ? <CategoryDonut data={categories} total={total} /> : null}
         </div>
         <div className="hidden justify-center print:flex">
           <PrintDonut data={categories} total={total} />

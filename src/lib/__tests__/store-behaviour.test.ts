@@ -40,7 +40,7 @@ import type {
   MaintenanceInput,
 } from "../db/repository";
 import { BusinessNotFoundError } from "../db/repository";
-import { recurringExpenseSuggestions } from "../recurring-expenses";
+import { activeRecurringExpenses, recurringExpenseSuggestions } from "../recurring-expenses";
 import { loadExpenseId } from "../load-expenses";
 
 const SANDBOX = mkdtempSync(path.join(tmpdir(), "onroad-books-store-"));
@@ -1411,6 +1411,44 @@ describe("financial review and customer cash events", () => {
     assert.deepEqual(after.expenses, before.expenses.map((row) => row.obligationId === obligation.id ? { ...row, obligationId: null } : row));
     assert.deepEqual(after.settlements, before.settlements);
     await assert.rejects(() => repo.deleteFinancialObligation(obligation.id), /does not belong/);
+  });
+
+  it("stops recurring series without changing money, splits, or other series", async () => {
+    const truckId = (await repo.getDataset()).trucks[0].id;
+    const input = expense({ truckId, description: "Manage monthly schedule", date: "2026-01-31", category: "TRUCK_PAYMENT", amount: 513, recurring: true, loanSplit: { principalAmount: 500, interestAmount: 13 } });
+    const first = await repo.createExpense(input);
+    await repo.createExpense({ ...input, date: "2026-02-28" });
+    const unrelated = await repo.createExpense(expense({ truckId, description: "Unrelated monthly cost", recurring: true }));
+    const before = await repo.getDataset();
+    const interest = before.expenses.find((row) => row.splitGroupId === first.splitGroupId && row.financialTreatment === "INTEREST")!;
+    await assert.rejects(() => new store.JsonRepository("biz_someone_else").stopRecurringExpense(first.id), /does not have access/);
+    await assert.rejects(() => repo.stopRecurringExpense("missing"), /does not belong/);
+    await repo.stopRecurringExpense(interest.id);
+    const after = await repo.getDataset();
+    const withoutFlag = (rows: typeof before.expenses) => rows.map(({ recurring: _recurring, ...row }) => row);
+    assert.deepEqual(withoutFlag(after.expenses), withoutFlag(before.expenses));
+    assert.deepEqual(after.settlements, before.settlements);
+    assert.deepEqual(after.reserveTransactions, before.reserveTransactions);
+    assert.equal(after.expenses.find((row) => row.id === unrelated.id)?.recurring, true);
+    assert.equal(activeRecurringExpenses(after.expenses, "2026-03-01").some((row) => row.description === input.description), false);
+    assert.equal(recurringExpenseSuggestions(after, "2026-03").some((row) => row.description === input.description), false);
+    await repo.stopRecurringExpense(first.id);
+    await repo.deleteExpense(first.id);
+    assert.equal(recurringExpenseSuggestions(await repo.getDataset(), "2026-04").some((row) => row.description === input.description), false);
+  });
+
+  it("manual reserves work with suggestions disabled and preserve historical statements", async () => {
+    const account = await repo.createReserveAccount({ name: "Optional manual reserve", kind: "CUSTOM", basis: "GROSS_REVENUE", contributionPct: 5, active: false });
+    const before = await repo.getDataset();
+    const contribution = await repo.createReserveTransaction({ accountId: account.id, date: "2026-08-20", type: "CONTRIBUTION", amount: 300, description: "Money set aside" });
+    const withdrawal = await repo.createReserveTransaction({ accountId: account.id, date: "2026-08-21", type: "WITHDRAWAL", amount: 50, description: "Money taken out" });
+    const after = await repo.getDataset();
+    assert.equal(contribution.amount + withdrawal.amount, 250);
+    assert.equal(contribution.settlementId, null);
+    assert.equal(withdrawal.settlementId, null);
+    assert.deepEqual(after.settlements, before.settlements);
+    assert.deepEqual(after.expenses, before.expenses);
+    assert.deepEqual(after.loads, before.loads);
   });
 
   it("saves an optional split once and repeats it as one complete monthly payment", async () => {

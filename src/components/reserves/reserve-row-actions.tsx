@@ -2,14 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { localizedClientError } from "@/lib/i18n/errors";
 
 import { ConfirmDelete } from "@/components/shared/confirm-delete";
 import { useLanguage } from "@/components/shell/language-provider";
-import { Button } from "@/components/ui/button";
 import {
   deleteReserveAccountAction,
   deleteReserveTransactionAction,
@@ -55,20 +53,7 @@ export function DeleteReserveTransactionButton({
   const copy = dictionary.reserves;
   const [, startTransition] = useTransition();
 
-  if (posted) {
-    return (
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        disabled
-        aria-label={copy.postedBySettlement}
-        title={copy.postedBySettlementHint}
-        className="text-muted-foreground/40"
-      >
-        <Trash2 />
-      </Button>
-    );
-  }
+  if (posted) return null;
 
   return (
     <ConfirmDelete

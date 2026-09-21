@@ -1,5 +1,5 @@
 import { roundMoney } from "./calculations";
-import { daysInMonth, pad, parseMonth } from "./periods";
+import { daysInMonth, pad, parseMonth, shiftMonth } from "./periods";
 import type { Dataset, Expense, ExpenseScope } from "./types";
 import type { ExpenseInput } from "./db/repository";
 
@@ -148,4 +148,53 @@ export function recurringExpenseSuggestions(
   }
 
   return suggestions;
+}
+
+/** Stop every occurrence in the same series, including both parts of a loan payment. */
+export function recurringSeriesExpenseIds(
+  expenses: (Pick<Expense, "id" | "scope" | "truckId" | "description" | "splitGroupId"> & { category: string; financialTreatment?: string | null })[],
+  id: string,
+): string[] {
+  const source = expenses.find((expense) => expense.id === id);
+  if (!source) throw new Error("That expense does not belong to this workspace.");
+  const bases = new Map<string, typeof source>();
+  for (const row of expenses) {
+    if (row.splitGroupId && (!bases.has(row.splitGroupId) || row.financialTreatment === "PRINCIPAL")) bases.set(row.splitGroupId, row);
+  }
+  const keyFor = (expense: typeof source) => {
+    const base = expense.splitGroupId ? bases.get(expense.splitGroupId)! : expense;
+    return recurrenceKey({ ...base,
+      category: (base.splitGroupId ? "TRUCK_PAYMENT" : base.category) as Expense["category"],
+      description: base.splitGroupId ? base.description.replace(/ · interest$/u, "") : base.description,
+    });
+  };
+  const key = keyFor(source);
+  return expenses.filter((expense) => keyFor(expense) === key).map((expense) => expense.id);
+}
+
+export interface ActiveRecurringExpense {
+  id: string;
+  description: string;
+  amount: number;
+  truckId: string | null;
+  nextDate: string;
+}
+
+/** Independent of the selected reporting period: these are the schedules still enabled. */
+export function activeRecurringExpenses(expenses: Expense[], today: string): ActiveRecurringExpense[] {
+  const payments = recurringPayments(expenses).sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
+  const latest = new Map<string, typeof payments[number]>();
+  const anchors = new Map<string, string>();
+  for (const payment of payments) {
+    const key = recurrenceKey(payment);
+    latest.set(key, payment);
+    if (!isMonthlyRecurringExpense(payment)) anchors.delete(key);
+    else if (!anchors.has(key)) anchors.set(key, payment.date);
+  }
+  return [...latest.entries()].filter(([, row]) => isMonthlyRecurringExpense(row)).map(([key, row]) => {
+    const nextMonth = shiftMonth(row.date.slice(0, 7), 1);
+    const month = nextMonth > today.slice(0, 7) ? nextMonth : today.slice(0, 7);
+    return { id: row.id, description: row.description, amount: row.amount, truckId: row.truckId,
+      nextDate: dateInMonth(month, anchors.get(key) ?? row.date) };
+  }).sort((a, b) => a.nextDate.localeCompare(b.nextDate) || a.description.localeCompare(b.description));
 }

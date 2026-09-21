@@ -8,6 +8,7 @@ import { repositoryWith } from "./guards";
 
 function revalidate() {
   revalidatePath("/reserves");
+  revalidatePath("/reports");
   revalidatePath("/dashboard");
   revalidatePath("/settlements");
   revalidatePath("/truck");

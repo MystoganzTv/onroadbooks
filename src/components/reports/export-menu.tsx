@@ -31,7 +31,7 @@ export function ExportMenu({ query, year }: { query: string; year: number }) {
     maintenance: [copy.exportMaintenance, copy.exportMaintenanceDescription],
   } as const;
   return (
-    <div className="flex items-center gap-2 print:hidden">
+    <>
       <Button variant="outline" size="sm" onClick={() => window.print()}>
         <Printer />
         {copy.printPdf}
@@ -72,6 +72,6 @@ export function ExportMenu({ query, year }: { query: string; year: number }) {
           </DropdownMenuItem>)}
         </DropdownMenuContent>
       </DropdownMenu>
-    </div>
+    </>
   );
 }

@@ -28,7 +28,7 @@ import { financialModelVersionOf } from "@/lib/finance/terminology";
 import { cn } from "@/lib/utils";
 
 /** A half-month payday view first, a frozen accounting statement second. */
-export function SettlementDetail({ view }: { view: SettlementView }) {
+export function SettlementDetail({ view, readOnly = false }: { view: SettlementView; readOnly?: boolean }) {
   const { dictionary, locale } = useLanguage();
   const copy = dictionary.settlements;
   const figures = view.figures;
@@ -63,7 +63,7 @@ export function SettlementDetail({ view }: { view: SettlementView }) {
 
   return (
     <div className="space-y-3">
-      <ActionableProblemList problems={problems} />
+      {!readOnly ? <ActionableProblemList problems={problems} /> : null}
 
       <Card className="overflow-hidden">
         <CardHeader className="flex-wrap">
@@ -94,7 +94,7 @@ export function SettlementDetail({ view }: { view: SettlementView }) {
               {closed ? <CircleCheck className="size-3" /> : <LockOpen className="size-3" />}
               {closed ? copy.settled : copy.live}
             </span>
-            {closed ? (
+            {readOnly ? null : closed ? (
               <ReopenSettlementButton id={view.id} />
             ) : (
               <CloseSettlementButton
@@ -214,7 +214,7 @@ export function SettlementDetail({ view }: { view: SettlementView }) {
                 : copy.liveRunningNote}
           </p>
 
-          {view.drifted ? (
+          {!readOnly && view.drifted ? (
             <div className="flex flex-col gap-3 border-t border-warn/40 bg-warn-soft/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-start gap-2.5">
                 <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warn" />

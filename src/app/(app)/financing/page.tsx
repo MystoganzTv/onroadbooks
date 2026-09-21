@@ -8,6 +8,8 @@ import {
 } from "@/components/financing/financial-obligation-dialog";
 import { MiniStat } from "@/components/dashboard/mini-stat";
 import { EmptyState } from "@/components/shared/empty-state";
+import { ViewModeToggle } from "@/components/shared/view-mode";
+import { getViewMode } from "@/lib/view-mode-server";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,7 +29,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function FinancingPage() {
-  const [session, locale] = await Promise.all([requireSession(), getAppLocale()]);
+  const [session, locale, mode] = await Promise.all([requireSession(), getAppLocale(), getViewMode()]);
+  const simple = mode === "simple";
   const copy = getWebDictionary(locale).financing;
   const { financialObligations, expenses, trucks } = await getDataset(session.businessId);
   const canManage = roleCan(session.role ?? "VIEWER", "manage_finances");
@@ -54,16 +57,18 @@ export default async function FinancingPage() {
         actions={canManage ? <FinancialObligationDialog trucks={trucks} /> : undefined}
       />
 
+      <div className="flex justify-start sm:justify-end"><ViewModeToggle /></div>
+
       {!canManage ? (
         <p className="rounded-lg border border-border bg-surface-sunken px-4 py-3 text-xs text-muted-foreground">
           {copy.readOnly}
         </p>
       ) : null}
 
-      <section aria-label={copy.title} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <section aria-label={copy.title} className={simple ? "grid grid-cols-2 gap-3" : "grid grid-cols-1 gap-3 sm:grid-cols-3"}>
         <MiniStat label={copy.activeObligations} value={String(active.length)} />
-        <MiniStat label={copy.monthlyCommitment} value={formatMoneyCompact(monthlyCommitment)} tone="negative" />
-        <MiniStat label={copy.recordedPayments} value={String(paymentKeys.size)} />
+        <MiniStat label={copy.monthlyCommitment} value={formatMoneyCompact(monthlyCommitment)} tone="neutral" />
+        {!simple ? <MiniStat label={copy.recordedPayments} value={String(paymentKeys.size)} /> : null}
       </section>
 
       <Card>
@@ -109,7 +114,7 @@ export default async function FinancingPage() {
                   <article key={obligation.id} className="grid gap-3 px-4 py-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] lg:items-center">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="truncate text-sm font-semibold">{obligation.name}</h2>
+                        <h2 className="break-words text-sm font-semibold">{obligation.name}</h2>
                         <Badge variant={obligation.active ? "positive" : "outline"}>
                           {obligation.active ? copy.active : copy.closed}
                         </Badge>
@@ -137,7 +142,7 @@ export default async function FinancingPage() {
                     <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs xl:grid-cols-3">
                       {obligation.kind === "LOAN" ? (
                         <>
-                          <ObligationDetail
+                          {!simple ? <ObligationDetail
                             label={copy.startingBalance}
                             value={obligation.startingBalance != null
                               ? formatMoney(obligation.startingBalance)
@@ -145,7 +150,7 @@ export default async function FinancingPage() {
                             hint={obligation.startingBalance != null
                               ? copy.startingBalanceHint
                               : copy.balanceUnavailable}
-                          />
+                          /> : null}
                           <ObligationDetail
                             label={copy.currentBalance}
                             value={balance.currentBalance != null
@@ -158,16 +163,16 @@ export default async function FinancingPage() {
                                 })
                               : copy.balanceUnavailable}
                           />
-                          <ObligationDetail
+                          {!simple ? <ObligationDetail
                             label={copy.apr}
                             value={obligation.aprPercent != null
                               ? `${formatLocaleNumber(obligation.aprPercent, locale, { maximumFractionDigits: 2 })}%`
                               : "—"}
                             hint={copy.aprHint}
-                          />
+                          /> : null}
                         </>
                       ) : null}
-                      <ObligationDetail
+                      {!simple ? <ObligationDetail
                         label={copy.nextPayment}
                         value={nextPaymentDate
                           ? formatLocaleDate(nextPaymentDate, locale, "medium")
@@ -182,7 +187,7 @@ export default async function FinancingPage() {
                           : obligation.active
                             ? copy.nextPaymentUnavailable
                             : copy.closed}
-                      />
+                      /> : null}
                       <ObligationDetail
                         label={copy.expectedMonthlyPayment}
                         value={obligation.expectedMonthlyPayment != null

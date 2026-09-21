@@ -1,4 +1,10 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { History } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ViewModeToggle } from "@/components/shared/view-mode";
+import { getViewMode } from "@/lib/view-mode-server";
+import { roleCan } from "@/lib/roles";
 
 import { RevenueExpenseChart } from "@/components/charts/revenue-expense-chart";
 import { TrendLineChart } from "@/components/charts/trend-line-chart";
@@ -82,12 +88,14 @@ export default async function ReportsPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const [params, session, locale] = await Promise.all([
+  const [params, session, locale, mode] = await Promise.all([
     searchParams,
     requireSession(),
     getAppLocale(),
+    getViewMode(),
   ]);
   const copy = getWebDictionary(locale).reports;
+  const simple = mode === "simple";
   const { business, trucks, loads, expenses, fuelEntries, settings, paymentEvents, reserveAccounts, subscription } = await getDataset(
     session.businessId,
   );
@@ -146,21 +154,25 @@ export default async function ReportsPage({
             current: periodLong,
             previous: priorLong,
           })}
-          actions={<ExportMenu query={query} year={Number(period.month.slice(0, 4))} />}
+          actions={<>
+            {roleCan(session.role ?? "VIEWER", "manage_owner_finances") ? <Button asChild size="sm" variant="outline"><Link href="/reports/settlements"><History />{copy.savedStatements}</Link></Button> : null}
+            <ExportMenu query={query} year={Number(period.month.slice(0, 4))} />
+          </>}
         />
       </div>
 
       <div className="flex flex-wrap items-center gap-2 print:hidden">
         <PeriodControls period={period} />
         <TruckSwitcher trucks={orderedTrucks(trucks)} selectedId={truckId} />
+        <div className="sm:ml-auto"><ViewModeToggle /></div>
       </div>
 
-      <Card className="border-info/30 bg-info-soft/30 print:hidden">
+      {!simple ? <Card className="print:hidden">
         <CardContent className="p-4 text-xs leading-relaxed text-muted-foreground">
           <span className="font-semibold text-foreground">{copy.accountantLead}</span>{" "}
           {copy.accountantNote}
         </CardContent>
-      </Card>
+      </Card> : null}
 
       <ReportLetterhead
         businessName={business.name}
@@ -172,20 +184,21 @@ export default async function ReportsPage({
         summary={summary}
       />
 
-      <div className="grid gap-4 xl:grid-cols-3 print:gap-3">
+      <div className={simple ? "space-y-4" : "grid gap-4 xl:grid-cols-3 print:gap-3"}>
         <div className="min-w-0 print-keep xl:col-span-2">
-          <ReportSummary
+          <ReportSummary simple={simple}
             current={summary}
             previous={priorSummary}
             currentLabel={periodShort}
             previousLabel={priorShort}
           />
         </div>
-        <div className="min-w-0 space-y-4 print-keep">
+        <div className={simple ? "hidden print:block" : "min-w-0 space-y-4 print-keep"}>
           <HalfMonthSplit halves={halves} monthLabel={monthName} />
         </div>
       </div>
 
+      <div className={simple ? "hidden print:block" : "contents"}>
       <div className="grid gap-4 xl:grid-cols-2 print:gap-3">
         <Card className="print-keep">
           <CardHeader>
@@ -194,7 +207,7 @@ export default async function ReportsPage({
           </CardHeader>
           <CardContent className="px-2 py-3">
             <div className="print:hidden">
-              <RevenueExpenseChart data={halfTrend} />
+              {!simple ? <RevenueExpenseChart data={halfTrend} /> : null}
             </div>
             <div className="hidden print:block">
               <PrintBarChart
@@ -215,14 +228,14 @@ export default async function ReportsPage({
           </CardHeader>
           <CardContent className="px-2 py-3">
             <div className="print:hidden">
-              <TrendLineChart
+              {!simple ? <TrendLineChart
                 data={monthTrend}
                 height={240}
                 series={[
                   { dataKey: "profit", name: copy.operatingProfit, color: "hsl(var(--pos))" },
                   { dataKey: "revenue", name: copy.bookedRevenue, color: "hsl(var(--info))" },
                 ]}
-              />
+              /> : null}
             </div>
             <div className="hidden print:block">
               <PrintLineChart
@@ -243,14 +256,14 @@ export default async function ReportsPage({
           </CardHeader>
           <CardContent className="px-2 py-3">
             <div className="print:hidden">
-              <TrendLineChart
+              {!simple ? <TrendLineChart
                 data={halfTrend}
                 formatter="rate"
                 series={[
                   { dataKey: "revenuePerMile", name: copy.revenuePerMile, color: "hsl(var(--info))" },
                   { dataKey: "profitPerMile", name: copy.profitPerMile, color: "hsl(var(--pos))" },
                 ]}
-              />
+              /> : null}
             </div>
             <div className="hidden print:block">
               <PrintLineChart
@@ -272,11 +285,11 @@ export default async function ReportsPage({
           </CardHeader>
           <CardContent className="px-2 py-3">
             <div className="print:hidden">
-              <TrendLineChart
+              {!simple ? <TrendLineChart
                 data={halfTrend}
                 formatter="rate"
                 series={[{ dataKey: "costPerMile", name: copy.costPerMile, color: "hsl(var(--neg))" }]}
-              />
+              /> : null}
             </div>
             <div className="hidden print:block">
               <PrintLineChart
@@ -299,7 +312,7 @@ export default async function ReportsPage({
 
       <div className="print-break-before grid gap-4 xl:grid-cols-3 print:gap-3">
         <div className="min-w-0 xl:col-span-1">
-          <CategoryBreakdown
+          <CategoryBreakdown showChart={!simple}
             categories={categories}
             total={summary.operatingExpenses}
             locale={locale}
@@ -354,6 +367,8 @@ export default async function ReportsPage({
             </p>
           </CardContent>
         </Card>
+      </div>
+
       </div>
 
       <ReportColophon

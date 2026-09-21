@@ -29,10 +29,10 @@ export function MiniStat({
   sub,
   className,
   help,
-  wrapText = false,
+  wrapText = true,
 }: MiniStatProps) {
   return (
-    <div className={cn("rounded-lg border border-border bg-card px-3.5 py-3", className)}>
+    <div className={cn("min-w-0 rounded-lg border border-border bg-card px-3.5 py-3", className)}>
       <div className="flex items-start justify-between gap-2">
         <p
           className={cn(
