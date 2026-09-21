@@ -81,7 +81,7 @@ export default async function FinancingPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warn/35 bg-warn-soft/35 px-4 py-3">
           <p className="text-xs font-medium text-warn">{copy.unclassifiedPayments}: {unclassified.length}</p>
           <Button asChild size="sm" variant="outline">
-            <Link href="/expenses?review=debt">{copy.reviewPayments}</Link>
+            <Link href="/expenses">{copy.reviewPayments}</Link>
           </Button>
         </div>
       ) : null}

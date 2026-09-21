@@ -30,6 +30,7 @@ import {
   driverSettlementTotals,
 } from "../driver-pay";
 import { financialTreatmentForCategory } from "../finance/terminology";
+import { expensePaymentRows } from "../expense-payment";
 import { requireExactDebtPaymentSplit } from "../finance/debt-payment";
 import { expenseMirrorSource, mirrorRefusal } from "../mirrored-expenses";
 import type {
@@ -1349,9 +1350,10 @@ export class JsonRepository implements Repository {
 
   async createExpense(input: ExpenseInput): Promise<Expense> {
     return mutate((dataset) => {
-      const expense = expenseFromInput(input, dataset, newId("exp"), new Date().toISOString());
-      dataset.expenses.push(expense);
-      return expense;
+      const rows = expensePaymentRows(input, newId("split")).map((row) =>
+        expenseFromInput(row, dataset, newId("exp"), new Date().toISOString()));
+      dataset.expenses.push(...rows);
+      return rows[0];
     }, this.businessId);
   }
 
@@ -1367,14 +1369,17 @@ export class JsonRepository implements Repository {
       if (dataset.expenses[index].splitGroupId) {
         throw new Error("Use the loan payment editor to keep principal and interest balanced.");
       }
+      const inputs = expensePaymentRows({ ...input, obligationId: input.obligationId === undefined ? dataset.expenses[index].obligationId : input.obligationId }, newId("split"));
       const updated = expenseFromInput(
-        input,
+        inputs[0],
         dataset,
         id,
         dataset.expenses[index].createdAt,
         dataset.expenses[index],
       );
       dataset.expenses[index] = updated;
+      dataset.expenses.push(...inputs.slice(1).map((row) =>
+        expenseFromInput(row, dataset, newId("exp"), updated.createdAt)));
       return updated;
     }, this.businessId);
   }

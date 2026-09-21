@@ -12,7 +12,6 @@ import { dayCount, pad, resolvePeriod, type Period } from "./periods";
 import type { Dataset } from "./types";
 import {
   FINANCIAL_MODEL_VERSION,
-  financialTreatmentOf,
   isOperatingExpenseCategory,
 } from "./finance/terminology";
 
@@ -43,12 +42,6 @@ export function yearPeriod(year: number): Period {
 }
 
 const money = (value: number) => Number(value.toFixed(2));
-const displayMoney = (value: number) => new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-}).format(value);
-
 /** Excel refuses these in a sheet name, and truncates past 31 characters. */
 function sheetName(label: string): string {
   return label.replace(/[[\]:*?/\\]/g, " ").trim().slice(0, 31);
@@ -174,7 +167,6 @@ interface ReviewCheck {
 
 function reviewChecksTable(dataset: Dataset, period: Period, businessName: string): ReportTable {
   const loads = loadsInPeriod(dataset.loads, period);
-  const expenses = expensesInPeriod(dataset.expenses, period);
   const fuel = fuelInPeriod(dataset.fuelEntries, period);
   const summary = summarizePeriod(
     dataset.loads,
@@ -190,11 +182,6 @@ function reviewChecksTable(dataset: Dataset, period: Period, businessName: strin
     : [];
   const missingIftaFuel = iftaRelevant ? fuel.filter((entry) => !entry.jurisdiction) : [];
   const missingFuelDetails = fuel.filter((entry) => !entry.location?.trim() || entry.odometer == null);
-  const unclassifiedDebt = expenses.filter(
-    (expense) => financialTreatmentOf(expense) === "DEBT_UNALLOCATED",
-  );
-  const unclassifiedDebtAmount = unclassifiedDebt.reduce((sum, expense) => sum + expense.amount, 0);
-
   const issue = (
     condition: boolean,
     actionCheck: Omit<ReviewCheck, "status">,
@@ -239,18 +226,6 @@ function reviewChecksTable(dataset: Dataset, period: Period, businessName: strin
         route: "/fuel",
       },
       "Fuel detail is complete.",
-    ),
-    issue(
-      unclassifiedDebt.length > 0,
-      {
-        what: `${displayMoney(unclassifiedDebtAmount)} OF DEBT PAYMENTS NEEDS CLASSIFICATION`,
-        records: unclassifiedDebt.length,
-        amount: money(unclassifiedDebtAmount),
-        why: "Without an interest/principal split, financing cost and debt reduction cannot be separated.",
-        action: "Split each payment into interest and principal.",
-        route: "/expenses",
-      },
-      "Debt payments are classified.",
     ),
   ];
 

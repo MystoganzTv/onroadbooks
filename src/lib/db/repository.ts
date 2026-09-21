@@ -106,6 +106,8 @@ export interface LoadInput {
 }
 
 export interface ExpenseInput {
+  /** Optional breakdown of one payment, saved atomically. */
+  loanSplit?: { principalAmount: number; interestAmount: number };
   /**
    * TRUCK charges the cost to a unit; BUSINESS is fleet overhead and forces
    * truckId to null. A TRUCK expense may omit the id only while the workspace

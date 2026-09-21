@@ -241,18 +241,6 @@ export function selectActionableFinancialProblems(
       severity: "warning",
     });
   }
-  if ((input.unallocatedDebtService ?? 0) > 0) {
-    problems.push({
-      id: "unclassified-debt",
-      amount: input.unallocatedDebtService!,
-      count: null,
-      headline: "Debt & financing payments need a split",
-      what: "Some financing payments are not classified between interest and principal.",
-      why: "The total cash out is known, but reports cannot explain financing cost versus balance reduction.",
-      action: { label: "Classify debt payments", href: "/expenses?review=debt" },
-      severity: "warning",
-    });
-  }
   if ((input.estimatedFuelWithoutDetails ?? 0) > 0) {
     problems.push({
       id: "missing-fuel-details",

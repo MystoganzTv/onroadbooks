@@ -1,3 +1,4 @@
+import { roundMoney } from "./calculations";
 import { daysInMonth, pad, parseMonth } from "./periods";
 import type { Dataset, Expense, ExpenseScope } from "./types";
 import type { ExpenseInput } from "./db/repository";
@@ -37,6 +38,38 @@ function recurrenceKey(expense: Pick<Expense, "category" | "scope" | "truckId" |
   ].join(":");
 }
 
+/** A split repeats as one payment, with a new group created by the repository. */
+function recurringPayments(expenses: Expense[]): (Expense & Pick<ExpenseInput, "loanSplit">)[] {
+  const groups = new Map<string, Expense[]>();
+  for (const expense of expenses) {
+    if (expense.splitGroupId) {
+      const rows = groups.get(expense.splitGroupId) ?? [];
+      rows.push(expense);
+      groups.set(expense.splitGroupId, rows);
+    }
+  }
+  const seen = new Set<string>();
+  return expenses.flatMap((expense) => {
+    if (!expense.splitGroupId) return [expense];
+    if (seen.has(expense.splitGroupId)) return [];
+    seen.add(expense.splitGroupId);
+    const rows = groups.get(expense.splitGroupId)!;
+    const base = rows.find((row) => row.financialTreatment === "PRINCIPAL") ?? rows[0];
+    return [{
+      ...base,
+      category: "TRUCK_PAYMENT" as const,
+      financialTreatment: "DEBT_UNALLOCATED" as const,
+      description: base.description.replace(/ · interest$/u, ""),
+      amount: roundMoney(rows.reduce((total, row) => total + row.amount, 0)),
+      recurring: rows.every(isMonthlyRecurringExpense),
+      loanSplit: {
+        principalAmount: roundMoney(rows.filter((row) => row.financialTreatment === "PRINCIPAL").reduce((total, row) => total + row.amount, 0)),
+        interestAmount: roundMoney(rows.filter((row) => row.financialTreatment === "INTEREST").reduce((total, row) => total + row.amount, 0)),
+      },
+    }];
+  });
+}
+
 function dateInMonth(month: string, sourceDate: string): string {
   const { year, monthIndex } = parseMonth(month);
   const requestedDay = Number.parseInt(sourceDate.slice(8, 10), 10) || 1;
@@ -71,11 +104,12 @@ export function recurringExpenseSuggestions(
   const suggestions: RecurringExpenseSuggestion[] = [];
   // Keep the latest explicit choice, including switching recurrence off.
   // Looking only at recurring=true resurrected an older monthly template.
-  const history = dataset.expenses
+  const payments = recurringPayments(dataset.expenses);
+  const history = payments
     .filter((expense) => expense.date < `${month}-01`)
     .filter((expense) => !selectedTruckId || expense.scope !== "TRUCK" || expense.truckId === selectedTruckId)
     .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
-  const latestByKey = new Map<string, Expense>();
+  const latestByKey = new Map<string, Expense & Pick<ExpenseInput, "loanSplit">>();
   const anchorByKey = new Map<string, string>();
   for (const expense of history) {
     const key = recurrenceKey(expense);
@@ -89,7 +123,7 @@ export function recurringExpenseSuggestions(
   }
 
   const currentKeys = new Set(
-    dataset.expenses.filter((expense) => expense.date.startsWith(month)).map(recurrenceKey),
+    payments.filter((expense) => expense.date.startsWith(month)).map(recurrenceKey),
   );
   for (const [key, template] of latestByKey) {
     if (!isMonthlyRecurringExpense(template) || currentKeys.has(key)) continue;
@@ -107,6 +141,9 @@ export function recurringExpenseSuggestions(
       recurring: true,
       receiptNumber: null,
       notes: template.notes,
+      loanSplit: template.loanSplit,
+      obligationId: template.obligationId,
+      financialTreatment: template.financialTreatment,
     });
   }
 

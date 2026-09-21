@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { CircleDollarSign, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { localizedClientError } from "@/lib/i18n/errors";
@@ -10,7 +10,6 @@ import { useLanguage } from "@/components/shell/language-provider";
 
 import { Field } from "@/components/shared/field";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogBody,
@@ -33,59 +32,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { classifyDebtPaymentAction } from "@/lib/actions/expenses";
+import { isMonthlyRecurringExpense, optedInRecurringNotes } from "@/lib/recurring-expenses";
 import { roundMoney } from "@/lib/calculations";
 import { reconcileDebtPaymentSplit } from "@/lib/finance/debt-payment";
 import { formatMoney } from "@/lib/formatters";
-import { formatLocaleDate } from "@/lib/i18n-format";
 import { interpolate, type WebDictionary } from "@/lib/i18n/dictionaries";
 import type { Expense, FinancialObligation, Truck } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type Treatment = "LOAN_SPLIT" | "OPERATING_LEASE" | "DEBT_UNALLOCATED";
-
-export function DebtReviewPanel({
-  expenses,
-  obligations,
-  trucks,
-}: {
-  expenses: Expense[];
-  obligations: FinancialObligation[];
-  trucks: Truck[];
-}) {
-  const { locale, dictionary } = useLanguage();
-  const copy = dictionary.expenses;
-  const unknown = expenses.filter(
-    (expense) =>
-      expense.category === "TRUCK_PAYMENT" &&
-      (expense.financialTreatment ?? "DEBT_UNALLOCATED") === "DEBT_UNALLOCATED",
-  );
-  if (unknown.length === 0) return null;
-  return (
-    <Card className="border-warn/40">
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <CircleDollarSign className="size-4 text-warn" />
-          <CardTitle>{copy.paymentsNeedClassification}</CardTitle>
-        </div>
-        <span className="text-2xs text-muted-foreground">
-          {interpolate(copy.classificationNote, { count: unknown.length, unit: unknown.length === 1 ? copy.payment : copy.payments })}
-        </span>
-      </CardHeader>
-      <CardContent className="divide-y divide-border p-0">
-        {unknown.map((expense) => (
-          <div key={expense.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{expense.description}</p>
-              <p className="text-xs text-muted-foreground">{formatLocaleDate(expense.date, locale, { month: "short", day: "numeric" })} · {expense.vendor ?? copy.noLender} · {trucks.find((truck) => truck.id === expense.truckId)?.name ?? copy.business}</p>
-            </div>
-            <span className="tnum text-sm font-semibold">{formatMoney(expense.amount)}</span>
-            <DebtClassificationDialog expense={expense} obligations={obligations} trucks={trucks} />
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
 
 export function DebtClassificationDialog({
   expense,
@@ -141,7 +96,7 @@ export function DebtClassificationDialog({
   const [date, setDate] = React.useState(expense.date);
   const [description, setDescription] = React.useState(expense.description.replace(/ · interest$/u, ""));
   const [vendor, setVendor] = React.useState(expense.vendor ?? "");
-  const [recurring, setRecurring] = React.useState(expense.recurring);
+  const [recurring, setRecurring] = React.useState(isMonthlyRecurringExpense(expense));
   const [principal, setPrincipal] = React.useState(String(editingSplit ? currentPrincipal : expense.amount));
   const [interest, setInterest] = React.useState(String(editingSplit ? currentInterest : 0));
   const [notes, setNotes] = React.useState(currentNotes);
@@ -165,7 +120,7 @@ export function DebtClassificationDialog({
     setDate(expense.date);
     setDescription(expense.description.replace(/ · interest$/u, ""));
     setVendor(expense.vendor ?? "");
-    setRecurring(expense.recurring);
+    setRecurring(isMonthlyRecurringExpense({ recurring: expense.recurring, notes: expense.notes }));
     setPrincipal(String(editingSplit ? currentPrincipal : expense.amount));
     setInterest(String(editingSplit ? currentInterest : 0));
     setNotes(currentNotes);
@@ -178,6 +133,7 @@ export function DebtClassificationDialog({
     expense.date,
     expense.description,
     expense.recurring,
+    expense.notes,
     expense.truckId,
     expense.vendor,
     initialObligation,
@@ -308,7 +264,7 @@ export function DebtClassificationDialog({
         description: editingSplit ? description : undefined,
         vendor: editingSplit ? vendor.trim() || null : undefined,
         recurring: editingSplit ? recurring : undefined,
-        notes: notes.trim() || null,
+        notes: (recurring ? optedInRecurringNotes(notes) : notes).trim() || null,
       });
       if (!result.ok) {
         toast.error(localizedClientError(result.error));

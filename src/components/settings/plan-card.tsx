@@ -54,7 +54,7 @@ function BillingSubmit({
       type="submit"
       size="sm"
       variant={variant}
-      className="w-full rounded-full"
+      className="h-10 w-full rounded-lg"
       disabled={disabled || pending}
     >
       {pending ? <Loader2 className="animate-spin" aria-hidden /> : null}
@@ -97,21 +97,13 @@ function PortalForm({
   );
 }
 
-/**
- * One plan, presented the same way wherever it is offered. A slim accent bar
- * on top, a pill for what it covers and (when relevant) a pill for its
- * status, an icon tile, circled checkmarks, and a full-width pill CTA --
- * so a real, purchasable tier never looks like a lesser or disabled option
- * next to the others, and the current/active one reads as clearly ahead of
- * the rest rather than merely outlined.
- */
+/** Complete plan features with equal-height cards and a consistent action footer. */
 function PlanTile({
   anchorId,
   plan,
   truckLabel,
   highlighted,
   statusLabel,
-  featureLimit = 4,
   action,
 }: {
   anchorId?: string;
@@ -119,24 +111,24 @@ function PlanTile({
   truckLabel: string;
   highlighted: boolean;
   statusLabel?: string;
-  featureLimit?: number;
   action?: ReactNode;
 }) {
   const { dictionary } = useLanguage();
   const copy = dictionary.plans;
   const Icon = PLAN_ICONS[plan.id];
   const localized = {
-    SOLO: { tagline: copy.soloTagline, features: copy.soloFeatures.split("|"), note: null },
-    OWNER: { tagline: copy.proTagline, features: copy.proFeatures.split("|"), note: null },
-    FLEET: { tagline: copy.fleetTagline, features: copy.fleetFeatures.split("|"), note: copy.fleetNote },
+    SOLO: { tagline: copy.soloTagline, features: copy.soloFeatures.split("|") },
+    OWNER: { tagline: copy.proTagline, features: copy.proFeatures.split("|") },
+    FLEET: { tagline: copy.fleetTagline, features: copy.fleetFeatures.split("|") },
   } as const;
   const planCopy = localized[plan.id];
 
   return (
-    <div
+    <article
+      aria-label={plan.name}
       id={anchorId}
       className={cn(
-        "relative overflow-hidden rounded-xl border pt-4",
+        "relative flex h-full flex-col overflow-hidden rounded-xl border pt-4",
         highlighted ? "border-primary bg-primary/[0.06]" : "border-border bg-card",
       )}
     >
@@ -168,11 +160,11 @@ function PlanTile({
           ${plan.priceMonthly}
           <span className="text-2xs font-normal text-muted-foreground"> {copy.perMonth}</span>
         </p>
-        <p className="mt-1 text-2xs text-muted-foreground">{planCopy.tagline}</p>
+        <p className="mt-2 text-xs leading-relaxed text-muted-foreground lg:min-h-10">{planCopy.tagline}</p>
 
-        <ul className="mt-3 space-y-1.5">
-          {planCopy.features.slice(0, featureLimit).map((feature) => (
-            <li key={feature} className="flex items-start gap-2 text-2xs text-muted-foreground">
+        <ul className="mt-4 space-y-2.5">
+          {planCopy.features.map((feature) => (
+            <li key={feature} className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
               <span
                 className={cn(
                   "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full",
@@ -185,14 +177,12 @@ function PlanTile({
             </li>
           ))}
         </ul>
-
-        {planCopy.note ? (
-          <p className="mt-2.5 text-2xs italic leading-relaxed text-muted-foreground">{planCopy.note}</p>
-        ) : null}
       </div>
 
-      {action ? <div className="mt-4 px-4 pb-4">{action}</div> : <div className="pb-4" />}
-    </div>
+      <div className="mt-auto px-4 pb-4 pt-6">
+        {action ?? <Button size="sm" variant="outline" disabled className="h-10 w-full rounded-lg">{copy.currentPlan}</Button>}
+      </div>
+    </article>
   );
 }
 
@@ -232,7 +222,7 @@ function OneTruckPlan({
               {(isCurrent ? copy.keepPlan : copy.choosePlan).replace("{plan}", plan.name)}
             </CheckoutForm>
           )
-        ) : undefined
+        ) : managedBilling ? <PortalForm>{copy.manageBilling}</PortalForm> : undefined
       }
     />
   );
@@ -342,11 +332,10 @@ export function PlanCard({
             <h4 id="plans" className="text-xs font-semibold">
               {copy.plans}
             </h4>
-            <p className="mt-0.5 text-2xs leading-relaxed text-muted-foreground">
-              {copy.plansDescription}
-            </p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{copy.plansDescription}</p>
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{copy.viewModesDescription}</p>
           </div>
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-4 lg:grid-cols-3">
             {ONE_TRUCK_PLANS.map((id) => (
               <OneTruckPlan
                 key={id}
@@ -370,10 +359,11 @@ export function PlanCard({
                       {copy.chooseFleet}
                     </CheckoutForm>
                   )
-                ) : undefined
+                ) : managedBilling ? <PortalForm>{copy.manageBilling}</PortalForm> : undefined
               }
             />
           </div>
+          <p className="mt-4 text-xs leading-relaxed text-muted-foreground">{copy.fleetNote}</p>
         </section>
 
         <p className="text-2xs leading-relaxed text-muted-foreground">

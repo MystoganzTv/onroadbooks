@@ -1,3 +1,4 @@
+import { reconcileDebtPaymentSplit } from "./finance/debt-payment";
 import { z } from "zod";
 import { isIftaJurisdiction } from "./ifta";
 
@@ -246,6 +247,7 @@ export const iftaRatesSchema = z.object({
 });
 
 export const expenseSchema = z.object({
+  loanSplit: z.object({ principalAmount: money, interestAmount: money }).optional(),
   scope: z.enum(expenseScopeValues).optional(),
   truckId: z.string().trim().optional().nullable(),
   date: isoDate,
@@ -257,6 +259,13 @@ export const expenseSchema = z.object({
   recurring: z.boolean(),
   receiptNumber: z.string().trim().max(80).optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
+}).superRefine((value, ctx) => {
+  if (!value.loanSplit) return;
+  if (value.category !== "TRUCK_PAYMENT" || reconcileDebtPaymentSplit(
+    value.amount, value.loanSplit.principalAmount, value.loanSplit.interestAmount,
+  ).state !== "BALANCED") {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["loanSplit"], message: "Principal plus interest must equal the total payment." });
+  }
 });
 
 export const fuelSchema = z.object({

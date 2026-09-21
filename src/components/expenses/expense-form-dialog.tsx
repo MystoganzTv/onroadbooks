@@ -38,6 +38,7 @@ import {
 } from "@/components/documents/document-uploader";
 import { Label } from "@/components/ui/label";
 import { createExpenseAction, updateExpenseAction } from "@/lib/actions/expenses";
+import { roundMoney } from "@/lib/calculations";
 import { behaviorOf, categoryLabel, EXPENSE_CATEGORIES } from "@/lib/categories";
 import { formatMoney } from "@/lib/formatters";
 import { formatLocaleDate } from "@/lib/i18n-format";
@@ -75,6 +76,9 @@ interface FormState {
   amount: string;
   loadId: string;
   recurring: boolean;
+  splitPayment: boolean;
+  principal: string;
+  interest: string;
   receiptNumber: string;
   notes: string;
 }
@@ -89,6 +93,9 @@ function emptyState(defaultDate: string, charge: string): FormState {
     amount: "",
     loadId: "none",
     recurring: false,
+    splitPayment: false,
+    principal: "",
+    interest: "0",
     receiptNumber: "",
     notes: "",
   };
@@ -156,6 +163,9 @@ export function ExpenseFormDialog({
             amount: String(expense.amount),
             loadId: expense.loadId ?? "none",
             recurring: isMonthlyRecurringExpense(expense),
+            splitPayment: false,
+            principal: String(expense.amount),
+            interest: "0",
             receiptNumber: expense.receiptNumber ?? "",
             notes: expense.notes ?? "",
           }
@@ -229,6 +239,10 @@ export function ExpenseFormDialog({
     const payload = {
       scope: business ? ("BUSINESS" as const) : ("TRUCK" as const),
       truckId: business || !values.charge ? null : values.charge,
+      loanSplit: values.category === "TRUCK_PAYMENT" && values.splitPayment ? {
+        principalAmount: values.principal.trim() ? Number(values.principal) : NaN,
+        interestAmount: values.interest.trim() ? Number(values.interest) : NaN,
+      } : undefined,
       date: values.date,
       category: values.category,
       description: values.description,
@@ -245,6 +259,7 @@ export function ExpenseFormDialog({
     const parsed = expenseSchema.safeParse(payload);
     if (!parsed.success) {
       const next = fieldErrors(parsed.error);
+      if (next.loanSplit) next.loanSplit = copy.paymentSplitError;
       setErrors(next);
       // A failure the user cannot see is a dead button: announce it, name the
       // fields, and move focus to the first one.
@@ -256,6 +271,7 @@ export function ExpenseFormDialog({
         category: copy.category,
         date: copy.date,
         receiptNumber: copy.receiptNumber,
+        loanSplit: copy.optionalPaymentSplit,
       }));
       requestAnimationFrame(() => focusFirstError("expense-form"));
       return;
@@ -332,7 +348,10 @@ export function ExpenseFormDialog({
                   min={0}
                   step="0.01"
                   value={values.amount}
-                  onChange={(e) => set("amount", e.target.value)}
+                  onChange={(e) => setValues((previous) => ({
+                    ...previous, amount: e.target.value,
+                    principal: String(Math.max(0, roundMoney(Number(e.target.value) - Number(previous.interest)))),
+                  }))}
                   placeholder="0.00"
                   aria-invalid={Boolean(errors.amount)}
                   required
@@ -409,6 +428,38 @@ export function ExpenseFormDialog({
                 </SelectContent>
               </Select>
             </Field>
+
+            {values.category === "TRUCK_PAYMENT" ? (
+              <div className="space-y-3 rounded-md border border-border p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="expense-split" className="normal-case tracking-normal text-foreground">
+                    {copy.optionalPaymentSplit}
+                  </Label>
+                  <Switch id="expense-split" checked={values.splitPayment}
+                    onCheckedChange={(checked) => setValues((previous) => ({
+                      ...previous, splitPayment: checked,
+                      principal: String(Math.max(0, roundMoney(Number(previous.amount) - Number(previous.interest)))),
+                    }))} />
+                </div>
+                {values.splitPayment ? <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label={copy.principal} htmlFor="expense-principal" error={errors.loanSplit}>
+                      <Input id="expense-principal" type="number" min={0} step="0.01"
+                        aria-invalid={Boolean(errors.loanSplit)} value={values.principal}
+                        onChange={(e) => set("principal", e.target.value)} />
+                    </Field>
+                    <Field label={copy.interest} htmlFor="expense-interest">
+                      <Input id="expense-interest" type="number" min={0} step="0.01" value={values.interest}
+                        onChange={(e) => setValues((previous) => ({
+                          ...previous, interest: e.target.value,
+                          principal: String(Math.max(0, roundMoney(Number(previous.amount) - Number(e.target.value)))),
+                        }))} />
+                    </Field>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{copy.paymentSplitHint}</p>
+                </> : null}
+              </div>
+            ) : null}
 
             <Field
               label={copy.description}

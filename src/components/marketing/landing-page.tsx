@@ -385,7 +385,7 @@ export function LandingPage({ primaryHref, initialLang = "en" }: { primaryHref: 
             </p>
           </Container>
 
-          <Container className="grid max-w-[1120px] items-start gap-5 pb-16 pt-10 sm:grid-cols-2 lg:grid-cols-3 sm:pb-20">
+          <Container className="grid max-w-[1120px] items-stretch gap-5 pb-16 pt-10 sm:grid-cols-2 lg:grid-cols-3 sm:pb-20">
             {c.pricing.plans.map((plan) => {
               // Name and price come from lib/plans, so the page cannot quote a
               // figure the product does not charge.
@@ -394,7 +394,7 @@ export function LandingPage({ primaryHref, initialLang = "en" }: { primaryHref: 
               <div
                 key={plan.id}
                 className={cn(
-                  "rounded-2xl px-7 pb-8 pt-8",
+                  "flex h-full flex-col rounded-2xl px-7 pb-8 pt-8",
                   plan.featured
                     ? "border border-mkt-amber/55 bg-[linear-gradient(165deg,#123055,#0A1B33)] shadow-[0_30px_70px_-34px_rgba(246,168,27,0.5)]"
                     : "border border-white/10 bg-mkt-panel",
@@ -413,7 +413,7 @@ export function LandingPage({ primaryHref, initialLang = "en" }: { primaryHref: 
                     {plan.badge}
                   </span>
                 </div>
-                <div className="mt-1.5 text-[14.5px] text-mkt-dim">{plan.tagline}</div>
+                <div className="mt-1.5 text-[14.5px] text-mkt-dim lg:min-h-12">{plan.tagline}</div>
                 <div className="mb-1 mt-6 flex items-baseline gap-2">
                   <span
                     className={cn(
@@ -433,21 +433,23 @@ export function LandingPage({ primaryHref, initialLang = "en" }: { primaryHref: 
                     </li>
                   ))}
                 </ul>
-                {plan.featured ? (
-                  <PrimaryButton href={primaryHref} block>
-                    {isLogin ? c.nav.signIn : plan.cta}
-                  </PrimaryButton>
-                ) : (
-                  <Link
-                    href={primaryHref}
-                    className="block rounded-[10px] border border-white/25 px-4 py-3.5 text-center font-display text-base font-bold text-white transition-colors hover:bg-white/10"
-                  >
-                    {isLogin ? c.nav.signIn : plan.cta}
-                  </Link>
-                )}
                 {plan.note ? (
-                  <p className="mt-4 text-[13px] leading-relaxed text-mkt-faint">{plan.note}</p>
+                  <p className="mb-5 text-[13px] leading-relaxed text-mkt-faint">{plan.note}</p>
                 ) : null}
+                <div className="mt-auto">
+                  {plan.featured ? (
+                    <PrimaryButton href={primaryHref} block>
+                      {isLogin ? c.nav.signIn : plan.cta}
+                    </PrimaryButton>
+                  ) : (
+                    <Link
+                      href={primaryHref}
+                      className="flex h-12 items-center justify-center rounded-lg border border-white/25 px-4 text-center font-display text-base font-bold text-white transition-colors hover:bg-white/10"
+                    >
+                      {isLogin ? c.nav.signIn : plan.cta}
+                    </Link>
+                  )}
+                </div>
               </div>
               );
             })}
@@ -627,10 +629,11 @@ function PrimaryButton({
       href={href}
       className={cn(
         "whitespace-nowrap rounded-lg bg-mkt-amber font-display font-extrabold text-mkt-slate transition-colors hover:bg-mkt-amberhi",
-        size === "lg"
+        block
+          ? "flex h-12 w-full items-center justify-center px-4 text-center text-base"
+          : size === "lg"
           ? "flex items-center gap-3 rounded-[10px] px-7 py-4 text-base shadow-[0_18px_40px_-18px_rgba(246,168,27,0.95)] sm:text-[17px]"
           : "px-3.5 py-2 text-[13px] shadow-[0_8px_24px_-10px_rgba(246,168,27,0.9)] sm:px-5 sm:py-2.5 sm:text-[14.5px]",
-        block && "block w-full px-4 py-3.5 text-center text-base",
       )}
     >
       {children}

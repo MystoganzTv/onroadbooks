@@ -106,7 +106,7 @@ describe("actionable financial problems", () => {
       reserveFundingGap: 600,
     });
 
-    assert.equal(problems.length, 7);
+    assert.equal(problems.length, 6);
     assert.equal(problems[0]?.count, 2);
     assert.match(problems[0]?.what ?? "", /2 paid loads/);
     for (const problem of problems) {
@@ -120,5 +120,6 @@ describe("actionable financial problems", () => {
 
   it("does not create dead warnings for resolved states", () => {
     assert.deepEqual(selectActionableFinancialProblems({}), []);
+    assert.deepEqual(selectActionableFinancialProblems({ unallocatedDebtService: 513 }), []);
   });
 });

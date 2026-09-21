@@ -17,8 +17,8 @@ export const EXPENSE_CATEGORIES: CategoryDefinition[] = [
   { id: "INSURANCE", label: "Insurance", labelEs: "Seguro", defaultBehavior: "FIXED", color: "#3b82f6" },
   {
     id: "TRUCK_PAYMENT",
-    label: "Truck Payment (Unallocated)",
-    labelEs: "Pago del camión (sin clasificar)",
+    label: "Loan / truck payment",
+    labelEs: "Pago de préstamo / camión",
     defaultBehavior: "FIXED",
     color: "#6366f1",
   },

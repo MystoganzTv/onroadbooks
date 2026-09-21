@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { CategoryBreakdown } from "@/components/expenses/category-breakdown";
 import { ExpenseFormDialog } from "@/components/expenses/expense-form-dialog";
 import { ExpensesTable } from "@/components/expenses/expenses-table";
-import { DebtReviewPanel } from "@/components/expenses/debt-review-panel";
 import { MiniStat } from "@/components/dashboard/mini-stat";
 import { PeriodControls } from "@/components/dashboard/period-controls";
 import { PageHeader } from "@/components/shared/page-header";
@@ -138,7 +137,6 @@ export default async function ExpensesPage({
         />
       </section>
 
-      <DebtReviewPanel expenses={periodExpenses} obligations={financialObligations} trucks={trucks} />
 
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="min-w-0 xl:col-span-2">

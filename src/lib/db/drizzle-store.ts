@@ -65,6 +65,7 @@ import type {
 } from "../types";
 import { defaultCategoryBehavior } from "../categories";
 import { financialTreatmentForCategory } from "../finance/terminology";
+import { expensePaymentRows } from "../expense-payment";
 import { requireExactDebtPaymentSplit } from "../finance/debt-payment";
 import { isLoadExpenseId } from "../load-expenses";
 import { mirrorRefusal } from "../mirrored-expenses";
@@ -2355,20 +2356,13 @@ export class DrizzleRepository implements Repository {
       truckId,
       scope,
     );
-    const row = await oneRow(
-      client
-        .insert(s.expense)
-        .values(
-          insertValues(s.expense, {
-            ...this.expenseData(input),
-            loadId,
-            businessId: business.id,
-            scope,
-            truckId,
-          }),
-        )
-        .returning(),
-    );
+    const inputs = expensePaymentRows(input, newId("split"));
+    const rows = await client.insert(s.expense).values(inputs.map((part) =>
+      insertValues(s.expense, {
+        ...this.expenseData(part), loadId, businessId: business.id, scope, truckId,
+      }),
+    )).returning();
+    const row = rows[0];
     const dataset = await this.getDataset();
     return dataset.expenses.find((e) => e.id === row.id)!;
   }
@@ -2435,7 +2429,7 @@ export class DrizzleRepository implements Repository {
     // the same, and the two used to disagree on exactly this edit.
     const previous = await client.query.expense.findFirst({
       where: and(eq(s.expense.id, id), eq(s.expense.businessId, business.id)),
-      columns: { category: true, financialTreatment: true, splitGroupId: true },
+      columns: { category: true, financialTreatment: true, splitGroupId: true, obligationId: true },
     });
     if (previous?.splitGroupId) {
       throw new Error(
@@ -2456,26 +2450,20 @@ export class DrizzleRepository implements Repository {
       truckId,
       scope,
     );
-    const updated = await affectedRows(
-      client
-        .update(s.expense)
-        .set(
-          updateValues(s.expense, {
-            ...this.expenseData(input),
-            financialTreatment:
-              input.financialTreatment ??
-              preservedTreatment ??
-              financialTreatmentForCategory(input.category),
-            loadId,
-            scope,
-            truckId,
-          }),
-        )
-        .where(and(eq(s.expense.id, id), eq(s.expense.businessId, business.id)))
-        .returning(),
-    );
-    if (updated.count !== 1)
-      throw new Error("That expense does not belong to this workspace.");
+    const inputs = expensePaymentRows({ ...input, obligationId: input.obligationId === undefined ? previous?.obligationId : input.obligationId }, newId("split"));
+    await client.transaction(async (tx) => {
+      const updated = await affectedRows(tx.update(s.expense).set(updateValues(s.expense, {
+        ...this.expenseData(inputs[0]),
+        financialTreatment: inputs[0].financialTreatment ?? preservedTreatment ?? financialTreatmentForCategory(input.category),
+        loadId, scope, truckId,
+      })).where(and(eq(s.expense.id, id), eq(s.expense.businessId, business.id))).returning());
+      if (updated.count !== 1) throw new Error("That expense does not belong to this workspace.");
+      for (const part of inputs.slice(1)) {
+        await tx.insert(s.expense).values(insertValues(s.expense, {
+          ...this.expenseData(part), loadId, businessId: business.id, scope, truckId,
+        }));
+      }
+    });
     const dataset = await this.getDataset();
     return dataset.expenses.find((e) => e.id === id)!;
   }

@@ -40,6 +40,7 @@ import type {
   MaintenanceInput,
 } from "../db/repository";
 import { BusinessNotFoundError } from "../db/repository";
+import { recurringExpenseSuggestions } from "../recurring-expenses";
 import { loadExpenseId } from "../load-expenses";
 
 const SANDBOX = mkdtempSync(path.join(tmpdir(), "onroad-books-store-"));
@@ -1392,6 +1393,50 @@ describe("financial review and customer cash events", () => {
     assert.equal(updated.expectedMonthlyPayment, 513);
     assert.equal(updated.active, false);
     assert.equal(updated.endedOn, "2026-09-02");
+  });
+
+  it("saves an optional split once and repeats it as one complete monthly payment", async () => {
+    const dataset = await repo.getDataset();
+    const input = expense({ truckId: dataset.trucks[0].id, category: "TRUCK_PAYMENT",
+      date: "2026-01-31", amount: 513, description: "Optional monthly loan", recurring: true,
+      loanSplit: { principalAmount: 500, interestAmount: 13 } });
+    const saved = await repo.createExpense(input);
+    const after = await repo.getDataset();
+    const rows = after.expenses.filter((row) => row.splitGroupId === saved.splitGroupId);
+    assert.equal(rows.length, 2);
+    assert.equal(rows.reduce((sum, row) => sum + row.amount, 0), 513);
+    assert.deepEqual(rows.map((row) => row.financialTreatment).sort(), ["INTEREST", "PRINCIPAL"]);
+    const repeats = recurringExpenseSuggestions(after, "2026-02").filter((row) => row.description === input.description);
+    assert.equal(repeats.length, 1);
+    assert.equal(repeats[0].date, "2026-02-28");
+    assert.deepEqual(repeats[0].loanSplit, input.loanSplit);
+    const next = await repo.createExpense(repeats[0]);
+    assert.notEqual(next.splitGroupId, saved.splitGroupId);
+    const repeated = await repo.getDataset();
+    assert.equal(repeated.expenses.filter((row) => row.splitGroupId === next.splitGroupId).length, 2);
+    assert.equal(recurringExpenseSuggestions(repeated, "2026-02").filter((row) => row.description === input.description).length, 0);
+    assert.equal(recurringExpenseSuggestions(repeated, "2026-03").find((row) => row.description === input.description)?.date, "2026-03-31");
+    await repo.classifyDebtPayment(next.id, { treatment: "LOAN_SPLIT", principalAmount: 500, interestAmount: 13, recurring: false });
+    assert.equal(recurringExpenseSuggestions(await repo.getDataset(), "2026-03").filter((row) => row.description === input.description).length, 0);
+  });
+
+  it("keeps an unsplit payment valid and lets its regular edit add the optional breakdown atomically", async () => {
+    const truckId = (await repo.getDataset()).trucks[0].id;
+    const input = expense({ truckId, category: "TRUCK_PAYMENT", amount: 513, description: "Optional split on edit" });
+    const saved = await repo.createExpense(input);
+    assert.equal(saved.financialTreatment, "DEBT_UNALLOCATED");
+    const before = await repo.getDataset();
+    const invalid = { ...input, loanSplit: { principalAmount: 500, interestAmount: 20 } };
+    await assert.rejects(() => repo.createExpense(invalid), /over/);
+    await assert.rejects(() => repo.updateExpense(saved.id, invalid), /over/);
+    assert.deepEqual((await repo.getDataset()).expenses, before.expenses);
+    const updated = await repo.updateExpense(saved.id, { ...input, loanSplit: { principalAmount: 500, interestAmount: 13 } });
+    assert.equal(updated.id, saved.id);
+    const after = await repo.getDataset();
+    assert.equal(after.expenses.filter((row) => row.splitGroupId === updated.splitGroupId).reduce((sum, row) => sum + row.amount, 0), 513);
+    assert.equal(after.expenses.length, before.expenses.length + 1);
+    await repo.deleteExpense(updated.id);
+    assert.equal((await repo.getDataset()).expenses.some((row) => row.splitGroupId === updated.splitGroupId), false);
   });
 
   it("splits a reviewed loan payment without changing its total", async () => {

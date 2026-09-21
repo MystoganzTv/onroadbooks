@@ -41,6 +41,7 @@ import type {
 } from "../types";
 import { defaultCategoryBehavior } from "../categories";
 import { financialTreatmentForCategory } from "../finance/terminology";
+import { expensePaymentRows } from "../expense-payment";
 import { requireExactDebtPaymentSplit } from "../finance/debt-payment";
 import { isLoadExpenseId } from "../load-expenses";
 import { mirrorRefusal } from "../mirrored-expenses";
@@ -1691,14 +1692,15 @@ export class PrismaRepository implements Repository {
     const scope = input.scope ?? "TRUCK";
     const truckId = scope === "BUSINESS" ? null : truckIdFor(business, input.truckId);
     const loadId = await ownedLoadId(client, business.id, input.loadId, truckId, scope);
-    const row = await client.expense.create({
-      data: {
-        ...this.expenseData(input),
-        loadId,
-        businessId: business.id,
-        scope,
-        truckId,
-      },
+    const inputs = expensePaymentRows(input, newId("split"));
+    const row = await client.$transaction(async (tx) => {
+      const rows = [];
+      for (const part of inputs) {
+        rows.push(await tx.expense.create({ data: {
+          ...this.expenseData(part), loadId, businessId: business.id, scope, truckId,
+        } }));
+      }
+      return rows[0];
     });
     const dataset = await this.getDataset();
     return dataset.expenses.find((e) => e.id === row.id)!;
@@ -1722,7 +1724,7 @@ export class PrismaRepository implements Repository {
     // the same, and the two used to disagree on exactly this edit.
     const previous = await client.expense.findFirst({
       where: { id, businessId: business.id },
-      select: { category: true, financialTreatment: true, splitGroupId: true },
+      select: { category: true, financialTreatment: true, splitGroupId: true, obligationId: true },
     });
     if (previous?.splitGroupId) {
       throw new Error("Use the loan payment editor to keep principal and interest balanced.");
@@ -1732,20 +1734,23 @@ export class PrismaRepository implements Repository {
     const scope = input.scope ?? "TRUCK";
     const truckId = scope === "BUSINESS" ? null : truckIdFor(business, input.truckId);
     const loadId = await ownedLoadId(client, business.id, input.loadId, truckId, scope);
-    const updated = await client.expense.updateMany({
-      where: { id, businessId: business.id },
-      data: {
-        ...this.expenseData(input),
-        financialTreatment:
-          input.financialTreatment ??
-          preservedTreatment ??
-          financialTreatmentForCategory(input.category),
-        loadId,
-        scope,
-        truckId,
-      },
+    const inputs = expensePaymentRows({ ...input, obligationId: input.obligationId === undefined ? previous?.obligationId : input.obligationId }, newId("split"));
+    await client.$transaction(async (tx) => {
+      const updated = await tx.expense.updateMany({
+        where: { id, businessId: business.id },
+        data: {
+          ...this.expenseData(inputs[0]),
+          financialTreatment: inputs[0].financialTreatment ?? preservedTreatment ?? financialTreatmentForCategory(input.category),
+          loadId, scope, truckId,
+        },
+      });
+      if (updated.count !== 1) throw new Error("That expense does not belong to this workspace.");
+      for (const part of inputs.slice(1)) {
+        await tx.expense.create({ data: {
+          ...this.expenseData(part), loadId, businessId: business.id, scope, truckId,
+        } });
+      }
     });
-    if (updated.count !== 1) throw new Error("That expense does not belong to this workspace.");
     const dataset = await this.getDataset();
     return dataset.expenses.find((e) => e.id === id)!;
   }

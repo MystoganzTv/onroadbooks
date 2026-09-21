@@ -236,10 +236,11 @@ test.describe.serial("critical browser flows", () => {
     await expect(page.getByText("Each recorded load counts as income received.", { exact: false })).toBeVisible();
     await page.screenshot({ path: "/tmp/onroad-dashboard-simple.png", fullPage: true });
 
-    await page.getByRole("button", { name: "View details", exact: true }).click();
+    await expect(page.getByRole("button", { name: "View details", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Detailed", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Business health", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Simple", exact: true })).toHaveAttribute("aria-pressed", "true");
-    await page.getByRole("button", { name: "Back to simple", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Detailed", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "Simple", exact: true }).click();
     await expect(summary).toBeVisible();
     await page.reload();
     await expect(summary).toBeVisible();
@@ -260,11 +261,12 @@ test.describe.serial("critical browser flows", () => {
     await expect(page).toHaveURL(/month=2026-08&period=month/);
     await page.getByRole("button", { name: "Simple", exact: true }).click();
     await expect(page.getByRole("columnheader")).toHaveCount(4);
-    await page.getByRole("button", { name: "View details", exact: true }).click();
+    await expect(page.getByRole("button", { name: "View details", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Detailed", exact: true }).click();
     await page.getByRole("combobox", { name: "Filter by rating" }).click();
     await page.getByRole("option", { name: "Bad", exact: true }).click();
     await expect(page.getByRole("table")).toHaveCount(0);
-    await page.getByRole("button", { name: "Back to simple", exact: true }).click();
+    await page.getByRole("button", { name: "Simple", exact: true }).click();
     await expect(page.getByRole("table")).toBeVisible();
     await page.getByRole("button", { name: "Display settings", exact: true }).first().click();
     await page.getByRole("menuitemradio", { name: /Español/ }).click();
@@ -272,7 +274,7 @@ test.describe.serial("critical browser flows", () => {
     await expect(page.getByRole("columnheader", { name: "Ganancia del viaje" })).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({ path: "/tmp/onroad-loads-simple-mobile.png", fullPage: true });
-    await expect(page.getByRole("button", { name: "Ver detalle", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Ver detalle", exact: true })).toHaveCount(0);
     await expect(page.getByRole("list", { name: "Cargas", exact: true })).toContainText("$620.00");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     expect(await fs.readFile(dataFile, "utf8")).toBe(datasetBefore);
@@ -384,6 +386,40 @@ test.describe.serial("critical browser flows", () => {
     }
   });
 
+  test("a payment needs no review and can add an optional split from Edit expense", async ({ page }) => {
+    const before = await readDataset();
+    await login(page);
+    await page.goto("/expenses?month=2026-09&period=month");
+    await page.getByRole("button", { name: "Add expense", exact: true }).first().click();
+    const dialog = page.getByRole("dialog", { name: "Add expense" });
+    await dialog.locator("#expense-date").fill("2026-09-01");
+    await dialog.locator("#expense-amount").fill("513");
+    await dialog.locator("#expense-category").click();
+    await page.getByRole("option", { name: "Loan / truck payment" }).click();
+    await dialog.locator("#expense-description").fill("BIZON optional payment");
+    await expect(dialog.getByRole("switch", { name: "Recurring", exact: true })).not.toBeChecked();
+    await expect(dialog.getByRole("switch", { name: "Separate principal and interest (optional)" })).not.toBeChecked();
+    await dialog.getByRole("button", { name: "Add expense", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByText("Payments needing financial classification")).toHaveCount(0);
+    const row = page.getByRole("row").filter({ has: page.getByText("BIZON optional payment", { exact: true }) });
+    await expect(row).toContainText("$513.00");
+    await row.getByRole("button", { name: "Edit expense", exact: true }).click();
+    const edit = page.getByRole("dialog", { name: "Edit expense" });
+    await edit.getByRole("switch", { name: "Separate principal and interest (optional)" }).check();
+    await edit.getByLabel("Loan interest").fill("13");
+    await expect(edit.getByLabel("Loan principal")).toHaveValue("500");
+    await edit.getByRole("switch", { name: "Recurring", exact: true }).check();
+    await edit.getByRole("button", { name: "Save changes", exact: true }).click();
+    await expect(edit).toBeHidden();
+    await expect(row).toContainText("Loan payment");
+    await expect(row).toContainText("$513.00");
+    await expect(row).toHaveCount(1);
+    await page.goto("/dashboard?month=2026-09&period=month");
+    await expect(page.getByText("Debt & financing payments need a split")).toHaveCount(0);
+    await writeDataset(before);
+  });
+
   test("owner manages a loan payment as one editable and deletable transaction", async ({ page }) => {
     const datasetBeforeTest = await readDataset();
     await login(page);
@@ -394,26 +430,24 @@ test.describe.serial("critical browser flows", () => {
     await page.locator("#expense-date").fill("2026-09-01");
     await page.locator("#expense-amount").fill("513");
     await page.locator("#expense-category").click();
-    await page.getByRole("option", { name: "Truck Payment (Unallocated)" }).click();
+    await page.getByRole("option", { name: "Loan / truck payment" }).click();
     await expect(expenseDialog.getByLabel("Receipt number")).toHaveCount(0);
     await expect(expenseDialog.locator('input[type="file"]')).toHaveCount(0);
     await expect(expenseDialog.getByLabel("Notes")).toBeVisible();
     await page.locator("#expense-description").fill("AMEX payment");
     await page.locator("#expense-vendor").fill("Amex");
     await expenseDialog.getByLabel("Notes").fill("ACH payment from operating account");
+    await expenseDialog.getByRole("switch", { name: "Separate principal and interest (optional)" }).check();
+    await expect(expenseDialog.getByLabel("Loan principal")).toHaveValue("513");
+    await expect(expenseDialog.getByLabel("Loan interest")).toHaveValue("0");
+    await expenseDialog.getByLabel("Loan principal").fill("500");
+    await expenseDialog.getByRole("button", { name: "Add expense", exact: true }).click();
+    await expect(expenseDialog).toBeVisible();
+    await expect(expenseDialog.getByText("Principal plus interest must equal the total payment.")).toBeVisible();
+    expect((await readDataset() as CalculatorFixtureDataset).expenses.filter((row: { description: string }) => row.description === "AMEX payment")).toHaveLength(0);
+    await expenseDialog.getByLabel("Loan principal").fill("513");
     await page.getByRole("button", { name: "Add expense", exact: true }).last().click();
     await expect(expenseDialog).toBeHidden();
-
-    await page.getByRole("button", { name: "Review", exact: true }).last().click();
-    const classifyDialog = page.getByRole("dialog", { name: "Classify $513.00 payment" });
-    await expect(classifyDialog.getByLabel("Loan principal")).toHaveValue("513");
-    await expect(classifyDialog.getByLabel("Loan interest")).toHaveValue("0");
-    await expect(classifyDialog.getByLabel("Notes")).toHaveValue("ACH payment from operating account");
-    await classifyDialog.getByLabel("Starting principal balance").fill("10000");
-    await classifyDialog.getByLabel("APR").fill("12");
-    await classifyDialog.getByLabel("Payment due day").fill("5");
-    await classifyDialog.getByRole("button", { name: "Confirm classification" }).click();
-    await expect(classifyDialog).toBeHidden();
 
     const originalPaymentRow = page.getByRole("row").filter({
       has: page.getByText("AMEX payment", { exact: true }),
@@ -429,16 +463,18 @@ test.describe.serial("critical browser flows", () => {
     await expect(editDialog.getByLabel("Bank or lender")).toHaveValue("Amex");
     await expect(editDialog.getByLabel("Loan principal")).toHaveValue("513");
     await expect(editDialog.getByLabel("Loan interest")).toHaveValue("0");
-    await expect(editDialog.getByLabel("Starting principal balance")).toHaveValue("10000");
-    await expect(editDialog.getByLabel("APR")).toHaveValue("12");
-    await expect(editDialog.getByLabel("Payment due day")).toHaveValue("5");
+    await editDialog.getByLabel("Obligation", { exact: true }).click();
+    await page.getByRole("option", { name: "Create from this review" }).click();
+    await editDialog.getByLabel("Starting principal balance").fill("10000");
+    await editDialog.getByLabel("APR").fill("12");
+    await editDialog.getByLabel("Payment due day").fill("5");
     await editDialog.getByLabel("Loan interest").fill("25");
     await editDialog.getByLabel("Total payment").fill("525");
     await expect(editDialog.getByLabel("Loan principal")).toHaveValue("500");
     await editDialog.getByLabel("Date").fill("2026-09-02");
     await editDialog.getByLabel("Description").fill("AMEX September payment");
     await editDialog.getByLabel("Bank or lender").fill("American Express");
-    await editDialog.getByRole("switch", { name: "Recurring expense" }).check();
+    await editDialog.getByRole("switch", { name: "Recurring", exact: true }).check();
     await editDialog.getByLabel("Obligation name").fill("Amex Business Card");
     await editDialog.getByLabel("Expected monthly payment").fill("525");
     await editDialog.getByRole("switch", { name: "Active financing" }).uncheck();

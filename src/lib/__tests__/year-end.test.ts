@@ -62,11 +62,15 @@ describe("the year-end packet", () => {
   });
 
   it("turns incomplete data into an explained next action", () => {
-    const review = buildYearEndPacket(dataset, 2026, "EPS Logistics LLC").tables[2];
+    const incomplete = structuredClone(dataset);
+    incomplete.loads[0].broker = null;
+    incomplete.loads[0].billToName = null;
+    const review = buildYearEndPacket(incomplete, 2026, "EPS Logistics LLC").tables[2];
     assert.deepEqual(review.columns, [
       "Status", "What happened", "Records", "Amount", "Why it matters", "What to do", "Open in OnRoad",
     ]);
     assert.ok(review.rows.some((row) => row[0] === "ACTION"));
+    assert.ok(!review.rows.some((row) => String(row[1]).includes("DEBT PAYMENTS NEEDS CLASSIFICATION")));
     for (const row of review.rows.filter((item) => item[0] === "ACTION")) {
       assert.ok(String(row[1]).length > 0);
       assert.ok(String(row[4]).length > 0);

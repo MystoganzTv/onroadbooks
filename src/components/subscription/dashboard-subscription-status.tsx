@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, CheckCircle2, Clock3, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowRight, Clock3, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import type { Subscription } from "@/lib/types";
 import type { AppLocale } from "@/lib/i18n";
 import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
 
-/** Account status belongs in the cockpit, where owners begin their day. */
+/** Active subscriptions stay in Settings; the dashboard only shows billing notices. */
 export function DashboardSubscriptionStatus({
   subscription,
   today,
@@ -21,6 +21,8 @@ export function DashboardSubscriptionStatus({
   canManage?: boolean;
   locale?: AppLocale;
 }) {
+  if (subscription.status === "ACTIVE") return null;
+
   const copy = getWebDictionary(locale).plans;
   const plan = planOf(subscription);
   const trial = trialState(subscription, today);
@@ -62,38 +64,16 @@ export function DashboardSubscriptionStatus({
     );
   }
 
-  const active = subscription.status === "ACTIVE";
   const pastDue = subscription.status === "PAST_DUE";
-  const canceled = subscription.status === "CANCELED";
-  const message = pastDue
-    ? copy.paymentAttention
-    : canceled
-      ? copy.subscriptionEnded
-      : plan.id === "OWNER"
-        ? copy.currentOneTruck
-        : plan.id === "FLEET"
-          ? interpolate(copy.fleetService, { count: plan.truckLimit })
-          : copy.oneTruck;
-  const actionLabel = pastDue
-    ? copy.fixBilling
-    : canceled
-      ? copy.chooseAPlan
-      : plan.id === "SOLO"
-        ? copy.upgradePro
-        : copy.manageBilling;
+  const message = pastDue ? copy.paymentAttention : copy.subscriptionEnded;
+  const actionLabel = pastDue ? copy.fixBilling : copy.chooseAPlan;
 
   return (
     <Card className={pastDue ? "overflow-hidden border-warn/40 bg-warn-soft" : "overflow-hidden"}>
       <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-start gap-3 sm:items-center">
-          <span
-            className={`flex size-10 shrink-0 items-center justify-center rounded-full ${
-              active ? "bg-pos-soft text-pos" : "bg-warn-soft text-warn"
-            }`}
-          >
-            {active ? (
-              <CheckCircle2 className="size-5" aria-hidden />
-            ) : pastDue ? (
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-warn-soft text-warn">
+            {pastDue ? (
               <AlertTriangle className="size-5" aria-hidden />
             ) : (
               <Sparkles className="size-5" aria-hidden />
@@ -102,8 +82,8 @@ export function DashboardSubscriptionStatus({
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-semibold">{plan.name}</p>
-              <Badge variant={active ? "positive" : "warning"}>
-                {active ? copy.active : pastDue ? copy.pastDue : copy.canceled}
+              <Badge variant="warning">
+                {pastDue ? copy.pastDue : copy.canceled}
               </Badge>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
