@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { BadgeDollarSign, Building2, CalendarDays, Truck as TruckIcon } from "lucide-react";
 
+import { DeleteFinancialObligationButton } from "@/components/financing/delete-financial-obligation-button";
 import {
   EditFinancialObligationButton,
   FinancialObligationDialog,
@@ -10,7 +10,6 @@ import { MiniStat } from "@/components/dashboard/mini-stat";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireSession } from "@/lib/auth";
 import { getDataset } from "@/lib/db";
@@ -42,11 +41,6 @@ export default async function FinancingPage() {
   const paymentKeys = new Set(
     linkedExpenses.map((expense) => expense.splitGroupId ?? expense.id),
   );
-  const unclassified = expenses.filter(
-    (expense) =>
-      expense.category === "TRUCK_PAYMENT"
-      && (expense.financialTreatment ?? "DEBT_UNALLOCATED") === "DEBT_UNALLOCATED",
-  );
   const ordered = financialObligations.toSorted((left, right) => {
     if (left.active !== right.active) return left.active ? -1 : 1;
     return left.name.localeCompare(right.name);
@@ -66,25 +60,11 @@ export default async function FinancingPage() {
         </p>
       ) : null}
 
-      <section aria-label={copy.title} className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <section aria-label={copy.title} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <MiniStat label={copy.activeObligations} value={String(active.length)} />
         <MiniStat label={copy.monthlyCommitment} value={formatMoneyCompact(monthlyCommitment)} tone="negative" />
         <MiniStat label={copy.recordedPayments} value={String(paymentKeys.size)} />
-        <MiniStat
-          label={copy.unclassifiedPayments}
-          value={String(unclassified.length)}
-          tone={unclassified.length > 0 ? "warning" : "neutral"}
-        />
       </section>
-
-      {unclassified.length > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warn/35 bg-warn-soft/35 px-4 py-3">
-          <p className="text-xs font-medium text-warn">{copy.unclassifiedPayments}: {unclassified.length}</p>
-          <Button asChild size="sm" variant="outline">
-            <Link href="/expenses">{copy.reviewPayments}</Link>
-          </Button>
-        </div>
-      ) : null}
 
       <Card>
         <CardHeader>
@@ -222,12 +202,13 @@ export default async function FinancingPage() {
                       />
                     </div>
                     {canManage ? (
-                      <div className="justify-self-end">
+                      <div className="flex items-center gap-1 justify-self-end">
                         <EditFinancialObligationButton
                           obligation={obligation}
                           trucks={trucks}
                           kindLocked={transactionCount > 0}
                         />
+                        <DeleteFinancialObligationButton id={obligation.id} name={obligation.name} />
                       </div>
                     ) : null}
                   </article>

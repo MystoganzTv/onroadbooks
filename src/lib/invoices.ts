@@ -23,33 +23,19 @@ export function invoicePaymentSummary(
   };
 }
 
-/**
- * What issuing an invoice does to a load's status and payment date.
- *
- * A load that is already PAID stays paid. Owner-operators are routinely
- * quick-paid or factored before the paperwork is cut, so attaching the
- * document to money already collected must not turn it back into a
- * receivable -- doing so drops the load out of "Collected" and into
- * "Outstanding", and the owner is left chasing an invoice that is settled.
- *
- * Anything else becomes INVOICED with no payment date: that is the whole
- * point of issuing it.
- */
+/** Generating a document preserves the recorded income and legacy payment metadata. */
 export function invoiceIssueOutcome(
   load: Pick<Load, "status" | "invoicePaidDate">,
-  invoiceDate: string,
+  _invoiceDate: string,
 ): { status: PaymentStatus; invoicePaidDate: string | null } {
-  if (load.status !== "PAID") return { status: "INVOICED", invoicePaidDate: null };
-  // Paid before it was ever invoiced: the invoice date is the closest honest
-  // stand-in, and leaving it null would strand the load without one.
-  return { status: "PAID", invoicePaidDate: load.invoicePaidDate ?? invoiceDate };
+  return { status: load.status, invoicePaidDate: load.invoicePaidDate };
 }
 
 /** What issuing an invoice needs, whatever posted it: a web form or a phone. */
 export interface InvoiceDetails {
   invoiceNumber: string;
   invoiceDate: string;
-  invoiceDueDate: string;
+  invoiceDueDate?: string | null;
   billToName: string;
   billToEmail?: string | null;
   billToAddress?: string | null;
@@ -72,16 +58,16 @@ export function duplicateInvoiceNumber(
 
 /**
  * The exact patch issuing an invoice writes onto a load. Empty optional fields
- * become null rather than "", and `invoiceIssueOutcome` decides the status --
- * both callers go through here so a phone can never write a shape the web form
- * would not have written.
+ * become null rather than "". Both callers preserve the load's payment metadata;
+ * a document is not another income or collection event.
  */
 export function invoiceIssuePatch(
-  load: Pick<Load, "status" | "invoicePaidDate">,
+  load: Pick<Load, "status" | "invoicePaidDate"> & Partial<Pick<Load, "invoiceDueDate">>,
   details: InvoiceDetails,
 ) {
   return {
     ...details,
+    invoiceDueDate: details.invoiceDueDate === undefined ? load.invoiceDueDate ?? null : details.invoiceDueDate,
     billToEmail: details.billToEmail || null,
     billToAddress: details.billToAddress || null,
     invoiceNotes: details.invoiceNotes || null,

@@ -79,7 +79,9 @@ export async function invoicePdf(business: Business, load: Load): Promise<Uint8A
   for (const value of [load.billToAddress, load.billToEmail].filter(Boolean)) {
     for (const part of String(value).split(/\r?\n/).slice(0, 4)) { page.drawText(fit(printable(part), font, 9, 265), { x: 42, y: billY, size: 9, font, color: muted }); billY -= 13; }
   }
-  const meta: [string, string | null][] = [["Invoice date", load.invoiceDate], ["Due date", load.invoiceDueDate], ["Load number", load.loadNumber ?? "-"]];
+  const meta: [string, string | null][] = [["Invoice date", load.invoiceDate]];
+  if (load.invoiceDueDate) meta.push(["Due date", load.invoiceDueDate]);
+  meta.push(["Load number", load.loadNumber ?? "-"]);
   meta.forEach(([label, value], index) => { const y = 665 - index * 24; page.drawText(label, { x: 390, y, size: 8, font, color: muted }); page.drawText(printable(value), { x: 475, y, size: 9, font: bold, color: navy }); });
   page.drawRectangle({ x: 42, y: 532, width: 528, height: 26, color: blue });
   page.drawText("DESCRIPTION", { x: 50, y: 542, size: 8, font: bold, color: rgb(1, 1, 1) });
@@ -89,7 +91,7 @@ export async function invoicePdf(business: Business, load: Load): Promise<Uint8A
   page.drawText(`${(load.loadedMiles + load.deadheadMiles).toLocaleString("en-US")} total miles${load.broker ? ` | ${printable(load.broker)}` : ""}`, { x: 50, y: 486, size: 8, font, color: muted });
   page.drawText(`$${load.grossRate.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, { x: 485, y: 504, size: 10, font: bold, color: navy });
   page.drawLine({ start: { x: 42, y: 468 }, end: { x: 570, y: 468 }, thickness: 0.8, color: line });
-  page.drawText("TOTAL DUE", { x: 392, y: 428, size: 10, font: bold, color: muted });
+  page.drawText("INVOICE TOTAL", { x: 392, y: 428, size: 10, font: bold, color: muted });
   page.drawText(`$${load.grossRate.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, { x: 480, y: 426, size: 14, font: bold, color: navy });
   if (load.invoiceNotes) { page.drawText("NOTES", { x: 42, y: 390, size: 9, font: bold, color: blue }); page.drawText(fit(printable(load.invoiceNotes), font, 9, 520), { x: 42, y: 372, size: 9, font, color: muted }); }
   page.drawText("Thank you for your business.", { x: 42, y: 64, size: 9, font: bold, color: navy });

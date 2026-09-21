@@ -1395,6 +1395,24 @@ describe("financial review and customer cash events", () => {
     assert.equal(updated.endedOn, "2026-09-02");
   });
 
+  it("deletes financing without deleting or changing its recorded payments", async () => {
+    const truckId = (await repo.getDataset()).trucks[0].id;
+    const obligation = await repo.createFinancialObligation({ truckId, name: "Financing to remove", kind: "LOAN", startingBalance: 10000 });
+    await repo.createExpense(expense({ truckId, category: "TRUCK_PAYMENT", description: "Preserved loan payment", amount: 513,
+      obligationId: obligation.id, recurring: true, loanSplit: { principalAmount: 500, interestAmount: 13 } }));
+    const before = await repo.getDataset();
+    const intruder = new store.JsonRepository("biz_someone_else");
+    await assert.rejects(() => intruder.deleteFinancialObligation(obligation.id), /does not have access/);
+    await assert.rejects(() => repo.deleteFinancialObligation("missing-obligation"), /does not belong/);
+    assert.deepEqual((await repo.getDataset()).expenses, before.expenses);
+    await repo.deleteFinancialObligation(obligation.id);
+    const after = await repo.getDataset();
+    assert.equal(after.financialObligations.some((row) => row.id === obligation.id), false);
+    assert.deepEqual(after.expenses, before.expenses.map((row) => row.obligationId === obligation.id ? { ...row, obligationId: null } : row));
+    assert.deepEqual(after.settlements, before.settlements);
+    await assert.rejects(() => repo.deleteFinancialObligation(obligation.id), /does not belong/);
+  });
+
   it("saves an optional split once and repeats it as one complete monthly payment", async () => {
     const dataset = await repo.getDataset();
     const input = expense({ truckId: dataset.trucks[0].id, category: "TRUCK_PAYMENT",

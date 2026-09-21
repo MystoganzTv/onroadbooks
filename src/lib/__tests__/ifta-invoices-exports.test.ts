@@ -17,6 +17,7 @@ import {
   invoiceAgeDays,
   nextInvoiceNumber,
 } from "../invoices";
+import { invoiceSchema } from "../schemas";
 import { freightMarket } from "../markets";
 import { buildSeedDataset } from "../seed/seed-data";
 import { toPdf } from "../export-pdf";
@@ -235,11 +236,20 @@ describe("issuing an invoice", () => {
         billToEmail: "",
       },
     );
-    assert.equal(patch.status, "INVOICED");
+    assert.equal(patch.status, "PENDING");
     assert.equal(patch.invoicePaidDate, null);
     assert.equal(patch.billToEmail, null);
     assert.equal(patch.billToAddress, null);
     assert.equal(patch.invoiceNumber, "INV-2026-0043");
+  });
+
+  it("creates a document without a due date and keeps existing document terms when omitted", () => {
+    const details = { invoiceNumber: "INV-2026-0100", invoiceDate: "2026-09-01", billToName: "Test broker" };
+    assert.equal(invoiceSchema.safeParse(details).success, true);
+    const original = { status: "PAID" as const, invoicePaidDate: "2026-08-20", invoiceDueDate: "2026-10-01" };
+    assert.equal(invoiceIssuePatch(original, details).invoiceDueDate, "2026-10-01");
+    assert.equal(invoiceIssuePatch({ ...original, invoiceDueDate: null }, details).invoiceDueDate, null);
+    assert.equal(invoiceIssuePatch(original, details).invoicePaidDate, original.invoicePaidDate);
   });
 
   it("refuses to reuse an invoice number on a different load", () => {
@@ -253,22 +263,22 @@ describe("issuing an invoice", () => {
     assert.equal(duplicateInvoiceNumber(loads, "b", "INV-2026-0002"), false);
   });
 
-  it("backfills a payment date when the load was paid before it had an invoice", () => {
+  it("does not invent a payment date when generating a document", () => {
     const outcome = invoiceIssueOutcome({ status: "PAID", invoicePaidDate: null }, "2026-08-31");
-    assert.deepEqual(outcome, { status: "PAID", invoicePaidDate: "2026-08-31" });
+    assert.deepEqual(outcome, { status: "PAID", invoicePaidDate: null });
   });
 
-  it("moves a pending load to invoiced with no payment date", () => {
+  it("preserves legacy status when generating a document", () => {
     assert.deepEqual(
       invoiceIssueOutcome({ status: "PENDING", invoicePaidDate: null }, "2026-08-31"),
-      { status: "INVOICED", invoicePaidDate: null },
+      { status: "PENDING", invoicePaidDate: null },
     );
   });
 
-  it("clears a stale payment date when re-issuing an unpaid invoice", () => {
+  it("preserves the recorded payment date when re-generating a document", () => {
     assert.deepEqual(
       invoiceIssueOutcome({ status: "INVOICED", invoicePaidDate: "2026-07-01" }, "2026-08-31"),
-      { status: "INVOICED", invoicePaidDate: null },
+      { status: "INVOICED", invoicePaidDate: "2026-07-01" },
     );
   });
 });

@@ -31,8 +31,8 @@ describe("progressive navigation", () => {
   });
 
   it("holds result screens until their prerequisite exists", () => {
-    assert.equal(navAvailability(item("/invoices"), empty).badge, "Add load");
-    assert.equal(navAvailability(item("/settlements"), empty).badge, "No activity");
+    assert.equal(PRIMARY_NAV.some((candidate) => candidate.href === "/invoices"), false);
+    assert.equal(PRIMARY_NAV.some((candidate) => candidate.href === "/settlements"), false);
     assert.equal(navAvailability(item("/analytics/cost-per-mile"), empty).enabled, false);
     assert.equal(navAvailability(item("/reports"), empty).enabled, false);
   });
@@ -58,7 +58,6 @@ describe("progressive navigation", () => {
   it("keeps owner planning and driver pay out of unrelated roles", () => {
     assert.equal(isNavVisibleToRole(item("/reserves"), "OWNER"), true);
     assert.equal(isNavVisibleToRole(item("/reserves"), "BOOKKEEPER"), false);
-    assert.equal(isNavVisibleToRole(item("/settlements"), "ADMIN"), false);
     assert.equal(isNavVisibleToRole(item("/driver-settlements"), "ADMIN"), true);
     assert.equal(isNavVisibleToRole(item("/driver-settlements"), "BOOKKEEPER"), false);
     assert.equal(isNavVisibleToRole(item("/financing"), "BOOKKEEPER"), true);

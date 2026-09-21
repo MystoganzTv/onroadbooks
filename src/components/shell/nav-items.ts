@@ -11,10 +11,8 @@ import {
   Settings,
   ShieldCheck,
   Truck,
-  Wallet,
   UserRound,
   ClipboardList,
-  FileText,
   MapPinned,
   type LucideIcon,
 } from "lucide-react";
@@ -77,14 +75,6 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Financing",
         icon: BadgeDollarSign,
         roles: ["OWNER", "ADMIN", "BOOKKEEPER"],
-      },
-      { href: "/invoices", label: "Invoices", icon: FileText, requires: "LOAD" },
-      {
-        href: "/settlements",
-        label: "Owner Settlements",
-        icon: Wallet,
-        requires: "ACTIVITY",
-        roles: ["OWNER"],
       },
       {
         href: "/driver-settlements",

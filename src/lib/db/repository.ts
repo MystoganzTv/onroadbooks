@@ -356,6 +356,8 @@ export interface Repository {
 
   createFinancialObligation(input: FinancialObligationInput): Promise<FinancialObligation>;
   updateFinancialObligation(id: string, input: FinancialObligationInput): Promise<FinancialObligation>;
+  /** Removes the financing record while keeping its payments in the ledger. */
+  deleteFinancialObligation(id: string): Promise<void>;
   classifyDebtPayment(id: string, input: DebtPaymentClassificationInput): Promise<Expense[]>;
   createPaymentEvent(input: PaymentEventInput): Promise<PaymentEvent>;
 

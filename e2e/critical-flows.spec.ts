@@ -221,6 +221,42 @@ test.describe.serial("critical browser flows", () => {
     await expect(page.getByText(/Online billing is being configured/).first()).toBeVisible();
   });
 
+  test("invoice PDFs belong to loads and preserve existing documents and income", async ({ page }) => {
+    const before = await readDataset() as CalculatorFixtureDataset;
+    const load = before.loads[0];
+    await login(page);
+    await page.goto(`/loads/${load.id}`);
+    await expect(page.getByRole("link", { name: "Invoices", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Generate invoice PDF", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Generate invoice PDF" });
+    await dialog.locator("#invoice-number").fill("INV-DOCUMENT-TEST");
+    await dialog.locator("#invoice-customer").fill("Test Freight Customer");
+    await expect(dialog.getByLabel("Due date")).toHaveCount(0);
+    const generated = page.waitForEvent("download");
+    await dialog.getByRole("button", { name: "Generate PDF", exact: true }).click();
+    await (await generated).saveAs("/tmp/onroad-invoice-generated.pdf");
+    await expect(dialog).toBeHidden();
+    await page.reload();
+    await expect(page.getByRole("link", { name: "Download PDF", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Generate invoice PDF", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Edit invoice", exact: true }).click();
+    const edit = page.getByRole("dialog", { name: "Edit invoice" });
+    await expect(edit.locator("#invoice-number")).toHaveValue("INV-DOCUMENT-TEST");
+    await expect(edit.locator("#invoice-customer")).toHaveValue("Test Freight Customer");
+    await edit.getByRole("button", { name: "Cancel" }).click();
+    const existing = page.waitForEvent("download");
+    await page.getByRole("link", { name: "Download PDF", exact: true }).click();
+    expect((await existing).suggestedFilename()).toBe("inv-document-test.pdf");
+    const after = await readDataset() as CalculatorFixtureDataset;
+    const saved = after.loads.find((row) => row.id === load.id)!;
+    expect(saved.grossRate).toBe(load.grossRate);
+    expect(saved.status).toBe(load.status);
+    expect(saved.invoicePaidDate).toBe(load.invoicePaidDate);
+    expect(saved.invoiceDueDate).toBeNull();
+    expect(after.expenses).toEqual(before.expenses);
+    await writeDataset(before);
+  });
+
   test("simple and detailed views preserve data, scope and the saved preference", async ({ page }) => {
     const browserErrors: string[] = [];
     page.on("pageerror", (error) => browserErrors.push(error.message));
@@ -514,6 +550,16 @@ test.describe.serial("critical browser flows", () => {
     await expect(financing).toContainText("12%");
     await expect(financing).toContainText("$500.00 principal recorded");
 
+    const beforeFinancingDelete = await readDataset() as CalculatorFixtureDataset;
+    await financing.getByRole("button", { name: "Delete financing: Amex Business Card" }).click();
+    const removeFinancing = page.getByRole("dialog", { name: "Delete this financing?" });
+    await expect(removeFinancing).toContainText("Recorded payments and their recurring settings stay in Expenses.");
+    await removeFinancing.getByRole("button", { name: "Delete financing", exact: true }).click();
+    await expect(financing).toHaveCount(0);
+    const afterFinancingDelete = await readDataset() as CalculatorFixtureDataset;
+    const withoutObligations = (rows: CalculatorFixtureDataset["expenses"]) => rows.map(({ obligationId: _id, ...row }) => row);
+    expect(withoutObligations(afterFinancingDelete.expenses)).toEqual(withoutObligations(beforeFinancingDelete.expenses));
+
     await page.goto("/expenses?month=2026-09&period=month");
 
     await paymentRow.getByRole("button", { name: "Delete complete loan payment" }).click();
@@ -527,8 +573,8 @@ test.describe.serial("critical browser flows", () => {
     };
     expect(datasetAfterDelete.expenses.some((expense) => expense.description.startsWith("AMEX"))).toBe(false);
     expect(datasetAfterDelete.financialObligations.some(
-      (obligation) => obligation.name === "Amex Business Card" && !obligation.active,
-    )).toBe(true);
+      (obligation) => obligation.name === "Amex Business Card",
+    )).toBe(false);
 
     await writeDataset(datasetBeforeTest);
   });
@@ -612,6 +658,14 @@ test.describe.serial("critical browser flows", () => {
       document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1
     )).toBe(true);
 
+    await closedObligation.getByRole("button", { name: "Delete financing: AMEX equipment financing" }).click();
+    const remove = page.getByRole("dialog", { name: "Delete this financing?" });
+    await remove.getByRole("button", { name: "Cancel" }).click();
+    await expect(closedObligation).toBeVisible();
+    await closedObligation.getByRole("button", { name: "Delete financing: AMEX equipment financing" }).click();
+    await remove.getByRole("button", { name: "Delete financing", exact: true }).click();
+    await expect(closedObligation).toHaveCount(0);
+    await expect(page.getByText("Payments needing review", { exact: true })).toHaveCount(0);
     await writeDataset(datasetBeforeTest);
   });
 

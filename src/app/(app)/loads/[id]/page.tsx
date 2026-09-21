@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { FileText, Fuel, MapPin, Package, Pencil, Receipt } from "lucide-react";
+import { Download, FileText, Fuel, MapPin, Package, Pencil, Receipt } from "lucide-react";
 
+import { InvoiceDialog } from "@/components/invoices/invoice-dialog";
+import { nextInvoiceNumber } from "@/lib/invoices";
+import { roleCan } from "@/lib/roles";
 import { DocumentList } from "@/components/documents/document-list";
 import { DocumentUploader } from "@/components/documents/document-uploader";
 import { DeleteLoadButton } from "@/components/loads/delete-load-button";
@@ -55,7 +58,8 @@ export default async function LoadDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const [{ id }, session, locale] = await Promise.all([params, requireSession(), getAppLocale()]);
-  const copy = getWebDictionary(locale).loads;
+  const dictionary = getWebDictionary(locale);
+  const copy = dictionary.loads;
   const dataset = await getDataset(session.businessId);
   const load = dataset.loads.find((item) => item.id === id);
   if (!load) notFound();
@@ -116,6 +120,14 @@ export default async function LoadDetailPage({
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {roleCan(session.role ?? "VIEWER", "manage_finances") ? (
+            <InvoiceDialog load={load} suggestedNumber={nextInvoiceNumber(dataset.loads, todayISO())} today={todayISO()} canManage />
+          ) : null}
+          {load.invoiceNumber ? (
+            <Button asChild variant="outline" size="sm">
+              <a href={`/api/export/invoice/${load.id}`}><Download />{dictionary.invoices.downloadPdf}</a>
+            </Button>
+          ) : null}
           <LoadFormDialog
             load={load}
             brokers={brokers}

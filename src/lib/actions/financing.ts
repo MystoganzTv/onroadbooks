@@ -13,6 +13,8 @@ function revalidateFinancing() {
   revalidatePath("/dashboard");
   revalidatePath("/calculator");
   revalidatePath("/truck");
+  revalidatePath("/reports");
+  revalidatePath("/settlements");
 }
 
 export async function createFinancialObligationAction(values: unknown): Promise<ActionResult> {
@@ -59,5 +61,16 @@ export async function updateFinancialObligationAction(
       ok: false,
       error: error instanceof Error ? error.message : "Could not update the obligation.",
     };
+  }
+}
+
+export async function deleteFinancialObligationAction(id: string): Promise<ActionResult> {
+  try {
+    const session = await requireWritableSession("manage_finances");
+    await getRepository(session.businessId).deleteFinancialObligation(id);
+    revalidateFinancing();
+    return { ok: true, id };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not delete the financing." };
   }
 }

@@ -2687,6 +2687,16 @@ export class DrizzleRepository implements Repository {
     )!;
   }
 
+  async deleteFinancialObligation(id: string): Promise<void> {
+    const client = await this.clientProvider();
+    const business = await this.business(client);
+    // The foreign key uses SET NULL, so every recorded payment survives.
+    const deleted = await client.delete(s.financialObligation).where(and(
+      eq(s.financialObligation.id, id), eq(s.financialObligation.businessId, business.id),
+    )).returning({ id: s.financialObligation.id });
+    if (deleted.length !== 1) throw new Error("That obligation does not belong to this workspace.");
+  }
+
   async classifyDebtPayment(
     id: string,
     input: DebtPaymentClassificationInput,

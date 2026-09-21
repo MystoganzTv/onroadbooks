@@ -19,12 +19,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/shared/field";
 
-function addDays(date: string, days: number): string {
-  const value = new Date(`${date}T00:00:00Z`);
-  value.setUTCDate(value.getUTCDate() + days);
-  return value.toISOString().slice(0, 10);
-}
-
 export function InvoiceDialog({ load, suggestedNumber, today, canManage }: {
   load: Load;
   suggestedNumber: string;
@@ -41,13 +35,13 @@ export function InvoiceDialog({ load, suggestedNumber, today, canManage }: {
   const [form, setForm] = React.useState({
     invoiceNumber: load.invoiceNumber ?? suggestedNumber,
     invoiceDate: load.invoiceDate ?? today,
-    invoiceDueDate: load.invoiceDueDate ?? addDays(today, 30),
+    invoiceDueDate: load.invoiceDueDate ?? null,
     billToName: load.billToName ?? load.broker ?? "",
     billToEmail: load.billToEmail ?? "",
     billToAddress: load.billToAddress ?? "",
     invoiceNotes: load.invoiceNotes ?? "",
   });
-  const set = (name: keyof typeof form, value: string) => setForm((current) => ({ ...current, [name]: value }));
+  const set = <K extends keyof typeof form>(name: K, value: (typeof form)[K]) => setForm((current) => ({ ...current, [name]: value }));
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -61,14 +55,15 @@ export function InvoiceDialog({ load, suggestedNumber, today, canManage }: {
       toast.success(load.invoiceNumber ? copy.invoiceUpdated : copy.invoiceIssued);
       setOpen(false);
       router.refresh();
+      if (!load.invoiceNumber) window.location.assign(`/api/export/invoice/${load.id}`);
     });
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant={load.invoiceNumber ? "outline" : "default"} disabled={!canManage}>
-          <FilePlus2 /> {load.invoiceNumber ? copy.edit : copy.issue}
+        <Button size="sm" variant="outline" disabled={!canManage}>
+          <FilePlus2 /> {load.invoiceNumber ? copy.editInvoice : copy.issue}
         </Button>
       </DialogTrigger>
       <DialogContent>
@@ -88,9 +83,9 @@ export function InvoiceDialog({ load, suggestedNumber, today, canManage }: {
               <Field label={copy.invoiceDate} htmlFor="invoice-date" required error={errors.invoiceDate}>
                 <Input id="invoice-date" type="date" value={form.invoiceDate} onChange={(e) => set("invoiceDate", e.target.value)} />
               </Field>
-              <Field label={copy.dueDate} htmlFor="invoice-due-date" required error={errors.invoiceDueDate}>
-                <Input id="invoice-due-date" type="date" value={form.invoiceDueDate} onChange={(e) => set("invoiceDueDate", e.target.value)} />
-              </Field>
+              {load.invoiceDueDate ? <Field label={copy.dueDate} htmlFor="invoice-due-date" error={errors.invoiceDueDate}>
+                <Input id="invoice-due-date" type="date" value={form.invoiceDueDate ?? ""} onChange={(e) => set("invoiceDueDate", e.target.value || null)} />
+              </Field> : null}
             </div>
             <Field label={copy.billingEmail} htmlFor="invoice-email" error={errors.billToEmail}>
               <Input id="invoice-email" type="email" value={form.billToEmail} onChange={(e) => set("billToEmail", e.target.value)} />
@@ -104,7 +99,7 @@ export function InvoiceDialog({ load, suggestedNumber, today, canManage }: {
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>{common.cancel}</Button>
-            <Button type="submit" disabled={pending}>{pending ? <Loader2 className="animate-spin" /> : null} {copy.saveInvoice}</Button>
+            <Button type="submit" disabled={pending}>{pending ? <Loader2 className="animate-spin" /> : null} {load.invoiceNumber ? copy.saveInvoice : copy.generatePdf}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

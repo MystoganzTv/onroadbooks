@@ -1464,6 +1464,18 @@ export class JsonRepository implements Repository {
     }, this.businessId);
   }
 
+  async deleteFinancialObligation(id: string): Promise<void> {
+    await mutate((dataset) => {
+      if (!dataset.financialObligations.some((row) => row.id === id)) {
+        throw new Error("That obligation does not belong to this workspace.");
+      }
+      dataset.financialObligations = dataset.financialObligations.filter((row) => row.id !== id);
+      for (const expense of dataset.expenses) {
+        if (expense.obligationId === id) expense.obligationId = null;
+      }
+    }, this.businessId);
+  }
+
   async classifyDebtPayment(
     id: string,
     input: DebtPaymentClassificationInput,

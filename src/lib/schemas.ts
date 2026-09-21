@@ -153,13 +153,13 @@ export const invoiceSchema = z
   .object({
     invoiceNumber: z.string().trim().min(1, "Invoice number is required").max(40),
     invoiceDate: isoDate,
-    invoiceDueDate: isoDate,
+    invoiceDueDate: isoDate.optional().nullable(),
     billToName: z.string().trim().min(1, "Customer name is required").max(160),
     billToEmail: z.string().trim().email("Enter a valid email").max(254).optional().nullable().or(z.literal("")),
     billToAddress: z.string().trim().max(500).optional().nullable(),
     invoiceNotes: z.string().trim().max(2000).optional().nullable(),
   })
-  .refine((value) => value.invoiceDueDate >= value.invoiceDate, {
+  .refine((value) => !value.invoiceDueDate || value.invoiceDueDate >= value.invoiceDate, {
     message: "Due date cannot be before the invoice date",
     path: ["invoiceDueDate"],
   });

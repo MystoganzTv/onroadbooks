@@ -1877,6 +1877,14 @@ export class PrismaRepository implements Repository {
     return (await this.getDataset()).financialObligations.find((item) => item.id === id)!;
   }
 
+  async deleteFinancialObligation(id: string): Promise<void> {
+    const client = await getClient();
+    const business = await this.business(client);
+    // The foreign key uses SET NULL, so every recorded payment survives.
+    const deleted = await client.financialObligation.deleteMany({ where: { id, businessId: business.id } });
+    if (deleted.count !== 1) throw new Error("That obligation does not belong to this workspace.");
+  }
+
   async classifyDebtPayment(
     id: string,
     input: DebtPaymentClassificationInput,
