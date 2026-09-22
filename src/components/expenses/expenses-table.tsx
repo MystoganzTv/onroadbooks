@@ -47,7 +47,7 @@ import {
 } from "@/components/ui/table";
 import { deleteExpenseAction } from "@/lib/actions/expenses";
 import type { Document } from "@/lib/types";
-import { behaviorOf, categoryColor, categoryLabel, EXPENSE_CATEGORIES } from "@/lib/categories";
+import { expenseBehaviorOf, categoryColor, categoryLabel, EXPENSE_CATEGORIES } from "@/lib/categories";
 import { formatMoney } from "@/lib/formatters";
 import { formatLocaleDate } from "@/lib/i18n-format";
 import { interpolate } from "@/lib/i18n/dictionaries";
@@ -109,7 +109,7 @@ export function ExpensesTable({
 
     const rows = expenses.filter((expense) => {
       if (category !== "all" && expense.category !== category) return false;
-      if (behavior !== "all" && behaviorOf(expense.category, categoryBehavior) !== behavior)
+      if (behavior !== "all" && expenseBehaviorOf(expense, categoryBehavior) !== behavior)
         return false;
       if (!query) return true;
       return [expense.description, expense.vendor ?? "", categoryLabel(expense.category, locale), expense.notes ?? ""]
@@ -339,7 +339,7 @@ export function ExpensesTable({
                 const paymentGroupId = expense.splitGroupId;
                 const isPaymentGroup = Boolean(paymentGroupId);
                 const paymentExpanded = Boolean(paymentGroupId && expandedPayments.has(paymentGroupId));
-                const isFixed = behaviorOf(expense.category, categoryBehavior) === "FIXED";
+                const isFixed = expenseBehaviorOf(expense, categoryBehavior) === "FIXED";
                 // Rows the app writes for you must be changed at their source.
                 // Load costs have a focused editor here that updates that
                 // source; the other mirrors point to their owning workflow.

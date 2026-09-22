@@ -792,3 +792,47 @@ test("Financing links an existing loan payment without a duplicate or an assumed
     await client.end();
   }
 });
+
+test("Expense classification is editable independently of its monthly frequency", async ({ page }) => {
+  await page.goto("/setup");
+  await page.getByLabel("Your name").fill("Classification Owner");
+  await page.getByLabel("Email").fill("classification-owner@example.test");
+  await page.getByLabel("Password").fill("Database-test-password-2026");
+  await page.getByRole("button", { name: "Create account", exact: true }).click();
+  await page.getByLabel("Business name").fill("Classification Test");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Keep Truck 1 for now" }).click();
+  await page.getByRole("button", { name: "Skip for now" }).click();
+  await page.getByRole("button", { name: /Open the dashboard/ }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await page.goto("/expenses?month=2026-09&period=month");
+  await page.getByRole("button", { name: "Add expense", exact: true }).first().click();
+  const dialog = page.getByRole("dialog", { name: "Add expense" });
+  await dialog.locator("#expense-date").fill("2026-09-03");
+  await dialog.locator("#expense-amount").fill("2305.62");
+  await dialog.locator("#expense-category").click();
+  await page.getByRole("option", { name: "Insurance", exact: true }).click();
+  await dialog.locator("#expense-description").fill("Insurance downpayment");
+  await dialog.getByRole("combobox", { name: "Cost classification" }).click();
+  await page.getByRole("option", { name: "Variable", exact: true }).click();
+  await expect(dialog.getByRole("radio", { name: "One time", exact: true })).toBeChecked();
+  await dialog.getByRole("button", { name: "Add expense", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  const row = page.getByRole("row").filter({ hasText: "Insurance downpayment" });
+  await row.getByRole("button", { name: "Edit expense", exact: true }).click();
+  const edit = page.getByRole("dialog", { name: "Edit expense" });
+  await expect(edit.getByRole("combobox", { name: "Cost classification" })).toHaveText("Variable");
+  await edit.getByRole("combobox", { name: "Cost classification" }).click();
+  await page.getByRole("option", { name: "Fixed", exact: true }).click();
+  await expect(edit.getByRole("radio", { name: "One time", exact: true })).toBeChecked();
+  await edit.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(edit).toBeHidden();
+  const client = new Client({ connectionString: process.env.NEON_DATABASE_URL });
+  await client.connect();
+  try {
+    const { rows } = await client.query('SELECT e.amount::text,e.behavior,e.recurring FROM "Expense" e JOIN "User" u ON u."businessId"=e."businessId" WHERE u.email=$1', ["classification-owner@example.test"]);
+    expect(rows).toEqual([{ amount: "2305.62", behavior: "FIXED", recurring: false }]);
+  } finally {
+    await client.end();
+  }
+});

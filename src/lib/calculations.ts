@@ -8,7 +8,7 @@
  * All ratios go through `div`, which returns 0 instead of Infinity/NaN.
  */
 
-import { behaviorOf, EXPENSE_CATEGORIES, getCategory } from "./categories";
+import { expenseBehaviorOf, behaviorOf, EXPENSE_CATEGORIES, getCategory } from "./categories";
 import {
   FINANCIAL_MODEL_VERSION,
   financialTreatmentOf,
@@ -313,7 +313,7 @@ export function summarizePeriod(
   const overrides = settings?.categoryBehavior;
   const fixedExpenses = roundMoney(
     sum(
-      operatingExpenseRows.filter((e) => behaviorOf(e.category, overrides) === "FIXED"),
+      operatingExpenseRows.filter((e) => expenseBehaviorOf(e, overrides) === "FIXED"),
       (e) => e.amount,
     ),
   );
@@ -544,11 +544,13 @@ export function categoryTotals(
   settings?: FinancialSettings,
 ): CategoryTotal[] {
   const total = sum(expenses, (e) => e.amount);
-  const buckets = new Map<string, { amount: number; count: number }>();
+  const buckets = new Map<string, { amount: number; count: number; fixedAmount: number; variableAmount: number }>();
 
   for (const expense of expenses) {
-    const current = buckets.get(expense.category) ?? { amount: 0, count: 0 };
+    const current = buckets.get(expense.category) ?? { amount: 0, count: 0, fixedAmount: 0, variableAmount: 0 };
     current.amount += expense.amount;
+    if (expenseBehaviorOf(expense, settings?.categoryBehavior) === "FIXED") current.fixedAmount += expense.amount;
+    else current.variableAmount += expense.amount;
     current.count += 1;
     buckets.set(expense.category, current);
   }
@@ -559,7 +561,9 @@ export function categoryTotals(
       return {
         category: def.id,
         label: def.label,
-        behavior: behaviorOf(category, settings?.categoryBehavior),
+        behavior: value.fixedAmount > 0 && value.variableAmount > 0 ? "MIXED" : value.fixedAmount > 0 ? "FIXED" : "VARIABLE",
+        fixedAmount: roundMoney(value.fixedAmount),
+        variableAmount: roundMoney(value.variableAmount),
         amount: roundMoney(value.amount),
         share: div(value.amount, total) * 100,
         count: value.count,
@@ -576,7 +580,7 @@ export function behaviorTotals(
   let fixed = 0;
   let variable = 0;
   for (const e of expenses) {
-    if (behaviorOf(e.category, overrides) === "FIXED") fixed += e.amount;
+    if (expenseBehaviorOf(e, overrides) === "FIXED") fixed += e.amount;
     else variable += e.amount;
   }
   return { FIXED: roundMoney(fixed), VARIABLE: roundMoney(variable) };
@@ -818,7 +822,7 @@ export function buildInsights(
     });
   }
 
-  const topFixed = categories.filter((c) => c.behavior === "FIXED");
+  const topFixed = categories.filter((c) => c.fixedAmount > 0);
   const fixedShare = div(current.fixedExpenses, current.operatingExpenses) * 100;
   if (topFixed.length > 0 && fixedShare > 0) {
     insights.push({

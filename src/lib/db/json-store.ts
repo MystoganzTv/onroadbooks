@@ -502,6 +502,7 @@ function expenseFromInput(
       input.obligationId === undefined ? (existing?.obligationId ?? null) : input.obligationId,
     splitGroupId:
       input.splitGroupId === undefined ? (existing?.splitGroupId ?? null) : input.splitGroupId,
+    behavior: input.behavior === undefined ? existing?.behavior ?? null : input.behavior,
     recurring: input.recurring,
     receiptNumber: input.receiptNumber?.trim() || null,
     notes: input.notes?.trim() || null,

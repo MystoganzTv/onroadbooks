@@ -137,6 +137,7 @@ export function recurringExpenseSuggestions(
       description: template.description,
       vendor: template.vendor,
       amount: template.amount,
+      behavior: template.behavior,
       loadId: null,
       recurring: true,
       receiptNumber: null,

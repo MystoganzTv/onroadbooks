@@ -248,6 +248,7 @@ export interface Expense {
   loadId: string | null;
   date: string;
   category: ExpenseCategoryId;
+  behavior?: ExpenseBehavior | null;
   description: string;
   vendor: string | null;
   amount: number;
@@ -541,7 +542,9 @@ export interface MoneyBreakdown {
 export interface CategoryTotal {
   category: ExpenseCategoryId;
   label: string;
-  behavior: ExpenseBehavior;
+  behavior: ExpenseBehavior | "MIXED";
+  fixedAmount: number;
+  variableAmount: number;
   amount: number;
   share: number;
   count: number;

@@ -21,7 +21,7 @@ import {
 import { calculateTrueCostPerMile } from "./finance/cost-per-mile";
 import { calculateDeadheadCost } from "./finance/deadhead";
 import { buildFinancialSummary } from "./finance/financial-summary";
-import { behaviorOf, categoryLabel } from "./categories";
+import { expenseBehaviorOf, categoryLabel } from "./categories";
 import { maintenanceLabel } from "./maintenance";
 import { equipmentTypeLabel, loadCapacityLabel } from "./load-details";
 import type { Period } from "./periods";
@@ -179,7 +179,7 @@ export function buildReport(
                 : financialTreatmentOf(expense) === "DEBT_UNALLOCATED"
                   ? "Unallocated Debt Service"
                   : "Operating Expense",
-            behaviorOf(expense.category, settings.categoryBehavior) === "FIXED" ? "Fixed" : "Variable",
+            expenseBehaviorOf(expense, settings.categoryBehavior) === "FIXED" ? "Fixed" : "Variable",
             expense.description,
             expense.vendor ?? "",
             money(expense.amount),
@@ -252,7 +252,7 @@ export function buildReport(
             category.label,
             money(category.amount),
             rate(summary.totalMiles ? category.amount / summary.totalMiles : 0),
-            category.behavior === "FIXED" ? "Fixed" : "Variable",
+            category.behavior === "MIXED" ? "Fixed and variable" : category.behavior === "FIXED" ? "Fixed" : "Variable",
           ]),
           ["Total operating expenses", money(summary.operatingExpenses), rate(summary.costPerMile), ""],
           ["Fixed expenses", money(behavior.FIXED), "", ""],

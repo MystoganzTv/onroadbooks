@@ -77,6 +77,7 @@ interface FormState {
   vendor: string;
   amount: string;
   loadId: string;
+  behavior: ExpenseBehavior | null;
   recurring: boolean;
   splitPayment: boolean;
   principal: string;
@@ -94,6 +95,7 @@ function emptyState(defaultDate: string, charge: string): FormState {
     vendor: "",
     amount: "",
     loadId: "none",
+    behavior: null,
     recurring: false,
     splitPayment: false,
     principal: "",
@@ -164,6 +166,7 @@ export function ExpenseFormDialog({
             vendor: expense.vendor ?? "",
             amount: String(expense.amount),
             loadId: expense.loadId ?? "none",
+            behavior: expense.behavior ?? null,
             recurring: isMonthlyRecurringExpense(expense),
             splitPayment: false,
             principal: String(expense.amount),
@@ -192,7 +195,7 @@ export function ExpenseFormDialog({
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setValues((prev) => ({ ...prev, [key]: value }));
 
-  const behavior = behaviorOf(values.category, categoryBehavior);
+  const behavior = values.behavior ?? behaviorOf(values.category, categoryBehavior);
   const canLinkToLoad = ["FUEL", "TOLLS", "DISPATCH", "FACTORING", "OTHER"].includes(values.category);
   const isFinancingPayment = FINANCING_PAYMENT_CATEGORIES.has(values.category);
 
@@ -252,6 +255,7 @@ export function ExpenseFormDialog({
       vendor: values.vendor || null,
       amount: toNumber(values.amount),
       loadId: !canLinkToLoad || values.loadId === "none" ? null : values.loadId,
+      behavior: values.behavior,
       recurring: values.recurring,
       receiptNumber: isFinancingPayment
         ? (expense?.receiptNumber ?? null)
@@ -403,6 +407,17 @@ export function ExpenseFormDialog({
                 />
               </Field>
             </div>
+
+            <Field label={copy.costClassification} htmlFor="expense-behavior" hint={copy.costClassificationHint}>
+              <Select value={values.behavior ?? "category"} onValueChange={(value) => set("behavior", value === "category" ? null : value as ExpenseBehavior)}>
+                <SelectTrigger id="expense-behavior"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="category">{copy.categoryDefault} ({behaviorOf(values.category, categoryBehavior) === "FIXED" ? dictionary.common.fixed : dictionary.common.variable})</SelectItem>
+                  <SelectItem value="FIXED">{dictionary.common.fixed}</SelectItem>
+                  <SelectItem value="VARIABLE">{dictionary.common.variable}</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
 
             <ExpenseFrequencyField
               recurring={values.recurring}

@@ -14,6 +14,7 @@ export const expense = pgTable("Expense", {
   date: date("date", { mode: "string" }).notNull(),
   scope: enums.expenseScope("scope").notNull().default("TRUCK"),
   category: enums.expenseCategory("category").notNull(),
+  behavior: enums.expenseBehavior("behavior"),
   description: text("description").notNull(),
   vendor: text("vendor"),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),

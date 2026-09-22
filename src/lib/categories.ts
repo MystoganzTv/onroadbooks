@@ -1,5 +1,5 @@
 import type { AppLocale } from "./i18n";
-import type { ExpenseBehavior, ExpenseCategoryId } from "./types";
+import type { Expense, ExpenseBehavior, ExpenseCategoryId } from "./types";
 
 export interface CategoryDefinition {
   id: ExpenseCategoryId;
@@ -84,4 +84,12 @@ export function behaviorOf(
   overrides: Record<string, ExpenseBehavior> | undefined,
 ): ExpenseBehavior {
   return overrides?.[id] ?? getCategory(id).defaultBehavior;
+}
+
+/** An explicit choice on the expense takes precedence over category defaults. */
+export function expenseBehaviorOf(
+  expense: Pick<Expense, "category" | "behavior">,
+  overrides?: Record<string, ExpenseBehavior>,
+): ExpenseBehavior {
+  return expense.behavior ?? behaviorOf(expense.category, overrides);
 }

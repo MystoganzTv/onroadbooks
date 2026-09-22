@@ -252,6 +252,7 @@ export const expenseSchema = z.object({
   truckId: z.string().trim().optional().nullable(),
   date: isoDate,
   category: z.enum(CATEGORY_IDS as [string, ...string[]]),
+  behavior: z.enum(["FIXED", "VARIABLE"]).optional().nullable(),
   description: z.string().trim().min(1, "Description is required").max(200),
   vendor: z.string().trim().max(120).optional().nullable(),
   amount: money.min(0.01, "Amount is required"),

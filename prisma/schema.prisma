@@ -556,6 +556,7 @@ model Expense {
   date               DateTime             @db.Date
   scope              ExpenseScope         @default(TRUCK)
   category           ExpenseCategory
+  behavior           ExpenseBehavior?
   description        String
   vendor             String?
   amount             Decimal              @db.Decimal(12, 2)

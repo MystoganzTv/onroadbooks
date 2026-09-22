@@ -343,8 +343,9 @@ export default async function ReportsPage({
             <div className="grid gap-3 sm:grid-cols-2">
               <BehaviorList
                 title={copy.fixed}
-                items={categories.filter((c) => c.behavior === "FIXED").map((item) => ({
+                items={categories.filter((c) => c.fixedAmount > 0).map((item) => ({
                   ...item,
+                  amount: item.fixedAmount,
                   label: categoryLabel(item.category, locale),
                 }))}
                 total={summary.fixedExpenses}
@@ -353,8 +354,9 @@ export default async function ReportsPage({
               />
               <BehaviorList
                 title={copy.variable}
-                items={categories.filter((c) => c.behavior === "VARIABLE").map((item) => ({
+                items={categories.filter((c) => c.variableAmount > 0).map((item) => ({
                   ...item,
+                  amount: item.variableAmount,
                   label: categoryLabel(item.category, locale),
                 }))}
                 total={summary.variableExpenses}

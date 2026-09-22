@@ -117,6 +117,7 @@ export interface ExpenseInput {
   truckId?: string | null;
   date: string;
   category: ExpenseCategoryId;
+  behavior?: "FIXED" | "VARIABLE" | null;
   description: string;
   vendor?: string | null;
   amount: number;

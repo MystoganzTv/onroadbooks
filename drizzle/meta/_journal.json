@@ -36,6 +36,13 @@
       "when": 1790046208606,
       "tag": "0004_chassis-lube",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790046686219,
+      "tag": "0005_expense-behavior",
+      "breakpoints": true
     }
   ]
 }

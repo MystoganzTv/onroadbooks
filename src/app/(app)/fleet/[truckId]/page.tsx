@@ -197,7 +197,9 @@ export default async function FleetUnitPage({
                   label={categoryLabel(category.category, locale)}
                   value={-category.amount}
                   note={
-                    category.behavior === "FIXED"
+                    category.behavior === "MIXED"
+                      ? getWebDictionary(locale).expenses.mixedClassification
+                      : category.behavior === "FIXED"
                       ? getWebDictionary(locale).common.fixed
                       : getWebDictionary(locale).common.variable
                   }

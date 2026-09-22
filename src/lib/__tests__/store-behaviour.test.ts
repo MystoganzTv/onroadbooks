@@ -1814,6 +1814,23 @@ describe("financial review and customer cash events", () => {
 });
 
 describe("expense financial treatment", () => {
+  it("persists per-expense classification independently of recurrence and preserves it on older-client edits", async () => {
+    const truckId = (await repo.getDataset()).trucks[0].id;
+    const input = expense({ truckId, category: "INSURANCE", behavior: "VARIABLE", recurring: false });
+    const created = await repo.createExpense(input);
+    assert.equal(created.behavior, "VARIABLE");
+    const { behavior: _behavior, ...legacyInput } = input;
+    const edited = await repo.updateExpense(created.id, { ...legacyInput, amount: 150 });
+    assert.equal(edited.behavior, "VARIABLE");
+    assert.equal(edited.recurring, false);
+    const fixed = await repo.updateExpense(created.id, { ...input, behavior: "FIXED" });
+    assert.equal(fixed.behavior, "FIXED");
+    assert.equal(fixed.recurring, false);
+    const reset = await repo.updateExpense(created.id, { ...input, behavior: null });
+    assert.equal(reset.behavior, null);
+    await repo.deleteExpense(created.id);
+  });
+
   it("re-derives the treatment when the category changes", async () => {
     // A stale treatment is how a row ends up counted as operating spend under
     // a debt category -- and it made this store disagree with Postgres on the

@@ -18,17 +18,15 @@
  *     replace the load's generated fuel row, so one purchase is counted once.
  *  3. Deadhead miles are in the denominator. A mile is a mile; the empty ones
  *     still burn fuel and still wear the truck.
- *  4. Fixed vs variable is the business's own classification, taken from
- *     FinancialSettings.categoryBehavior, so an owner who leases parking by
- *     the month can say so.
+ *  4. Fixed vs variable uses each expense's explicit classification, falling
+ *     back to FinancialSettings.categoryBehavior when no choice was made.
  *
  * Because a short window can be distorted by a single annual bill, anything
  * that needs a STABLE cost per mile (the load calculator, the target rate
  * tool, deadhead costing) uses `trailingCostBasis`, not the selected period.
  */
 
-import { div, roundMoney, sum } from "../calculations";
-import { behaviorOf, getCategory } from "../categories";
+import { categoryTotals, div, roundMoney, sum } from "../calculations";
 import { isLoadExpenseId } from "../load-expenses";
 import { addDays, inRange, type DateRange } from "../periods";
 import type {
@@ -45,7 +43,7 @@ import {
 export interface CostLine {
   category: ExpenseCategoryId;
   label: string;
-  behavior: ExpenseBehavior;
+  behavior: ExpenseBehavior | "MIXED";
   amount: number;
   perMile: number;
   /** Share of Actual Cost Per Mile, 0-100. */
@@ -162,11 +160,6 @@ export function calculateTrueCostPerMile(
     };
   }
 
-  const overrides = settings?.categoryBehavior;
-  const buckets = new Map<ExpenseCategoryId, number>();
-  for (const expense of operatingExpenses) {
-    buckets.set(expense.category, (buckets.get(expense.category) ?? 0) + expense.amount);
-  }
 
   const totalCost = roundMoney(sum(operatingExpenses, (e) => e.amount));
   const debtServiceTotal = roundMoney(sum(debtExpenses, (expense) => expense.amount));
@@ -182,22 +175,14 @@ export function calculateTrueCostPerMile(
     ),
   );
 
-  const lines: CostLine[] = [...buckets.entries()]
-    .map(([category, amount]) => {
-      const def = getCategory(category);
-      return {
-        category: def.id,
-        label: def.label,
-        behavior: behaviorOf(category, overrides),
-        amount: roundMoney(amount),
-        perMile: div(amount, totalMiles),
-        share: div(amount, totalCost) * 100,
-      } satisfies CostLine;
-    })
-    .sort((a, b) => b.amount - a.amount);
-
-  const fixed = lines.filter((l) => l.behavior === "FIXED");
-  const variable = lines.filter((l) => l.behavior === "VARIABLE");
+  const categories = categoryTotals(operatingExpenses, settings);
+  const costLine = (category: typeof categories[number], amount: number, behavior: CostLine["behavior"]): CostLine => ({
+    category: category.category, label: category.label, behavior,
+    amount, perMile: div(amount, totalMiles), share: div(amount, totalCost) * 100,
+  });
+  const lines = categories.map((category) => costLine(category, category.amount, category.behavior));
+  const fixed = categories.filter((category) => category.fixedAmount > 0).map((category) => costLine(category, category.fixedAmount, "FIXED"));
+  const variable = categories.filter((category) => category.variableAmount > 0).map((category) => costLine(category, category.variableAmount, "VARIABLE"));
   const fixedTotal = roundMoney(sum(fixed, (l) => l.amount));
   const variableTotal = roundMoney(totalCost - fixedTotal);
 
