@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ExpenseFrequencyField } from "./expense-frequency-field";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -342,7 +341,6 @@ export function DebtClassificationDialog({
                     placeholder={copy.optional}
                   />
                 </Field>
-                <ExpenseFrequencyField recurring={recurring} onChange={setRecurring} />
               </div>
             ) : null}
 

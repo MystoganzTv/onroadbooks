@@ -815,7 +815,7 @@ test("Expense classification is editable independently of its monthly frequency"
   await dialog.locator("#expense-description").fill("Insurance downpayment");
   await dialog.getByRole("combobox", { name: "Cost classification" }).click();
   await page.getByRole("option", { name: "Variable", exact: true }).click();
-  await expect(dialog.getByRole("radio", { name: "One time", exact: true })).toBeChecked();
+  await expect(dialog.getByRole("group", { name: "How often?", exact: true })).toHaveCount(0);
   await dialog.getByRole("button", { name: "Add expense", exact: true }).click();
   await expect(dialog).toBeHidden();
   const row = page.getByRole("row").filter({ hasText: "Insurance downpayment" });
@@ -824,7 +824,7 @@ test("Expense classification is editable independently of its monthly frequency"
   await expect(edit.getByRole("combobox", { name: "Cost classification" })).toHaveText("Variable");
   await edit.getByRole("combobox", { name: "Cost classification" }).click();
   await page.getByRole("option", { name: "Fixed", exact: true }).click();
-  await expect(edit.getByRole("radio", { name: "One time", exact: true })).toBeChecked();
+  await expect(edit.getByRole("group", { name: "How often?", exact: true })).toHaveCount(0);
   await edit.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect(edit).toBeHidden();
   const client = new Client({ connectionString: process.env.NEON_DATABASE_URL });
