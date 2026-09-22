@@ -16,6 +16,7 @@ export const fuelEntry = pgTable("FuelEntry", {
   totalCost: numeric("totalCost", { precision: 12, scale: 2 }).notNull(),
   odometer: integer("odometer"),
   location: text("location"),
+  station: text("station"),
   jurisdiction: varchar("jurisdiction", { length: 2 }),
   expenseId: text("expenseId"),
   notes: text("notes"),

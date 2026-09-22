@@ -176,6 +176,8 @@ export interface PaymentEventInput {
 }
 
 export interface FuelEntryInput {
+  /** Complete an existing expense, reusing its ledger row instead of adding one. */
+  sourceExpenseId?: string;
   truckId?: string | null;
   date: string;
   gallons: number;
@@ -183,6 +185,7 @@ export interface FuelEntryInput {
   totalCost: number;
   odometer?: number | null;
   location?: string | null;
+  station?: string | null;
   jurisdiction?: string | null;
   loadId?: string | null;
   notes?: string | null;

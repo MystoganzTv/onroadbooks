@@ -736,6 +736,7 @@ model FuelEntry {
   /// Odometer at fill-up -- drives MPG once two readings exist.
   odometer       Int?
   location       String?
+  station        String?
   jurisdiction   String?  @db.VarChar(2)
 
   /// The ledger row this fill-up mirrors into. An explicit relation, so the

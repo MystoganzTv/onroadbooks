@@ -7,6 +7,8 @@ import { PeriodControls } from "@/components/dashboard/period-controls";
 import { FuelFormDialog } from "@/components/fuel/fuel-form-dialog";
 import { FuelTable } from "@/components/fuel/fuel-table";
 import { LoadFuelEstimates } from "@/components/fuel/load-fuel-estimates";
+import { FuelExpensesWithoutDetails } from "@/components/fuel/fuel-expenses-without-details";
+import { fuelExpensesWithoutEntries } from "@/lib/fuel-expenses";
 import { ViewModeToggle } from "@/components/shared/view-mode";
 import { getViewMode } from "@/lib/view-mode-server";
 import { PageHeader } from "@/components/shared/page-header";
@@ -97,6 +99,7 @@ export default async function FuelPage({
   const loadFuelEstimates = periodExpenses.filter(
     (expense) => expense.category === "FUEL" && expense.id.startsWith("expload_") && expense.loadId,
   );
+  const expensesWithoutDetails = fuelExpensesWithoutEntries(periodExpenses, allFuel);
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
@@ -160,6 +163,8 @@ export default async function FuelPage({
         trucks={trucks}
         lastOdometer={lastOdometer}
       />
+
+      <FuelExpensesWithoutDetails expenses={expensesWithoutDetails} loads={periodLoads} trucks={trucks} />
 
       <div>
         <h2 className="text-sm font-semibold">{copy.detailedPurchases}</h2>

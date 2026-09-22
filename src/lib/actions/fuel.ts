@@ -22,7 +22,9 @@ export async function createFuelEntryAction(values: unknown): Promise<ActionResu
   }
 
   try {
-    const entry = await getRepository((await requireWritableSession("manage_fuel")).businessId).createFuelEntry(parsed.data);
+    const session = await requireWritableSession("manage_fuel");
+    if (parsed.data.sourceExpenseId) await requireWritableSession("manage_expenses");
+    const entry = await getRepository(session.businessId).createFuelEntry(parsed.data);
     revalidateAll();
     return { ok: true, id: entry.id };
   } catch (error) {

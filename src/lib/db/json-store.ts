@@ -1,5 +1,6 @@
 import { recurringSeriesExpenseIds } from "../recurring-expenses";
 import "server-only";
+import { assertFuelExpenseSource } from "../fuel-expenses";
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -344,6 +345,7 @@ function migrate(dataset: Dataset): Dataset {
   for (const entry of dataset.fuelEntries) {
     entry.expenseId ??= fuelExpenseId(entry.id);
     entry.jurisdiction ??= null;
+    entry.station ??= null;
   }
   reconcileLoadExpenseLedger(dataset);
 
@@ -554,6 +556,7 @@ function fuelFromInput(
     totalCost: roundMoney(input.totalCost),
     odometer: input.odometer ?? null,
     location: input.location?.trim() || null,
+    station: input.station?.trim() || null,
     jurisdiction: input.jurisdiction?.trim().toUpperCase() || null,
     // The mirror is addressed by an explicit column, not by reconstructing a
     // string, so the two records can never drift apart.
@@ -587,7 +590,7 @@ function syncFuelExpense(dataset: Dataset, entry: FuelEntry): void {
     existing.date = entry.date;
     existing.amount = entry.totalCost;
     existing.description = description;
-    existing.vendor = entry.location;
+    existing.vendor = entry.station || entry.location;
     existing.loadId = entry.loadId;
     return;
   }
@@ -601,7 +604,7 @@ function syncFuelExpense(dataset: Dataset, entry: FuelEntry): void {
     date: entry.date,
     category: "FUEL",
     description,
-    vendor: entry.location,
+    vendor: entry.station || entry.location,
     amount: entry.totalCost,
     recurring: false,
     receiptNumber: null,
@@ -1854,7 +1857,17 @@ export class JsonRepository implements Repository {
 
   async createFuelEntry(input: FuelEntryInput): Promise<FuelEntry> {
     return mutate((dataset) => {
+      const source = input.sourceExpenseId ? dataset.expenses.find((expense) => expense.id === input.sourceExpenseId) : undefined;
+      if (input.sourceExpenseId) {
+        assertFuelExpenseSource(source, Boolean(expenseMirrorSource(dataset, input.sourceExpenseId)) || dataset.driverSettlements.some((settlement) => settlement.lines.some((line) => line.expenseId === input.sourceExpenseId)));
+      }
       const entry = fuelFromInput(input, dataset, newId("fuel"), new Date().toISOString());
+      if (source) {
+        entry.expenseId = source.id;
+        source.category = "FUEL";
+        source.financialTreatment = "OPERATING";
+        source.recurring = false;
+      }
       dataset.fuelEntries.push(entry);
       syncFuelExpense(dataset, entry);
       const load = entry.loadId ? dataset.loads.find((item) => item.id === entry.loadId) : null;
@@ -1870,6 +1883,7 @@ export class JsonRepository implements Repository {
       if (index === -1) throw new Error(`Fuel entry ${id} not found`);
       const previousLoadId = dataset.fuelEntries[index].loadId;
       const updated = fuelFromInput(input, dataset, id, dataset.fuelEntries[index].createdAt);
+      updated.expenseId = dataset.fuelEntries[index].expenseId ?? fuelExpenseId(id);
       dataset.fuelEntries[index] = updated;
       syncFuelExpense(dataset, updated);
       for (const loadId of new Set([previousLoadId, updated.loadId].filter(Boolean))) {

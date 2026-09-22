@@ -269,6 +269,7 @@ export const expenseSchema = z.object({
 });
 
 export const fuelSchema = z.object({
+  sourceExpenseId: z.string().trim().min(1).optional(),
   truckId: z.string().trim().optional().nullable(),
   date: isoDate,
   gallons: z
@@ -287,6 +288,7 @@ export const fuelSchema = z.object({
     .optional()
     .nullable(),
   location: z.string().trim().max(120).optional().nullable(),
+  station: z.string().trim().max(120).optional().nullable(),
   jurisdiction: iftaJurisdiction.optional().nullable(),
   loadId: z.string().trim().optional().nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),

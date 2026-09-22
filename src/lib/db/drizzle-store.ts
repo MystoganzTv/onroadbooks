@@ -1,5 +1,6 @@
 import { recurringSeriesExpenseIds } from "../recurring-expenses";
 import "server-only";
+import { assertFuelExpenseSource } from "../fuel-expenses";
 
 import {
   and,
@@ -1531,6 +1532,7 @@ export class DrizzleRepository implements Repository {
           date: isoDate(row.date),
           gallons: num(row.gallons),
           pricePerGallon: num(row.pricePerGallon),
+          station: row.station,
           totalCost: num(row.totalCost),
           odometer: row.odometer,
           location: row.location,
@@ -3194,6 +3196,7 @@ export class DrizzleRepository implements Repository {
       date: toDate(input.date),
       gallons: input.gallons,
       pricePerGallon: input.pricePerGallon,
+      station: input.station?.trim() || null,
       totalCost: roundMoney(input.totalCost),
       odometer: input.odometer ?? null,
       location: input.location?.trim() || null,
@@ -3213,6 +3216,17 @@ export class DrizzleRepository implements Repository {
     };
 
     const row = await client.transaction(async (tx) => {
+      if (input.sourceExpenseId) {
+        const [source] = await tx.select().from(s.expense)
+          .where(and(eq(s.expense.id, input.sourceExpenseId), eq(s.expense.businessId, business.id)))
+          .for("update");
+        const [fuelLink, serviceLink, driverLink] = await Promise.all([
+          tx.query.fuelEntry.findFirst({ where: eq(s.fuelEntry.expenseId, input.sourceExpenseId) }),
+          tx.query.maintenanceRecord.findFirst({ where: eq(s.maintenanceRecord.expenseId, input.sourceExpenseId) }),
+          tx.query.driverSettlementLine.findFirst({ where: eq(s.driverSettlementLine.expenseId, input.sourceExpenseId) }),
+        ]);
+        assertFuelExpenseSource(source, Boolean(fuelLink || serviceLink || driverLink));
+      }
       const created = await oneRow(
         tx
           .insert(s.fuelEntry)
@@ -3225,28 +3239,17 @@ export class DrizzleRepository implements Repository {
           )
           .returning(),
       );
-      // Mirror the purchase into the expense ledger so operating expenses
-      // stay complete without the user entering fuel twice. The id is
-      // derived from the entry so update and delete can find it again --
-      // matching the JSON store exactly.
-      const mirror = await oneRow(
-        tx
-          .insert(s.expense)
-          .values(
-            insertValues(s.expense, {
-              businessId: business.id,
-              truckId,
-              loadId: data.loadId,
-              date: data.date,
-              category: "FUEL",
-              description: fuelDescription(input.gallons, input.pricePerGallon),
-              vendor: data.location,
-              amount: data.totalCost,
-              recurring: false,
-            }),
-          )
-          .returning(),
-      );
+      // Complete an existing purchase in place; never write a second expense.
+      const mirrorData = {
+        truckId, scope: "TRUCK" as const, loadId: data.loadId, date: data.date,
+        category: "FUEL" as const, financialTreatment: "OPERATING" as const,
+        description: fuelDescription(input.gallons, input.pricePerGallon),
+        vendor: data.station || data.location, amount: data.totalCost, recurring: false,
+      };
+      const mirror = input.sourceExpenseId
+        ? await oneRow(tx.update(s.expense).set(updateValues(s.expense, mirrorData))
+            .where(and(eq(s.expense.id, input.sourceExpenseId), eq(s.expense.businessId, business.id))).returning())
+        : await oneRow(tx.insert(s.expense).values(insertValues(s.expense, { ...mirrorData, businessId: business.id })).returning());
       await oneRow(
         tx
           .update(s.fuelEntry)
@@ -3322,7 +3325,7 @@ export class DrizzleRepository implements Repository {
         date: data.date,
         truckId,
         description: fuelDescription(input.gallons, input.pricePerGallon),
-        vendor: data.location,
+        vendor: data.station || data.location,
         amount: data.totalCost,
       };
 

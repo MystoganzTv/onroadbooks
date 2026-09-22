@@ -117,6 +117,7 @@ async function main() {
               "node_modules/@playwright/test/cli.js",
               "test",
               "--config=playwright.database.config.ts",
+              ...process.argv.slice(process.argv.indexOf("--browser") + 1),
             ]
           : [
               "--conditions=react-server",

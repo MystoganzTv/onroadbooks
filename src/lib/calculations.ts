@@ -56,6 +56,22 @@ export function roundMoney(value: number): number {
   return result === 0 ? 0 : result;
 }
 
+/** Resolve a fill-up from gallons and either price or receipt total.
+ * Keep an entered total intact: a price rounded to mills cannot reproduce
+ * every receipt to the cent. Null means missing; explicit zero stays invalid.
+ */
+export function fuelAmounts(
+  gallons: number,
+  pricePerGallon: number | null,
+  receiptTotal: number | null,
+): { pricePerGallon: number; totalCost: number } {
+  const totalCost = receiptTotal ?? roundMoney(gallons * (pricePerGallon ?? 0));
+  const price = pricePerGallon ?? (gallons > 0 && totalCost > 0
+    ? Number(div(totalCost, gallons).toFixed(3))
+    : 0);
+  return { pricePerGallon: price, totalCost };
+}
+
 /** Coerces a possibly missing or non-finite numeric column to 0. */
 export function num(value: number | null | undefined): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;

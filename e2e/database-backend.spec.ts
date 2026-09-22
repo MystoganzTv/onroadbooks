@@ -679,3 +679,73 @@ test("cron and verified Stripe events use Drizzle, isolate workspaces and tolera
     await db.end();
   }
 });
+
+
+test("Expenses and Fuel share one purchase and completing legacy details never doubles the charge", async ({ page }) => {
+  await page.goto("/setup");
+  await page.getByLabel("Your name").fill("Fuel Test Owner");
+  await page.getByLabel("Email").fill("fuel-owner@example.test");
+  await page.getByLabel("Password").fill("Database-test-password-2026");
+  await page.getByRole("button", { name: "Create account", exact: true }).click();
+  await page.getByLabel("Business name").fill("Fuel Browser Trucking");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Keep Truck 1 for now" }).click();
+  await page.getByRole("button", { name: "Skip for now" }).click();
+  await page.getByRole("button", { name: /Open the dashboard/ }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+
+  await page.goto("/expenses?month=2026-09&period=month");
+  await page.getByRole("button", { name: "Add expense", exact: true }).first().click();
+  await page.locator("#expense-date").fill("2026-09-17");
+  await page.locator("#expense-amount").fill("311.07");
+  await page.locator("#expense-category").click();
+  await page.getByRole("option", { name: "Fuel", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.locator("#fuel-total")).toHaveValue("311.07");
+  await expect(dialog.locator("#fuel-date")).toHaveValue("2026-09-17");
+  await dialog.locator("#fuel-gallons").fill("48");
+  await expect(dialog.locator("#fuel-price")).toHaveAttribute("placeholder", "6.481");
+  await dialog.locator("#fuel-station").fill("Pilot");
+  await dialog.locator("#fuel-location").fill("Richmond Hill, GA");
+  await dialog.getByRole("button", { name: "Add fuel", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("row").filter({ hasText: "Fuel - 48.0 gal @ 6.481/gal" })).toHaveCount(1);
+  await page.goto("/fuel?month=2026-09&period=month");
+  await expect(page.getByRole("row").filter({ hasText: "Pilot" })).toHaveCount(1);
+  await expect(page.getByText("Fuel - 48.0 gal @ 6.481/gal", { exact: true })).toBeVisible();
+
+  const client = new Client({ connectionString: process.env.NEON_DATABASE_URL });
+  await client.connect();
+  try {
+    const { rows: [owner] } = await client.query('SELECT "businessId" FROM "User" WHERE email=$1', ["fuel-owner@example.test"]);
+    const { rows: [truck] } = await client.query('SELECT id FROM "Truck" WHERE "businessId"=$1', [owner.businessId]);
+    const totals = async () => (await client.query('SELECT count(*)::int AS count, sum(amount)::text AS total FROM "Expense" WHERE "businessId"=$1 AND category=\'FUEL\'', [owner.businessId])).rows[0];
+    expect(await totals()).toEqual({ count: 1, total: "311.07" });
+    await client.query(`INSERT INTO "Expense" (id,"businessId","truckId",scope,date,category,description,amount,recurring,"updatedAt") VALUES ('legacy-fuel-browser',$1,$2,'TRUCK','2026-09-18','FUEL','Legacy fuel receipt',300,false,NOW())`, [owner.businessId, truck.id]);
+    await page.reload();
+    const legacy = page.getByRole("row").filter({ hasText: "Legacy fuel receipt" });
+    await legacy.getByRole("button", { name: "Complete fuel details" }).click();
+    await expect(dialog.locator("#fuel-total")).toHaveValue("300");
+    await dialog.locator("#fuel-gallons").fill("48");
+    await dialog.locator("#fuel-station").fill("Love’s");
+    await dialog.getByRole("button", { name: "Save changes", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByText("Fuel expenses awaiting details")).toHaveCount(0);
+    expect(await totals()).toEqual({ count: 2, total: "611.07" });
+    const { rows: [completed] } = await client.query('SELECT "expenseId" FROM "FuelEntry" WHERE station=$1 AND "businessId"=$2', ["Love’s", owner.businessId]);
+    expect(completed.expenseId).toBe("legacy-fuel-browser");
+
+    const completedRow = page.getByRole("row").filter({ hasText: "Love’s" });
+    await completedRow.getByRole("button", { name: "Edit fuel entry" }).click();
+    await expect(dialog.locator("#fuel-price")).toHaveValue("6.25");
+    await dialog.locator("#fuel-total").fill("305");
+    await dialog.getByRole("button", { name: "Save changes", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    expect(await totals()).toEqual({ count: 2, total: "616.07" });
+    await page.screenshot({ path: "/tmp/onroad-fuel-shared-form.png", fullPage: true });
+    await page.goto("/expenses?month=2026-09&period=month");
+    await expect(page.getByRole("row").filter({ hasText: "Fuel - 48.0 gal @ 6.250/gal" })).toHaveCount(1);
+  } finally {
+    await client.end();
+  }
+});

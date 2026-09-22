@@ -42,6 +42,7 @@ import type {
 import { BusinessNotFoundError } from "../db/repository";
 import { activeRecurringExpenses, recurringExpenseSuggestions } from "../recurring-expenses";
 import { loadExpenseId } from "../load-expenses";
+import { fuelExpensesWithoutEntries } from "../fuel-expenses";
 
 const SANDBOX = mkdtempSync(path.join(tmpdir(), "onroad-books-store-"));
 const ORIGINAL_CWD = process.cwd();
@@ -208,6 +209,58 @@ describe("business scoping", () => {
 });
 
 describe("fuel <-> expense mirror", () => {
+  it("completes a fuel expense in place without duplicating spending or receipt references", async () => {
+    const original = await repo.createExpense(expense({ category: "FUEL", amount: 311.07, receiptNumber: "PUMP-42", notes: "Original receipt" }));
+    const before = await repo.getDataset();
+    assert.ok(fuelExpensesWithoutEntries(before.expenses, before.fuelEntries).some((row) => row.id === original.id));
+    const entry = await repo.createFuelEntry(fuel({ sourceExpenseId: original.id, gallons: 48, pricePerGallon: 6.481, totalCost: 311.07, station: "Pilot" }));
+    const after = await repo.getDataset();
+    assert.equal(entry.expenseId, original.id);
+    assert.equal(after.expenses.length, before.expenses.length);
+    assert.equal(after.expenses.reduce((sum, row) => sum + row.amount, 0), before.expenses.reduce((sum, row) => sum + row.amount, 0));
+    assert.equal(after.expenses.find((row) => row.id === original.id)?.receiptNumber, "PUMP-42");
+    assert.equal(after.expenses.find((row) => row.id === original.id)?.notes, "Original receipt");
+    assert.equal(fuelExpensesWithoutEntries(after.expenses, after.fuelEntries).some((row) => row.id === original.id), false);
+    await assert.rejects(() => repo.createFuelEntry(fuel({ sourceExpenseId: original.id })), /already linked/);
+    assert.equal((await repo.getDataset()).fuelEntries.length, after.fuelEntries.length);
+    await repo.updateFuelEntry(entry.id, fuel({ totalCost: 320 }));
+    assert.equal((await repo.getDataset()).expenses.find((row) => row.id === original.id)?.amount, 320);
+    await repo.deleteFuelEntry(entry.id);
+    assert.equal((await repo.getDataset()).expenses.some((row) => row.id === original.id), false);
+  });
+
+  it("rejects missing, linked and protected expense sources without writing fuel", async () => {
+    const before = await repo.getDataset();
+    await assert.rejects(() => repo.createFuelEntry(fuel({ sourceExpenseId: "expense-in-another-workspace" })), /does not belong/);
+    const existingFuel = before.fuelEntries.find((row) => row.expenseId);
+    assert.ok(existingFuel?.expenseId);
+    await assert.rejects(() => repo.createFuelEntry(fuel({ sourceExpenseId: existingFuel.expenseId! })), /already linked/);
+    const payment = await repo.createExpense(expense({ category: "TRUCK_PAYMENT" }));
+    await assert.rejects(() => repo.createFuelEntry(fuel({ sourceExpenseId: payment.id })), /cannot be converted/);
+    assert.equal((await repo.getDataset()).fuelEntries.length, before.fuelEntries.length);
+    await repo.deleteExpense(payment.id);
+  });
+
+  it("saves, edits and clears an optional station independently of location", async () => {
+    const entry = await repo.createFuelEntry(fuel({ station: "  Love’s  ", location: "Richmond Hill, GA" }));
+    let dataset = await repo.getDataset();
+    assert.equal(dataset.fuelEntries.find((row) => row.id === entry.id)?.station, "Love’s");
+    assert.equal(dataset.expenses.find((row) => row.id === entry.expenseId)?.vendor, "Love’s");
+
+    await repo.updateFuelEntry(entry.id, fuel({ station: "Pilot", location: "Richmond Hill, GA" }));
+    dataset = await repo.getDataset();
+    assert.equal(dataset.fuelEntries.find((row) => row.id === entry.id)?.station, "Pilot");
+    assert.equal(dataset.fuelEntries.find((row) => row.id === entry.id)?.location, "Richmond Hill, GA");
+    assert.equal(dataset.expenses.find((row) => row.id === entry.expenseId)?.vendor, "Pilot");
+
+    await repo.updateFuelEntry(entry.id, fuel({ station: null, location: "Richmond Hill, GA" }));
+    dataset = await repo.getDataset();
+    assert.equal(dataset.fuelEntries.find((row) => row.id === entry.id)?.station, null);
+    assert.equal(dataset.expenses.find((row) => row.id === entry.expenseId)?.vendor, "Richmond Hill, GA");
+    assert.equal(dataset.expenses.filter((row) => row.id === entry.expenseId).length, 1);
+    await repo.deleteFuelEntry(entry.id);
+  });
+
   it("creates, updates and removes the ledger row with the entry", async () => {
     const entry = await repo.createFuelEntry(fuel({ totalCost: 180, gallons: 50 }));
     assert.ok(entry.expenseId);

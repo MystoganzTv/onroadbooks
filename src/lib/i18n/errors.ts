@@ -2,6 +2,9 @@ import { APP_LOCALE_COOKIE, type AppLocale } from "@/lib/i18n";
 
 const en = {
   generic: "We could not complete that action. Try again.",
+  fuelExpenseMissing: "That expense does not belong to this workspace.",
+  fuelExpenseLinked: "This expense is already linked to another record.",
+  fuelExpensePayment: "This payment cannot be converted to a fuel purchase.",
   highlighted: "Check the highlighted fields.",
   cityState: "Review the highlighted city and state.",
   loadMissing: "Load not found.",
@@ -39,6 +42,9 @@ const en = {
 
 const es: { [K in keyof typeof en]: string } = {
   generic: "No pudimos completar esa acción. Inténtalo otra vez.",
+  fuelExpenseMissing: "Ese gasto no pertenece a este espacio de trabajo.",
+  fuelExpenseLinked: "Este gasto ya está vinculado a otro registro.",
+  fuelExpensePayment: "Este pago no se puede convertir en una compra de combustible.",
   highlighted: "Revisa los campos señalados.",
   cityState: "Revisa la ciudad y el estado señalados.",
   loadMissing: "No se encontró la carga.",

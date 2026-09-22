@@ -152,8 +152,17 @@ export function FuelTable({
                     {formatLocaleDate(entry.date, locale, { month: "short", day: "numeric" })}
                   </TableCell>
                   <TableCell className={simple ? "min-w-24 max-w-64 whitespace-normal break-words" : "max-w-[12.5rem] truncate"}>
-                    {entry.location ?? "--"}
-                    {simple ? <span className="block text-xs text-muted-foreground">{formatNumber(entry.gallons, 1)} gal</span> : null}
+                    {entry.station ? (
+                      <>
+                        <span className="block truncate font-medium" title={entry.station}>{entry.station}</span>
+                        {entry.location ? <span className="block text-xs text-muted-foreground" title={entry.location}>{entry.location}</span> : null}
+                      </>
+                    ) : entry.location ?? "--"}
+                    {simple ? (
+                      <span className="block text-xs tnum text-muted-foreground">
+                        {copy.title} - {formatNumber(entry.gallons, 1)} gal @ {entry.pricePerGallon.toFixed(3)}/gal
+                      </span>
+                    ) : null}
                   </TableCell>
                   <TableCell className="text-right tnum">
                     {formatNumber(entry.gallons, 1)}

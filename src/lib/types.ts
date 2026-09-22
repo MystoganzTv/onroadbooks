@@ -309,6 +309,8 @@ export interface FuelEntry {
   totalCost: number;
   odometer: number | null;
   location: string | null;
+  /** Optional station or merchant name, separate from the city/state. */
+  station?: string | null;
   /** Jurisdiction where the tax-paid fuel was purchased. */
   jurisdiction: string | null;
   /**

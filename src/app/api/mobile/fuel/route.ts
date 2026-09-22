@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
           totalCost: entry.totalCost,
           odometer: entry.odometer ?? null,
           location: entry.location ?? null,
+          station: entry.station ?? null,
           jurisdiction: entry.jurisdiction ?? null,
         })),
     },
@@ -89,6 +90,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    if (parsed.data.sourceExpenseId) {
+      const conversionGate = await requireMobileWrite(request, "manage_expenses");
+      if (!conversionGate.ok) return NextResponse.json({ error: conversionGate.error }, { status: conversionGate.status });
+    }
     const entry = await gate.repository.createFuelEntry(parsed.data);
     for (const path of ["/dashboard", "/fuel", "/expenses", "/reports", "/truck"]) revalidatePath(path);
     return NextResponse.json({ id: entry.id }, { status: 201 });

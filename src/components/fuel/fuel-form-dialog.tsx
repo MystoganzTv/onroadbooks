@@ -32,14 +32,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/shared/field";
 import { fieldErrors, focusFirstError, validationMessage } from "@/lib/form";
 import { createFuelEntryAction, updateFuelEntryAction } from "@/lib/actions/fuel";
-import { roundMoney } from "@/lib/calculations";
+import { fuelAmounts } from "@/lib/calculations";
 import { formatMoney } from "@/lib/formatters";
 import { formatLocaleDate, localeTag } from "@/lib/i18n-format";
 import { todayISO } from "@/lib/periods";
 import { fuelSchema } from "@/lib/schemas";
 import { orderedTrucks } from "@/lib/fleet";
 import { IFTA_JURISDICTIONS, inferFuelJurisdiction } from "@/lib/ifta";
-import type { FuelEntry, LoadWithMetrics, Truck } from "@/lib/types";
+import type { Expense, FuelEntry, LoadWithMetrics, Truck } from "@/lib/types";
 import { toNumber } from "@/lib/utils";
 
 interface FormState {
@@ -49,6 +49,7 @@ interface FormState {
   totalCost: string;
   odometer: string;
   location: string;
+  station: string;
   jurisdiction: string;
   loadId: string;
   notes: string;
@@ -56,6 +57,14 @@ interface FormState {
 
 interface FuelFormDialogProps {
   entry?: FuelEntry;
+  sourceExpense?: Expense;
+  /** Reuse the exact fuel form inside the expense dialog. */
+  embedded?: boolean;
+  onClose?: () => void;
+  extraFields?: React.ReactNode;
+  defaultTotalCost?: string;
+  defaultStation?: string;
+  defaultNotes?: string;
   loads?: LoadWithMetrics[];
   trucks?: Truck[];
   defaultTruckId?: string | null;
@@ -66,11 +75,18 @@ interface FuelFormDialogProps {
 }
 
 /**
- * Fuel entry. Total cost auto-derives from gallons x price, but stays
- * editable because pump receipts round differently.
+ * Fuel entry. Derive the missing price or total, preserving an entered
+ * receipt total because pump receipts round differently.
  */
 export function FuelFormDialog({
   entry,
+  sourceExpense,
+  embedded = false,
+  onClose,
+  extraFields,
+  defaultTotalCost,
+  defaultStation,
+  defaultNotes,
   loads = [],
   trucks = [],
   defaultTruckId,
@@ -86,8 +102,8 @@ export function FuelFormDialog({
   const isEdit = Boolean(entry);
 
   const truckOptions = React.useMemo(
-    () => orderedTrucks(trucks).filter((t) => t.active || t.id === entry?.truckId),
-    [trucks, entry?.truckId],
+    () => orderedTrucks(trucks).filter((t) => t.active || t.id === entry?.truckId || t.id === sourceExpense?.truckId),
+    [trucks, entry?.truckId, sourceExpense?.truckId],
   );
   const showTruck = truckOptions.length > 1;
   const [truckId, setTruckId] = React.useState(
@@ -104,25 +120,32 @@ export function FuelFormDialog({
             totalCost: String(entry.totalCost),
             odometer: entry.odometer ? String(entry.odometer) : "",
             location: entry.location ?? "",
+            station: entry.station ?? "",
             jurisdiction: entry.jurisdiction ?? inferFuelJurisdiction(entry.location) ?? "UNASSIGNED",
             loadId: entry.loadId ?? "none",
             notes: entry.notes ?? "",
           }
         : {
-            date: defaultDate ?? todayISO(),
+            date: defaultDate ?? sourceExpense?.date ?? todayISO(),
             gallons: "",
             pricePerGallon: "",
-            totalCost: "",
+            totalCost: defaultTotalCost ?? (sourceExpense ? String(sourceExpense.amount) : ""),
             odometer: "",
             location: "",
+            station: defaultStation ?? sourceExpense?.vendor ?? "",
             jurisdiction: "UNASSIGNED",
-            loadId: defaultLoadId ?? "none",
-            notes: "",
+            loadId: defaultLoadId ?? sourceExpense?.loadId ?? "none",
+            notes: defaultNotes ?? sourceExpense?.notes ?? "",
           },
-    [entry, defaultDate, defaultLoadId],
+    [entry, sourceExpense, defaultDate, defaultLoadId, defaultTotalCost, defaultStation, defaultNotes],
   );
 
-  const [open, setOpen] = React.useState(false);
+  const [dialogOpen, setOpen] = React.useState(false);
+  const open = embedded || dialogOpen;
+  function close() {
+    setOpen(false);
+    onClose?.();
+  }
   const [values, setValues] = React.useState<FormState>(initial);
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [costEdited, setCostEdited] = React.useState(false);
@@ -131,18 +154,21 @@ export function FuelFormDialog({
   React.useEffect(() => {
     if (open) {
       setTruckId(
-        entry?.truckId ?? defaultTruckId ?? truckOptions.find((truck) => truck.active)?.id ?? "",
+        entry?.truckId ?? defaultTruckId ?? sourceExpense?.truckId ?? truckOptions.find((truck) => truck.active)?.id ?? "",
       );
       setValues(initial);
       setErrors({});
-      setCostEdited(Boolean(entry));
+      setCostEdited(Boolean(entry) || initial.totalCost !== "");
     }
-  }, [open, initial, entry, defaultTruckId, truckOptions]);
+  }, [open, initial, entry, defaultTruckId, truckOptions, sourceExpense?.truckId]);
 
   const gallons = toNumber(values.gallons);
-  const price = toNumber(values.pricePerGallon);
-  const derivedCost = roundMoney(gallons * price);
-  const totalCost = costEdited ? toNumber(values.totalCost) : derivedCost;
+  const priceIsAutomatic = values.pricePerGallon.trim() === "";
+  const { pricePerGallon: price, totalCost } = fuelAmounts(
+    gallons,
+    priceIsAutomatic ? null : toNumber(values.pricePerGallon),
+    costEdited ? toNumber(values.totalCost) : null,
+  );
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -152,11 +178,11 @@ export function FuelFormDialog({
   const linkOptions = React.useMemo(() => {
     const matching = loads.filter((load) => load.truckId === truckId);
     const visible = matching.slice(0, 40);
-    const linkedId = entry?.loadId ?? defaultLoadId;
+    const linkedId = entry?.loadId ?? defaultLoadId ?? sourceExpense?.loadId;
     if (!linkedId || visible.some((l) => l.id === linkedId)) return visible;
     const linked = matching.find((l) => l.id === linkedId);
     return linked ? [linked, ...visible] : visible;
-  }, [loads, entry?.loadId, defaultLoadId, truckId]);
+  }, [loads, entry?.loadId, defaultLoadId, truckId, sourceExpense?.loadId]);
 
   function changeTruck(nextTruckId: string) {
     setTruckId(nextTruckId);
@@ -173,6 +199,7 @@ export function FuelFormDialog({
     event.preventDefault();
 
     const payload = {
+      sourceExpenseId: sourceExpense?.id,
       truckId: truckId || null,
       date: values.date,
       gallons,
@@ -180,6 +207,7 @@ export function FuelFormDialog({
       totalCost,
       odometer: values.odometer ? toNumber(values.odometer) : null,
       location: values.location || null,
+      station: values.station || null,
       jurisdiction: values.jurisdiction === "UNASSIGNED" ? null : values.jurisdiction,
       loadId: values.loadId === "none" ? null : values.loadId,
       notes: values.notes || null,
@@ -193,6 +221,7 @@ export function FuelFormDialog({
       // fields, and move focus to the first one.
       toast.error(validationMessage(next, {
         location: copy.location,
+        station: copy.station,
         gallons: copy.gallons,
         pricePerGallon: copy.priceGal,
         totalCost: copy.totalCost,
@@ -214,7 +243,7 @@ export function FuelFormDialog({
         toast.success(isEdit ? copy.entryUpdated : copy.entryAdded, {
           description: `${gallons.toFixed(1)} gal - ${formatMoney(totalCost)}`,
         });
-        setOpen(false);
+        close();
         router.refresh();
       } else {
         setErrors(result.fieldErrors ?? {});
@@ -223,27 +252,18 @@ export function FuelFormDialog({
     });
   }
 
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger ?? (
-          <Button size="sm">
-            <Plus />
-            {copy.addFuel}
-          </Button>
-        )}
-      </DialogTrigger>
-
-      <DialogContent>
+  const content = (
+    <>
         <DialogHeader>
           <DialogTitle>{isEdit ? copy.editFuel : copy.addFuelEntry}</DialogTitle>
           <DialogDescription>
-            {copy.formDescription}
+            {sourceExpense ? copy.completeExpenseDescription : copy.formDescription}
           </DialogDescription>
         </DialogHeader>
 
         <DialogBody>
           <form id="fuel-form" onSubmit={submit} className="space-y-4" noValidate>
+            {extraFields}
             {showTruck ? (
               <Field
                 label={copy.truck}
@@ -267,7 +287,7 @@ export function FuelFormDialog({
               </Field>
             ) : null}
 
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3">
               <Field label={copy.date} htmlFor="fuel-date" required error={errors.date}>
                 <Input
                   id="fuel-date"
@@ -276,6 +296,17 @@ export function FuelFormDialog({
                   onChange={(e) => set("date", e.target.value)}
                   aria-invalid={Boolean(errors.date)}
                   required
+                />
+              </Field>
+              <Field label={copy.station} htmlFor="fuel-station" error={errors.station} hint={copy.optional}>
+                <Input
+                  id="fuel-station"
+                  maxLength={120}
+                  aria-invalid={Boolean(errors.station)}
+                  aria-describedby="fuel-station-message"
+                  value={values.station}
+                  onChange={(e) => set("station", e.target.value)}
+                  placeholder="Love’s, Pilot, Flying J…"
                 />
               </Field>
               <Field label={copy.location} htmlFor="fuel-location" error={errors.location}>
@@ -330,7 +361,7 @@ export function FuelFormDialog({
               <Field
                 label={copy.priceGal}
                 htmlFor="fuel-price"
-                required
+                hint={priceIsAutomatic && price > 0 ? copy.auto : copy.priceHint}
                 error={errors.pricePerGallon}
               >
                 <Input
@@ -340,9 +371,10 @@ export function FuelFormDialog({
                   min={0}
                   step="0.001"
                   value={values.pricePerGallon}
+                  placeholder={priceIsAutomatic && price > 0 ? price.toFixed(3) : ""}
                   onChange={(e) => set("pricePerGallon", e.target.value)}
                   aria-invalid={Boolean(errors.pricePerGallon)}
-                  required
+                  aria-describedby="fuel-price-message"
                 />
               </Field>
               <Field
@@ -357,7 +389,7 @@ export function FuelFormDialog({
                   inputMode="decimal"
                   min={0}
                   step="0.01"
-                  value={costEdited ? values.totalCost : derivedCost ? derivedCost.toFixed(2) : ""}
+                  value={costEdited ? values.totalCost : totalCost ? totalCost.toFixed(2) : ""}
                   onChange={(e) => {
                     setCostEdited(true);
                     set("totalCost", e.target.value);
@@ -420,21 +452,31 @@ export function FuelFormDialog({
             </Field>
 
             <p className="rounded-md border border-border bg-surface-sunken px-3 py-2 text-2xs text-muted-foreground">
-              {copy.ledgerNotice}
+              {sourceExpense ? copy.completeExpenseDescription : copy.ledgerNotice}
             </p>
           </form>
         </DialogBody>
 
         <DialogFooter>
-          <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>
+          <Button type="button" variant="outline" size="sm" onClick={close}>
             {common.cancel}
           </Button>
           <Button type="submit" form="fuel-form" size="sm" disabled={pending}>
             {pending ? <Loader2 className="animate-spin" /> : null}
-            {isEdit ? common.saveChanges : copy.addFuel}
+            {isEdit || sourceExpense ? common.saveChanges : copy.addFuel}
           </Button>
         </DialogFooter>
-      </DialogContent>
+    </>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        {trigger ?? <Button size="sm"><Plus />{copy.addFuel}</Button>}
+      </DialogTrigger>
+      <DialogContent>{content}</DialogContent>
     </Dialog>
   );
 }

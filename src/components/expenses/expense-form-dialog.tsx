@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { localizedClientError } from "@/lib/i18n/errors";
 import { useLanguage } from "@/components/shell/language-provider";
 
+import { FuelFormDialog } from "@/components/fuel/fuel-form-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -87,7 +88,7 @@ function emptyState(defaultDate: string, charge: string): FormState {
   return {
     charge,
     date: defaultDate,
-    category: "FUEL",
+    category: "OTHER",
     description: "",
     vendor: "",
     amount: "",
@@ -232,6 +233,7 @@ export function ExpenseFormDialog({
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (values.category === "FUEL") return;
 
     // An empty charge means this business has no fleet to choose between:
     // send no truck and let the store bill the one unit that exists.
@@ -304,6 +306,32 @@ export function ExpenseFormDialog({
     });
   }
 
+  const categoryField = (
+    <Field
+              label={copy.category}
+              htmlFor="expense-category"
+              required
+              hint={behavior === "FIXED" ? copy.fixedClassification : copy.variableClassification}
+              error={errors.category}
+            >
+              <Select
+                value={values.category}
+                onValueChange={(value) => changeCategory(value as ExpenseCategoryId)}
+              >
+                <SelectTrigger id="expense-category">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {EXPENSE_CATEGORIES.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {categoryLabel(category.id, locale)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+  );
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -316,6 +344,22 @@ export function ExpenseFormDialog({
       </DialogTrigger>
 
       <DialogContent>
+        {values.category === "FUEL" ? (
+          <FuelFormDialog
+            embedded
+            onClose={() => setOpen(false)}
+            extraFields={categoryField}
+            sourceExpense={expense}
+            loads={loads}
+            trucks={trucks}
+            defaultTruckId={values.charge === BUSINESS ? undefined : values.charge || undefined}
+            defaultLoadId={values.loadId === "none" ? undefined : values.loadId}
+            defaultDate={values.date}
+            defaultTotalCost={values.amount}
+            defaultStation={values.vendor}
+            defaultNotes={values.notes}
+          />
+        ) : <>
         <DialogHeader>
           <DialogTitle>
             {isEdit
@@ -405,29 +449,7 @@ export function ExpenseFormDialog({
               </Field>
             ) : null}
 
-            <Field
-              label={copy.category}
-              htmlFor="expense-category"
-              required
-              hint={behavior === "FIXED" ? copy.fixedClassification : copy.variableClassification}
-              error={errors.category}
-            >
-              <Select
-                value={values.category}
-                onValueChange={(value) => changeCategory(value as ExpenseCategoryId)}
-              >
-                <SelectTrigger id="expense-category">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {EXPENSE_CATEGORIES.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {categoryLabel(category.id, locale)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
+            {categoryField}
 
             {values.category === "TRUCK_PAYMENT" ? (
               <div className="space-y-3 rounded-md border border-border p-3">
@@ -578,6 +600,7 @@ export function ExpenseFormDialog({
             {isEdit ? common.saveChanges : copy.addExpense}
           </Button>
         </DialogFooter>
+        </>}
       </DialogContent>
     </Dialog>
   );

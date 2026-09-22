@@ -1,5 +1,6 @@
 import { recurringSeriesExpenseIds } from "../recurring-expenses";
 import "server-only";
+import { assertFuelExpenseSource } from "../fuel-expenses";
 
 import type { Prisma } from "@/generated/prisma";
 
@@ -1130,6 +1131,7 @@ export class PrismaRepository implements Repository {
           date: isoDate(row.date),
           gallons: num(row.gallons),
           pricePerGallon: num(row.pricePerGallon),
+          station: row.station,
           totalCost: num(row.totalCost),
           odometer: row.odometer,
           location: row.location,
@@ -2226,6 +2228,7 @@ export class PrismaRepository implements Repository {
       date: toDate(input.date),
       gallons: input.gallons,
       pricePerGallon: input.pricePerGallon,
+      station: input.station?.trim() || null,
       totalCost: roundMoney(input.totalCost),
       odometer: input.odometer ?? null,
       location: input.location?.trim() || null,
@@ -2245,26 +2248,29 @@ export class PrismaRepository implements Repository {
     };
 
     const row = await client.$transaction(async (tx) => {
+      if (input.sourceExpenseId) {
+        const source = await tx.expense.findFirst({ where: { id: input.sourceExpenseId, businessId: business.id } });
+        const [fuelLink, serviceLink, driverLink] = await Promise.all([
+          tx.fuelEntry.findFirst({ where: { expenseId: input.sourceExpenseId } }),
+          tx.maintenanceRecord.findFirst({ where: { expenseId: input.sourceExpenseId } }),
+          tx.driverSettlementLine.findFirst({ where: { expenseId: input.sourceExpenseId } }),
+        ]);
+        assertFuelExpenseSource(source, Boolean(fuelLink || serviceLink || driverLink));
+      }
       const created = await tx.fuelEntry.create({
         data: { ...data, businessId: business.id, truckId },
       });
-      // Mirror the purchase into the expense ledger so operating expenses
-      // stay complete without the user entering fuel twice. The id is
-      // derived from the entry so update and delete can find it again --
-      // matching the JSON store exactly.
-      const mirror = await tx.expense.create({
-        data: {
-          businessId: business.id,
-          truckId,
-          loadId: data.loadId,
-          date: data.date,
-          category: "FUEL",
-          description: fuelDescription(input.gallons, input.pricePerGallon),
-          vendor: data.location,
-          amount: data.totalCost,
-          recurring: false,
-        },
-      });
+      // Reuse the original ledger row when completing an amount-only expense.
+      // Its identity, receipt reference and attached documents stay intact.
+      const mirrorData = {
+        truckId, scope: "TRUCK" as const, loadId: data.loadId, date: data.date,
+        category: "FUEL" as const, financialTreatment: "OPERATING" as const,
+        description: fuelDescription(input.gallons, input.pricePerGallon),
+        vendor: data.station || data.location, amount: data.totalCost, recurring: false,
+      };
+      const mirror = input.sourceExpenseId
+        ? await tx.expense.update({ where: { id: input.sourceExpenseId, businessId: business.id }, data: mirrorData })
+        : await tx.expense.create({ data: { ...mirrorData, businessId: business.id } });
       await tx.fuelEntry.update({ where: { id: created.id }, data: { expenseId: mirror.id } });
       if (data.loadId) {
         const load = await tx.load.findFirst({
@@ -2309,7 +2315,7 @@ export class PrismaRepository implements Repository {
         date: data.date,
         truckId,
         description: fuelDescription(input.gallons, input.pricePerGallon),
-        vendor: data.location,
+        vendor: data.station || data.location,
         amount: data.totalCost,
       };
 
