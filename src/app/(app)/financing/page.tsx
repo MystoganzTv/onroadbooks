@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { BadgeDollarSign, Building2, CalendarDays, Truck as TruckIcon } from "lucide-react";
 
 import { DeleteFinancialObligationButton } from "@/components/financing/delete-financial-obligation-button";
+import { UnlinkedLoanPayments } from "@/components/financing/unlinked-loan-payments";
 import {
   EditFinancialObligationButton,
   FinancialObligationDialog,
@@ -41,8 +42,10 @@ export default async function FinancingPage() {
     0,
   );
   const linkedExpenses = expenses.filter((expense) => expense.obligationId);
+  const unlinkedLoanPayments = expenses.filter((expense) => expense.category === "TRUCK_PAYMENT" && !expense.obligationId && !expense.splitGroupId);
   const paymentKeys = new Set(
-    linkedExpenses.map((expense) => expense.splitGroupId ?? expense.id),
+    expenses.filter((expense) => expense.obligationId || ["TRUCK_PAYMENT", "PRINCIPAL_PAYMENT", "INTEREST_EXPENSE", "OPERATING_LEASE"].includes(expense.category))
+      .map((expense) => expense.splitGroupId ?? expense.id),
   );
   const ordered = financialObligations.toSorted((left, right) => {
     if (left.active !== right.active) return left.active ? -1 : 1;
@@ -70,6 +73,8 @@ export default async function FinancingPage() {
         <MiniStat label={copy.monthlyCommitment} value={formatMoneyCompact(monthlyCommitment)} tone="neutral" />
         {!simple ? <MiniStat label={copy.recordedPayments} value={String(paymentKeys.size)} /> : null}
       </section>
+
+      <UnlinkedLoanPayments payments={unlinkedLoanPayments} obligations={financialObligations} trucks={trucks} canManage={roleCan(session.role ?? "VIEWER", "manage_expenses")} />
 
       <Card>
         <CardHeader>

@@ -18,6 +18,7 @@ function revalidateAll() {
   revalidatePath("/reports");
   revalidatePath("/truck");
   revalidatePath("/fuel");
+  revalidatePath("/financing");
 }
 
 export async function updateLoadExpenseAction(id: string, amount: unknown): Promise<ActionResult> {

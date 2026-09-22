@@ -1548,6 +1548,24 @@ describe("financial review and customer cash events", () => {
     assert.equal((await repo.getDataset()).expenses.some((row) => row.splitGroupId === updated.splitGroupId), false);
   });
 
+  it("links an existing unsplit payment to a loan without duplicating cash or assuming principal", async () => {
+    const truckId = (await repo.getDataset()).trucks[0].id;
+    const obligation = await repo.createFinancialObligation({ truckId, name: "AMEX", kind: "LOAN", startingBalance: 15000, startedOn: "2026-09-15", active: true });
+    const payment = await repo.createExpense(expense({ truckId, category: "TRUCK_PAYMENT", date: "2026-09-01", amount: 512.59, vendor: "AMEX" }));
+    const before = await repo.getDataset();
+    const [linked] = await repo.classifyDebtPayment(payment.id, { treatment: "DEBT_UNALLOCATED", obligationId: obligation.id });
+    assert.equal(linked.id, payment.id);
+    assert.equal(linked.amount, 512.59);
+    assert.equal(linked.obligationId, obligation.id);
+    assert.equal(linked.financialTreatment, "DEBT_UNALLOCATED");
+    const after = await repo.getDataset();
+    assert.equal(after.expenses.length, before.expenses.length);
+    assert.equal(after.expenses.filter((row) => row.obligationId === obligation.id).length, 1);
+    assert.equal(after.expenses.filter((row) => row.obligationId === obligation.id && row.financialTreatment === "PRINCIPAL").length, 0);
+    await repo.deleteExpense(payment.id);
+    await repo.deleteFinancialObligation(obligation.id);
+  });
+
   it("splits a reviewed loan payment without changing its total", async () => {
     const dataset = await repo.getDataset();
     const original = await repo.createExpense(expense({

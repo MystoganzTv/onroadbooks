@@ -749,3 +749,46 @@ test("Expenses and Fuel share one purchase and completing legacy details never d
     await client.end();
   }
 });
+
+test("Financing links an existing loan payment without a duplicate or an assumed principal reduction", async ({ page }) => {
+  await page.goto("/setup");
+  await page.getByLabel("Your name").fill("Financing Owner");
+  await page.getByLabel("Email").fill("financing-owner@example.test");
+  await page.getByLabel("Password").fill("Database-test-password-2026");
+  await page.getByRole("button", { name: "Create account", exact: true }).click();
+  await page.getByLabel("Business name").fill("Financing Test");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Keep Truck 1 for now" }).click();
+  await page.getByRole("button", { name: "Skip for now" }).click();
+  await page.getByRole("button", { name: /Open the dashboard/ }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  const client = new Client({ connectionString: process.env.NEON_DATABASE_URL });
+  await client.connect();
+  try {
+    const { rows: [owner] } = await client.query('SELECT "businessId" FROM "User" WHERE email=$1', ["financing-owner@example.test"]);
+    const { rows: [truck] } = await client.query('SELECT id FROM "Truck" WHERE "businessId"=$1', [owner.businessId]);
+    await client.query(`INSERT INTO "FinancialObligation" (id,"businessId","truckId",name,kind,"startedOn","startingBalance","expectedMonthlyPayment",active,"updatedAt") VALUES ('amex-browser',$1,$2,'AMEX','LOAN','2026-09-15',15000,512.59,true,NOW())`, [owner.businessId, truck.id]);
+    await client.query(`INSERT INTO "Expense" (id,"businessId","truckId",scope,date,category,description,vendor,amount,"financialTreatment",recurring,"updatedAt") VALUES ('loan-payment-browser',$1,$2,'TRUCK','2026-09-01','TRUCK_PAYMENT','Casper - Payment','AMEX',512.59,'DEBT_UNALLOCATED',false,NOW())`, [owner.businessId, truck.id]);
+    await page.goto("/financing");
+    await expect(page.getByText("Loan payments awaiting a financing link")).toBeVisible();
+    const loan = page.locator("article").filter({ hasText: "AMEX" });
+    await expect(loan.getByText("0 recorded payments", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Link payment", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Link payment" });
+    await expect(dialog.getByRole("button", { name: "Link payment", exact: true })).toBeDisabled();
+    await dialog.getByRole("combobox").click();
+    await page.getByRole("option", { name: "AMEX", exact: true }).click();
+    await expect(dialog.getByText(/dated before the loan/)).toBeVisible();
+    await dialog.getByRole("button", { name: "Link payment", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByText("Loan payments awaiting a financing link")).toHaveCount(0);
+    await expect(loan.getByText("1 recorded payment", { exact: true })).toBeVisible();
+    await expect(loan.getByText("$512.59 recorded to date", { exact: true })).toBeVisible();
+    const { rows } = await client.query('SELECT id,amount::text,"obligationId","financialTreatment" FROM "Expense" WHERE "businessId"=$1', [owner.businessId]);
+    expect(rows).toEqual([{ id: "loan-payment-browser", amount: "512.59", obligationId: "amex-browser", financialTreatment: "DEBT_UNALLOCATED" }]);
+    await expect(loan.getByText("$15,000.00", { exact: true })).toBeVisible();
+    await page.screenshot({ path: "/tmp/onroad-financing-linked-payment.png", fullPage: true });
+  } finally {
+    await client.end();
+  }
+});
