@@ -97,6 +97,7 @@ enum MaintenanceType {
   REGISTRATION
   INSURANCE
   OTHER
+  CHASSIS_LUBE
 }
 
 /// What the next service is measured against.

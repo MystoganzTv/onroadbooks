@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ExpenseFrequencyField } from "./expense-frequency-field";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -341,19 +342,7 @@ export function DebtClassificationDialog({
                     placeholder={copy.optional}
                   />
                 </Field>
-                <div className="flex items-center justify-between rounded-md border border-border bg-card px-3 py-2">
-                  <div>
-                    <Label htmlFor={`payment-recurring-${expense.id}`} className="normal-case tracking-normal text-foreground">
-                      {copy.recurringExpense}
-                    </Label>
-                    <p className="mt-0.5 text-2xs text-muted-foreground">{copy.recurringDescription}</p>
-                  </div>
-                  <Switch
-                    id={`payment-recurring-${expense.id}`}
-                    checked={recurring}
-                    onCheckedChange={setRecurring}
-                  />
-                </div>
+                <ExpenseFrequencyField recurring={recurring} onChange={setRecurring} />
               </div>
             ) : null}
 

@@ -364,6 +364,7 @@ export interface Document {
 /* ---- Maintenance ----------------------------------------------------- */
 
 export type MaintenanceType =
+  | "CHASSIS_LUBE"
   | "OIL_CHANGE"
   | "OIL_FILTER"
   | "FUEL_FILTER"

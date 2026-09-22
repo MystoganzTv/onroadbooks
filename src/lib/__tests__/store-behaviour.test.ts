@@ -341,6 +341,18 @@ describe("fuel <-> expense mirror", () => {
 });
 
 describe("maintenance <-> expense mirror", () => {
+  it("stores chassis lubrication and keeps its expense linked when edited", async () => {
+    const record = await repo.createMaintenance(service({ type: "CHASSIS_LUBE", cost: 45 }));
+    let dataset = await repo.getDataset();
+    assert.equal(dataset.maintenanceRecords.find((row) => row.id === record.id)?.type, "CHASSIS_LUBE");
+    assert.equal(dataset.expenses.find((row) => row.id === record.expenseId)?.amount, 45);
+    const updated = await repo.updateMaintenance(record.id, service({ type: "CHASSIS_LUBE", cost: 55 }));
+    assert.equal(updated.expenseId, record.expenseId);
+    dataset = await repo.getDataset();
+    assert.equal(dataset.expenses.find((row) => row.id === record.expenseId)?.amount, 55);
+    await repo.deleteMaintenance(record.id);
+  });
+
   it("books the cost once and withdraws it when the toggle is turned off", async () => {
     const record = await repo.createMaintenance(service({ cost: 320 }));
     assert.ok(record.expenseId, "recordAsExpense must produce a ledger row");

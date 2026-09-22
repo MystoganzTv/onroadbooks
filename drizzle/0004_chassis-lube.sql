@@ -1,0 +1,1 @@
+ALTER TYPE "public"."MaintenanceType" ADD VALUE 'CHASSIS_LUBE';

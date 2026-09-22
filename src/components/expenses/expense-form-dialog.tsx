@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { localizedClientError } from "@/lib/i18n/errors";
 import { useLanguage } from "@/components/shell/language-provider";
 
+import { ExpenseFrequencyField } from "./expense-frequency-field";
 import { FuelFormDialog } from "@/components/fuel/fuel-form-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -403,22 +404,10 @@ export function ExpenseFormDialog({
               </Field>
             </div>
 
-            <div className="flex items-center justify-between rounded-md border border-border bg-surface-sunken px-3 py-2">
-              <div>
-                <Label htmlFor="expense-recurring" className="normal-case tracking-normal text-foreground">
-                  {copy.recurringExpense}
-                </Label>
-                <p id="expense-recurring-hint" className="mt-0.5 max-w-md text-2xs text-muted-foreground">
-                  {copy.recurringDescription}
-                </p>
-              </div>
-              <Switch
-                id="expense-recurring"
-                aria-describedby="expense-recurring-hint"
-                checked={values.recurring}
-                onCheckedChange={(checked) => set("recurring", checked)}
-              />
-            </div>
+            <ExpenseFrequencyField
+              recurring={values.recurring}
+              onChange={(recurring) => set("recurring", recurring)}
+            />
 
 
             {showCharge ? (

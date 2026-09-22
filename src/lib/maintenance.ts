@@ -33,6 +33,7 @@ export interface MaintenanceTypeDefinition {
 
 export const MAINTENANCE_TYPES: MaintenanceTypeDefinition[] = [
   { id: "OIL_CHANGE", label: "Oil Change", labelEs: "Cambio de aceite", defaultBasis: "BOTH", intervalMiles: 15000, intervalMonths: 6 },
+  { id: "CHASSIS_LUBE", label: "Chassis Lubrication (Grease)", labelEs: "Engrasar el camión", defaultBasis: "MILEAGE", intervalMiles: null, intervalMonths: null },
   { id: "OIL_FILTER", label: "Oil Filter", labelEs: "Filtro de aceite", defaultBasis: "MILEAGE", intervalMiles: 15000, intervalMonths: 6 },
   { id: "FUEL_FILTER", label: "Fuel Filter", labelEs: "Filtro de combustible", defaultBasis: "MILEAGE", intervalMiles: 30000, intervalMonths: 12 },
   { id: "TIRES", label: "Tires", labelEs: "Neumáticos", defaultBasis: "MILEAGE", intervalMiles: 60000, intervalMonths: null },
