@@ -86,6 +86,13 @@ export function MaintenanceTable({
 
   return (
     <div className="rounded-lg border border-border bg-card">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <h2 className="flex items-center gap-2 text-sm font-semibold">
+          <Wrench className="size-3.5 text-muted-foreground" aria-hidden />
+          {dictionary.dashboard.serviceLog}
+        </h2>
+        <MaintenanceFormDialog currentOdometer={currentOdometer} truckId={truckId} />
+      </div>
       <TableWrapper>
         <Table>
           <TableHeader>
