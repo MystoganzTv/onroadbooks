@@ -43,6 +43,13 @@
       "when": 1790046686219,
       "tag": "0005_expense-behavior",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790073475580,
+      "tag": "0006_software-category",
+      "breakpoints": true
     }
   ]
 }

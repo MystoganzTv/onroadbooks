@@ -811,14 +811,22 @@ test("Expense classification is editable independently of its monthly frequency"
   await dialog.locator("#expense-date").fill("2026-09-03");
   await dialog.locator("#expense-amount").fill("2305.62");
   await dialog.locator("#expense-category").click();
-  await page.getByRole("option", { name: "Insurance", exact: true }).click();
-  await dialog.locator("#expense-description").fill("Insurance downpayment");
+  await expect(page.getByRole("option", { name: "Loan Principal Payment", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("option", { name: "Loan Interest Payment", exact: true })).toHaveCount(0);
+  await page.getByRole("option", { name: "Loan / truck payment", exact: true }).click();
+  await expect(dialog.getByRole("switch", { name: "Separate principal and interest (optional)" })).not.toBeChecked();
+  await dialog.getByRole("switch", { name: "Separate principal and interest (optional)" }).check();
+  await expect(dialog.getByLabel("Loan principal", { exact: true })).toBeVisible();
+  await expect(dialog.getByLabel("Loan interest", { exact: true })).toBeVisible();
+  await dialog.locator("#expense-category").click();
+  await page.getByRole("option", { name: "Software", exact: true }).click();
+  await dialog.locator("#expense-description").fill("Accounting software");
   await dialog.getByRole("combobox", { name: "Cost classification" }).click();
   await page.getByRole("option", { name: "Variable", exact: true }).click();
   await expect(dialog.getByRole("group", { name: "How often?", exact: true })).toHaveCount(0);
   await dialog.getByRole("button", { name: "Add expense", exact: true }).click();
   await expect(dialog).toBeHidden();
-  const row = page.getByRole("row").filter({ hasText: "Insurance downpayment" });
+  const row = page.getByRole("row").filter({ hasText: "Accounting software" });
   await row.getByRole("button", { name: "Edit expense", exact: true }).click();
   const edit = page.getByRole("dialog", { name: "Edit expense" });
   await expect(edit.getByRole("combobox", { name: "Cost classification" })).toHaveText("Variable");
@@ -830,8 +838,8 @@ test("Expense classification is editable independently of its monthly frequency"
   const client = new Client({ connectionString: process.env.NEON_DATABASE_URL });
   await client.connect();
   try {
-    const { rows } = await client.query('SELECT e.amount::text,e.behavior,e.recurring FROM "Expense" e JOIN "User" u ON u."businessId"=e."businessId" WHERE u.email=$1', ["classification-owner@example.test"]);
-    expect(rows).toEqual([{ amount: "2305.62", behavior: "FIXED", recurring: false }]);
+    const { rows } = await client.query('SELECT e.amount::text,e.category,e.behavior,e.recurring FROM "Expense" e JOIN "User" u ON u."businessId"=e."businessId" WHERE u.email=$1', ["classification-owner@example.test"]);
+    expect(rows).toEqual([{ amount: "2305.62", category: "SOFTWARE", behavior: "FIXED", recurring: false }]);
   } finally {
     await client.end();
   }

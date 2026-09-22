@@ -326,7 +326,12 @@ export function ExpenseFormDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {EXPENSE_CATEGORIES.map((category) => (
+                  {EXPENSE_CATEGORIES.filter((category) =>
+                    // New payments use one category and the optional split below.
+                    // Keep a legacy standalone entry editable without reclassifying it.
+                    !["PRINCIPAL_PAYMENT", "INTEREST_EXPENSE"].includes(category.id)
+                    || expense?.category === category.id,
+                  ).map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       {categoryLabel(category.id, locale)}
                     </SelectItem>

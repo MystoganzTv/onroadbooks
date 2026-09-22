@@ -1816,8 +1816,10 @@ describe("financial review and customer cash events", () => {
 describe("expense financial treatment", () => {
   it("persists per-expense classification independently of recurrence and preserves it on older-client edits", async () => {
     const truckId = (await repo.getDataset()).trucks[0].id;
-    const input = expense({ truckId, category: "INSURANCE", behavior: "VARIABLE", recurring: false });
+    const input = expense({ truckId, category: "SOFTWARE", behavior: "VARIABLE", recurring: false });
     const created = await repo.createExpense(input);
+    assert.equal(created.category, "SOFTWARE");
+    assert.equal(created.financialTreatment, "OPERATING");
     assert.equal(created.behavior, "VARIABLE");
     const { behavior: _behavior, ...legacyInput } = input;
     const edited = await repo.updateExpense(created.id, { ...legacyInput, amount: 150 });

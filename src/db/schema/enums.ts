@@ -20,5 +20,5 @@ export const driverSettlementStatus = pgEnum("DriverSettlementStatus", ["DRAFT",
 export const driverSettlementAdjustmentType = pgEnum("DriverSettlementAdjustmentType", ["ACCESSORIAL_PAY","REIMBURSEMENT","DEDUCTION","ADVANCE","OTHER_EARNING"]);
 export const planId = pgEnum("PlanId", ["INDIVIDUAL","FLEET","SOLO","OWNER"]);
 export const subscriptionStatus = pgEnum("SubscriptionStatus", ["TRIALING","ACTIVE","PAST_DUE","CANCELED"]);
-export const expenseCategory = pgEnum("ExpenseCategory", ["FUEL","TOLLS","INSURANCE","TRUCK_PAYMENT","MAINTENANCE","REPAIRS","PARKING","DISPATCH","FACTORING","ELD","PERMITS","REGISTRATION","OFFICE","PHONE","ACCOUNTING","OTHER","DRIVER_PAY","INTEREST_EXPENSE","PRINCIPAL_PAYMENT","OPERATING_LEASE"]);
+export const expenseCategory = pgEnum("ExpenseCategory", ["FUEL","TOLLS","INSURANCE","TRUCK_PAYMENT","MAINTENANCE","REPAIRS","PARKING","DISPATCH","FACTORING","ELD","PERMITS","REGISTRATION","OFFICE","PHONE","ACCOUNTING","OTHER","DRIVER_PAY","INTEREST_EXPENSE","PRINCIPAL_PAYMENT","OPERATING_LEASE","SOFTWARE"]);
 export const memberRole = pgEnum("MemberRole", ["OWNER","ADMIN","BOOKKEEPER","DISPATCHER","VIEWER"]);

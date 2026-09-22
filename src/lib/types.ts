@@ -15,6 +15,7 @@ export type ExpenseBehavior = "FIXED" | "VARIABLE";
 export type MemberRole = "OWNER" | "ADMIN" | "BOOKKEEPER" | "DISPATCHER" | "VIEWER";
 
 export type ExpenseCategoryId =
+  | "SOFTWARE"
   | "FUEL"
   | "TOLLS"
   | "INSURANCE"

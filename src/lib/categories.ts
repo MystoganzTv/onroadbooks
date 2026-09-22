@@ -51,6 +51,7 @@ export const EXPENSE_CATEGORIES: CategoryDefinition[] = [
   { id: "ELD", label: "ELD", labelEs: "ELD", defaultBehavior: "FIXED", color: "#0ea5e9" },
   { id: "PERMITS", label: "Permits", labelEs: "Permisos", defaultBehavior: "FIXED", color: "#22c55e" },
   { id: "REGISTRATION", label: "Registration", labelEs: "Registro", defaultBehavior: "FIXED", color: "#84cc16" },
+  { id: "SOFTWARE", label: "Software", labelEs: "Software", defaultBehavior: "FIXED", color: "#d946ef" },
   { id: "OFFICE", label: "Office", labelEs: "Oficina", defaultBehavior: "FIXED", color: "#a855f7" },
   { id: "PHONE", label: "Phone", labelEs: "Teléfono", defaultBehavior: "FIXED", color: "#06b6d4" },
   { id: "ACCOUNTING", label: "Accounting", labelEs: "Contabilidad", defaultBehavior: "FIXED", color: "#64748b" },
