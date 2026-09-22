@@ -40,16 +40,25 @@ export function MoneyFlow({
       : 0,
   });
   const revenue = ownerPay.bookedRevenue;
+  // Use one scale for the whole card, including periods with costs but no loads.
+  const scale = Math.max(
+    Math.abs(revenue),
+    Math.abs(ownerPay.collectedRevenue),
+    Math.abs(ownerPay.operatingExpenses) + Math.abs(ownerPay.debtService),
+    Math.abs(ownerPay.operatingProfit),
+  );
   const width = (value: number) =>
-    revenue > 0 ? `${Math.max(1.5, Math.min(100, (Math.abs(value) / revenue) * 100))}%` : "1.5%";
+    scale > 0 ? `${Math.min(100, (Math.abs(value) / scale) * 100)}%` : "0%";
 
   const operatingCategories = categories.filter((category) =>
     isOperatingExpenseCategory(category.category),
   );
-  const shown = operatingCategories.slice(0, maxRows);
+  const shown = operatingCategories.slice(0, maxRows).map((row) => ({
+    ...row, key: row.category, label: categoryLabel(row.category, locale),
+  }));
   const restTotal = operatingCategories.slice(maxRows).reduce((total, row) => total + row.amount, 0);
   const rows = restTotal > 0
-    ? [...shown, { category: "OTHER" as const, label: copy.everythingElse, amount: restTotal, share: 0, behavior: "VARIABLE" as const, count: 0 }]
+    ? [...shown, { key: "remaining-categories", category: "OTHER" as const, label: copy.everythingElse, amount: restTotal }]
     : shown;
   const available = presentation.availableToYou.state === "KNOWN"
     ? presentation.availableToYou.amount
@@ -59,7 +68,7 @@ export function MoneyFlow({
     : null;
 
 
-  if (revenue <= 0 && ownerPay.operatingExpenses <= 0) {
+  if (revenue <= 0 && ownerPay.operatingExpenses <= 0 && ownerPay.debtService <= 0 && ownerPay.collectedRevenue <= 0) {
     return (
       <div className={cn("rounded-lg border border-dashed border-border bg-card p-8 text-center", className)}>
         <p className="text-sm text-muted-foreground">{interpolate(copy.noMoneyActivity, { period: periodLabel })}</p>
@@ -98,8 +107,8 @@ export function MoneyFlow({
             ) : (
               <ul className="space-y-1.5">
                 {rows.map((row) => (
-                  <li key={row.category + row.label} className="grid grid-cols-[7.5rem_1fr_auto] items-center gap-2.5">
-                    <span className="truncate text-xs text-muted-foreground">{row.category === "OTHER" && restTotal > 0 ? copy.everythingElse : categoryLabel(row.category, locale)}</span>
+                  <li key={row.key} className="grid grid-cols-[7.5rem_1fr_auto] items-center gap-2.5">
+                    <span className="truncate text-xs text-muted-foreground">{row.label}</span>
                     <span className="h-2 overflow-hidden rounded-full bg-surface-sunken">
                       <span
                         className="block h-full rounded-full"

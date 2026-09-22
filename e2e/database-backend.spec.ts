@@ -844,3 +844,49 @@ test("Expense classification is editable independently of its monthly frequency"
     await client.end();
   }
 });
+
+test("Money flow bars stay proportional before the first load and distinguish Other from remaining categories", async ({ page }) => {
+  await page.goto("/setup");
+  await page.getByLabel("Your name").fill("Money Flow Owner");
+  await page.getByLabel("Email").fill("money-flow-owner@example.test");
+  await page.getByLabel("Password").fill("Database-test-password-2026");
+  await page.getByRole("button", { name: "Create account", exact: true }).click();
+  await page.getByLabel("Business name").fill("Money Flow Test");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Keep Truck 1 for now" }).click();
+  await page.getByRole("button", { name: "Skip for now" }).click();
+  await page.getByRole("button", { name: /Open the dashboard/ }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  const client = new Client({ connectionString: process.env.NEON_DATABASE_URL });
+  await client.connect();
+  try {
+    const { rows: [owner] } = await client.query('SELECT "businessId" FROM "User" WHERE email=$1', ["money-flow-owner@example.test"]);
+    const { rows: [truck] } = await client.query('SELECT id FROM "Truck" WHERE "businessId"=$1', [owner.businessId]);
+    const expenses = [
+      ["INSURANCE", 3051.39], ["FUEL", 1504.38], ["OTHER", 623.45], ["MAINTENANCE", 550],
+      ["REGISTRATION", 519], ["PARKING", 200], ["SOFTWARE", 114.99], ["TRUCK_PAYMENT", 512.59],
+    ] as const;
+    for (const [category, amount] of expenses) {
+      await client.query('INSERT INTO "Expense" (id,"businessId","truckId",scope,date,category,description,amount,recurring,"updatedAt") VALUES ($1,$2,$3,\'TRUCK\',\'2026-09-03\',$4,$6,$5,false,NOW())', [`flow-${category}`, owner.businessId, truck.id, category, amount, category]);
+    }
+    await page.setViewportSize({ width: 1440, height: 1100 });
+    await page.goto("/dashboard?month=2026-09&period=month");
+    await page.getByRole("button", { name: "Detailed", exact: true }).click();
+    const flow = page.getByRole("region", { name: "Where the money went", exact: true }).locator("section");
+    await expect(flow).toBeVisible();
+    await expect(flow.getByText("Other", { exact: true })).toHaveCount(1);
+    await expect(flow.getByText("Everything else", { exact: true })).toHaveCount(1);
+    const insurance = flow.locator("li").filter({ has: page.getByText("Insurance", { exact: true }) });
+    const width = await insurance.locator("span[style]").evaluate((element) => parseFloat((element as HTMLElement).style.width));
+    expect(width).toBeCloseTo(3051.39 / 7075.8 * 100, 2);
+    const earned = flow.locator('div[title="How much did I earn?"] div[style]');
+    await expect(earned).toHaveCSS("width", "0px");
+    const collected = flow.locator('div[title="How much did I collect?"] div[style]');
+    await expect(collected).toHaveCSS("width", "0px");
+    const spent = await flow.locator('div[title="How much did I spend running the business?"] div[style]').evaluate((element) => parseFloat((element as HTMLElement).style.width));
+    expect(spent).toBeCloseTo(6563.21 / 7075.8 * 100, 2);
+    await flow.screenshot({ path: "/tmp/onroad-money-flow-before-first-load.png" });
+  } finally {
+    await client.end();
+  }
+});
