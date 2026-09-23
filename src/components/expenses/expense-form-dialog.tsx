@@ -359,10 +359,8 @@ export function ExpenseFormDialog({
             onClose={() => setOpen(false)}
             extraFields={categoryField}
             sourceExpense={expense}
-            loads={loads}
             trucks={trucks}
             defaultTruckId={values.charge === BUSINESS ? undefined : values.charge || undefined}
-            defaultLoadId={values.loadId === "none" ? undefined : values.loadId}
             defaultDate={values.date}
             defaultTotalCost={values.amount}
             defaultStation={values.vendor}

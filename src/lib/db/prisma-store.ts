@@ -197,7 +197,6 @@ async function syncPrismaLoadExpenses(
   businessId: string,
   load: LoadLedgerSource,
 ): Promise<void> {
-  const detailedFuel = await tx.fuelEntry.count({ where: { loadId: load.id, businessId } });
   const specs = loadExpenseSpecs({
     fuelCost: num(load.fuelCost),
     tolls: num(load.tolls),
@@ -208,7 +207,7 @@ async function syncPrismaLoadExpenses(
 
   for (const spec of specs) {
     const id = loadExpenseId(load.id, spec.key);
-    const shouldPost = load.costsPosted && spec.amount > 0 && !(spec.key === "fuel" && detailedFuel > 0);
+    const shouldPost = load.costsPosted && spec.amount > 0 && spec.key !== "fuel";
 
     if (!shouldPost) {
       await tx.expense.deleteMany({ where: { id, businessId } });
@@ -1290,20 +1289,14 @@ export class PrismaRepository implements Repository {
       }
       if (existing.truckId !== truckId) {
         const generatedIds = LOAD_EXPENSE_KEYS.map((key) => loadExpenseId(id, key));
-        const [linkedExpenses, linkedFuel] = await Promise.all([
-          tx.expense.count({
-            where: {
-              businessId: business.id,
-              loadId: id,
-              id: { notIn: generatedIds },
-              OR: [{ scope: "BUSINESS" }, { truckId: { not: truckId } }],
-            },
-          }),
-          tx.fuelEntry.count({
-            where: { businessId: business.id, loadId: id, truckId: { not: truckId } },
-          }),
-        ]);
-        if (linkedExpenses > 0 || linkedFuel > 0) {
+        const linkedExpenses = await tx.expense.count({ where: {
+          businessId: business.id,
+          loadId: id,
+          category: { not: "FUEL" },
+          id: { notIn: generatedIds },
+          OR: [{ scope: "BUSINESS" }, { truckId: { not: truckId } }],
+        } });
+        if (linkedExpenses > 0) {
           throw new Error(
             "This load has linked costs on another truck. Reassign or unlink them before moving the load.",
           );
@@ -1683,7 +1676,7 @@ export class PrismaRepository implements Repository {
         input.financialTreatment ?? financialTreatmentForCategory(input.category),
       obligationId: input.obligationId,
       splitGroupId: input.splitGroupId,
-      loadId: input.loadId || null,
+      loadId: input.category === "FUEL" ? null : input.loadId || null,
       behavior: input.behavior,
       recurring: input.recurring,
       receiptNumber: input.receiptNumber?.trim() || null,
@@ -1696,7 +1689,7 @@ export class PrismaRepository implements Repository {
     const business = await this.business(client);
     const scope = input.scope ?? "TRUCK";
     const truckId = scope === "BUSINESS" ? null : truckIdFor(business, input.truckId);
-    const loadId = await ownedLoadId(client, business.id, input.loadId, truckId, scope);
+    const loadId = await ownedLoadId(client, business.id, input.category === "FUEL" ? null : input.loadId, truckId, scope);
     const inputs = expensePaymentRows(input, newId("split"));
     const row = await client.$transaction(async (tx) => {
       const rows = [];
@@ -1738,7 +1731,7 @@ export class PrismaRepository implements Repository {
       previous && previous.category === input.category ? previous.financialTreatment : null;
     const scope = input.scope ?? "TRUCK";
     const truckId = scope === "BUSINESS" ? null : truckIdFor(business, input.truckId);
-    const loadId = await ownedLoadId(client, business.id, input.loadId, truckId, scope);
+    const loadId = await ownedLoadId(client, business.id, input.category === "FUEL" ? null : input.loadId, truckId, scope);
     const inputs = expensePaymentRows({ ...input, obligationId: input.obligationId === undefined ? previous?.obligationId : input.obligationId }, newId("split"));
     await client.$transaction(async (tx) => {
       const updated = await tx.expense.updateMany({
@@ -2235,7 +2228,7 @@ export class PrismaRepository implements Repository {
       odometer: input.odometer ?? null,
       location: input.location?.trim() || null,
       jurisdiction: input.jurisdiction?.trim().toUpperCase() || null,
-      loadId: input.loadId || null,
+      loadId: null,
       notes: input.notes?.trim() || null,
     };
   }
@@ -2244,10 +2237,7 @@ export class PrismaRepository implements Repository {
     const client = await getClient();
     const business = await this.business(client);
     const truckId = truckIdFor(business, input.truckId);
-    const data = {
-      ...this.fuelData(input),
-      loadId: await ownedLoadId(client, business.id, input.loadId, truckId),
-    };
+    const data = this.fuelData(input);
 
     const row = await client.$transaction(async (tx) => {
       if (input.sourceExpenseId) {
@@ -2274,12 +2264,7 @@ export class PrismaRepository implements Repository {
         ? await tx.expense.update({ where: { id: input.sourceExpenseId, businessId: business.id }, data: mirrorData })
         : await tx.expense.create({ data: { ...mirrorData, businessId: business.id } });
       await tx.fuelEntry.update({ where: { id: created.id }, data: { expenseId: mirror.id } });
-      if (data.loadId) {
-        const load = await tx.load.findFirst({
-          where: { id: data.loadId, businessId: business.id },
-        });
-        if (load) await syncPrismaLoadExpenses(tx, business.id, load);
-      }
+
       if (data.odometer) {
         await tx.truck.updateMany({
           where: { id: truckId, currentOdometer: { lt: data.odometer } },
@@ -2297,10 +2282,7 @@ export class PrismaRepository implements Repository {
     const client = await getClient();
     const business = await this.business(client);
     const truckId = truckIdFor(business, input.truckId);
-    const data = {
-      ...this.fuelData(input),
-      loadId: await ownedLoadId(client, business.id, input.loadId, truckId),
-    };
+    const data = this.fuelData(input);
 
     await client.$transaction(async (tx) => {
       const existing = await tx.fuelEntry.findFirst({ where: { id, businessId: business.id } });

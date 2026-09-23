@@ -7,9 +7,6 @@ import SwiftUI
 /// receipt wins and the app stops overwriting you. Taxes and rounding mean the
 /// printed total is often not exactly the product.
 ///
-/// The odometer is the field worth nagging about: without two readings on the
-/// same truck there is no MPG at all, so the form says so rather than letting
-/// it look optional-and-unimportant.
 struct AddFuelView: View {
     let repository: LedgerRepository
     let onSaved: () -> Void
@@ -56,7 +53,7 @@ struct AddFuelView: View {
                 Section {
                     OBNumberRow(label: "Odómetro", placeholder: "0", text: $odometerText)
                 } footer: {
-                    Text("Sin dos lecturas del odómetro en el mismo camión no hay MPG que calcular.")
+                    Text("Opcional. Actualiza la lectura del camión.")
                         .foregroundStyle(OBColor.mutedForeground)
                 }
                 .listRowBackground(OBColor.card)

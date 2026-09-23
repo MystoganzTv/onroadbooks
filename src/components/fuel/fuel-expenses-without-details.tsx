@@ -6,12 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrapper } from "@/components/ui/table";
 import { formatMoney } from "@/lib/formatters";
 import { formatLocaleDate } from "@/lib/i18n-format";
-import type { Expense, LoadWithMetrics, Truck } from "@/lib/types";
+import type { Expense, Truck } from "@/lib/types";
 import { FuelFormDialog } from "./fuel-form-dialog";
 
-export function FuelExpensesWithoutDetails({ expenses, loads, trucks }: {
+export function FuelExpensesWithoutDetails({ expenses, trucks }: {
   expenses: Expense[];
-  loads: LoadWithMetrics[];
   trucks: Truck[];
 }) {
   const { dictionary, locale } = useLanguage();
@@ -44,7 +43,7 @@ export function FuelExpensesWithoutDetails({ expenses, loads, trucks }: {
                 </TableCell>
                 <TableCell className="text-right tnum text-neg">-{formatMoney(expense.amount)}</TableCell>
                 <TableCell className="text-right">
-                  <FuelFormDialog sourceExpense={expense} loads={loads} trucks={trucks}
+                  <FuelFormDialog sourceExpense={expense} trucks={trucks}
                     trigger={<Button size="sm" variant="outline">{copy.completeDetails}</Button>} />
                 </TableCell>
               </TableRow>)}

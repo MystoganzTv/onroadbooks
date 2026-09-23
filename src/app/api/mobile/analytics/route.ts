@@ -3,7 +3,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getMobileSession } from "@/lib/auth/mobile";
 import {
   brokerPerformance,
-  linkedFuelByLoad,
   loadsInPeriod,
   thresholdsFromSettings,
   withMetricsAll,
@@ -40,7 +39,6 @@ export async function GET(request: NextRequest) {
   const scored = withMetricsAll(
     loadsInPeriod(dataset.loads, period),
     thresholds,
-    linkedFuelByLoad(dataset.fuelEntries),
   );
 
   // `calculateLanePerformance` defaults to "state"; this route was taking that

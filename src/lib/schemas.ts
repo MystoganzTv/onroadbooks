@@ -291,7 +291,8 @@ export const fuelSchema = z.object({
   location: z.string().trim().max(120).optional().nullable(),
   station: z.string().trim().max(120).optional().nullable(),
   jurisdiction: iftaJurisdiction.optional().nullable(),
-  loadId: z.string().trim().optional().nullable(),
+  // Accept legacy clients without attributing a truck purchase to a load.
+  loadId: z.string().trim().optional().nullable().transform(() => null),
   notes: z.string().trim().max(2000).optional().nullable(),
 });
 

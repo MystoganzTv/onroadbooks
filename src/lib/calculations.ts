@@ -141,43 +141,12 @@ export function rateLoad(
   return "BAD";
 }
 
-/**
- * What each load's own fuel really cost, keyed by load id.
- *
- * A load carries the fuel figure typed on the rate confirmation -- an
- * estimate. The moment a real fill-up is linked to that load the estimate is
- * superseded: `reconcileLoadExpenseLedger` already drops the load's fuel row
- * from the ledger so the diesel is not counted twice. The load's own
- * economics have to follow the same number, or the same trip reports two
- * different profits on the same screen.
- *
- * Only loads that actually have a linked fill-up appear here; everything else
- * keeps using its own estimate.
- */
-export function linkedFuelByLoad(
-  fuelEntries: Pick<FuelEntry, "loadId" | "totalCost">[],
-): Map<string, number> {
-  const totals = new Map<string, number>();
-  for (const entry of fuelEntries) {
-    if (!entry.loadId) continue;
-    totals.set(entry.loadId, num(totals.get(entry.loadId)) + num(entry.totalCost));
-  }
-  for (const [loadId, total] of totals) totals.set(loadId, roundMoney(total));
-  return totals;
-}
-
-/** The fuel figure a load's own profit must be built on. */
-export function effectiveFuelCost(load: Load, linkedFuelCost?: number): number {
-  return linkedFuelCost === undefined ? num(load.fuelCost) : num(linkedFuelCost);
-}
-
 /** Every trip cost on a load, itemised for the waterfall. */
 export function tripExpenseLines(
   load: Load,
-  linkedFuelCost?: number,
 ): { key: string; label: string; amount: number }[] {
   return [
-    { key: "fuel", label: "Fuel", amount: effectiveFuelCost(load, linkedFuelCost) },
+    { key: "fuel", label: "Estimated fuel", amount: num(load.fuelCost) },
     { key: "tolls", label: "Tolls", amount: load.tolls },
     { key: "dispatch", label: "Dispatch", amount: load.dispatchFee },
     { key: "factoring", label: "Factoring", amount: load.factoringFee },
@@ -189,13 +158,12 @@ export function tripExpenseLines(
 export function loadMetrics(
   load: Load,
   thresholds?: RatingThresholds,
-  linkedFuelCost?: number,
 ): LoadMetrics {
   const totalMiles = num(load.loadedMiles) + num(load.deadheadMiles);
   // Summed defensively: a row written by an older build can be missing a fee
   // column, and a raw + would turn the whole waterfall into NaN -> 0.
   const tripExpenses =
-    effectiveFuelCost(load, linkedFuelCost) +
+    num(load.fuelCost) +
     num(load.tolls) +
     num(load.dispatchFee) +
     num(load.factoringFee) +
@@ -220,21 +188,15 @@ export function loadMetrics(
 export function withMetrics(
   load: Load,
   thresholds?: RatingThresholds,
-  linkedFuelCost?: number,
 ): LoadWithMetrics {
-  return { ...load, metrics: loadMetrics(load, thresholds, linkedFuelCost) };
+  return { ...load, metrics: loadMetrics(load, thresholds) };
 }
 
-/**
- * `linkedFuel` comes from `linkedFuelByLoad(dataset.fuelEntries)`. Passing it
- * is what keeps a load's profit on the same diesel the ledger charged it.
- */
 export function withMetricsAll(
   loads: Load[],
   thresholds?: RatingThresholds,
-  linkedFuel?: Map<string, number>,
 ): LoadWithMetrics[] {
-  return loads.map((load) => withMetrics(load, thresholds, linkedFuel?.get(load.id)));
+  return loads.map((load) => withMetrics(load, thresholds));
 }
 
 /* ---- Period filtering ----------------------------------------------- */
@@ -594,7 +556,7 @@ export interface FuelSummary {
   averagePricePerGallon: number;
   fuelCostPerMile: number;
   entryCount: number;
-  /** Odometer-derived MPG. Null until two odometer readings exist. */
+  /** Unavailable without measured consumption; retained for API compatibility. */
   milesPerGallon: number | null;
   odometerMiles: number | null;
 }
@@ -603,42 +565,8 @@ export function summarizeFuel(entries: FuelEntry[], totalMiles: number): FuelSum
   const totalGallons = sum(entries, (f) => f.gallons);
   const totalCost = roundMoney(sum(entries, (f) => f.totalCost));
 
-  // MPG architecture: consecutive odometer readings bound the distance
-  // covered by the gallons purchased between them. An odometer is a fact
-  // about ONE vehicle, so entries are grouped by truck first -- subtracting
-  // one truck's reading from another's produced triple-digit "MPG" on any
-  // fleet view. The combined figure is total span miles over total gallons
-  // burned across each truck's own span.
-  const byTruck = new Map<string, FuelEntry[]>();
-  for (const entry of entries) {
-    if (typeof entry.odometer !== "number" || entry.odometer <= 0) continue;
-    const key = entry.truckId ?? "";
-    const group = byTruck.get(key);
-    if (group) group.push(entry);
-    else byTruck.set(key, [entry]);
-  }
-
-  let milesPerGallon: number | null = null;
-  let odometerMiles: number | null = null;
-  let spanMiles = 0;
-  let spanGallons = 0;
-  let spans = 0;
-
-  for (const group of byTruck.values()) {
-    if (group.length < 2) continue;
-    const ordered = [...group].sort((a, b) => a.odometer! - b.odometer!);
-    spanMiles += ordered[ordered.length - 1].odometer! - ordered[0].odometer!;
-    // Gallons that fuelled each span exclude that truck's first fill-up.
-    spanGallons += sum(ordered.slice(1), (f) => f.gallons);
-    spans += 1;
-  }
-
-  if (spans > 0 && spanMiles > 0) {
-    odometerMiles = spanMiles;
-    const mpg = div(spanMiles, spanGallons);
-    milesPerGallon = mpg > 0 ? mpg : null;
-  }
-
+  // Purchases and odometer readings do not establish fuel consumed.
+  // Keep nullable fields for older API clients, without inventing an MPG.
   return {
     // Kept at full precision: rounding here made the printed total disagree
     // with the sum of the printed rows.
@@ -647,8 +575,8 @@ export function summarizeFuel(entries: FuelEntry[], totalMiles: number): FuelSum
     averagePricePerGallon: div(totalCost, totalGallons),
     fuelCostPerMile: div(totalCost, totalMiles),
     entryCount: entries.length,
-    milesPerGallon,
-    odometerMiles,
+    milesPerGallon: null,
+    odometerMiles: null,
   };
 }
 
@@ -811,14 +739,6 @@ export function buildInsights(
       id: "outstanding",
       tone: "warning",
       text: `${formatUsd(current.outstandingRevenue)} of revenue is still pending or invoiced and has not been collected.`,
-    });
-  }
-
-  if (fuel.milesPerGallon) {
-    insights.push({
-      id: "mpg",
-      tone: "neutral",
-      text: `Odometer readings put the truck at ${fuel.milesPerGallon.toFixed(1)} MPG across ${Math.round(fuel.odometerMiles ?? 0).toLocaleString()} tracked miles.`,
     });
   }
 

@@ -4,8 +4,8 @@ import UIKit
 /// "What rate should I ask? Is this load worth it?" — the two questions the web
 /// app's Load Calculator answers.
 ///
-/// Every cost assumption comes from THIS truck's ledger, fetched on open: its
-/// own MPG, the price it last paid for diesel, the dispatch and factoring
+/// The user supplies a reference MPG. Ledger defaults include the price
+/// last paid for diesel, the dispatch and factoring
 /// percentages it actually pays, and its overhead per mile. It used to ship
 /// hardcoded guesses — 6.5 MPG, $3.85 diesel, $0.85/mi — which produced a
 /// confident verdict about somebody else's truck, at the exact moment a broker
@@ -336,11 +336,11 @@ struct LoadCalculatorView: View {
         }
     }
 
-    /// Fuel cannot be estimated without an MPG the odometer proved.
+    /// Fuel estimates need a reference MPG supplied by the user.
     @ViewBuilder
     private var mpgNote: some View {
         if defaults?.mpg == nil && mpg <= 0 {
-            Text("Hacen falta dos lecturas de odómetro en el mismo camión para saber tu MPG. Escríbelo a mano para calcular.")
+            Text("Ingresa un MPG de referencia para estimar el combustible del viaje.")
                 .font(.caption2)
                 .foregroundStyle(OBColor.warn)
         }
@@ -377,7 +377,7 @@ struct LoadCalculatorView: View {
                 OBNumberRow(label: "Deadhead miles", suffix: "mi", text: $deadheadMilesText)
                 OBNumberRow(label: "Fuel price", prefix: "$", suffix: "/gal", placeholder: "3.85", text: $fuelPriceText)
                 VStack(alignment: .leading, spacing: 4) {
-                    OBNumberRow(label: "MPG", suffix: "mi/gal", placeholder: "8.5", text: $mpgText)
+                    OBNumberRow(label: "MPG de referencia", suffix: "mi/gal", placeholder: "8.5", text: $mpgText)
                     mpgNote
                 }
                 OBNumberRow(label: "Tolls", prefix: "$", text: $tollsText)

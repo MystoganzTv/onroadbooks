@@ -83,22 +83,6 @@ struct TruckView: View {
 
                 HStack(spacing: OBSpacing.sm) {
                     rateTile("Ingreso / mi", truck.revenuePerMile, color: OBColor.foreground)
-                    VStack(alignment: .leading, spacing: 6) {
-                        LabelXS("MPG")
-                        Text(truck.milesPerGallon
-                             .map { $0.formatted(.number.precision(.fractionLength(1))) } ?? "—")
-                            .font(.title2.weight(.semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(OBColor.foreground)
-                        Text(truck.milesPerGallon == nil
-                             ? "hacen falta dos odómetros"
-                             : "\(truck.fuelCostPerMile.formatted(.currency(code: "USD").precision(.fractionLength(2)))) de diésel / mi")
-                            .font(.caption)
-                            .foregroundStyle(OBColor.mutedForeground)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(OBSpacing.md)
-                    .obPanel()
                 }
                 .padding(.horizontal, OBSpacing.md)
 

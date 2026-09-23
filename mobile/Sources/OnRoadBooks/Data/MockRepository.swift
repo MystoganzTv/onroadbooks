@@ -195,7 +195,7 @@ final class MockRepository: LedgerRepository {
             loadCount: 5,
             collectedRevenue: 7395.00, accountsReceivable: 2400.00,
             debtService: 513.00, cashAfterDebtService: 738.10,
-            milesPerGallon: 7.0,
+            milesPerGallon: nil,
             fuelCostPerMile: 0.40,
             due: [
                 MaintenanceDueItem(id: "OIL_CHANGE", label: "Oil change", status: .dueSoon,
@@ -618,13 +618,6 @@ final class MockRepository: LedgerRepository {
     func fetchFuel() async throws -> FuelLedger {
         let gallons = fuel.reduce(0) { $0 + $1.gallons }
         let cost = fuel.reduce(0) { $0 + $1.totalCost }
-        let odometers = fuel.compactMap(\.odometer).sorted()
-        // Same rule as the server: a span needs two readings, and the gallons
-        // that fuelled it exclude the first fill-up.
-        let spanMiles = odometers.count >= 2 ? Double(odometers.last! - odometers.first!) : nil
-        let spanGallons = fuel.sorted { ($0.odometer ?? 0) < ($1.odometer ?? 0) }
-            .dropFirst().reduce(0) { $0 + $1.gallons }
-
         return FuelLedger(
             summary: FuelSummary(
                 totalGallons: gallons,
@@ -632,8 +625,8 @@ final class MockRepository: LedgerRepository {
                 averagePricePerGallon: gallons > 0 ? cost / gallons : 0,
                 fuelCostPerMile: cost / 3339,      // the demo month's total miles
                 entryCount: fuel.count,
-                milesPerGallon: (spanMiles ?? 0) > 0 && spanGallons > 0 ? spanMiles! / spanGallons : nil,
-                odometerMiles: spanMiles
+                milesPerGallon: nil,
+                odometerMiles: nil
             ),
             entries: fuel
         )

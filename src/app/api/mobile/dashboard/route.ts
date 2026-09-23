@@ -5,7 +5,6 @@ import { getRepository } from "@/lib/db";
 import {
   categoryTotals,
   expensesInPeriod,
-  linkedFuelByLoad,
   loadsInPeriod,
   pctChange,
   roundMoney,
@@ -53,7 +52,7 @@ export async function GET(request: NextRequest) {
   const today = todayISO();
 
   const dataset = await getRepository(session.businessId).getDataset();
-  const { loads, expenses, settings, goals, reserveAccounts, reserveTransactions, fuelEntries, paymentEvents, financialObligations } = dataset;
+  const { loads, expenses, settings, goals, reserveAccounts, reserveTransactions, paymentEvents, financialObligations } = dataset;
 
   // The web dashboard guards owner planning with `cockpit && ownerPlanning`
   // (see the dashboard page). Role alone would hand a Solo account the
@@ -88,7 +87,7 @@ export async function GET(request: NextRequest) {
     : [];
 
   const periodLoads = scoreLoads(
-    withMetricsAll(loadsInPeriod(loads, period), thresholds, linkedFuelByLoad(fuelEntries)),
+    withMetricsAll(loadsInPeriod(loads, period), thresholds),
     thresholds,
     settings.deadheadWarnPct,
   );

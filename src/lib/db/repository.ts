@@ -188,6 +188,7 @@ export interface FuelEntryInput {
   location?: string | null;
   station?: string | null;
   jurisdiction?: string | null;
+  /** Accepted for older callers; ignored because purchases belong to the truck. */
   loadId?: string | null;
   notes?: string | null;
 }

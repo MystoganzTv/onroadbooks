@@ -6,7 +6,6 @@ import { getMobileSession, requireMobileWrite } from "@/lib/auth/mobile";
 import { loadSchema } from "@/lib/schemas";
 import { getRepository } from "@/lib/db";
 import {
-  linkedFuelByLoad,
   loadsInPeriod,
   roundMoney,
   thresholdsFromSettings,
@@ -27,11 +26,11 @@ export async function GET(request: NextRequest) {
 
   const period = periodFromSearchParams(Object.fromEntries(request.nextUrl.searchParams));
   const dataset = await getRepository(session.businessId).getDataset();
-  const { loads, expenses, settings, fuelEntries } = dataset;
+  const { loads, expenses, settings } = dataset;
 
   const thresholds = thresholdsFromSettings(settings);
   const scored = scoreLoads(
-    withMetricsAll(loadsInPeriod(loads, period), thresholds, linkedFuelByLoad(fuelEntries)),
+    withMetricsAll(loadsInPeriod(loads, period), thresholds),
     thresholds,
     settings.deadheadWarnPct,
   );

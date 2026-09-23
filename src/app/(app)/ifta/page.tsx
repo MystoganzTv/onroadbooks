@@ -194,10 +194,8 @@ export default async function IftaPage({ searchParams }: { searchParams: Promise
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       {/*
         Spelled out as a division on purpose. This is the IFTA method -- every
-        mile in the quarter over every gallon bought in it -- and it does not
-        match the tank-to-tank MPG on the Fuel page, which ignores the gallons
-        bought before the first odometer reading. Two different numbers for the
-        same truck is alarming until you can see which question each answers.
+        mile in the quarter over every gallon bought in it. This reporting
+        ratio is separate from measured consumption; Fuel shows purchases only.
       */}
       <MiniStat label={copy.fleetMpg} value={report.fleetMpg ? report.fleetMpg.toFixed(2) : "—"} sub={`${formatMiles(report.totalFleetMiles)} ÷ ${report.totalGallons.toFixed(1)} ${copy.gallons}`} />
       <MiniStat label={copy.iftaMiles} value={formatMiles(report.assignedMiles)} sub={interpolate(copy.fleetMiles, { miles: formatMiles(report.totalFleetMiles) })} />

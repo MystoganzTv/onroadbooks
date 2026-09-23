@@ -1423,7 +1423,7 @@ describe("settlements", () => {
       settings,
       accounts,
     );
-    assert.equal(snapshot.calculationVersion, 4);
+    assert.equal(snapshot.calculationVersion, 5);
     assert.equal(snapshot.bookedRevenue, snapshot.grossRevenue);
     assert.equal(snapshot.collectedRevenue, snapshot.grossRevenue);
     assert.equal(snapshot.debtService, 1200);

@@ -18,7 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth";
-import { linkedFuelByLoad, loadsInPeriod, thresholdsFromSettings, withMetricsAll } from "@/lib/calculations";
+import { loadsInPeriod, thresholdsFromSettings, withMetricsAll } from "@/lib/calculations";
 import { getDataset } from "@/lib/db";
 import {
   bestBroker,
@@ -73,7 +73,7 @@ export default async function BrokersPage({
     getAppLocale(),
   ]);
   const copy = getWebDictionary(locale).analytics;
-  const { trucks, loads: allLoads, fuelEntries, settings, subscription } = await getDataset(
+  const { trucks, loads: allLoads, settings, subscription } = await getDataset(
     session.businessId,
   );
   const period = periodFromSearchParams(params);
@@ -103,7 +103,6 @@ export default async function BrokersPage({
   const periodLoads = withMetricsAll(
     loadsInPeriod(loads, period),
     thresholds,
-    linkedFuelByLoad(fuelEntries),
   );
   const brokers = calculateBrokerPerformance(periodLoads, thresholds);
   const ranked = sortBrokers(brokers, sort);

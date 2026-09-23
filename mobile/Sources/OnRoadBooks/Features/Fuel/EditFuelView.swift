@@ -35,7 +35,7 @@ struct EditFuelView: View {
     }
 
     /// What the numbers imply, so a fat-fingered total is visible before it is
-    /// saved rather than after it has moved the MPG.
+    /// saved rather than after it has changed the truck reading.
     private var impliedTotal: Double? {
         guard let gallons, let price, gallons > 0, price > 0 else { return nil }
         return gallons * price

@@ -34,12 +34,12 @@ import { fieldErrors, focusFirstError, validationMessage } from "@/lib/form";
 import { createFuelEntryAction, updateFuelEntryAction } from "@/lib/actions/fuel";
 import { fuelAmounts } from "@/lib/calculations";
 import { formatMoney } from "@/lib/formatters";
-import { formatLocaleDate, localeTag } from "@/lib/i18n-format";
+import { localeTag } from "@/lib/i18n-format";
 import { todayISO } from "@/lib/periods";
 import { fuelSchema } from "@/lib/schemas";
 import { orderedTrucks } from "@/lib/fleet";
 import { IFTA_JURISDICTIONS, inferFuelJurisdiction } from "@/lib/ifta";
-import type { Expense, FuelEntry, LoadWithMetrics, Truck } from "@/lib/types";
+import type { Expense, FuelEntry, Truck } from "@/lib/types";
 import { toNumber } from "@/lib/utils";
 
 interface FormState {
@@ -51,7 +51,6 @@ interface FormState {
   location: string;
   station: string;
   jurisdiction: string;
-  loadId: string;
   notes: string;
 }
 
@@ -65,10 +64,8 @@ interface FuelFormDialogProps {
   defaultTotalCost?: string;
   defaultStation?: string;
   defaultNotes?: string;
-  loads?: LoadWithMetrics[];
   trucks?: Truck[];
   defaultTruckId?: string | null;
-  defaultLoadId?: string | null;
   defaultDate?: string;
   lastOdometer?: number | null;
   trigger?: React.ReactNode;
@@ -87,10 +84,8 @@ export function FuelFormDialog({
   defaultTotalCost,
   defaultStation,
   defaultNotes,
-  loads = [],
   trucks = [],
   defaultTruckId,
-  defaultLoadId,
   defaultDate,
   lastOdometer,
   trigger,
@@ -122,7 +117,6 @@ export function FuelFormDialog({
             location: entry.location ?? "",
             station: entry.station ?? "",
             jurisdiction: entry.jurisdiction ?? inferFuelJurisdiction(entry.location) ?? "UNASSIGNED",
-            loadId: entry.loadId ?? "none",
             notes: entry.notes ?? "",
           }
         : {
@@ -134,10 +128,9 @@ export function FuelFormDialog({
             location: "",
             station: defaultStation ?? sourceExpense?.vendor ?? "",
             jurisdiction: "UNASSIGNED",
-            loadId: defaultLoadId ?? sourceExpense?.loadId ?? "none",
             notes: defaultNotes ?? sourceExpense?.notes ?? "",
           },
-    [entry, sourceExpense, defaultDate, defaultLoadId, defaultTotalCost, defaultStation, defaultNotes],
+    [entry, sourceExpense, defaultDate, defaultTotalCost, defaultStation, defaultNotes],
   );
 
   const [dialogOpen, setOpen] = React.useState(false);
@@ -173,28 +166,6 @@ export function FuelFormDialog({
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setValues((prev) => ({ ...prev, [key]: value }));
 
-  // Same as the expense form: a link made in another period must stay
-  // visible, or the select renders empty and looks unlinked.
-  const linkOptions = React.useMemo(() => {
-    const matching = loads.filter((load) => load.truckId === truckId);
-    const visible = matching.slice(0, 40);
-    const linkedId = entry?.loadId ?? defaultLoadId ?? sourceExpense?.loadId;
-    if (!linkedId || visible.some((l) => l.id === linkedId)) return visible;
-    const linked = matching.find((l) => l.id === linkedId);
-    return linked ? [linked, ...visible] : visible;
-  }, [loads, entry?.loadId, defaultLoadId, truckId, sourceExpense?.loadId]);
-
-  function changeTruck(nextTruckId: string) {
-    setTruckId(nextTruckId);
-    setValues((prev) => {
-      const linked = loads.find((load) => load.id === prev.loadId);
-      return {
-        ...prev,
-        loadId: linked?.truckId === nextTruckId ? prev.loadId : "none",
-      };
-    });
-  }
-
   function submit(event: React.FormEvent) {
     event.preventDefault();
 
@@ -209,7 +180,6 @@ export function FuelFormDialog({
       location: values.location || null,
       station: values.station || null,
       jurisdiction: values.jurisdiction === "UNASSIGNED" ? null : values.jurisdiction,
-      loadId: values.loadId === "none" ? null : values.loadId,
       notes: values.notes || null,
     };
 
@@ -271,7 +241,7 @@ export function FuelFormDialog({
                 required
                 hint={copy.truckHint}
               >
-                <Select value={truckId} onValueChange={changeTruck}>
+                <Select value={truckId} onValueChange={setTruckId}>
                   <SelectTrigger id="fuel-truck">
                     <SelectValue />
                   </SelectTrigger>
@@ -361,11 +331,12 @@ export function FuelFormDialog({
               <Field
                 label={copy.priceGal}
                 htmlFor="fuel-price"
-                hint={priceIsAutomatic && price > 0 ? copy.auto : copy.priceHint}
+                hint={priceIsAutomatic && price > 0 ? undefined : copy.priceHint}
                 error={errors.pricePerGallon}
               >
                 <Input
                   id="fuel-price"
+                  className="placeholder:text-foreground"
                   type="number"
                   inputMode="decimal"
                   min={0}
@@ -374,14 +345,13 @@ export function FuelFormDialog({
                   placeholder={priceIsAutomatic && price > 0 ? price.toFixed(3) : ""}
                   onChange={(e) => set("pricePerGallon", e.target.value)}
                   aria-invalid={Boolean(errors.pricePerGallon)}
-                  aria-describedby="fuel-price-message"
+                  aria-describedby={errors.pricePerGallon || !(priceIsAutomatic && price > 0) ? "fuel-price-message" : undefined}
                 />
               </Field>
               <Field
                 label={copy.totalCost}
                 htmlFor="fuel-total"
                 error={errors.totalCost}
-                hint={costEdited ? undefined : copy.auto}
               >
                 <Input
                   id="fuel-total"
@@ -413,29 +383,7 @@ export function FuelFormDialog({
                   step={1}
                   value={values.odometer}
                   onChange={(e) => set("odometer", e.target.value)}
-                  placeholder={lastOdometer ? String(lastOdometer + 400) : ""}
                 />
-              </Field>
-              <Field
-                label={copy.linkToLoad}
-                htmlFor="fuel-load"
-                hint={copy.truckLoadsOnly}
-              >
-                <Select value={values.loadId} onValueChange={(value) => set("loadId", value)}>
-                  <SelectTrigger id="fuel-load">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">{copy.notLinked}</SelectItem>
-                    {/* The list is period-filtered, so a link made in another
-                        period would otherwise render as a blank selection. */}
-                    {linkOptions.map((load) => (
-                      <SelectItem key={load.id} value={load.id}>
-                        {formatLocaleDate(load.date, locale, "short")} · {load.originCity} {copy.routeConnector} {load.destinationCity}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </Field>
             </div>
 

@@ -88,7 +88,7 @@ function initialValues(defaults: CalculatorDefaults): Values {
     loadedMiles: "",
     deadheadMiles: "0",
     fuelPrice: defaults.fuelPrice ? defaults.fuelPrice.toFixed(2) : "3.85",
-    mpg: defaults.mpg ? defaults.mpg.toFixed(1) : "8.5",
+    mpg: defaults.mpg ? defaults.mpg.toFixed(1) : "",
     tolls: "",
     dispatchMode: "PCT",
     dispatchValue: defaults.dispatchPct ? String(defaults.dispatchPct) : "0",

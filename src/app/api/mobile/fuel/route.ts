@@ -11,15 +11,7 @@ import { fuelSchema } from "@/lib/schemas";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * Fill-ups, and the MPG the odometer actually proves.
- *
- * `summarizeFuel` is the same function `src/app/(app)/fuel/page.tsx` calls,
- * including the rule that cost this app a bug once: MPG is derived per truck
- * from consecutive odometer readings, and stays null until one truck has two
- * of them. The phone must never invent a number the web page would refuse to
- * show -- so `milesPerGallon` is sent as null and the app says why.
- */
+/** Fuel purchases for the selected period; receipts do not measure consumption. */
 export async function GET(request: NextRequest) {
   const session = await getMobileSession(request);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -64,12 +56,7 @@ export async function GET(request: NextRequest) {
   );
 }
 
-/**
- * Record a fill-up. Same `fuelSchema` and same `createFuelEntry` the web form
- * uses -- including the reason the odometer matters: it is the only thing that
- * turns gallons into MPG, and it is a field only the person standing at the
- * pump can fill in.
- */
+/** Record a truck fuel purchase and its matching expense. */
 export async function POST(request: NextRequest) {
   const gate = await requireMobileWrite(request, "manage_fuel");
   if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });

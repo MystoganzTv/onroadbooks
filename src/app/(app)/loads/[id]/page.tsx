@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Download, FileText, Fuel, MapPin, Package, Pencil, Receipt } from "lucide-react";
+import { Download, FileText, MapPin, Package, Pencil, Receipt } from "lucide-react";
 
 import { InvoiceDialog } from "@/components/invoices/invoice-dialog";
 import { nextInvoiceNumber } from "@/lib/invoices";
@@ -21,7 +21,6 @@ import { driverScheduleFromLoads } from "@/lib/driver-availability";
 import { hasFleetAccess } from "@/lib/plans";
 import {
   isDeadheadElevated,
-  linkedFuelByLoad,
   loadMetrics,
   roundMoney,
   thresholdsFromSettings,
@@ -33,7 +32,6 @@ import {
 import { calculateLoadScore } from "@/lib/finance/load-score";
 import { LoadScoreBreakdown } from "@/components/cockpit/load-score-badge";
 import {
-  formatGallons,
   formatMiles,
   formatMoney,
   formatNumber,
@@ -64,13 +62,7 @@ export default async function LoadDetailPage({
   const load = dataset.loads.find((item) => item.id === id);
   if (!load) notFound();
 
-  // A real fill-up linked to this load supersedes the fuel figure typed on the
-  // rate confirmation. The ledger already drops the load's own fuel row when
-  // that happens, so the trip's profit and its score have to use the same
-  // diesel or the page contradicts itself.
-  const linkedFuel = dataset.fuelEntries.filter((entry) => entry.loadId === load.id);
-  const linkedFuelCost = linkedFuelByLoad(linkedFuel).get(load.id);
-  const metrics = loadMetrics(load, thresholdsFromSettings(dataset.settings), linkedFuelCost);
+  const metrics = loadMetrics(load, thresholdsFromSettings(dataset.settings));
   const score = calculateLoadScore(
     metrics,
     thresholdsFromSettings(dataset.settings),
@@ -150,7 +142,7 @@ export default async function LoadDetailPage({
         <div className="min-w-0 space-y-4 lg:col-span-2">
         <LoadScoreBreakdown score={score} showBasis="trip" />
 
-        <TripWaterfall load={load} metrics={metrics} linkedFuelCost={linkedFuelCost} />
+        <TripWaterfall load={load} metrics={metrics} />
 
         <Card>
           <CardHeader>
@@ -315,39 +307,7 @@ export default async function LoadDetailPage({
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Fuel className="size-3.5 text-muted-foreground" />
-                <CardTitle>{copy.linkedFuel}</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {linkedFuel.length === 0 ? (
-                <p className="px-4 py-4 text-xs text-muted-foreground">
-                  {copy.noLinkedFuel}
-                </p>
-              ) : (
-                <ul className="divide-y divide-border/70">
-                  {linkedFuel.map((entry) => (
-                    <li key={entry.id} className="flex items-baseline justify-between gap-3 px-4 py-2">
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm">
-                          {entry.location ?? copy.fuelStop}
-                        </span>
-                        <span className="text-2xs text-muted-foreground tnum">
-                          {formatGallons(entry.gallons)}
-                        </span>
-                      </span>
-                      <span className="shrink-0 tnum text-sm text-neg">
-                        -{formatMoney(entry.totalCost)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
+
         </div>
       </div>
     </div>

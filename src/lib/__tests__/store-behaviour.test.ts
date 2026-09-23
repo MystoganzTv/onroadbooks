@@ -326,11 +326,12 @@ describe("fuel <-> expense mirror", () => {
     await repo.deleteFuelEntry(backward.id);
   });
 
-  it("keeps the load link in step with the entry", async () => {
+  it("ignores legacy load links when creating and editing truck fuel purchases", async () => {
     const loadId = (await repo.getDataset()).loads[0].id;
     const entry = await repo.createFuelEntry(fuel({ loadId }));
     const linked = (await repo.getDataset()).expenses.find((e) => e.id === entry.expenseId);
-    assert.equal(linked?.loadId, loadId);
+    assert.equal(entry.loadId, null);
+    assert.equal(linked?.loadId, null);
 
     await repo.updateFuelEntry(entry.id, fuel({ loadId: null }));
     const unlinked = (await repo.getDataset()).expenses.find((e) => e.id === entry.expenseId);
@@ -418,7 +419,7 @@ describe("maintenance <-> expense mirror", () => {
 });
 
 describe("load costs <-> expense mirror", () => {
-  it("posts each trip cost once, updates it, and advances only from a real odometer", async () => {
+  it("posts non-fuel trip costs once and keeps fuel as an estimate", async () => {
     const start = (await repo.getDataset()).trucks[0].currentOdometer;
     const load = await repo.createLoad({
       date: "2026-08-29",
@@ -444,14 +445,14 @@ describe("load costs <-> expense mirror", () => {
 
     let dataset = await repo.getDataset();
     assert.equal(dataset.trucks[0].currentOdometer, start + 700);
-    assert.equal(dataset.expenses.find((e) => e.id === loadExpenseId(load.id, "fuel"))?.amount, 300);
+    assert.equal(dataset.expenses.some((e) => e.id === loadExpenseId(load.id, "fuel")), false);
     assert.equal(dataset.expenses.find((e) => e.id === loadExpenseId(load.id, "tolls"))?.amount, 45);
     assert.equal(
       dataset.expenses
         .filter((expense) => expense.loadId === load.id)
         .reduce((total, expense) => total + expense.amount, 0),
-      550,
-      "all trip costs must reach the same-day operating ledger even from an old false flag",
+      250,
+      "only non-fuel trip costs reach the operating ledger",
     );
     assert.equal(
       dataset.expenses.filter((expense) => expense.loadId === load.id).every((expense) => expense.date === load.date),
@@ -463,9 +464,9 @@ describe("load costs <-> expense mirror", () => {
     dataset = await repo.getDataset();
     assert.equal(
       dataset.expenses.filter((e) => e.id === loadExpenseId(load.id, "fuel")).length,
-      1,
+      0,
     );
-    assert.equal(dataset.expenses.find((e) => e.id === loadExpenseId(load.id, "fuel"))?.amount, 325);
+    assert.equal(dataset.loads.find((row) => row.id === load.id)?.fuelCost, 325);
     assert.equal(dataset.expenses.some((e) => e.id === loadExpenseId(load.id, "tolls")), false);
 
     await repo.deleteLoad(updated.id);
@@ -503,7 +504,7 @@ describe("load costs <-> expense mirror", () => {
     assert.equal(dataset.expenses.some((row) => row.id === expenseId), false);
   });
 
-  it("keeps a separate fuel estimate visible for every load", async () => {
+  it("keeps fuel estimates on loads without posting them as purchases", async () => {
     const first = await repo.createLoad({
       date: "2026-09-01",
       originCity: "Austell",
@@ -538,13 +539,10 @@ describe("load costs <-> expense mirror", () => {
     });
 
     const dataset = await repo.getDataset();
-    const estimates = [first, second].map((load) =>
-      dataset.expenses.find((expense) => expense.id === loadExpenseId(load.id, "fuel")),
-    );
-    assert.deepEqual(
-      estimates.map((expense) => expense?.amount),
-      [80, 295.69],
-    );
+    assert.deepEqual([first, second].map((load) =>
+      dataset.loads.find((row) => row.id === load.id)?.fuelCost), [80, 295.69]);
+    assert.equal(dataset.expenses.some((expense) =>
+      [first, second].some((load) => expense.id === loadExpenseId(load.id, "fuel"))), false);
   });
 
   it("honours an explicit costsPosted:false so history is never posted retroactively", async () => {
@@ -576,7 +574,7 @@ describe("load costs <-> expense mirror", () => {
     await repo.deleteLoad(load.id);
   });
 
-  it("lets linked detailed Fuel replace the load fuel row without double counting", async () => {
+  it("records purchases independently and never restores a fuel budget as an expense", async () => {
     const load = await repo.createLoad({
       date: "2026-08-30",
       originCity: "A",
@@ -594,16 +592,18 @@ describe("load costs <-> expense mirror", () => {
       costsPosted: true,
       status: "PENDING",
     });
-    assert.ok((await repo.getDataset()).expenses.some((e) => e.id === loadExpenseId(load.id, "fuel")));
+    assert.equal((await repo.getDataset()).expenses.some((e) => e.id === loadExpenseId(load.id, "fuel")), false);
 
     const entry = await repo.createFuelEntry(fuel({ loadId: load.id, totalCost: 190 }));
     let dataset = await repo.getDataset();
     assert.equal(dataset.expenses.some((e) => e.id === loadExpenseId(load.id, "fuel")), false);
-    assert.equal(dataset.expenses.filter((e) => e.category === "FUEL" && e.loadId === load.id).length, 1);
+    assert.equal(dataset.expenses.filter((e) => e.category === "FUEL" && e.loadId === load.id).length, 0);
+    assert.equal(dataset.expenses.find((e) => e.id === entry.expenseId)?.amount, 190);
+    assert.equal(dataset.loads.find((row) => row.id === load.id)?.fuelCost, 180);
 
     await repo.deleteFuelEntry(entry.id);
     dataset = await repo.getDataset();
-    assert.equal(dataset.expenses.find((e) => e.id === loadExpenseId(load.id, "fuel"))?.amount, 180);
+    assert.equal(dataset.expenses.some((e) => e.id === loadExpenseId(load.id, "fuel")), false);
     await repo.deleteLoad(load.id);
   });
 });
@@ -1252,10 +1252,10 @@ describe("which truck a row belongs to", () => {
       () => repo.createExpense(expense({ truckId: third.id, loadId: load.id })),
       /another truck/,
     );
-    await assert.rejects(
-      () => repo.createFuelEntry(fuel({ truckId: third.id, loadId: load.id })),
-      /another truck/,
-    );
+    const purchase = await repo.createFuelEntry(fuel({ truckId: third.id, loadId: load.id }));
+    assert.equal(purchase.truckId, third.id);
+    assert.equal(purchase.loadId, null);
+    await repo.deleteFuelEntry(purchase.id);
     await assert.rejects(
       () => repo.createExpense(expense({ scope: "BUSINESS", loadId: load.id })),
       /overhead cannot be linked/,

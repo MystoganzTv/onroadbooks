@@ -29,28 +29,24 @@ import {
   formatNumber,
   formatOdometer,
 } from "@/lib/formatters";
-import type { FuelEntry, LoadWithMetrics, Truck } from "@/lib/types";
+import type { FuelEntry, Truck } from "@/lib/types";
 import { formatLocaleDate } from "@/lib/i18n-format";
 import { FuelFormDialog } from "./fuel-form-dialog";
 
 interface FuelTableProps {
   entries: FuelEntry[];
-  loads: LoadWithMetrics[];
   trucks?: Truck[];
   defaultTruckId?: string | null;
   defaultDate: string;
   lastOdometer: number | null;
-  hasLoadEstimates?: boolean;
 }
 
 export function FuelTable({
   entries,
-  loads,
   trucks = [],
   defaultTruckId,
   defaultDate,
   lastOdometer,
-  hasLoadEstimates = false,
 }: FuelTableProps) {
   const router = useRouter();
   const { mode } = useViewMode();
@@ -60,25 +56,10 @@ export function FuelTable({
   const common = dictionary.common;
   const [deleting, setDeleting] = React.useState<string | null>(null);
 
-  // Segment MPG: miles since the previous reading / gallons in this fill-up.
   const ordered = React.useMemo(
     () => [...entries].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)),
     [entries],
   );
-
-  const segmentMpg = React.useMemo(() => {
-    const map = new Map<string, number | null>();
-    let previousOdometer: number | null = null;
-    for (const entry of ordered) {
-      if (previousOdometer !== null && entry.odometer && entry.odometer > previousOdometer) {
-        map.set(entry.id, div(entry.odometer - previousOdometer, entry.gallons));
-      } else {
-        map.set(entry.id, null);
-      }
-      if (entry.odometer) previousOdometer = entry.odometer;
-    }
-    return map;
-  }, [ordered]);
 
   const rows = [...ordered].reverse();
   const totals = rows.reduce(
@@ -107,14 +88,9 @@ export function FuelTable({
         <EmptyState
           icon={Fuel}
           title={copy.noFillUps}
-          description={
-            hasLoadEstimates
-              ? copy.estimatesAlreadyCount
-              : copy.logFillUps
-          }
+          description={copy.logFillUps}
           action={
             <FuelFormDialog
-              loads={loads}
               trucks={trucks}
               defaultTruckId={defaultTruckId}
               defaultDate={defaultDate}
@@ -128,7 +104,7 @@ export function FuelTable({
 
   return (
     <div className="rounded-lg border border-border bg-card">
-      <TableWrapper className={simple ? "[&_thead_tr>*:nth-child(3)]:hidden [&_thead_tr>*:nth-child(4)]:hidden [&_thead_tr>*:nth-child(6)]:hidden [&_thead_tr>*:nth-child(7)]:hidden [&_tbody_tr>*:nth-child(3)]:hidden [&_tbody_tr>*:nth-child(4)]:hidden [&_tbody_tr>*:nth-child(6)]:hidden [&_tbody_tr>*:nth-child(7)]:hidden" : undefined}>
+      <TableWrapper className={simple ? "[&_thead_tr>*:nth-child(3)]:hidden [&_thead_tr>*:nth-child(4)]:hidden [&_thead_tr>*:nth-child(6)]:hidden [&_tbody_tr>*:nth-child(3)]:hidden [&_tbody_tr>*:nth-child(4)]:hidden [&_tbody_tr>*:nth-child(6)]:hidden" : undefined}>
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -138,14 +114,12 @@ export function FuelTable({
               <TableHead className="text-right">{copy.pricePerGallon}</TableHead>
               <TableHead className="text-right">{copy.total}</TableHead>
               <TableHead className="text-right">{copy.odometer}</TableHead>
-              <TableHead className="text-right">{copy.segmentMpg}</TableHead>
               <TableHead className="w-[4.375rem] text-right">{common.actions}</TableHead>
             </TableRow>
           </TableHeader>
 
           <TableBody>
             {rows.map((entry) => {
-              const mpg = segmentMpg.get(entry.id);
               return (
                 <TableRow key={entry.id}>
                   <TableCell className="text-muted-foreground">
@@ -176,15 +150,11 @@ export function FuelTable({
                   <TableCell className="text-right tnum text-muted-foreground">
                     {entry.odometer ? formatOdometer(entry.odometer) : "--"}
                   </TableCell>
-                  <TableCell className="text-right tnum">
-                    {mpg ? `${mpg.toFixed(1)}` : <span className="text-muted-foreground">--</span>}
-                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-0.5">
                       <FuelFormDialog
                         trucks={trucks}
                         entry={entry}
-                        loads={loads}
                         lastOdometer={lastOdometer}
                         trigger={
                           <Button variant="ghost" size="icon-sm" aria-label={copy.editEntry}>
@@ -233,7 +203,7 @@ export function FuelTable({
               <TableCell className="text-right tnum font-semibold text-neg">
                 -{formatMoney(totals.cost)}
               </TableCell>
-              <TableCell colSpan={simple ? 1 : 3} />
+              <TableCell colSpan={simple ? 1 : 2} />
             </TableRow>
           </TableFooter>
         </Table>

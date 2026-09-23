@@ -221,7 +221,7 @@ function reviewChecksTable(dataset: Dataset, period: Period, businessName: strin
         what: `${missingFuelDetails.length} FUEL ENTR${missingFuelDetails.length === 1 ? "Y NEEDS" : "IES NEED"} DETAILS`,
         records: missingFuelDetails.length,
         amount: money(missingFuelDetails.reduce((sum, entry) => sum + entry.totalCost, 0)),
-        why: "Missing location or odometer readings weakens MPG, audit and fuel-tax analysis.",
+        why: "Missing location or odometer readings leave the truck purchase history incomplete.",
         action: "Add the location and odometer reading from the fuel receipt.",
         route: "/fuel",
       },

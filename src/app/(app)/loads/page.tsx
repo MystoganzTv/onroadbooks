@@ -9,7 +9,6 @@ import { MiniStat } from "@/components/dashboard/mini-stat";
 import { PageHeader } from "@/components/shared/page-header";
 import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import {
-  linkedFuelByLoad,
   isDeadheadElevated,
   loadsInPeriod,
   roundMoney,
@@ -53,7 +52,7 @@ export default async function LoadsPage({
   const [params, session, locale] = await Promise.all([searchParams, requireSession(), getAppLocale()]);
   const dictionary = getWebDictionary(locale);
   const copy = dictionary.loads;
-  const { trucks, loads, expenses, fuelEntries, settings, drivers, subscription, paymentEvents } = await getDataset(
+  const { trucks, loads, expenses, settings, drivers, subscription, paymentEvents } = await getDataset(
     session.businessId,
   );
   const period = periodFromSearchParams(params);
@@ -64,8 +63,7 @@ export default async function LoadsPage({
   const scopedLoads = loadsForTruck(loads, scopeTruckId);
   const scopedExpenses = expensesForTruck(expenses, scopeTruckId);
 
-  const linkedFuel = linkedFuelByLoad(fuelEntries);
-  const periodLoads = withMetricsAll(loadsInPeriod(scopedLoads, period), ratingThresholds, linkedFuel);
+  const periodLoads = withMetricsAll(loadsInPeriod(scopedLoads, period), ratingThresholds);
   const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings, paymentEvents);
   const brokers = [...new Set(loads.map((l) => l.broker).filter(Boolean))].sort() as string[];
   const driverSchedule = driverScheduleFromLoads(loads);

@@ -304,6 +304,7 @@ export interface FuelEntry {
   id: string;
   businessId: string;
   truckId: string;
+  /** Legacy storage field. Truck fuel purchases are returned without load links. */
   loadId: string | null;
   date: string;
   gallons: number;

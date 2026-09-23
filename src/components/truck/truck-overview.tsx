@@ -25,7 +25,6 @@ interface TruckOverviewProps {
   truck: Truck;
   odometerMiles: number;
   loadMiles: number;
-  milesPerGallon: number | null;
   activeTruckCount: number;
   canRestore: boolean;
   profileIncomplete: boolean;
@@ -37,7 +36,6 @@ export function TruckOverview({
   truck,
   odometerMiles,
   loadMiles,
-  milesPerGallon,
   activeTruckCount,
   canRestore,
   profileIncomplete,
@@ -123,11 +121,6 @@ export function TruckOverview({
               label={copy.milesDriven}
               value={formatNumber(odometerMiles)}
               sub={copy.sincePurchase}
-            />
-            <Metric
-              label={copy.lifetimeMpg}
-              value={milesPerGallon ? milesPerGallon.toFixed(1) : "--"}
-              sub={milesPerGallon ? copy.tankToTank : copy.needsReadings}
             />
           </CardContent>
         </Card>

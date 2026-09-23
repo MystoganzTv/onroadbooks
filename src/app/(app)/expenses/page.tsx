@@ -17,7 +17,6 @@ import { PeriodControls } from "@/components/dashboard/period-controls";
 import { PageHeader } from "@/components/shared/page-header";
 import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import {
-  linkedFuelByLoad,
   categoryTotals,
   expensesInPeriod,
   loadsInPeriod,
@@ -69,7 +68,6 @@ export default async function ExpensesPage({
   const periodLoads = withMetricsAll(
     loadsInPeriod(scopedLoads, period),
     ratingThresholds,
-    linkedFuelByLoad(fuelEntries),
   );
   const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings, paymentEvents);
   const operatingPeriodExpenses = periodExpenses.filter((expense) =>

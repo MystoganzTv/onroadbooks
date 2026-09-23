@@ -29,7 +29,6 @@ import {
 } from "@/components/print/report-letterhead";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  linkedFuelByLoad,
   brokerPerformance,
   buildTrend,
   categoryTotals,
@@ -96,7 +95,7 @@ export default async function ReportsPage({
   ]);
   const copy = getWebDictionary(locale).reports;
   const simple = mode === "simple";
-  const { business, trucks, loads, expenses, fuelEntries, settings, paymentEvents, reserveAccounts, subscription } = await getDataset(
+  const { business, trucks, loads, expenses, settings, paymentEvents, reserveAccounts, subscription } = await getDataset(
     session.businessId,
   );
   const period = periodFromSearchParams(params);
@@ -116,7 +115,7 @@ export default async function ReportsPage({
   const halves = halfMonthComparison(scopedLoads, scopedExpenses, period.month);
   const thresholds = thresholdsFromSettings(settings);
   const brokers = brokerPerformance(
-    withMetricsAll(loadsInPeriod(scopedLoads, period), thresholds, linkedFuelByLoad(fuelEntries)),
+    withMetricsAll(loadsInPeriod(scopedLoads, period), thresholds),
     thresholds,
   );
   const query = scopeQuery(period, truckId);

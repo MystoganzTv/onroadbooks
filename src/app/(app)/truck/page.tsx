@@ -23,7 +23,7 @@ import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { summarizeFuel, truckLifetime } from "@/lib/calculations";
+import { truckLifetime } from "@/lib/calculations";
 import { requireSession } from "@/lib/auth";
 import { getDataset } from "@/lib/db";
 import { activeTrucks, orderedTrucks, primaryTruck, truckById } from "@/lib/fleet";
@@ -63,10 +63,6 @@ export default async function TruckPage({
   const selectedId = fleetAccount ? truckFromSearchParams(params, trucks) : primary.id;
   const truck = truckById(trucks, selectedId) ?? primary;
   const lifetime = truckLifetime(dataset, truck);
-  const fuel = summarizeFuel(
-    dataset.fuelEntries.filter((entry) => entry.truckId === truck.id),
-    lifetime.totalMiles,
-  );
 
   const today = todayISO();
   const thresholds = thresholdsFrom(dataset.settings);
@@ -375,7 +371,6 @@ export default async function TruckPage({
             truck={truck}
             odometerMiles={lifetime.odometerMiles}
             loadMiles={lifetime.totalMiles}
-            milesPerGallon={fuel.milesPerGallon}
             activeTruckCount={running}
             canRestore={allowance.canAdd}
             profileIncomplete={profileIncomplete}

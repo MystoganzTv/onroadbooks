@@ -106,6 +106,19 @@ export function loadExpenseDescription(
 export function reconcileLoadExpenseLedger(
   dataset: Pick<Dataset, "business" | "loads" | "expenses" | "fuelEntries">,
 ): void {
+  // Fuel receipts belong to the truck. Keep historical receipts and their
+  // amounts, but stop interpreting legacy load links as trip consumption.
+  for (const entry of dataset.fuelEntries) entry.loadId = null;
+  for (let index = dataset.expenses.length - 1; index >= 0; index--) {
+    const expense = dataset.expenses[index];
+    if (expense.category !== "FUEL") continue;
+    if (isLoadExpenseId(expense.id)) {
+      // A load's fuel budget is an estimate, never an additional purchase.
+      dataset.expenses.splice(index, 1);
+    } else {
+      expense.loadId = null;
+    }
+  }
   for (const load of dataset.loads) {
     // `costsPosted` is the load's own answer to "are my trip costs in the
     // ledger". It is set true for everything the app creates, and false for
@@ -117,11 +130,9 @@ export function reconcileLoadExpenseLedger(
     // a real ledger that is the same diesel counted twice.
     if (!load.costsPosted) continue;
 
-    const detailedFuel = dataset.fuelEntries.some((entry) => entry.loadId === load.id);
-
     for (const spec of loadExpenseSpecs(load)) {
       const id = loadExpenseId(load.id, spec.key);
-      const shouldPost = spec.amount > 0 && !(spec.key === "fuel" && detailedFuel);
+      const shouldPost = spec.amount > 0 && spec.key !== "fuel";
       const existingIndex = dataset.expenses.findIndex((expense) => expense.id === id);
       const existing = existingIndex >= 0 ? dataset.expenses[existingIndex] : undefined;
 

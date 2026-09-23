@@ -475,13 +475,14 @@ function expenseFromInput(
   // Overhead belongs to the business, so it deliberately carries no truck.
   const scope: ExpenseScope = input.scope ?? "TRUCK";
   const truckId = scope === "BUSINESS" ? null : resolveTruckId(dataset.trucks, input.truckId);
-  assertLoadTruckLink(dataset.loads, input.loadId, truckId, scope);
+  const loadId = input.category === "FUEL" ? null : input.loadId || null;
+  assertLoadTruckLink(dataset.loads, loadId, truckId, scope);
   return {
     id,
     businessId: dataset.business.id,
     truckId,
     scope,
-    loadId: input.loadId || null,
+    loadId,
     date: input.date,
     category: input.category,
     description: input.description.trim(),
@@ -545,12 +546,11 @@ function fuelFromInput(
   createdAt: string,
 ): FuelEntry {
   const truckId = resolveTruckId(dataset.trucks, input.truckId);
-  assertLoadTruckLink(dataset.loads, input.loadId, truckId);
   return {
     id,
     businessId: dataset.business.id,
     truckId,
-    loadId: input.loadId || null,
+    loadId: null,
     date: input.date,
     gallons: Math.round(input.gallons * 1000) / 1000,
     pricePerGallon: Math.round(input.pricePerGallon * 1000) / 1000,
@@ -617,8 +617,8 @@ function syncFuelExpense(dataset: Dataset, entry: FuelEntry): void {
 /**
  * Load costs and the expense ledger are one accounting fact. Deterministic
  * ids make this an idempotent mirror: editing a load updates the same rows,
- * setting a cost to zero removes it, and detailed Fuel entries take priority
- * over the load's fuel amount so the same purchase is never counted twice.
+ * setting a cost to zero removes it. Fuel budgets stay on loads and never
+ * become purchase expenses.
  */
 function syncLoadExpenses(dataset: Dataset, load: Load): void {
   reconcileLoadExpenseLedger({
@@ -631,7 +631,7 @@ function syncLoadExpenses(dataset: Dataset, load: Load): void {
 
 /**
  * Moving a load may move its generated rows, but never somebody's manually
- * linked expense or fill-up. Those records must be reassigned explicitly so
+ * linked non-fuel expense. Those records must be reassigned explicitly so
  * the owner sees the accounting consequence.
  */
 function assertLoadCanMove(dataset: Dataset, loadId: string, targetTruckId: string): void {
@@ -639,13 +639,11 @@ function assertLoadCanMove(dataset: Dataset, loadId: string, targetTruckId: stri
   const linkedExpense = dataset.expenses.some(
     (expense) =>
       expense.loadId === loadId &&
+      expense.category !== "FUEL" &&
       !generated.has(expense.id) &&
       (expense.scope === "BUSINESS" || expense.truckId !== targetTruckId),
   );
-  const linkedFuel = dataset.fuelEntries.some(
-    (entry) => entry.loadId === loadId && entry.truckId !== targetTruckId,
-  );
-  if (linkedExpense || linkedFuel) {
+  if (linkedExpense) {
     throw new Error(
       "This load has linked costs on another truck. Reassign or unlink them before moving the load.",
     );

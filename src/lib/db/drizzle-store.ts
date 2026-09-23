@@ -202,17 +202,6 @@ async function syncDrizzleLoadExpenses(
   businessId: string,
   load: LoadLedgerSource,
 ): Promise<void> {
-  const detailedFuel = await countRows(
-    tx
-      .select({ value: sqlCount() })
-      .from(s.fuelEntry)
-      .where(
-        and(
-          eq(s.fuelEntry.loadId, load.id),
-          eq(s.fuelEntry.businessId, businessId),
-        ),
-      ),
-  );
   const specs = loadExpenseSpecs({
     fuelCost: num(load.fuelCost),
     tolls: num(load.tolls),
@@ -226,7 +215,7 @@ async function syncDrizzleLoadExpenses(
     const shouldPost =
       load.costsPosted &&
       spec.amount > 0 &&
-      !(spec.key === "fuel" && detailedFuel > 0);
+      spec.key !== "fuel";
 
     if (!shouldPost) {
       await affectedRows(
@@ -1743,37 +1732,16 @@ export class DrizzleRepository implements Repository {
         const generatedIds = LOAD_EXPENSE_KEYS.map((key) =>
           loadExpenseId(id, key),
         );
-        const [linkedExpenses, linkedFuel] = await Promise.all([
-          countRows(
-            tx
-              .select({ value: sqlCount() })
-              .from(s.expense)
-              .where(
-                and(
-                  eq(s.expense.businessId, business.id),
-                  eq(s.expense.loadId, id),
-                  notInArray(s.expense.id, generatedIds),
-                  or(
-                    eq(s.expense.scope, "BUSINESS"),
-                    ne(s.expense.truckId, truckId),
-                  ),
-                ),
-              ),
-          ),
-          countRows(
-            tx
-              .select({ value: sqlCount() })
-              .from(s.fuelEntry)
-              .where(
-                and(
-                  eq(s.fuelEntry.businessId, business.id),
-                  eq(s.fuelEntry.loadId, id),
-                  ne(s.fuelEntry.truckId, truckId),
-                ),
-              ),
-          ),
-        ]);
-        if (linkedExpenses > 0 || linkedFuel > 0) {
+        const linkedExpenses = await countRows(
+          tx.select({ value: sqlCount() }).from(s.expense).where(and(
+            eq(s.expense.businessId, business.id),
+            eq(s.expense.loadId, id),
+            ne(s.expense.category, "FUEL"),
+            notInArray(s.expense.id, generatedIds),
+            or(eq(s.expense.scope, "BUSINESS"), ne(s.expense.truckId, truckId)),
+          )),
+        );
+        if (linkedExpenses > 0) {
           throw new Error(
             "This load has linked costs on another truck. Reassign or unlink them before moving the load.",
           );
@@ -2340,7 +2308,7 @@ export class DrizzleRepository implements Repository {
         financialTreatmentForCategory(input.category),
       obligationId: input.obligationId,
       splitGroupId: input.splitGroupId,
-      loadId: input.loadId || null,
+      loadId: input.category === "FUEL" ? null : input.loadId || null,
       behavior: input.behavior,
       recurring: input.recurring,
       receiptNumber: input.receiptNumber?.trim() || null,
@@ -2357,7 +2325,7 @@ export class DrizzleRepository implements Repository {
     const loadId = await ownedLoadId(
       client,
       business.id,
-      input.loadId,
+      input.category === "FUEL" ? null : input.loadId,
       truckId,
       scope,
     );
@@ -2451,7 +2419,7 @@ export class DrizzleRepository implements Repository {
     const loadId = await ownedLoadId(
       client,
       business.id,
-      input.loadId,
+      input.category === "FUEL" ? null : input.loadId,
       truckId,
       scope,
     );
@@ -3203,7 +3171,7 @@ export class DrizzleRepository implements Repository {
       odometer: input.odometer ?? null,
       location: input.location?.trim() || null,
       jurisdiction: input.jurisdiction?.trim().toUpperCase() || null,
-      loadId: input.loadId || null,
+      loadId: null,
       notes: input.notes?.trim() || null,
     };
   }
@@ -3212,10 +3180,7 @@ export class DrizzleRepository implements Repository {
     const client = await this.clientProvider();
     const business = await this.business(client);
     const truckId = truckIdFor(business, input.truckId);
-    const data = {
-      ...this.fuelData(input),
-      loadId: await ownedLoadId(client, business.id, input.loadId, truckId),
-    };
+    const data = this.fuelData(input);
 
     const row = await client.transaction(async (tx) => {
       if (input.sourceExpenseId) {
@@ -3259,15 +3224,7 @@ export class DrizzleRepository implements Repository {
           .where(eq(s.fuelEntry.id, created.id))
           .returning(),
       );
-      if (data.loadId) {
-        const load = await tx.query.load.findFirst({
-          where: and(
-            eq(s.load.id, data.loadId),
-            eq(s.load.businessId, business.id),
-          ),
-        });
-        if (load) await syncDrizzleLoadExpenses(tx, business.id, load);
-      }
+
       if (data.odometer) {
         await affectedRows(
           tx
@@ -3293,10 +3250,7 @@ export class DrizzleRepository implements Repository {
     const client = await this.clientProvider();
     const business = await this.business(client);
     const truckId = truckIdFor(business, input.truckId);
-    const data = {
-      ...this.fuelData(input),
-      loadId: await ownedLoadId(client, business.id, input.loadId, truckId),
-    };
+    const data = this.fuelData(input);
 
     await client.transaction(async (tx) => {
       const existing = await tx.query.fuelEntry.findFirst({

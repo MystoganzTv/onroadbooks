@@ -21,7 +21,6 @@ import {
 import { requireSession } from "@/lib/auth";
 import { categoryLabel } from "@/lib/categories";
 import {
-  linkedFuelByLoad,
   categoryTotals,
   expensesInPeriod,
   loadsInPeriod,
@@ -103,7 +102,6 @@ export default async function FleetUnitPage({
   const recentLoads = withMetricsAll(
     loadsInPeriod(unitLoads, period),
     thresholds,
-    linkedFuelByLoad(dataset.fuelEntries),
   )
     .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))
     .slice(0, 8);

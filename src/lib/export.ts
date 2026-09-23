@@ -12,7 +12,6 @@ import {
   categoryTotals,
   expensesInPeriod,
   fuelInPeriod,
-  linkedFuelByLoad,
   loadsInPeriod,
   summarizeFuel,
   thresholdsFromSettings,
@@ -95,7 +94,6 @@ export function buildReport(
   const periodLoads = withMetricsAll(
     loadsInPeriod(loads, period),
     thresholds,
-    linkedFuelByLoad(dataset.fuelEntries),
   );
   const periodExpenses = expensesInPeriod(expenses, period);
   const periodFuel = fuelInPeriod(fuelEntries, period);
@@ -118,7 +116,7 @@ export function buildReport(
           "Equipment", "Load Type", "Length (ft)", "Weight (lb)", "Commodity",
           "Loaded Miles", "Deadhead Miles", "Total Miles", "Deadhead %",
           "Gross Rate", "Rate/Loaded Mile", "Rate/Total Mile",
-          "Fuel", "Tolls", "Dispatch", "Factoring", "Other", "Driver Pay",
+          "Estimated Fuel", "Tolls", "Dispatch", "Factoring", "Other", "Driver Pay",
           "Direct Trip Costs", "Contribution Profit", "Contribution/Total Mile",
           "Contribution Margin %", "Rating", "Notes",
         ],
@@ -196,10 +194,9 @@ export function buildReport(
       return {
         title: `Fuel - ${scopeLabel} - ${period.label}`,
         calculationVersion: FINANCIAL_MODEL_VERSION,
-        columns: ["Truck", "Date", "Location", "Gallons", "Price/Gallon", "Total Cost", "Odometer", "Linked Load"],
+        columns: ["Truck", "Date", "Location", "Gallons", "Price/Gallon", "Total Cost", "Odometer"],
         rows: [
           ...periodFuel.map((entry) => {
-            const load = entry.loadId ? loads.find((l) => l.id === entry.loadId) : undefined;
             return [
               truckName(entry.truckId),
               entry.date,
@@ -208,18 +205,11 @@ export function buildReport(
               rate(entry.pricePerGallon),
               money(entry.totalCost),
               entry.odometer ?? "",
-              load ? `${load.originCity}-${load.destinationCity}` : "",
             ];
           }),
           [],
-          ["TOTALS", "", "", Number(fuel.totalGallons.toFixed(2)), rate(fuel.averagePricePerGallon), money(fuel.totalCost), "", ""],
-          // Derived figures are labelled in place so no dollar value ever
-          // lands under a gallons or odometer column.
-          [`Fuel cost per mile: ${rate(fuel.fuelCostPerMile)}`, "", "", "", "", "", "", ""],
-          [
-            `Miles per gallon: ${fuel.milesPerGallon ? Number(fuel.milesPerGallon.toFixed(2)) : "n/a"}`,
-            "", "", "", "", "", "", "",
-          ],
+          ["TOTALS", "", "", Number(fuel.totalGallons.toFixed(2)), rate(fuel.averagePricePerGallon), money(fuel.totalCost), ""],
+
         ],
       };
     }

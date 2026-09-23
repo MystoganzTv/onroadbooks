@@ -1,11 +1,6 @@
 import SwiftUI
 
-/// Fill-ups, and the one number that says whether the truck is getting worse.
-///
-/// MPG comes from the server or not at all: it is derived per truck from
-/// consecutive odometer readings and stays empty until one truck has two of
-/// them. Showing a plausible-looking average of gallons over trip miles would
-/// be easy and wrong, so this screen says what is missing instead.
+/// Truck fuel purchases. Receipts do not establish fuel consumption.
 struct FuelView: View {
     let repository: LedgerRepository
 
@@ -95,21 +90,10 @@ struct FuelView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: OBSpacing.lg) {
                 HStack(spacing: OBSpacing.sm) {
-                    tile("MPG", mpgText(ledger.summary), footnote: mpgFootnote(ledger.summary))
                     tile(
-                        "Costo / milla",
-                        ledger.summary.fuelCostPerMile
-                            .formatted(.currency(code: "USD").precision(.fractionLength(2))),
-                        footnote: "solo combustible"
-                    )
-                }
-                .padding(.horizontal, OBSpacing.md)
-
-                HStack(spacing: OBSpacing.sm) {
-                    tile(
-                        "Galones",
+                        "Galones comprados",
                         ledger.summary.totalGallons.formatted(.number.precision(.fractionLength(1))),
-                        footnote: "\(ledger.summary.entryCount) cargas"
+                        footnote: "\(ledger.summary.entryCount) compras"
                     )
                     tile(
                         "Precio promedio",
@@ -122,12 +106,12 @@ struct FuelView: View {
 
                 VStack(alignment: .leading, spacing: 0) {
                     PanelHeader(
-                        title: "Cargas",
+                        title: "Compras",
                         trailing: ledger.summary.totalCost
                             .formatted(.currency(code: "USD").precision(.fractionLength(0)))
                     )
                     if ledger.entries.isEmpty {
-                        Text("Ninguna carga registrada en este período.")
+                        Text("Ninguna compra registrada en este período.")
                             .font(.subheadline)
                             .foregroundStyle(OBColor.mutedForeground)
                             .padding(OBSpacing.md)
@@ -181,17 +165,6 @@ struct FuelView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(OBSpacing.md)
         .obPanel()
-    }
-
-    private func mpgText(_ summary: FuelSummary) -> String {
-        summary.milesPerGallon.map { $0.formatted(.number.precision(.fractionLength(1))) } ?? "—"
-    }
-
-    private func mpgFootnote(_ summary: FuelSummary) -> String {
-        guard let miles = summary.odometerMiles, summary.milesPerGallon != nil else {
-            return "hacen falta dos odómetros"
-        }
-        return "\(Int(miles).formatted()) mi medidas"
     }
 
     private func reload() async {

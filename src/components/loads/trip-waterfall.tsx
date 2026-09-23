@@ -17,21 +17,13 @@ import { interpolate } from "@/lib/i18n/dictionaries";
 export function TripWaterfall({
   load,
   metrics,
-  linkedFuelCost,
 }: {
   load: Load;
   metrics: LoadMetrics;
-  /**
-   * Set when real fill-ups are linked to this load. Their total replaces the
-   * fuel figure typed on the load, exactly as the expense ledger does, so the
-   * waterfall and the ledger never disagree about the same trip.
-   */
-  linkedFuelCost?: number;
 }) {
   const { dictionary } = useLanguage();
   const copy = dictionary.loads;
-  const lines = tripExpenseLines(load, linkedFuelCost);
-  const fuelFromFillUps = linkedFuelCost !== undefined;
+  const lines = tripExpenseLines(load);
   const scale = (value: number) =>
     load.grossRate > 0 ? Math.max((Math.abs(value) / load.grossRate) * 100, 0.6) : 0;
 
@@ -58,8 +50,8 @@ export function TripWaterfall({
             {lines.map((line) => (
               <Row
                 key={line.key}
-                label={line.label}
-                hint={line.key === "fuel" && fuelFromFillUps ? copy.fromLinkedFillups : undefined}
+                label={line.key === "fuel" ? copy.tripFuel : line.label}
+                hint={line.key === "fuel" ? copy.fuelEstimateHint : undefined}
                 value={-line.amount}
                 width={scale(line.amount)}
                 barClass="bg-neg"

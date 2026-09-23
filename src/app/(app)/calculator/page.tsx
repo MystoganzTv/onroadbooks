@@ -43,8 +43,8 @@ export async function generateMetadata(): Promise<Metadata> {
 /**
  * The calculator runs on the truck's OWN history, not on averages:
  *
- *   MPG          derived from odometer readings across fuel fill-ups, so it is
- *                this truck loaded the way this owner loads it.
+ *   MPG          a reference entered by the user; purchases and odometer
+ *                readings cannot establish fuel consumption.
  *   Fuel price   the most recent price actually paid.
  *   Fees         the dispatch and factoring rates this truck has been paying,
  *                inferred from the ledger against Booked Revenue.
