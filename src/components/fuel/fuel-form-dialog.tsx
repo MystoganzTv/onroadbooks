@@ -155,6 +155,8 @@ export function FuelFormDialog({
     }
   }, [open, initial, entry, defaultTruckId, truckOptions, sourceExpense?.truckId]);
 
+  const showIfta = truckOptions.find((truck) => truck.id === truckId)?.iftaReportingEnabled === true;
+
   const gallons = toNumber(values.gallons);
   const priceIsAutomatic = values.pricePerGallon.trim() === "";
   const { pricePerGallon: price, totalCost } = fuelAmounts(
@@ -179,7 +181,9 @@ export function FuelFormDialog({
       odometer: values.odometer ? toNumber(values.odometer) : null,
       location: values.location || null,
       station: values.station || null,
-      jurisdiction: values.jurisdiction === "UNASSIGNED" ? null : values.jurisdiction,
+      jurisdiction: showIfta
+        ? values.jurisdiction === "UNASSIGNED" ? null : values.jurisdiction
+        : entry?.jurisdiction ?? null,
       notes: values.notes || null,
     };
 
@@ -289,7 +293,7 @@ export function FuelFormDialog({
                   placeholder="Baltimore, MD"
                 />
               </Field>
-              <Field
+              {showIfta ? <Field
                 label={copy.jurisdiction}
                 htmlFor="fuel-jurisdiction"
                 error={errors.jurisdiction}
@@ -311,7 +315,7 @@ export function FuelFormDialog({
                     ))}
                   </SelectContent>
                 </Select>
-              </Field>
+              </Field> : null}
             </div>
 
             <div className="grid grid-cols-3 gap-3">

@@ -15,6 +15,9 @@ import { fieldErrorsFrom, type ActionResult } from "./types";
 function revalidateAll() {
   revalidatePath("/dashboard");
   revalidatePath("/expenses");
+  revalidatePath("/loads", "layout");
+  revalidatePath("/analytics", "layout");
+  revalidatePath("/fleet", "layout");
   revalidatePath("/reports");
   revalidatePath("/truck");
   revalidatePath("/fuel");

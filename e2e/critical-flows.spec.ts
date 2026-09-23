@@ -123,7 +123,6 @@ async function addLoad(
   await page.locator("#load-deadhead").fill("20");
   await page.locator("#load-rate").fill("700");
   await page.locator("#load-number").fill(loadNumber);
-  await page.locator("#load-fuel").fill("80");
 
   if (attachDocument) {
     await page.locator("#load-form input[type=file]").setInputFiles({

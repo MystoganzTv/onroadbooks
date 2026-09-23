@@ -500,7 +500,6 @@ test("R2 server uploads preserve 10 MB, enforce ownership/roles and serve privat
       "load-deadhead": "20",
       "load-rate": "700",
       "load-number": "R2-UI-1",
-      "load-fuel": "80",
     }))
       await page.locator(`#${id}`).fill(value);
     await page.locator("#load-form input[type=file]").setInputFiles({

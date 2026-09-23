@@ -40,7 +40,7 @@ import {
   type PendingUpload,
 } from "@/components/documents/document-uploader";
 import { createLoadAction, updateLoadAction } from "@/lib/actions/loads";
-import { div, rateLoad, roundMoney, type RatingThresholds } from "@/lib/calculations";
+import { div, roundMoney, type RatingThresholds } from "@/lib/calculations";
 import {
   findDriverScheduleConflicts,
   type DriverScheduleEntry,
@@ -285,7 +285,6 @@ export function LoadFormDialog({
   drivers = [],
   defaultTruckId,
   defaultDate,
-  ratingThresholds,
   driverSchedule = [],
   trigger,
   prefill,
@@ -384,21 +383,12 @@ export function LoadFormDialog({
     });
   };
 
+  const showIfta = truckOptions.find((truck) => truck.id === values.truckId)?.iftaReportingEnabled === true;
+
   const loadedMiles = toNumber(values.loadedMiles);
   const deadheadMiles = toNumber(values.deadheadMiles);
   const grossRate = toNumber(values.grossRate);
-  const tripExpenses = roundMoney(
-    toNumber(values.fuelCost) +
-      toNumber(values.tolls) +
-      toNumber(values.dispatchFee) +
-      toNumber(values.factoringFee) +
-      toNumber(values.otherExpenses) +
-      (load?.driverPay ?? 0),
-  );
   const totalMiles = loadedMiles + deadheadMiles;
-  const tripProfit = roundMoney(grossRate - tripExpenses);
-  const profitPerMile = div(tripProfit, totalMiles);
-  const rating = rateLoad(profitPerMile, ratingThresholds);
   const assignedJurisdictionMiles = values.jurisdictionMiles.reduce(
     (total, row) => total + toNumber(row.totalMiles),
     0,
@@ -449,7 +439,7 @@ export function LoadFormDialog({
       dispatchFee: toNumber(values.dispatchFee),
       factoringFee: toNumber(values.factoringFee),
       otherExpenses: toNumber(values.otherExpenses),
-      costsPosted: true,
+      costsPosted: load?.costsPosted ?? true,
       // Preserve legacy metadata. Reporting a load already records its income.
       status: load?.status ?? "PENDING",
       jurisdictionMiles: values.jurisdictionMiles.map((row) => ({
@@ -750,22 +740,7 @@ export function LoadFormDialog({
               <Calc label={copy.totalMiles} value={formatMiles(totalMiles)} />
               {!simple && <Calc label={copy.perLoaded} value={formatRateValue(div(grossRate, loadedMiles))} />}
               {!simple && <Calc label={copy.perTotal} value={formatRateValue(div(grossRate, totalMiles))} />}
-              <Calc label={copy.directTripCosts} value={formatMoney(tripExpenses)} />
-              <Calc
-                label={copy.contributionProfit}
-                value={formatMoney(tripProfit)}
-                tone={tripProfit >= 0 ? "pos" : "neg"}
-              />
-              {!simple && <Calc
-                label={copy.contributionPerMile}
-                value={formatRateValue(profitPerMile)}
-                tone={tripProfit >= 0 ? "pos" : "neg"}
-              />}
             </div>
-
-            {!simple && grossRate > 0 && totalMiles > 0 ? (
-              <RatingPreview rating={rating} profitPerMile={profitPerMile} />
-            ) : null}
 
             <FormSection title={dictionary.viewMode.loadDetails} expanded={!simple}>
             <div className="grid grid-cols-2 gap-3">
@@ -916,77 +891,7 @@ export function LoadFormDialog({
 
             </FormSection>
 
-            <FormSection title={copy.directTripCosts} expanded={!simple}>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-              <Field label={copy.tripFuel} htmlFor="load-fuel" error={errors.fuelCost}>
-                <Input
-                  id="load-fuel"
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="0.01"
-                  value={values.fuelCost}
-                  onChange={(e) => set("fuelCost", e.target.value)}
-                  placeholder="0.00"
-                />
-              </Field>
-              <Field label={copy.tolls} htmlFor="load-tolls" error={errors.tolls}>
-                <Input
-                  id="load-tolls"
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="0.01"
-                  value={values.tolls}
-                  onChange={(e) => set("tolls", e.target.value)}
-                  placeholder="0.00"
-                />
-              </Field>
-              <Field label={copy.dispatch} htmlFor="load-dispatch" error={errors.dispatchFee}>
-                <Input
-                  id="load-dispatch"
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="0.01"
-                  value={values.dispatchFee}
-                  onChange={(e) => set("dispatchFee", e.target.value)}
-                  placeholder="0.00"
-                />
-              </Field>
-              <Field label={copy.factoring} htmlFor="load-factoring" error={errors.factoringFee}>
-                <Input
-                  id="load-factoring"
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="0.01"
-                  value={values.factoringFee}
-                  onChange={(e) => set("factoringFee", e.target.value)}
-                  placeholder="0.00"
-                />
-              </Field>
-              <Field label={copy.other} htmlFor="load-other" error={errors.otherExpenses}>
-                <Input
-                  id="load-other"
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="0.01"
-                  value={values.otherExpenses}
-                  onChange={(e) => set("otherExpenses", e.target.value)}
-                  placeholder="0.00"
-                />
-              </Field>
-            </div>
-
-            <p className="rounded-md border border-border bg-surface-sunken px-3 py-2.5 text-2xs leading-relaxed text-muted-foreground">
-              {copy.costsAutomatic}
-            </p>
-
-            </FormSection>
-
-            <FormSection title={copy.iftaMiles} expanded={!simple}>
+            {showIfta ? <FormSection title={copy.iftaMiles} expanded={!simple}>
             <div className="space-y-2 rounded-md border border-border p-3">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
@@ -1096,25 +1001,16 @@ export function LoadFormDialog({
               ) : null}
             </div>
 
-            </FormSection>
+            </FormSection> : null}
 
-            <FormSection title={copy.documents} expanded={!simple}>
-            <div className="space-y-2 border-t border-border pt-3">
-              <p className="label-xs">{copy.documents}</p>
-              {isEdit ? (
-                <p className="text-2xs text-muted-foreground">
-                  {copy.documentsDescription}
-                </p>
-              ) : (
-                <DocumentUploader
-                  owner="LOAD"
-                  pending={attachments}
-                  onPendingChange={setAttachments}
-                  compact
-                />
-              )}
-            </div>
-            </FormSection>
+            {!isEdit ? <FormSection title={copy.documents} expanded={!simple}>
+              <DocumentUploader
+                owner="LOAD"
+                pending={attachments}
+                onPendingChange={setAttachments}
+                compact
+              />
+            </FormSection> : null}
 
           </form>
         </DialogBody>
@@ -1151,34 +1047,6 @@ function Calc({
         }`}
       >
         {value}
-      </span>
-    </div>
-  );
-}
-
-function RatingPreview({
-  rating,
-  profitPerMile,
-}: {
-  rating: ReturnType<typeof rateLoad>;
-  profitPerMile: number;
-}) {
-  const { dictionary } = useLanguage();
-  const copy = dictionary.loads;
-  const tone = {
-    GREAT: "border-pos/40 bg-pos-soft text-pos",
-    GOOD: "border-info/40 bg-info-soft text-info",
-    MARGINAL: "border-warn/40 bg-warn-soft text-warn",
-    BAD: "border-neg/40 bg-neg-soft text-neg",
-  }[rating];
-
-  return (
-    <div className={`flex items-baseline justify-between rounded-md border px-3 py-2 ${tone}`}>
-      <span className="text-sm font-semibold tracking-wide">
-        {rating === "GREAT" ? copy.greatLoad : rating === "GOOD" ? copy.goodLoad : rating === "MARGINAL" ? copy.marginalLoad : copy.badLoad}
-      </span>
-      <span className="tnum text-sm font-semibold">
-        {formatRateValue(profitPerMile)}/mi · {copy.profitPerMile}
       </span>
     </div>
   );

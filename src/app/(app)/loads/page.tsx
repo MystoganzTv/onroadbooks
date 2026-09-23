@@ -63,7 +63,7 @@ export default async function LoadsPage({
   const scopedLoads = loadsForTruck(loads, scopeTruckId);
   const scopedExpenses = expensesForTruck(expenses, scopeTruckId);
 
-  const periodLoads = withMetricsAll(loadsInPeriod(scopedLoads, period), ratingThresholds);
+  const periodLoads = withMetricsAll(loadsInPeriod(scopedLoads, period), ratingThresholds, scopedExpenses);
   const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings, paymentEvents);
   const brokers = [...new Set(loads.map((l) => l.broker).filter(Boolean))].sort() as string[];
   const driverSchedule = driverScheduleFromLoads(loads);

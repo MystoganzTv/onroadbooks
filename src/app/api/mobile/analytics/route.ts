@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
   const scored = withMetricsAll(
     loadsInPeriod(dataset.loads, period),
     thresholds,
+    dataset.expenses,
   );
 
   // `calculateLanePerformance` defaults to "state"; this route was taking that

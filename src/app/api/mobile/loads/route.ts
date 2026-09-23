@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
 
   const thresholds = thresholdsFromSettings(settings);
   const scored = scoreLoads(
-    withMetricsAll(loadsInPeriod(loads, period), thresholds),
+    withMetricsAll(loadsInPeriod(loads, period), thresholds, expenses),
     thresholds,
     settings.deadheadWarnPct,
   );

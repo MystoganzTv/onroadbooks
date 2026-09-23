@@ -159,27 +159,7 @@ export function navAvailability(
     };
   }
   if (item.requires === "IFTA" && !readiness.hasIftaActivity) {
-    if (readiness.hasIftaDecisionPending) {
-      return {
-        enabled: true,
-        badge: "Review",
-        reason: "Confirm each active truck as included or excluded from IFTA filings.",
-      };
-    }
-    if (readiness.iftaApplicability === "UNKNOWN") {
-      return {
-        enabled: false,
-        badge: "Set up",
-        reason: "Complete axles, registered weight and operating area on the Truck page.",
-      };
-    }
-    if (readiness.iftaApplicability === "LIKELY_NOT_REQUIRED") {
-      return {
-        enabled: false,
-        badge: "Not needed",
-        reason: "The current vehicle profile does not indicate IFTA tracking.",
-      };
-    }
+    return { enabled: false, reason: "Enable IFTA reporting for a truck to show this section." };
   }
   return { enabled: true };
 }

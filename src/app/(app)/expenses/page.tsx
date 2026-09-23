@@ -68,6 +68,7 @@ export default async function ExpensesPage({
   const periodLoads = withMetricsAll(
     loadsInPeriod(scopedLoads, period),
     ratingThresholds,
+    scopedExpenses,
   );
   const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings, paymentEvents);
   const operatingPeriodExpenses = periodExpenses.filter((expense) =>

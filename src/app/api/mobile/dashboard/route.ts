@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
     : [];
 
   const periodLoads = scoreLoads(
-    withMetricsAll(loadsInPeriod(loads, period), thresholds),
+    withMetricsAll(loadsInPeriod(loads, period), thresholds, expenses),
     thresholds,
     settings.deadheadWarnPct,
   );

@@ -63,7 +63,7 @@ export interface CostPerMile {
   cashCostTotal: number;
   /**
    * Dollars the trip itself caused: everything in the four direct categories
-   * PLUS every ledger row posted automatically from a load (which includes
+   * PLUS every ledger row linked to a load (which includes
    * the load's "Other trip cost" row, filed under OTHER). This is what the
    * load calculator asks the driver for explicitly, so it is what
    * `overheadCostPerMile` must exclude.
@@ -169,7 +169,7 @@ export function calculateTrueCostPerMile(
   const directTripTotal = roundMoney(
     sum(
       operatingExpenses.filter(
-        (e) => DIRECT_TRIP_CATEGORIES.includes(e.category) || isLoadExpenseId(e.id),
+        (e) => DIRECT_TRIP_CATEGORIES.includes(e.category) || isLoadExpenseId(e.id) || Boolean(e.loadId),
       ),
       (e) => e.amount,
     ),

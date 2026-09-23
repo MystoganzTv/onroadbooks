@@ -62,7 +62,7 @@ export default async function LoadDetailPage({
   const load = dataset.loads.find((item) => item.id === id);
   if (!load) notFound();
 
-  const metrics = loadMetrics(load, thresholdsFromSettings(dataset.settings));
+  const metrics = loadMetrics(load, thresholdsFromSettings(dataset.settings), dataset.expenses);
   const score = calculateLoadScore(
     metrics,
     thresholdsFromSettings(dataset.settings),
@@ -142,7 +142,7 @@ export default async function LoadDetailPage({
         <div className="min-w-0 space-y-4 lg:col-span-2">
         <LoadScoreBreakdown score={score} showBasis="trip" />
 
-        <TripWaterfall load={load} metrics={metrics} />
+        <TripWaterfall load={load} metrics={metrics} expenses={linkedExpenses} />
 
         <Card>
           <CardHeader>

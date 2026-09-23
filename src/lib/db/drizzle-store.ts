@@ -242,7 +242,7 @@ async function syncDrizzleLoadExpenses(
       recurring: false,
       receiptNumber: null,
       notes:
-        "Posted automatically from the load. Edit the load to change this amount.",
+        "Posted automatically from the load. Edit this amount in Expenses.",
     };
     await oneRow(
       tx

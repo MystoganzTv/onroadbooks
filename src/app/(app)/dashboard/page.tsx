@@ -190,7 +190,7 @@ export default async function DashboardPage({
   const cockpit = planAllows(dataset.subscription, "cockpit");
 
   const periodLoads = scoreLoads(
-    withMetricsAll(loadsInPeriod(loads, period), ratingThresholds),
+    withMetricsAll(loadsInPeriod(loads, period), ratingThresholds, expenses),
     ratingThresholds,
     settings.deadheadWarnPct,
   );

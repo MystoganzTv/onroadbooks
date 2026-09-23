@@ -144,31 +144,38 @@ export function rateLoad(
 /** Every trip cost on a load, itemised for the waterfall. */
 export function tripExpenseLines(
   load: Load,
+  expenses: Expense[] = [],
 ): { key: string; label: string; amount: number }[] {
-  return [
+  const lines = [
     { key: "fuel", label: "Estimated fuel", amount: num(load.fuelCost) },
     { key: "tolls", label: "Tolls", amount: load.tolls },
     { key: "dispatch", label: "Dispatch", amount: load.dispatchFee },
     { key: "factoring", label: "Factoring", amount: load.factoringFee },
     { key: "other", label: "Other", amount: load.otherExpenses },
     { key: "driverPay", label: "Driver Pay", amount: load.driverPay },
-  ];
+  ].map((line) => ({ ...line, amount: num(line.amount) }));
+  const categoryKeys: Record<string, string> = {
+    TOLLS: "tolls", DISPATCH: "dispatch", FACTORING: "factoring", DRIVER_PAY: "driverPay",
+  };
+  for (const expense of expenses) {
+    if (expense.loadId !== load.id || expense.businessId !== load.businessId ||
+        expense.category === "FUEL" || isDebtServiceExpense(expense)) continue;
+    // Generated ledger rows already represent the cost fields above.
+    if (lines.some((line) => expense.id === `expload_${load.id}_${line.key}`) ||
+        (expense.category === "DRIVER_PAY" && expense.id.startsWith("expdriver_"))) continue;
+    const line = lines.find((line) => line.key === (categoryKeys[expense.category] ?? "other"))!;
+    line.amount += num(expense.amount);
+  }
+  return lines.map((line) => ({ ...line, amount: roundMoney(line.amount) }));
 }
 
 export function loadMetrics(
   load: Load,
   thresholds?: RatingThresholds,
+  expenses: Expense[] = [],
 ): LoadMetrics {
   const totalMiles = num(load.loadedMiles) + num(load.deadheadMiles);
-  // Summed defensively: a row written by an older build can be missing a fee
-  // column, and a raw + would turn the whole waterfall into NaN -> 0.
-  const tripExpenses =
-    num(load.fuelCost) +
-    num(load.tolls) +
-    num(load.dispatchFee) +
-    num(load.factoringFee) +
-    num(load.otherExpenses) +
-    num(load.driverPay);
+  const tripExpenses = sum(tripExpenseLines(load, expenses), (line) => line.amount);
   const tripProfit = num(load.grossRate) - tripExpenses;
   const profitPerMile = div(tripProfit, totalMiles);
 
@@ -188,15 +195,24 @@ export function loadMetrics(
 export function withMetrics(
   load: Load,
   thresholds?: RatingThresholds,
+  expenses: Expense[] = [],
 ): LoadWithMetrics {
-  return { ...load, metrics: loadMetrics(load, thresholds) };
+  return { ...load, metrics: loadMetrics(load, thresholds, expenses) };
 }
 
 export function withMetricsAll(
   loads: Load[],
   thresholds?: RatingThresholds,
+  expenses: Expense[] = [],
 ): LoadWithMetrics[] {
-  return loads.map((load) => withMetrics(load, thresholds));
+  const byLoad = new Map<string, Expense[]>();
+  for (const expense of expenses) {
+    if (!expense.loadId) continue;
+    const linked = byLoad.get(expense.loadId) ?? [];
+    linked.push(expense);
+    byLoad.set(expense.loadId, linked);
+  }
+  return loads.map((load) => withMetrics(load, thresholds, byLoad.get(load.id)));
 }
 
 /* ---- Period filtering ----------------------------------------------- */

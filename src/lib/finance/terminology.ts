@@ -11,7 +11,7 @@ import type { ExpenseCategoryId, FinancialTreatment } from "../types";
  * preserve any closed snapshot written by an earlier version.
  */
 
-export const FINANCIAL_MODEL_VERSION = 5 as const;
+export const FINANCIAL_MODEL_VERSION = 6 as const;
 export const LEGACY_FINANCIAL_MODEL_VERSION = 1 as const;
 
 /** Financing rows excluded from Operating Expenses and reported below it. */
@@ -95,7 +95,7 @@ export const FINANCIAL_TERMS = {
     label: "Direct Trip Costs",
     definition:
       "Estimated fuel for one load, plus its tolls, dispatch, factoring, other trip costs and driver pay.",
-    basis: "The load's own cost fields. Fuel purchases belong to the truck and never replace the trip's fuel estimate.",
+    basis: "The load's own cost fields plus independently recorded operating expenses linked to it, excluding generated ledger mirrors. Fuel purchases belong to the truck and never replace the trip's fuel estimate.",
   },
   contributionProfit: {
     label: "Contribution Profit",

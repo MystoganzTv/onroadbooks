@@ -115,7 +115,7 @@ export default async function ReportsPage({
   const halves = halfMonthComparison(scopedLoads, scopedExpenses, period.month);
   const thresholds = thresholdsFromSettings(settings);
   const brokers = brokerPerformance(
-    withMetricsAll(loadsInPeriod(scopedLoads, period), thresholds),
+    withMetricsAll(loadsInPeriod(scopedLoads, period), thresholds, scopedExpenses),
     thresholds,
   );
   const query = scopeQuery(period, truckId);

@@ -226,7 +226,7 @@ async function syncPrismaLoadExpenses(
       amount: spec.amount,
       recurring: false,
       receiptNumber: null,
-      notes: "Posted automatically from the load. Edit the load to change this amount.",
+      notes: "Posted automatically from the load. Edit this amount in Expenses.",
     };
     await tx.expense.upsert({ where: { id }, create: { id, ...values }, update: values });
   }

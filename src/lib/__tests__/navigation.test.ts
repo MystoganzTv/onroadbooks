@@ -37,22 +37,16 @@ describe("progressive navigation", () => {
     assert.equal(navAvailability(item("/reports"), empty).enabled, false);
   });
 
-  it("explains whether IFTA needs setup or is not indicated", () => {
-    assert.equal(navAvailability(item("/ifta"), empty).badge, "Set up");
-    assert.equal(
-      navAvailability(item("/ifta"), {
-        ...empty,
-        iftaApplicability: "LIKELY_NOT_REQUIRED",
-      }).badge,
-      "Not needed",
-    );
-    assert.equal(
-      navAvailability(item("/ifta"), {
-        ...empty,
-        iftaApplicability: "LIKELY_REQUIRED",
-      }).enabled,
-      true,
-    );
+  it("shows IFTA only when reporting is explicitly enabled", () => {
+    assert.equal(navAvailability(item("/ifta"), empty).enabled, false);
+    for (const iftaApplicability of ["UNKNOWN", "LIKELY_NOT_REQUIRED", "LIKELY_REQUIRED"] as const) {
+      assert.equal(navAvailability(item("/ifta"), {
+        ...empty, iftaApplicability, hasIftaDecisionPending: true,
+      }).enabled, false);
+    }
+    assert.equal(navAvailability(item("/ifta"), {
+      ...empty, hasIftaActivity: true,
+    }).enabled, true);
   });
 
   it("keeps owner planning and driver pay out of unrelated roles", () => {

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLanguage } from "@/components/shell/language-provider";
 import { tripExpenseLines } from "@/lib/calculations";
 import { formatMiles, formatMoney, formatPercent, formatRateValue } from "@/lib/formatters";
-import type { Load, LoadMetrics } from "@/lib/types";
+import type { Expense, Load, LoadMetrics } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { RatingVerdict } from "./rating-badge";
 import { interpolate } from "@/lib/i18n/dictionaries";
@@ -17,13 +17,15 @@ import { interpolate } from "@/lib/i18n/dictionaries";
 export function TripWaterfall({
   load,
   metrics,
+  expenses = [],
 }: {
   load: Load;
   metrics: LoadMetrics;
+  expenses?: Expense[];
 }) {
   const { dictionary } = useLanguage();
   const copy = dictionary.loads;
-  const lines = tripExpenseLines(load);
+  const lines = tripExpenseLines(load, expenses);
   const scale = (value: number) =>
     load.grossRate > 0 ? Math.max((Math.abs(value) / load.grossRate) * 100, 0.6) : 0;
 

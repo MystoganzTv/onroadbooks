@@ -336,6 +336,22 @@ describe("overheadCostPerMile", () => {
     const cost = calculateTrueCostPerMile([], [], august, settings, "x");
     assert.equal(overheadCostPerMile(cost), 0);
   });
+
+  it("does not allocate a manually linked trip expense again as overhead", () => {
+    const cost = calculateTrueCostPerMile(
+      [load({ loadedMiles: 900, deadheadMiles: 100 })],
+      [
+        expense({ id: "trip-parking", category: "PARKING", amount: 30, loadId: "l1" }),
+        expense({ id: "yard-parking", category: "PARKING", amount: 100 }),
+      ],
+      august,
+      settings,
+      "x",
+    );
+    assert.equal(cost.totalCost, 130);
+    assert.equal(cost.directTripTotal, 30);
+    assert.equal(overheadCostPerMile(cost), 0.1);
+  });
 });
 
 describe("hasSufficientOperatingCostBasis", () => {
@@ -1423,7 +1439,7 @@ describe("settlements", () => {
       settings,
       accounts,
     );
-    assert.equal(snapshot.calculationVersion, 5);
+    assert.equal(snapshot.calculationVersion, 6);
     assert.equal(snapshot.bookedRevenue, snapshot.grossRevenue);
     assert.equal(snapshot.collectedRevenue, snapshot.grossRevenue);
     assert.equal(snapshot.debtService, 1200);

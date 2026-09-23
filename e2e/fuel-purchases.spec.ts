@@ -32,8 +32,9 @@ test("truck purchases stay separate from estimated trip fuel", async ({ page }) 
   const truckId = dataset.trucks[0].id;
   const businessId = dataset.business.id;
   const load = { ...seed.loads[0], id: "fuel-estimate-trip", businessId, truckId,
-    date: "2026-09-21", fuelCost: 180, tolls: 0, dispatchFee: 0, factoringFee: 0,
+    date: "2026-09-21", deliveryDate: "2026-09-22", fuelCost: 180, tolls: 0, dispatchFee: 0, factoringFee: 0,
     otherExpenses: 0, driverPay: 0, driverId: null, costsPosted: true };
+  dataset.trucks[0].iftaReportingEnabled = false;
   dataset.loads = [load];
   dataset.expenses = [];
   dataset.fuelEntries = [];
@@ -46,6 +47,7 @@ test("truck purchases stay separate from estimated trip fuel", async ({ page }) 
   await page.getByRole("button", { name: "Add fuel", exact: true }).first().click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("Link to load", { exact: true })).toHaveCount(0);
+  await expect(dialog.locator("#fuel-jurisdiction")).toHaveCount(0);
   await dialog.locator("#fuel-date").fill("2026-09-22");
   await dialog.locator("#fuel-gallons").fill("41.107");
   await dialog.locator("#fuel-total").fill("277.43");
@@ -77,6 +79,44 @@ test("truck purchases stay separate from estimated trip fuel", async ({ page }) 
   await page.goto(`/loads/${load.id}`);
   await expect(page.getByText(/^Estimated fuel/)).toBeVisible();
   await expect(page.getByText("Linked fuel", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "IFTA", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  const edit = page.getByRole("dialog", { name: "Edit load" });
+  await expect(edit.getByText("Direct trip costs", { exact: true })).toHaveCount(0);
+  await expect(edit.getByText("Documents", { exact: true })).toHaveCount(0);
+  await expect(edit.getByText("IFTA jurisdiction miles", { exact: true })).toHaveCount(0);
+  await edit.locator("#load-notes").fill("Edited without duplicate cost fields");
+  await edit.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(edit).toBeHidden();
+  const afterEdit = JSON.parse(await fs.readFile(dataFile, "utf8")) as Dataset;
+  expect(afterEdit.loads.find((row) => row.id === load.id)?.fuelCost).toBe(180);
+
+  await page.goto("/expenses?month=2026-09&period=month");
+  await page.getByRole("button", { name: "Add expense", exact: true }).first().click();
+  const expenseDialog = page.getByRole("dialog");
+  await expenseDialog.locator("#expense-category").click();
+  await page.getByRole("option", { name: "Tolls", exact: true }).click();
+  await expenseDialog.locator("#expense-amount").fill("35");
+  await expenseDialog.locator("#expense-description").fill("Trip bridge toll");
+  await expenseDialog.locator("#expense-load").click();
+  await page.getByRole("option").filter({ hasText: load.originCity }).click();
+  await expenseDialog.getByRole("button", { name: "Add expense", exact: true }).click();
+  await expect(expenseDialog).toBeHidden();
+  await page.goto(`/loads/${load.id}`);
+  await expect(page.getByText("Trip bridge toll", { exact: true })).toBeVisible();
+  const breakdown = page.locator("div.rounded-lg").filter({ has: page.getByRole("heading", { name: "Trip cost breakdown", exact: true }) });
+  await expect(breakdown).toContainText("$215.00");
+  await page.screenshot({ path: "/tmp/onroad-load-expenses.png", fullPage: true });
+
+  // Explicitly enabling reporting reveals its fields and navigation again.
+  const enabled = JSON.parse(await fs.readFile(dataFile, "utf8")) as Dataset;
+  enabled.trucks[0].iftaReportingEnabled = true;
+  await fs.writeFile(dataFile, JSON.stringify(enabled));
+  await page.goto(`/loads/${load.id}`);
+  await expect(page.getByRole("link", { name: "IFTA", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await expect(page.getByRole("dialog").getByText("IFTA jurisdiction miles", { exact: true }).first()).toBeVisible();
+  await page.getByRole("dialog").getByRole("button", { name: "Cancel", exact: true }).click();
   await page.goto("/fuel?month=2026-09&period=month");
   await page.getByRole("button", { name: "Simple", exact: true }).click();
   await expect(page.getByRole("button", { name: "Edit fuel entry" })).toBeVisible();

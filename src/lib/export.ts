@@ -94,6 +94,7 @@ export function buildReport(
   const periodLoads = withMetricsAll(
     loadsInPeriod(loads, period),
     thresholds,
+    expenses,
   );
   const periodExpenses = expensesInPeriod(expenses, period);
   const periodFuel = fuelInPeriod(fuelEntries, period);

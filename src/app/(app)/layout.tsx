@@ -20,7 +20,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     loads,
     expenses,
     paymentEvents,
-    fuelEntries,
   } = dataset;
 
   // Fleet is a paid service, not a mode inferred from how many truck rows
@@ -52,8 +51,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             hasDriverPayActivity:
               dataset.drivers.length > 0 && loads.some((load) => Boolean(load.driverId)),
             hasIftaActivity:
-              loads.some((load) => load.jurisdictionMiles.length > 0) ||
-              fuelEntries.some((entry) => Boolean(entry.jurisdiction)) ||
               running.some((truck) => truck.iftaReportingEnabled === true),
             hasIftaDecisionPending: running.some(
               (truck) => truck.iftaReportingEnabled == null,

@@ -62,7 +62,7 @@ export default async function LanesPage({
     getAppLocale(),
   ]);
   const copy = getWebDictionary(locale).analytics;
-  const { trucks, loads: allLoads, settings, subscription } = await getDataset(
+  const { trucks, loads: allLoads, expenses, settings, subscription } = await getDataset(
     session.businessId,
   );
   const period = periodFromSearchParams(params);
@@ -92,6 +92,7 @@ export default async function LanesPage({
   const periodLoads = withMetricsAll(
     loadsInPeriod(loads, period),
     thresholds,
+    expenses,
   );
   const lanes = calculateLanePerformance(periodLoads, thresholds, LANE_MIN_LOADS, grouping);
 

@@ -153,7 +153,7 @@ export function reconcileLoadExpenseLedger(
         amount: spec.amount,
         recurring: false,
         receiptNumber: null,
-        notes: "Posted automatically from the load. Edit the load to change this amount.",
+        notes: "Posted automatically from the load. Edit this amount in Expenses.",
       };
 
       if (existing) Object.assign(existing, values);
