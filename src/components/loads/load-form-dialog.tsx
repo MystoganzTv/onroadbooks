@@ -1,9 +1,8 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ArrowUpRight, Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { localizedClientError } from "@/lib/i18n/errors";
@@ -41,12 +40,7 @@ import {
 } from "@/components/documents/document-uploader";
 import { createLoadAction, updateLoadAction } from "@/lib/actions/loads";
 import { div, roundMoney, type RatingThresholds } from "@/lib/calculations";
-import {
-  findDriverScheduleConflicts,
-  type DriverScheduleEntry,
-} from "@/lib/driver-availability";
 import { formatMiles, formatMoney, formatRateValue } from "@/lib/formatters";
-import { formatLocaleDate } from "@/lib/i18n-format";
 import { interpolate } from "@/lib/i18n/dictionaries";
 import { loadSchema } from "@/lib/schemas";
 import { todayISO } from "@/lib/periods";
@@ -260,8 +254,6 @@ interface LoadFormDialogProps {
   defaultTruckId?: string | null;
   defaultDate?: string;
   ratingThresholds?: RatingThresholds;
-  /** Existing dated assignments used only for a non-blocking availability warning. */
-  driverSchedule?: DriverScheduleEntry[];
   /** Pass `null` for a form opened from elsewhere, with no button of its own. */
   trigger?: React.ReactNode;
   /** Seed values for a NEW load, e.g. handed over by the load calculator. */
@@ -285,7 +277,6 @@ export function LoadFormDialog({
   drivers = [],
   defaultTruckId,
   defaultDate,
-  driverSchedule = [],
   trigger,
   prefill,
   initialAttachments,
@@ -393,17 +384,6 @@ export function LoadFormDialog({
     (total, row) => total + toNumber(row.totalMiles),
     0,
   );
-  const scheduleConflicts = React.useMemo(
-    () =>
-      findDriverScheduleConflicts(driverSchedule, {
-        loadId: load?.id,
-        driverId: values.driverId === "UNASSIGNED" ? null : values.driverId,
-        pickupDate: values.date,
-        deliveryDate: values.deliveryDate || null,
-      }),
-    [driverSchedule, load?.id, values.driverId, values.date, values.deliveryDate],
-  );
-  const selectedDriver = driverOptions.find((driver) => driver.id === values.driverId);
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -670,71 +650,6 @@ export function LoadFormDialog({
                 />
               </Field>
             </div>
-            {scheduleConflicts.length > 0 ? (
-              <div
-                className="flex gap-3 rounded-lg border border-warn/35 bg-warn-soft/45 p-3"
-                role="status"
-                aria-live="polite"
-              >
-                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" aria-hidden />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-foreground">
-                    {interpolate(copy.driverConflict, { driver: selectedDriver?.name ?? copy.thisDriver })}
-                  </p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                    {copy.conflictDescription}
-                  </p>
-                  <div className="mt-2 divide-y divide-warn/20 rounded-md border border-warn/20 bg-background/45">
-                    {scheduleConflicts.slice(0, 3).map((conflict) => {
-                      const truckName =
-                        trucks.find((truck) => truck.id === conflict.truckId)?.name ??
-                        copy.unknownTruck;
-                      const route = `${conflict.originCity}, ${conflict.originState} → ${conflict.destinationCity}, ${conflict.destinationState}`;
-                      return (
-                        <div
-                          key={conflict.loadId}
-                          className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-xs font-medium text-foreground">
-                              {conflict.loadNumber
-                                ? `Load ${conflict.loadNumber}`
-                                : copy.existingLoad}{" "}
-                              · {truckName}
-                            </p>
-                            <p className="truncate text-2xs text-muted-foreground">
-                              {formatLocaleDate(conflict.pickupDate, locale, "short")}
-                              {conflict.deliveryDate
-                                ? ` – ${formatLocaleDate(conflict.deliveryDate, locale, "short")}`
-                                : ""}{" "}
-                              · {route}
-                            </p>
-                          </div>
-                          <Link
-                            href={`/loads/${conflict.loadId}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary underline-offset-2 hover:underline focus-ring"
-                          >
-                            {copy.reviewLoad}
-                            <ArrowUpRight className="size-3" aria-hidden />
-                          </Link>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {scheduleConflicts.length > 3 ? (
-                    <p className="mt-1.5 text-2xs font-medium text-warn">
-                      {interpolate(copy.moreConflicts, { count: scheduleConflicts.length - 3, unit: scheduleConflicts.length - 3 === 1 ? copy.assignment : copy.assignments })}
-                    </p>
-                  ) : null}
-                  <p className="mt-2 text-2xs font-medium text-foreground">
-                    {copy.conflictAllowed}
-                  </p>
-                </div>
-              </div>
-            ) : null}
-
             {/* Live calculation strip -- the reason this form is fast. */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-md border border-border bg-surface-sunken px-3 py-2.5 sm:grid-cols-3">
               <Calc label={copy.totalMiles} value={formatMiles(totalMiles)} />

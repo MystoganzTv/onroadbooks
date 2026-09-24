@@ -19,7 +19,6 @@ import {
 } from "@/lib/calculations";
 import { requireSession } from "@/lib/auth";
 import { getDataset } from "@/lib/db";
-import { driverScheduleFromLoads } from "@/lib/driver-availability";
 import {
   formatMoneyCompact,
   formatNumber,
@@ -67,7 +66,6 @@ export default async function LoadsPage({
   const periodLoads = withMetricsAll(loadsInPeriod(scopedLoads, period), ratingThresholds, scopedExpenses);
   const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings, paymentEvents);
   const brokers = savedBrokerNames(loads, brokerProfiles);
-  const driverSchedule = driverScheduleFromLoads(loads);
 
   const tripExpenses = periodLoads.reduce((sum, load) => sum + load.metrics.tripExpenses, 0);
   const tripProfit = periodLoads.reduce((sum, load) => sum + load.metrics.tripProfit, 0);
@@ -94,7 +92,6 @@ export default async function LoadsPage({
                 defaultTruckId={scopeTruckId}
                 defaultDate={defaultEntryDate(period)}
                 ratingThresholds={ratingThresholds}
-                driverSchedule={driverSchedule}
               />
             )}
             <LoadFormDialog
@@ -104,7 +101,6 @@ export default async function LoadsPage({
               defaultTruckId={scopeTruckId}
               defaultDate={defaultEntryDate(period)}
               ratingThresholds={ratingThresholds}
-              driverSchedule={driverSchedule}
             />
           </div>
         }
@@ -129,7 +125,6 @@ export default async function LoadsPage({
             brokers={brokers}
             trucks={trucks}
             drivers={hasFleetAccess(subscription) ? drivers : []}
-            driverSchedule={driverSchedule}
             defaultTruckId={scopeTruckId}
             defaultDate={defaultEntryDate(period)}
             ratingThresholds={ratingThresholds}
@@ -217,7 +212,6 @@ export default async function LoadsPage({
           brokers={brokers}
           trucks={trucks}
           drivers={hasFleetAccess(subscription) ? drivers : []}
-          driverSchedule={driverSchedule}
           defaultTruckId={scopeTruckId}
           defaultDate={defaultEntryDate(period)}
           ratingThresholds={ratingThresholds}

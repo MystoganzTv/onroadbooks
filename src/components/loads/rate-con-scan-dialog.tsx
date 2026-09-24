@@ -19,7 +19,6 @@ import {
 } from "@/components/ui/dialog";
 import type { RatingThresholds } from "@/lib/calculations";
 import { optimizeDocumentFile } from "@/lib/document-optimization";
-import type { DriverScheduleEntry } from "@/lib/driver-availability";
 import { formatMiles, formatMoney, formatNumber } from "@/lib/formatters";
 import { interpolate } from "@/lib/i18n/dictionaries";
 import { localizedClientError } from "@/lib/i18n/errors";
@@ -64,7 +63,6 @@ interface RateConScanDialogProps {
   defaultTruckId?: string | null;
   defaultDate?: string;
   ratingThresholds?: RatingThresholds;
-  driverSchedule?: DriverScheduleEntry[];
 }
 
 type Stage = "idle" | "working" | "result";
@@ -78,7 +76,6 @@ export function RateConScanDialog({
   defaultTruckId,
   defaultDate,
   ratingThresholds,
-  driverSchedule = [],
 }: RateConScanDialogProps) {
   const { dictionary, locale } = useLanguage();
   const copy = dictionary.rateCon;
@@ -317,7 +314,6 @@ export function RateConScanDialog({
         defaultTruckId={defaultTruckId}
         defaultDate={defaultDate}
         ratingThresholds={ratingThresholds}
-        driverSchedule={driverSchedule}
         trigger={null}
         prefill={handoff?.prefill}
         initialAttachments={handoff?.attachments}

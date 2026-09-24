@@ -47,7 +47,6 @@ import {
 } from "@/lib/calculations";
 import { periodBuckets } from "@/lib/chart-data";
 import { getDataset } from "@/lib/db";
-import { driverScheduleFromLoads } from "@/lib/driver-availability";
 import { hasFleetAccess, planAllows } from "@/lib/plans";
 import {
   expensesForTruck,
@@ -271,7 +270,6 @@ export default async function DashboardPage({
       brokers={brokerNames}
       trucks={trucks}
       drivers={hasFleetAccess(dataset.subscription) ? drivers : []}
-      driverSchedule={driverScheduleFromLoads(allLoads)}
       defaultTruckId={truckId}
       defaultDate={defaultEntryDate(period)}
       ratingThresholds={ratingThresholds}
