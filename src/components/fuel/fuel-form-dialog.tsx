@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus } from "lucide-react";
+import { AlertTriangle, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { localizedClientError } from "@/lib/i18n/errors";
@@ -37,6 +37,7 @@ import { formatMoney } from "@/lib/formatters";
 import { localeTag } from "@/lib/i18n-format";
 import { todayISO } from "@/lib/periods";
 import { fuelSchema } from "@/lib/schemas";
+import { decimalSeparatorFor, odometerConcern, parseOdometerInput } from "@/lib/odometer";
 import { orderedTrucks } from "@/lib/fleet";
 import { IFTA_JURISDICTIONS, inferFuelJurisdiction } from "@/lib/ifta";
 import type { Expense, FuelEntry, Truck } from "@/lib/types";
@@ -53,6 +54,12 @@ interface FormState {
   jurisdiction: string;
   notes: string;
 }
+
+/** The pop-up shown before saving a reading that is probably a typo. */
+type OdometerReview =
+  | { kind: "format"; entered: string; suggestion: number }
+  | { kind: "below"; value: number; reference: number }
+  | { kind: "jump"; value: number; reference: number; miles: number };
 
 interface FuelFormDialogProps {
   entry?: FuelEntry;
@@ -143,6 +150,7 @@ export function FuelFormDialog({
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [costEdited, setCostEdited] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
+  const [review, setReview] = React.useState<OdometerReview | null>(null);
 
   React.useEffect(() => {
     if (open) {
@@ -151,11 +159,18 @@ export function FuelFormDialog({
       );
       setValues(initial);
       setErrors({});
+      setReview(null);
       setCostEdited(Boolean(entry) || initial.totalCost !== "");
     }
   }, [open, initial, entry, defaultTruckId, truckOptions, sourceExpense?.truckId]);
 
-  const showIfta = truckOptions.find((truck) => truck.id === truckId)?.iftaReportingEnabled === true;
+  const selectedTruck = truckOptions.find((truck) => truck.id === truckId);
+  const showIfta = selectedTruck?.iftaReportingEnabled === true;
+  // The truck's own odometer is the reference; the page's last fuel reading
+  // is the fallback when the form is embedded without truck data.
+  const referenceOdometer = selectedTruck?.currentOdometer || lastOdometer || null;
+  const tag = localeTag(locale);
+  const miles = (value: number) => value.toLocaleString(tag);
 
   const gallons = toNumber(values.gallons);
   const priceIsAutomatic = values.pricePerGallon.trim() === "";
@@ -170,7 +185,51 @@ export function FuelFormDialog({
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
+    attempt(values.odometer, false);
+  }
 
+  function focusOdometer() {
+    requestAnimationFrame(() => document.getElementById("fuel-odometer")?.focus());
+  }
+
+  /**
+   * Odometer checks run before anything is sent: a reading like "271.184"
+   * would otherwise be rejected by the database, or worse, saved as 271 mi.
+   */
+  function attempt(odometerText: string, confirmed: boolean) {
+    const reading = parseOdometerInput(odometerText, decimalSeparatorFor(tag));
+
+    if (reading.kind === "invalid") {
+      setErrors({ odometer: copy.odometerWhole });
+      toast.error(`${copy.odometer}: ${copy.odometerWhole}`);
+      focusOdometer();
+      return;
+    }
+    if (reading.kind === "suspect") {
+      setReview({ kind: "format", entered: odometerText.trim(), suggestion: reading.value });
+      return;
+    }
+
+    const odometer = reading.kind === "ok" ? reading.value : null;
+    // Edits of older entries legitimately sit below the truck's current reading.
+    if (!confirmed && !isEdit && odometer != null) {
+      const concern = odometerConcern(odometer, referenceOdometer);
+      if (concern) {
+        setReview({ ...concern, value: odometer });
+        return;
+      }
+    }
+    save(odometer);
+  }
+
+  function applySuggestion(value: number) {
+    set("odometer", String(value));
+    setErrors((prev) => ({ ...prev, odometer: "" }));
+    setReview(null);
+    attempt(String(value), false);
+  }
+
+  function save(odometer: number | null) {
     const payload = {
       sourceExpenseId: sourceExpense?.id,
       truckId: truckId || null,
@@ -178,7 +237,7 @@ export function FuelFormDialog({
       gallons,
       pricePerGallon: price,
       totalCost,
-      odometer: values.odometer ? toNumber(values.odometer) : null,
+      odometer,
       location: values.location || null,
       station: values.station || null,
       jurisdiction: showIfta
@@ -376,17 +435,19 @@ export function FuelFormDialog({
               <Field
                 label={copy.odometer}
                 htmlFor="fuel-odometer"
-                hint={lastOdometer ? interpolate(copy.lastReading, { value: lastOdometer.toLocaleString(localeTag(locale)) }) : copy.optional}
+                hint={referenceOdometer ? interpolate(copy.lastReading, { value: miles(referenceOdometer) }) : copy.optional}
                 error={errors.odometer}
               >
+                {/* Text, not type="number": a number input silently turns
+                    "271,184" into an empty value and drops the reading. */}
                 <Input
                   id="fuel-odometer"
-                  type="number"
+                  type="text"
                   inputMode="numeric"
-                  min={0}
-                  step={1}
+                  autoComplete="off"
                   value={values.odometer}
                   onChange={(e) => set("odometer", e.target.value)}
+                  aria-invalid={Boolean(errors.odometer)}
                 />
               </Field>
             </div>
@@ -418,6 +479,57 @@ export function FuelFormDialog({
             {isEdit || sourceExpense ? common.saveChanges : copy.addFuel}
           </Button>
         </DialogFooter>
+
+        <Dialog open={review !== null} onOpenChange={(next) => { if (!next) setReview(null); }}>
+          <DialogContent
+            className="max-w-sm"
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              document.getElementById("fuel-odometer")?.focus();
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="size-4 text-warn" />
+                {copy.odometerCheckTitle}
+              </DialogTitle>
+            </DialogHeader>
+            <DialogBody>
+              <DialogDescription className="text-sm text-foreground">
+                {review?.kind === "format"
+                  ? interpolate(copy.odometerFormatBody, { entered: review.entered, suggestion: miles(review.suggestion) })
+                  : review?.kind === "below"
+                    ? interpolate(copy.odometerBelowBody, { value: miles(review.value), reference: miles(review.reference) })
+                    : review?.kind === "jump"
+                      ? interpolate(copy.odometerJumpBody, { value: miles(review.value), reference: miles(review.reference), miles: miles(review.miles) })
+                      : null}
+              </DialogDescription>
+            </DialogBody>
+            <DialogFooter>
+              <Button type="button" variant="outline" size="sm" onClick={() => setReview(null)}>
+                {copy.odometerEdit}
+              </Button>
+              {review?.kind === "format" ? (
+                <Button type="button" size="sm" onClick={() => applySuggestion(review.suggestion)}>
+                  {interpolate(copy.odometerUseSuggestion, { value: miles(review.suggestion) })}
+                </Button>
+              ) : review ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const value = review.value;
+                    setReview(null);
+                    save(value);
+                  }}
+                >
+                  {copy.odometerSaveAnyway}
+                </Button>
+              ) : null}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
     </>
   );
 

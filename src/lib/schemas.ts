@@ -284,6 +284,7 @@ export const fuelSchema = z.object({
   totalCost: money.min(0.01, "Total cost is required"),
   odometer: z
     .number({ invalid_type_error: "Enter a number" })
+    .int("Use a whole-number odometer reading")
     .min(0)
     .max(5_000_000)
     .optional()
@@ -357,6 +358,7 @@ export const maintenanceSchema = z
     serviceDate: isoDate,
     odometer: z
       .number({ invalid_type_error: "Enter a number" })
+      .int("Use a whole-number odometer reading")
       .min(0)
       .max(5_000_000)
       .optional()
