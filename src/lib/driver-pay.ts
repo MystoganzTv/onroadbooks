@@ -176,3 +176,23 @@ export function allocateDriverSettlementNetPay(settlement: DriverSettlement): Ma
   });
   return allocations;
 }
+
+/** Pay attributed to assigned loads; statement lines retain the agreed rate at preparation. */
+export function driverLoadEarnings(driver: Driver, loads: Load[], settlements: DriverSettlement[]) {
+  const lines = new Map<string, { amount: number; paidAmount: number | null; paidOn: string | null }>();
+  for (const statement of settlements.filter((row) => row.driverId === driver.id)) {
+    const paid = statement.status === "PAID";
+    const allocations = paid ? allocateDriverSettlementNetPay(statement) : null;
+    for (const line of statement.lines) lines.set(line.loadId, {
+      amount: line.payAmount,
+      paidAmount: allocations?.get(line.id) ?? null,
+      paidOn: paid ? statement.paidOn : null,
+    });
+  }
+  return loads.filter((load) => load.driverId === driver.id).map((load) => ({
+    load,
+    amount: lines.get(load.id)?.amount ?? calculateDriverPay(driver.payType, driver.payRate, load),
+    paidAmount: lines.get(load.id)?.paidAmount ?? null,
+    paidOn: lines.get(load.id)?.paidOn ?? null,
+  }));
+}

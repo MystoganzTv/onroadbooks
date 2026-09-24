@@ -1,3 +1,4 @@
+import { brokerNames as savedBrokerNames } from "@/lib/brokers";
 import type { Metadata } from "next";
 
 import { ModeView, ViewModeToggle } from "@/components/shared/view-mode";
@@ -52,7 +53,7 @@ export default async function LoadsPage({
   const [params, session, locale] = await Promise.all([searchParams, requireSession(), getAppLocale()]);
   const dictionary = getWebDictionary(locale);
   const copy = dictionary.loads;
-  const { trucks, loads, expenses, settings, drivers, subscription, paymentEvents } = await getDataset(
+  const { trucks, loads, expenses, settings, drivers, subscription, paymentEvents, brokers: brokerProfiles } = await getDataset(
     session.businessId,
   );
   const period = periodFromSearchParams(params);
@@ -65,7 +66,7 @@ export default async function LoadsPage({
 
   const periodLoads = withMetricsAll(loadsInPeriod(scopedLoads, period), ratingThresholds, scopedExpenses);
   const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings, paymentEvents);
-  const brokers = [...new Set(loads.map((l) => l.broker).filter(Boolean))].sort() as string[];
+  const brokers = savedBrokerNames(loads, brokerProfiles);
   const driverSchedule = driverScheduleFromLoads(loads);
 
   const tripExpenses = periodLoads.reduce((sum, load) => sum + load.metrics.tripExpenses, 0);

@@ -1,3 +1,7 @@
+import { PeriodControls } from "@/components/dashboard/period-controls";
+import { periodFromSearchParams, type SearchParams } from "@/lib/period-params";
+import { loadsInPeriod, roundMoney } from "@/lib/calculations";
+import { formatMoney, formatMiles } from "@/lib/formatters";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -12,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth";
 import { getDataset } from "@/lib/db";
-import { driverPayDescription } from "@/lib/driver-pay";
+import { driverPayDescription, driverLoadEarnings } from "@/lib/driver-pay";
 import { hasFleetAccess } from "@/lib/plans";
 import { roleCan } from "@/lib/roles";
 import { Users } from "lucide-react";
@@ -24,7 +28,8 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: getWebDictionary(locale).drivers.metadataTitle };
 }
 
-export default async function DriversPage() {
+export default async function DriversPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const period = periodFromSearchParams(await searchParams);
   const [session, locale] = await Promise.all([requireSession(), getAppLocale()]);
   const copy = getWebDictionary(locale).drivers;
   const common = getWebDictionary(locale).common;
@@ -43,6 +48,7 @@ export default async function DriversPage() {
           {canManage ? <DriverFormDialog trucks={dataset.trucks} /> : null}
         </>}
       />
+      <PeriodControls period={period} />
       <Card>
         <CardContent className="p-0">
           {dataset.drivers.length === 0 ? (
@@ -57,13 +63,17 @@ export default async function DriversPage() {
               <Table>
                 <TableHeader><TableRow>
                   <TableHead>{copy.driver}</TableHead><TableHead>{copy.defaultUnit}</TableHead><TableHead>{copy.payAgreement}</TableHead>
-                  <TableHead>{copy.status}</TableHead>{canManage ? <TableHead className="text-right">{common.actions}</TableHead> : null}
+                  <TableHead className="text-right">{copy.loads}</TableHead><TableHead className="text-right">{copy.miles}</TableHead><TableHead className="text-right">{copy.payFromLoads}</TableHead><TableHead>{copy.status}</TableHead>{canManage ? <TableHead className="text-right">{common.actions}</TableHead> : null}
                 </TableRow></TableHeader>
                 <TableBody>{dataset.drivers.map((driver) => {
+                  const earnings = driverLoadEarnings(driver, loadsInPeriod(dataset.loads, period), dataset.driverSettlements);
                   return <TableRow key={driver.id}>
-                    <TableCell><Link href={`/drivers/${driver.id}`} className="font-medium text-primary hover:underline">{driver.name}</Link>{driver.reference ? <p className="text-2xs text-muted-foreground">{driver.reference}</p> : null}</TableCell>
+                    <TableCell><Link href={`/drivers/${driver.id}?period=custom&from=${period.start}&to=${period.end}`} className="font-medium text-primary hover:underline">{driver.name}</Link>{driver.reference ? <p className="text-2xs text-muted-foreground">{driver.reference}</p> : null}</TableCell>
                     <TableCell>{dataset.trucks.find((truck) => truck.id === driver.defaultTruckId)?.name ?? copy.anyUnit}</TableCell>
                     <TableCell>{driverPayDescription(driver, locale)}</TableCell>
+                    <TableCell className="text-right tnum">{earnings.length}</TableCell>
+                    <TableCell className="text-right tnum">{formatMiles(earnings.reduce((sum, row) => sum + row.load.loadedMiles + row.load.deadheadMiles, 0))}</TableCell>
+                    <TableCell className="text-right tnum"><Link href={`/drivers/${driver.id}?period=custom&from=${period.start}&to=${period.end}`} className="font-semibold text-primary hover:underline">{formatMoney(roundMoney(earnings.reduce((sum, row) => sum + row.amount, 0)))}</Link></TableCell>
                     <TableCell><Badge variant={driver.active ? "positive" : "default"}>{driver.active ? common.active : common.inactive}</Badge></TableCell>
                     {canManage ? <TableCell><DriverRowActions driver={driver} trucks={dataset.trucks} /></TableCell> : null}
                   </TableRow>;

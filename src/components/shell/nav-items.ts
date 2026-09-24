@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Building2,
   BadgeDollarSign,
   Calculator,
   CreditCard,
@@ -61,6 +62,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { href: "/loads", label: "Loads", icon: Package },
+      { href: "/brokers", label: "Brokers", icon: Building2 },
       { href: "/calculator", label: "Load Calculator", icon: Calculator },
       { href: "/expenses", label: "Expenses", icon: Receipt },
       { href: "/fuel", label: "Fuel", icon: Fuel },

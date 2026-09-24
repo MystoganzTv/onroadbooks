@@ -18,6 +18,7 @@ declare
     'ReserveTransaction',
     'Settlement',
     'Driver',
+    'Broker',
     'DriverSettlement',
     'DriverSettlementLine',
     'DriverSettlementAdjustment',

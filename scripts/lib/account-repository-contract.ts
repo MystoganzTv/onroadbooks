@@ -98,6 +98,7 @@ export async function accountRepositoryContract(
   );
 
   const loadInput = {
+    broker: "Example Brokerage",
     date: "2024-02-29",
     invoiceNumber: "CONTRACT-1",
     invoiceDate: "2024-02-29",
@@ -118,6 +119,15 @@ export async function accountRepositoryContract(
   const load = await repo.createLoad(loadInput);
   assert.equal(load.date, "2024-02-29");
   assert.equal(load.grossRate, 2500.01);
+  const contact = { name: "Example Brokerage", contactName: "Dispatch Team", phone: "555-0100", email: "dispatch@example.test", mcNumber: "123456", address: "Example address", notes: "Call before arrival" };
+  const broker = await repo.saveBroker(null, contact);
+  assert.equal((await repo.getDataset()).brokers?.find((row) => row.id === broker.id)?.email, contact.email);
+  await assert.rejects(repo.saveBroker(null, { ...contact, name: "  EXAMPLE BROKERAGE  " }), /already exists/);
+  await assert.rejects(foreign.saveBroker(broker.id, contact), /does not belong/);
+  const updatedBroker = await repo.saveBroker(broker.id, { ...contact, name: "Renamed Brokerage", phone: "555-0200" });
+  assert.equal(updatedBroker.phone, "555-0200");
+  assert.equal((await repo.getDataset()).loads.find((row) => row.id === load.id)?.broker, "Renamed Brokerage");
+
   await assert.rejects(foreign.updateLoad(load.id, loadInput));
   await assert.rejects(foreign.deleteLoad(load.id));
   await assert.rejects(
@@ -255,6 +265,7 @@ export async function accountRepositoryContract(
   assert.equal(reset.loads.length, 0);
   assert.equal(reset.expenses.length, 0);
   assert.equal(reset.documents.length, 0);
+  assert.equal(reset.brokers?.length, 0);
   assert.equal(reset.paymentEvents.length, 0);
   assert.equal(reset.subscription.plan, "FLEET");
   assert.equal(reset.business.name, "Contract workspace");

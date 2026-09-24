@@ -1,3 +1,4 @@
+import { brokerNameKey } from "../brokers";
 import { recurringSeriesExpenseIds } from "../recurring-expenses";
 import "server-only";
 import { assertFuelExpenseSource } from "../fuel-expenses";
@@ -11,6 +12,7 @@ import {
 } from "../driver-pay";
 import type {
   Business,
+  Broker,
   User,
   Dataset,
   Driver,
@@ -64,6 +66,7 @@ import type {
   AdminAccountSummary,
   AuthStore,
   BusinessInput,
+  BrokerInput,
   DocumentInput,
   DriverInput,
   DriverSettlementInput,
@@ -614,6 +617,7 @@ export class PrismaAuthStore implements AuthStore {
         select: { storageKey: true },
       });
 
+      await tx.broker.deleteMany({ where: { businessId } });
       await tx.document.deleteMany({ where: { businessId } });
       await tx.fuelEntry.deleteMany({ where: { businessId } });
       await tx.maintenanceRecord.deleteMany({ where: { businessId } });
@@ -743,6 +747,7 @@ export class PrismaRepository implements Repository {
     const business = await this.business(client);
 
     const [
+      brokerRows,
       loadRows,
       expenseRows,
       fuelRows,
@@ -758,6 +763,7 @@ export class PrismaRepository implements Repository {
       obligationRows,
       paymentEventRows,
     ] = await Promise.all([
+      client.broker.findMany({ where: { businessId: business.id }, orderBy: { name: "asc" } }),
       // Tie-break on id so same-day rows have a defined order, matching the
       // JSON store rather than whatever Postgres happens to return.
       client.load.findMany({
@@ -936,6 +942,7 @@ export class PrismaRepository implements Repository {
     }));
 
     const dataset: Dataset = {
+      brokers: brokerRows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() })),
       users: [],
       business: {
         id: business.id,
@@ -1398,6 +1405,25 @@ export class PrismaRepository implements Repository {
       });
       await tx.load.delete({ where: { id } });
     });
+  }
+
+  async saveBroker(id: string | null, input: BrokerInput): Promise<Broker> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const row = await client.$transaction(async (tx) => {
+      const existing = id ? await tx.broker.findFirst({ where: { id, businessId: business.id } }) : null;
+      if (id && !existing) throw new Error("That broker does not belong to this workspace.");
+      const nameKey = brokerNameKey(input.name);
+      const duplicate = await tx.broker.findFirst({ where: { businessId: business.id, nameKey } });
+      if (duplicate && duplicate.id !== id) throw new Error("A broker with that name already exists.");
+      const data = { ...input, name: input.name.trim(), nameKey };
+      if (!existing) return tx.broker.create({ data: { ...data, businessId: business.id } });
+      const loads = await tx.load.findMany({ where: { businessId: business.id }, select: { id: true, broker: true } });
+      const linked = loads.filter((load) => brokerNameKey(load.broker ?? "") === existing.nameKey).map((load) => load.id);
+      await tx.load.updateMany({ where: { businessId: business.id, id: { in: linked } }, data: { broker: data.name } });
+      return tx.broker.update({ where: { id: existing.id }, data });
+    });
+    return { ...row, createdAt: row.createdAt.toISOString() };
   }
 
   async createDriver(input: DriverInput): Promise<Driver> {

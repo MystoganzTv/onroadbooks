@@ -9,6 +9,7 @@
 
 import type {
   Business,
+  Broker,
   User,
   Dataset,
   Driver,
@@ -326,7 +327,10 @@ export interface SubscriptionInput {
   providerSubscriptionId?: string | null;
 }
 
+export type BrokerInput = Pick<Broker, "name" | "contactName" | "phone" | "email" | "mcNumber" | "address" | "notes">;
+
 export interface Repository {
+  saveBroker(id: string | null, input: BrokerInput): Promise<Broker>;
   /** Everything the app needs for a request, in one read. */
   getDataset(): Promise<Dataset>;
 

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { calculateDriverPay, driverSettlementTotals } from "../driver-pay";
-import type { DriverSettlement } from "../types";
+import { calculateDriverPay, driverSettlementTotals, driverLoadEarnings } from "../driver-pay";
+import type { Driver, Load, DriverSettlement } from "../types";
 
 const load = { grossRate: 2400, loadedMiles: 784, deadheadMiles: 100 };
 
@@ -56,5 +56,32 @@ describe("driver pay formulas", () => {
     assert.equal(totals.additions, 75);
     assert.equal(totals.reductions, 120);
     assert.equal(totals.netPay, 255);
+  });
+});
+
+describe("driver earnings by assigned load", () => {
+  const driver = { id: "driver", payType: "PERCENT_GROSS", payRate: 30 } as Driver;
+  const loads = [
+    { ...load, id: "first", driverId: driver.id, grossRate: 1000 },
+    { ...load, id: "second", driverId: driver.id, grossRate: 500 },
+    { ...load, id: "other", driverId: "someone-else", grossRate: 2000 },
+  ] as Load[];
+
+  it("shows the agreed salary for every assigned load without treating it as paid", () => {
+    const rows = driverLoadEarnings(driver, loads, []);
+    assert.deepEqual(rows.map((row) => row.amount), [300, 150]);
+    assert.ok(rows.every((row) => row.paidAmount === null));
+  });
+
+  it("preserves statement rates after an agreement changes and keeps paid adjustments separate", () => {
+    const statement = { driverId: driver.id, status: "PAID", paidOn: "2026-09-23",
+      lines: [{ id: "line", loadId: "first", payAmount: 250, grossRevenue: 1000, totalMiles: 884 }],
+      adjustments: [{ type: "REIMBURSEMENT", amount: 35 }],
+    } as DriverSettlement;
+    const rows = driverLoadEarnings({ ...driver, payRate: 40 }, loads, [statement]);
+    assert.equal(rows[0].amount, 250);
+    assert.equal(rows[0].paidAmount, 285);
+    assert.equal(rows[0].paidOn, "2026-09-23");
+    assert.equal(rows[1].amount, 200);
   });
 });

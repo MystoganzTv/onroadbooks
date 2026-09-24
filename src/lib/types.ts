@@ -432,7 +432,22 @@ export interface MaintenanceDue {
 export type ProfitabilityRating = "GREAT" | "GOOD" | "MARGINAL" | "BAD";
 
 /** Aggregate root loaded once per request and reused by every calculation. */
+export interface Broker {
+  id: string;
+  businessId: string;
+  name: string;
+  nameKey: string;
+  contactName: string | null;
+  phone: string | null;
+  email: string | null;
+  mcNumber: string | null;
+  address: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
 export interface Dataset {
+  brokers?: Broker[];
   business: Business;
   users: User[];
   settings: FinancialSettings;

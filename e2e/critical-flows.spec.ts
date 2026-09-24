@@ -1023,6 +1023,44 @@ test.describe.serial("critical browser flows", () => {
     expect((await xlsx.body()).subarray(0, 2).toString()).toBe("PK");
   });
 
+  test("broker contacts reuse historical names and keep load history after a rename", async ({ page }) => {
+    await login(page);
+    const dataset = await readDataset() as CalculatorFixtureDataset;
+    const load = dataset.loads[0];
+    await page.goto(`/loads/${load.id}`);
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await page.locator("#load-broker").fill("E2E Brokerage");
+    await page.getByRole("button", { name: "Save changes", exact: true }).click();
+    await expect(page.getByRole("dialog")).toBeHidden();
+    await page.goto("/brokers");
+    const row = page.getByRole("row").filter({ hasText: "E2E Brokerage" });
+    await row.getByRole("button", { name: "Add contact details", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByLabel("Company name", { exact: false })).toHaveValue("E2E Brokerage");
+    await dialog.getByLabel("Contact name", { exact: true }).fill("Alex Dispatch");
+    await dialog.getByLabel("Phone", { exact: true }).fill("555-0100");
+    await dialog.getByLabel("Email", { exact: true }).fill("dispatch@example.test");
+    await dialog.getByLabel("MC number", { exact: true }).fill("123456");
+    await dialog.getByLabel("Notes", { exact: true }).fill("Call before pickup");
+    await dialog.getByRole("button", { name: "Save changes", exact: true }).click();
+    await expect(page).toHaveURL(/\/brokers\/[^/]+$/);
+    await expect(page.getByRole("heading", { name: "E2E Brokerage", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "dispatch@example.test", exact: true })).toHaveAttribute("href", "mailto:dispatch@example.test");
+    await expect(page.getByRole("link", { name: "E2E-LOAD-1", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Edit broker", exact: true }).click();
+    await page.getByRole("dialog").getByLabel("Company name", { exact: false }).fill("Updated Brokerage");
+    await page.getByRole("dialog").getByRole("button", { name: "Save changes", exact: true }).click();
+    await expect(page.getByRole("dialog")).toBeHidden();
+    await expect(page.getByRole("heading", { name: "Updated Brokerage", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "E2E-LOAD-1", exact: true })).toBeVisible();
+    await page.screenshot({ path: "/tmp/onroad-broker-profile.png", fullPage: true });
+    await page.goto(`/loads/${load.id}`);
+    await expect(page.getByRole("link", { name: "Updated Brokerage", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect(page.locator("#load-broker")).toHaveValue("Updated Brokerage");
+    await expect(page.locator('#broker-list option[value="Updated Brokerage"]')).toHaveCount(1);
+  });
+
   test("Fleet owner adds a driver, assigns a load and posts a frozen statement", async ({ page }) => {
     await mutateDataset((dataset) => {
       dataset.subscription.plan = "FLEET";
@@ -1054,10 +1092,10 @@ test.describe.serial("critical browser flows", () => {
     await expect(page.getByText("Unsettled loads", { exact: true })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Open Driver Pay", exact: true })).toBeVisible();
     const driverHref = await page.getByRole("link", { name: "Jordan Miles", exact: true }).getAttribute("href");
-    await page.goto(`${driverHref}?month=2026-08&period=full`);
+    await page.goto(`${driverHref!.split("?")[0]}?month=2026-08&period=full`);
     await expect(page.getByRole("heading", { name: "Jordan Miles" })).toBeVisible();
-    await expect(page.getByText("Period performance")).toBeVisible();
-    await expect(page.getByText("Loads ready for payroll")).toBeVisible();
+    await expect(page.getByText("Pay by load", { exact: true })).toBeVisible();
+    await expect(page.getByRole("row").filter({ hasText: "E2E-LOAD-2" })).toContainText("$210.00");
 
     await page.goto("/driver-settlements");
     await page.getByRole("button", { name: "Prepare statement" }).first().click();
@@ -1088,6 +1126,15 @@ test.describe.serial("critical browser flows", () => {
     await page.getByRole("button", { name: "Mark paid" }).click();
     await page.getByRole("button", { name: "Post payment" }).click();
     await expect(page.getByText(/^Paid /).first()).toBeVisible();
+    await page.goto(`${driverHref!.split("?")[0]}?month=2026-08&period=full`);
+    const earningsRow = page.getByRole("row").filter({ hasText: "E2E-LOAD-2" });
+    await expect(earningsRow).toContainText("$210.00");
+    await expect(earningsRow).toContainText("$245.00");
+    await page.screenshot({ path: "/tmp/onroad-driver-earnings.png", fullPage: true });
+    await page.goto("/drivers?month=2026-08&period=month");
+    await expect(page.getByRole("row").filter({ hasText: "Jordan Miles" })).toContainText("$210.00");
+    await page.screenshot({ path: "/tmp/onroad-drivers-pay.png", fullPage: true });
+
   });
 
   test("Fleet calculator keeps truck history and financing confirmation scoped", async ({ page }) => {

@@ -251,6 +251,7 @@ model Business {
   reserveAccounts      ReserveAccount[]
   reserveTransactions  ReserveTransaction[]
   settlements          Settlement[]
+  brokers              Broker[]
   drivers              Driver[]
   driverSettlements    DriverSettlement[]
 }
@@ -824,4 +825,22 @@ model Document {
   @@index([expenseId])
   @@index([truckId])
   @@index([maintenanceId])
+}
+
+model Broker {
+  id String @id @default(cuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name String
+  nameKey String
+  contactName String?
+  phone String?
+  email String?
+  mcNumber String?
+  address String?
+  notes String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([businessId, nameKey])
 }

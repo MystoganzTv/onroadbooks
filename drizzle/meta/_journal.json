@@ -57,6 +57,13 @@
       "when": 1790208933235,
       "tag": "0007_driver-carrier-information-sheet",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790209839104,
+      "tag": "0008_broker-profiles",
+      "breakpoints": true
     }
   ]
 }

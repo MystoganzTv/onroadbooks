@@ -1,3 +1,4 @@
+import { brokerNames as savedBrokerNames } from "@/lib/brokers";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Calculator, Route } from "lucide-react";
@@ -262,7 +263,7 @@ export default async function DashboardPage({
 
   const buckets = periodBuckets(loads, expenses, period);
   const query = scopeQuery(period, truckId);
-  const brokerNames = [...new Set(loads.map((l) => l.broker).filter(Boolean))].sort() as string[];
+  const brokerNames = savedBrokerNames(loads, dataset.brokers);
   const hasLedgerHistory = allLoads.length > 0 || allExpenses.length > 0;
 
   const loadAction = roleCan(role, "manage_loads") ? (

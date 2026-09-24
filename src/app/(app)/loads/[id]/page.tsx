@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { brokerNameKey, brokerNames as savedBrokerNames } from "@/lib/brokers";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Download, FileText, MapPin, Package, Pencil, Receipt } from "lucide-react";
@@ -83,7 +85,8 @@ export default async function LoadDetailPage({
   const debtCashBurden = roundMoney(
     metrics.totalMiles * allocationBasis.debtServicePerMile,
   );
-  const brokers = [...new Set(dataset.loads.map((l) => l.broker).filter(Boolean))].sort() as string[];
+  const brokerProfile = dataset.brokers?.find((row) => row.nameKey === brokerNameKey(load.broker ?? ""));
+  const brokers = savedBrokerNames(dataset.loads, dataset.brokers);
   const linkedExpenses = dataset.expenses.filter((expense) => expense.loadId === load.id);
   const documents = dataset.documents.filter((doc) => doc.loadId === load.id);
   const route = `${load.originCity}, ${load.originState} ${copy.to} ${load.destinationCity}, ${load.destinationState}`;
@@ -100,7 +103,7 @@ export default async function LoadDetailPage({
           <p className="mt-0.5 text-sm text-muted-foreground">
             {copy.pickup} {formatLocaleDate(load.date, locale, "long")}
             {load.deliveryDate ? ` - ${copy.delivery} ${formatLocaleDate(load.deliveryDate, locale, "long")}` : ""}
-            {load.broker ? ` - ${load.broker}` : ""}
+            {load.broker ? <> - {brokerProfile ? <Link className="text-primary hover:underline" href={`/brokers/${brokerProfile.id}`}>{load.broker}</Link> : load.broker}</> : null}
             {load.loadNumber ? ` - ${interpolate(copy.loadNumber, { number: load.loadNumber })}` : ""}
             {dataset.trucks.length > 1
               ? ` - ${dataset.trucks.find((t) => t.id === load.truckId)?.name ?? copy.unknownTruck}`

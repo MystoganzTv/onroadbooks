@@ -1,3 +1,4 @@
+import { brokerNameKey } from "../brokers";
 import { recurringSeriesExpenseIds } from "../recurring-expenses";
 import "server-only";
 import { assertFuelExpenseSource } from "../fuel-expenses";
@@ -35,6 +36,7 @@ import {
 } from "../driver-pay";
 import type {
   Business,
+  Broker,
   User,
   Dataset,
   Driver,
@@ -97,6 +99,7 @@ import type {
   AdminAccountSummary,
   AuthStore,
   BusinessInput,
+  BrokerInput,
   DocumentInput,
   DriverInput,
   DriverSettlementInput,
@@ -841,6 +844,7 @@ export class DrizzleAuthStore implements AuthStore {
         columns: { storageKey: true },
       });
 
+      await tx.delete(s.broker).where(eq(s.broker.businessId, businessId));
       await affectedRows(
         tx
           .delete(s.document)
@@ -1086,6 +1090,7 @@ export class DrizzleRepository implements Repository {
     const business = await this.business(client);
 
     const [
+      brokerRows,
       loadRows,
       expenseRows,
       fuelRows,
@@ -1101,6 +1106,7 @@ export class DrizzleRepository implements Repository {
       obligationRows,
       paymentEventRows,
     ] = await Promise.all([
+      client.query.broker.findMany({ where: eq(s.broker.businessId, business.id), orderBy: [asc(s.broker.name)] }),
       // Tie-break on id so same-day rows have a defined order, matching the
       // JSON store rather than whatever Postgres happens to return.
       client.query.load.findMany({
@@ -1322,6 +1328,7 @@ export class DrizzleRepository implements Repository {
     }));
 
     const dataset: Dataset = {
+      brokers: brokerRows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() })),
       users: [],
       business: {
         id: business.id,
@@ -1896,6 +1903,25 @@ export class DrizzleRepository implements Repository {
       );
       await oneRow(tx.delete(s.load).where(eq(s.load.id, id)).returning());
     });
+  }
+
+  async saveBroker(id: string | null, input: BrokerInput): Promise<Broker> {
+    const client = await this.clientProvider();
+    const business = await this.business(client);
+    const row = await client.transaction(async (tx) => {
+      const existing = id ? await tx.query.broker.findFirst({ where: and(eq(s.broker.id, id), eq(s.broker.businessId, business.id)) }) : null;
+      if (id && !existing) throw new Error("That broker does not belong to this workspace.");
+      const nameKey = brokerNameKey(input.name);
+      const duplicate = await tx.query.broker.findFirst({ where: and(eq(s.broker.businessId, business.id), eq(s.broker.nameKey, nameKey)) });
+      if (duplicate && duplicate.id !== id) throw new Error("A broker with that name already exists.");
+      const data = { ...input, name: input.name.trim(), nameKey };
+      if (!existing) return oneRow(tx.insert(s.broker).values(insertValues(s.broker, { ...data, businessId: business.id })).returning());
+      const loads = await tx.query.load.findMany({ where: eq(s.load.businessId, business.id), columns: { id: true, broker: true } });
+      const linked = loads.filter((load) => brokerNameKey(load.broker ?? "") === existing.nameKey).map((load) => load.id);
+      if (linked.length) await tx.update(s.load).set(updateValues(s.load, { broker: data.name })).where(and(eq(s.load.businessId, business.id), inArray(s.load.id, linked)));
+      return oneRow(tx.update(s.broker).set(updateValues(s.broker, data)).where(and(eq(s.broker.id, existing.id), eq(s.broker.businessId, business.id))).returning());
+    });
+    return { ...row, createdAt: row.createdAt.toISOString() };
   }
 
   async createDriver(input: DriverInput): Promise<Driver> {

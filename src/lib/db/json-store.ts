@@ -1,3 +1,4 @@
+import { brokerNameKey } from "../brokers";
 import { recurringSeriesExpenseIds } from "../recurring-expenses";
 import "server-only";
 import { assertFuelExpenseSource } from "../fuel-expenses";
@@ -37,6 +38,7 @@ import { requireExactDebtPaymentSplit } from "../finance/debt-payment";
 import { expenseMirrorSource, mirrorRefusal } from "../mirrored-expenses";
 import type {
   Business,
+  Broker,
   Dataset,
   Driver,
   DriverSettlement,
@@ -67,6 +69,7 @@ import {
   type AdminAccountSummary,
   type AuthStore,
   type BusinessInput,
+  type BrokerInput,
   type DocumentInput,
   type DriverInput,
   type DriverSettlementInput,
@@ -215,6 +218,7 @@ async function seedFresh(): Promise<Dataset> {
     reserveTransactions: [],
     settlements: [],
     drivers: [],
+    brokers: [],
     driverSettlements: [],
   };
   await persist(dataset);
@@ -280,6 +284,7 @@ function migrate(dataset: Dataset): Dataset {
   // The plan a ledger was written with may no longer be a plan we sell. The
   // catalogue decides what it becomes -- Individual, the old single-truck
   // plan, keeps the cockpit it was sold and becomes OnRoad Pro.
+  dataset.brokers ??= [];
   dataset.subscription.plan = getPlan(dataset.subscription.plan).id;
   if (!Array.isArray(dataset.reserveAccounts) || dataset.reserveAccounts.length === 0) {
     dataset.reserveAccounts = defaultReserveAccounts(businessId);
@@ -955,6 +960,7 @@ export class JsonAuthStore implements AuthStore {
       dataset.reserveTransactions = [];
       dataset.settlements = [];
       dataset.drivers = [];
+      dataset.brokers = [];
       dataset.driverSettlements = [];
       dataset.trucks = [
         {
@@ -1149,6 +1155,28 @@ export class JsonRepository implements Repository {
       dataset.documents = dataset.documents.filter(
         (document) => !document.expenseId || !generatedIds.includes(document.expenseId),
       );
+    }, this.businessId);
+  }
+
+  async saveBroker(id: string | null, input: BrokerInput): Promise<Broker> {
+    return mutate((dataset) => {
+      const brokers = dataset.brokers ??= [];
+      const existing = id ? brokers.find((row) => row.id === id) : undefined;
+      if (id && !existing) throw new Error("That broker does not belong to this workspace.");
+      const nameKey = brokerNameKey(input.name);
+      if (brokers.some((row) => row.nameKey === nameKey && row.id !== id)) {
+        throw new Error("A broker with that name already exists.");
+      }
+      const row: Broker = { ...input, name: input.name.trim(), nameKey,
+        id: existing?.id ?? newId("broker"), businessId: dataset.business.id,
+        createdAt: existing?.createdAt ?? new Date().toISOString() };
+      if (existing) {
+        for (const load of dataset.loads) {
+          if (brokerNameKey(load.broker ?? "") === existing.nameKey) load.broker = row.name;
+        }
+        Object.assign(existing, row);
+      } else brokers.push(row);
+      return row;
     }, this.businessId);
   }
 
