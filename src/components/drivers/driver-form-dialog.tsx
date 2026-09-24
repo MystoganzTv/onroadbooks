@@ -13,7 +13,6 @@ import { DRIVER_PAY_TYPES } from "@/lib/driver-pay";
 import { fieldErrors, focusFirstError, validationMessage } from "@/lib/form";
 import { driverSchema } from "@/lib/schemas";
 import type { Driver, DriverPayType, Truck } from "@/lib/types";
-import { toNumber } from "@/lib/utils";
 import { Field } from "@/components/shared/field";
 import { Button } from "@/components/ui/button";
 import {
@@ -59,7 +58,7 @@ export function DriverFormDialog({
   const [payType, setPayType] = React.useState<DriverPayType>(
     driver?.payType ?? "PERCENT_GROSS",
   );
-  const [payRate, setPayRate] = React.useState(driver ? String(driver.payRate) : "30");
+  const [payRate, setPayRate] = React.useState(driver ? String(driver.payRate) : "");
 
   React.useEffect(() => {
     if (!open) return;
@@ -67,7 +66,7 @@ export function DriverFormDialog({
     setReference(driver?.reference ?? "");
     setDefaultTruckId(driver?.defaultTruckId ?? "NO_DEFAULT");
     setPayType(driver?.payType ?? "PERCENT_GROSS");
-    setPayRate(driver ? String(driver.payRate) : "30");
+    setPayRate(driver ? String(driver.payRate) : "");
     setErrors({});
   }, [open, driver]);
 
@@ -80,7 +79,7 @@ export function DriverFormDialog({
       reference: reference || null,
       defaultTruckId: defaultTruckId === "NO_DEFAULT" ? null : defaultTruckId,
       payType,
-      payRate: toNumber(payRate),
+      payRate: payRate.trim() === "" ? Number.NaN : Number(payRate),
     };
     const parsed = driverSchema.safeParse(values);
     if (!parsed.success) {

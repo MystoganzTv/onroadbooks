@@ -50,6 +50,13 @@
       "when": 1790073475580,
       "tag": "0006_software-category",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790208933235,
+      "tag": "0007_driver-carrier-information-sheet",
+      "breakpoints": true
     }
   ]
 }

@@ -19,7 +19,8 @@ export interface DocumentTypeDefinition {
 
 export const DOCUMENT_TYPES: DocumentTypeDefinition[] = [
   { id: "RATE_CONFIRMATION", label: "Rate Confirmation", short: "Rate Con", labelEs: "Confirmación de tarifa", shortEs: "Conf. tarifa" },
-  { id: "BOL", label: "Bill of Lading", short: "BOL", labelEs: "Conocimiento de embarque", shortEs: "BOL" },
+  { id: "DRIVER_CARRIER_INFORMATION_SHEET", label: "Driver/Carrier Information Sheet", short: "Driver/Carrier Info", labelEs: "Hoja de información del conductor/transportista", shortEs: "Info. conductor/transportista" },
+  { id: "BOL", label: "BOL (Bill of Lading)", short: "BOL", labelEs: "BOL (Conocimiento de embarque)", shortEs: "BOL" },
   { id: "POD", label: "Proof of Delivery", short: "POD", labelEs: "Comprobante de entrega", shortEs: "POD" },
   { id: "INVOICE", label: "Invoice", short: "Invoice", labelEs: "Factura", shortEs: "Factura" },
   { id: "RECEIPT", label: "Receipt", short: "Receipt", labelEs: "Recibo", shortEs: "Recibo" },
@@ -36,7 +37,7 @@ export const DOCUMENT_TYPE_IDS = DOCUMENT_TYPES.map((t) => t.id);
 
 /** The document types offered for each kind of record. */
 export const DOCUMENT_TYPES_FOR: Record<DocumentOwner, DocumentType[]> = {
-  LOAD: ["RATE_CONFIRMATION", "BOL", "POD", "INVOICE", "OTHER"],
+  LOAD: ["RATE_CONFIRMATION", "DRIVER_CARRIER_INFORMATION_SHEET", "BOL", "INVOICE", "OTHER"],
   EXPENSE: ["RECEIPT", "INVOICE", "OTHER"],
   TRUCK: ["REGISTRATION", "INSURANCE", "TITLE", "INSPECTION", "OTHER"],
   MAINTENANCE: ["RECEIPT", "INVOICE", "INSPECTION", "OTHER"],

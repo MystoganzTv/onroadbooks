@@ -125,12 +125,14 @@ async function addLoad(
   await page.locator("#load-number").fill(loadNumber);
 
   if (attachDocument) {
+    await dialog.getByRole("combobox", { name: "Document type" }).click();
+    await page.getByRole("option", { name: "Driver/Carrier Information Sheet", exact: true }).click();
     await page.locator("#load-form input[type=file]").setInputFiles({
-      name: "rate-confirmation.png",
+      name: "driver-carrier-info.png",
       mimeType: "image/png",
       buffer: onePixelPng,
     });
-    await expect(page.getByText("rate-confirmation.png")).toBeVisible();
+    await expect(page.getByText("driver-carrier-info.png")).toBeVisible();
   }
 
   await page.getByRole("button", { name: "Add load", exact: true }).last().click();
@@ -190,8 +192,9 @@ test.describe.serial("critical browser flows", () => {
       attachDocument: true,
     });
 
-    const datasetAfterLoad = await readDataset() as JsonDataset & { documents?: unknown[] };
+    const datasetAfterLoad = await readDataset() as JsonDataset & { documents?: Array<{ type: string }> };
     expect(datasetAfterLoad.documents).toHaveLength(1);
+    expect(datasetAfterLoad.documents?.[0].type).toBe("DRIVER_CARRIER_INFORMATION_SHEET");
 
     await page.goto("/expenses?month=2026-08&period=month");
     await page.getByRole("button", { name: /^Add expense$/i }).first().click();
@@ -1032,7 +1035,9 @@ test.describe.serial("critical browser flows", () => {
     await login(page);
     await page.goto("/drivers");
     await page.getByRole("button", { name: "Add driver", exact: true }).first().click();
+    await expect(page.locator("#driver-pay-rate")).toHaveValue("");
     await page.locator("#driver-name").fill("Jordan Miles");
+    await page.locator("#driver-pay-rate").fill("30");
     await page.locator("#driver-reference").fill("DRV-E2E");
     await page.getByRole("button", { name: "Add driver", exact: true }).last().click();
     await expect(page.getByText("Jordan Miles").first()).toBeVisible();
@@ -1045,6 +1050,9 @@ test.describe.serial("critical browser flows", () => {
     });
 
     await page.goto("/drivers");
+    await expect(page.getByText("Estimated unpaid", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Unsettled loads", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Open Driver Pay", exact: true })).toBeVisible();
     const driverHref = await page.getByRole("link", { name: "Jordan Miles", exact: true }).getAttribute("href");
     await page.goto(`${driverHref}?month=2026-08&period=full`);
     await expect(page.getByRole("heading", { name: "Jordan Miles" })).toBeVisible();

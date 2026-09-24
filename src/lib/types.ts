@@ -330,6 +330,7 @@ export interface FuelEntry {
 /** What a document is, independent of what it hangs off. */
 export type DocumentType =
   | "RATE_CONFIRMATION"
+  | "DRIVER_CARRIER_INFORMATION_SHEET"
   | "BOL"
   | "POD"
   | "INVOICE"

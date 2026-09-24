@@ -214,15 +214,17 @@ export async function accountRepositoryContract(
 
   const document = await repo.createDocument({
     loadId: load.id,
-    label: "Contract BOL",
-    type: "BOL",
+    label: "Driver/Carrier Information Sheet",
+    type: "DRIVER_CARRIER_INFORMATION_SHEET",
     fileName: "contract.pdf",
     contentType: "application/pdf",
     sizeBytes: 42,
     storageKey: `${prefix}/contract.pdf`,
   });
   assert.equal(await foreign.deleteDocument(document.id), null);
-  assert.equal((await repo.getDataset()).documents.length, 1);
+  const savedDocuments = (await repo.getDataset()).documents;
+  assert.equal(savedDocuments.length, 1);
+  assert.equal(savedDocuments[0].type, "DRIVER_CARRIER_INFORMATION_SHEET");
   const accounts = await auth.listAccounts();
   const account = accounts.find((row) => row.userId === owner.id);
   assert.ok(account);
