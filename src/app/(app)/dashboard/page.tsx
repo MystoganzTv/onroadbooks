@@ -1,3 +1,4 @@
+import { buildLoadEstimator } from "@/lib/load-estimates";
 import { brokerNames as savedBrokerNames } from "@/lib/brokers";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -198,7 +199,7 @@ export default async function DashboardPage({
   const cockpit = planAllows(dataset.subscription, "cockpit");
 
   const periodLoads = scoreLoads(
-    withMetricsAll(loadsInPeriod(loads, period), ratingThresholds, expenses),
+    withMetricsAll(loadsInPeriod(loads, period), ratingThresholds, expenses, buildLoadEstimator(dataset, today)),
     ratingThresholds,
     settings.deadheadWarnPct,
   );

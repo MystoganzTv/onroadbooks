@@ -1,3 +1,5 @@
+import { buildLoadEstimator } from "@/lib/load-estimates";
+import { todayISO } from "@/lib/periods";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -73,9 +75,8 @@ export default async function BrokersPage({
     getAppLocale(),
   ]);
   const copy = getWebDictionary(locale).analytics;
-  const { trucks, loads: allLoads, expenses, settings, subscription } = await getDataset(
-    session.businessId,
-  );
+  const dataset = await getDataset(session.businessId);
+  const { trucks, loads: allLoads, expenses, settings, subscription } = dataset;
   const period = periodFromSearchParams(params);
 
   if (!planAllows(subscription, "cockpit")) {
@@ -104,6 +105,7 @@ export default async function BrokersPage({
     loadsInPeriod(loads, period),
     thresholds,
     expenses,
+    buildLoadEstimator(dataset, todayISO()),
   );
   const brokers = calculateBrokerPerformance(periodLoads, thresholds);
   const ranked = sortBrokers(brokers, sort);

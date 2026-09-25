@@ -9,6 +9,7 @@
  */
 
 import { expenseBehaviorOf, behaviorOf, EXPENSE_CATEGORIES, getCategory } from "./categories";
+import type { TripCostEstimate } from "./load-estimates";
 import {
   FINANCIAL_MODEL_VERSION,
   financialTreatmentOf,
@@ -141,18 +142,33 @@ export function rateLoad(
   return "BAD";
 }
 
-/** Every trip cost on a load, itemised for the waterfall. */
+export interface TripExpenseLine {
+  key: string;
+  label: string;
+  amount: number;
+  /** True when the amount is an estimate (fuel) or not yet paid (driver pay). */
+  estimated?: boolean;
+}
+
+/**
+ * Every trip cost on a load, itemised for the waterfall. `estimate` fills the
+ * two costs that reach the ledger later -- see load-estimates.ts -- and only
+ * where the load itself records nothing.
+ */
 export function tripExpenseLines(
   load: Load,
   expenses: Expense[] = [],
-): { key: string; label: string; amount: number }[] {
-  const lines = [
-    { key: "fuel", label: "Estimated fuel", amount: num(load.fuelCost) },
+  estimate: TripCostEstimate = {},
+): TripExpenseLine[] {
+  const fuel = num(load.fuelCost) > 0 ? num(load.fuelCost) : num(estimate.fuelCost);
+  const driverPay = num(load.driverPay) > 0 ? num(load.driverPay) : num(estimate.driverPay);
+  const lines: TripExpenseLine[] = [
+    { key: "fuel", label: "Estimated fuel", amount: fuel, estimated: fuel > 0 && !(num(load.fuelCost) > 0) },
     { key: "tolls", label: "Tolls", amount: load.tolls },
     { key: "dispatch", label: "Dispatch", amount: load.dispatchFee },
     { key: "factoring", label: "Factoring", amount: load.factoringFee },
     { key: "other", label: "Other", amount: load.otherExpenses },
-    { key: "driverPay", label: "Driver Pay", amount: load.driverPay },
+    { key: "driverPay", label: "Driver Pay", amount: driverPay, estimated: driverPay > 0 && !(num(load.driverPay) > 0) },
   ].map((line) => ({ ...line, amount: num(line.amount) }));
   const categoryKeys: Record<string, string> = {
     TOLLS: "tolls", DISPATCH: "dispatch", FACTORING: "factoring", DRIVER_PAY: "driverPay",
@@ -173,9 +189,10 @@ export function loadMetrics(
   load: Load,
   thresholds?: RatingThresholds,
   expenses: Expense[] = [],
+  estimate: TripCostEstimate = {},
 ): LoadMetrics {
   const totalMiles = num(load.loadedMiles) + num(load.deadheadMiles);
-  const tripExpenses = sum(tripExpenseLines(load, expenses), (line) => line.amount);
+  const tripExpenses = sum(tripExpenseLines(load, expenses, estimate), (line) => line.amount);
   const tripProfit = num(load.grossRate) - tripExpenses;
   const profitPerMile = div(tripProfit, totalMiles);
 
@@ -196,14 +213,16 @@ export function withMetrics(
   load: Load,
   thresholds?: RatingThresholds,
   expenses: Expense[] = [],
+  estimate: TripCostEstimate = {},
 ): LoadWithMetrics {
-  return { ...load, metrics: loadMetrics(load, thresholds, expenses) };
+  return { ...load, metrics: loadMetrics(load, thresholds, expenses, estimate) };
 }
 
 export function withMetricsAll(
   loads: Load[],
   thresholds?: RatingThresholds,
   expenses: Expense[] = [],
+  estimator?: (load: Load) => TripCostEstimate,
 ): LoadWithMetrics[] {
   const byLoad = new Map<string, Expense[]>();
   for (const expense of expenses) {
@@ -212,7 +231,7 @@ export function withMetricsAll(
     linked.push(expense);
     byLoad.set(expense.loadId, linked);
   }
-  return loads.map((load) => withMetrics(load, thresholds, byLoad.get(load.id)));
+  return loads.map((load) => withMetrics(load, thresholds, byLoad.get(load.id), estimator?.(load)));
 }
 
 /* ---- Period filtering ----------------------------------------------- */

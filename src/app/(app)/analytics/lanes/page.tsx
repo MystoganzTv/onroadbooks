@@ -1,3 +1,5 @@
+import { buildLoadEstimator } from "@/lib/load-estimates";
+import { todayISO } from "@/lib/periods";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
@@ -62,9 +64,8 @@ export default async function LanesPage({
     getAppLocale(),
   ]);
   const copy = getWebDictionary(locale).analytics;
-  const { trucks, loads: allLoads, expenses, settings, subscription } = await getDataset(
-    session.businessId,
-  );
+  const dataset = await getDataset(session.businessId);
+  const { trucks, loads: allLoads, expenses, settings, subscription } = dataset;
   const period = periodFromSearchParams(params);
   const grouping = (Array.isArray(params.group) ? params.group[0] : params.group) === "state"
     ? "state"
@@ -93,6 +94,7 @@ export default async function LanesPage({
     loadsInPeriod(loads, period),
     thresholds,
     expenses,
+    buildLoadEstimator(dataset, todayISO()),
   );
   const lanes = calculateLanePerformance(periodLoads, thresholds, LANE_MIN_LOADS, grouping);
 

@@ -1,3 +1,5 @@
+import { todayISO } from "@/lib/periods";
+import { buildLoadEstimator } from "@/lib/load-estimates";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getMobileSession } from "@/lib/auth/mobile";
@@ -40,6 +42,7 @@ export async function GET(request: NextRequest) {
     loadsInPeriod(dataset.loads, period),
     thresholds,
     dataset.expenses,
+    buildLoadEstimator(dataset, todayISO()),
   );
 
   // `calculateLanePerformance` defaults to "state"; this route was taking that

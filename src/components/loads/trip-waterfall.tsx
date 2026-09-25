@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLanguage } from "@/components/shell/language-provider";
 import { tripExpenseLines } from "@/lib/calculations";
 import { formatMiles, formatMoney, formatPercent, formatRateValue } from "@/lib/formatters";
+import type { TripCostEstimate } from "@/lib/load-estimates";
 import type { Expense, Load, LoadMetrics } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { RatingVerdict } from "./rating-badge";
@@ -18,14 +19,17 @@ export function TripWaterfall({
   load,
   metrics,
   expenses = [],
+  estimate = {},
 }: {
   load: Load;
   metrics: LoadMetrics;
   expenses?: Expense[];
+  /** Fuel and driver pay the load does not record yet; see load-estimates.ts. */
+  estimate?: TripCostEstimate;
 }) {
   const { dictionary } = useLanguage();
   const copy = dictionary.loads;
-  const lines = tripExpenseLines(load, expenses);
+  const lines = tripExpenseLines(load, expenses, estimate);
   const scale = (value: number) =>
     load.grossRate > 0 ? Math.max((Math.abs(value) / load.grossRate) * 100, 0.6) : 0;
 
@@ -52,8 +56,17 @@ export function TripWaterfall({
             {lines.map((line) => (
               <Row
                 key={line.key}
-                label={line.key === "fuel" ? copy.tripFuel : line.label}
-                hint={line.key === "fuel" ? copy.fuelEstimateHint : undefined}
+                label={line.key === "fuel"
+                  ? copy.tripFuel
+                  : line.key === "driverPay" && line.estimated ? copy.driverPayExpected : line.label}
+                hint={line.key === "fuel"
+                  ? line.estimated && estimate.fuelPerMile
+                    ? interpolate(copy.fuelEstimateRateHint, {
+                      miles: formatMiles(metrics.totalMiles),
+                      rate: formatRateValue(estimate.fuelPerMile),
+                    })
+                    : copy.fuelEstimateHint
+                  : line.key === "driverPay" && line.estimated ? copy.driverPayExpectedHint : undefined}
                 value={-line.amount}
                 width={scale(line.amount)}
                 barClass="bg-neg"

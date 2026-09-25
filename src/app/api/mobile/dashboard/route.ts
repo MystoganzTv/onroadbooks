@@ -1,3 +1,4 @@
+import { buildLoadEstimator } from "@/lib/load-estimates";
 import { NextResponse, type NextRequest } from "next/server";
 import { operatingLedger } from "@/lib/startup-costs";
 
@@ -91,7 +92,7 @@ export async function GET(request: NextRequest) {
     : [];
 
   const periodLoads = scoreLoads(
-    withMetricsAll(loadsInPeriod(loads, period), thresholds, expenses),
+    withMetricsAll(loadsInPeriod(loads, period), thresholds, expenses, buildLoadEstimator(dataset, today)),
     thresholds,
     settings.deadheadWarnPct,
   );

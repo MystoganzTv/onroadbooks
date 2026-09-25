@@ -1,3 +1,4 @@
+import { buildLoadEstimator } from "@/lib/load-estimates";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { History } from "lucide-react";
@@ -61,7 +62,7 @@ import {
   truckFromSearchParams,
   type SearchParams,
 } from "@/lib/period-params";
-import { previousPeriod, trailingHalfMonths, trailingMonths } from "@/lib/periods";
+import { previousPeriod, todayISO, trailingHalfMonths, trailingMonths } from "@/lib/periods";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getAppLocale();
@@ -95,9 +96,8 @@ export default async function ReportsPage({
   ]);
   const copy = getWebDictionary(locale).reports;
   const simple = mode === "simple";
-  const { business, trucks, loads, expenses, settings, paymentEvents, reserveAccounts, subscription } = await getDataset(
-    session.businessId,
-  );
+  const dataset = await getDataset(session.businessId);
+  const { business, trucks, loads, expenses, settings, paymentEvents, reserveAccounts, subscription } = dataset;
   const period = periodFromSearchParams(params);
   const prior = previousPeriod(period);
   const truckId = truckFromSearchParams(params, trucks);
@@ -115,7 +115,7 @@ export default async function ReportsPage({
   const halves = halfMonthComparison(scopedLoads, scopedExpenses, period.month);
   const thresholds = thresholdsFromSettings(settings);
   const brokers = brokerPerformance(
-    withMetricsAll(loadsInPeriod(scopedLoads, period), thresholds, scopedExpenses),
+    withMetricsAll(loadsInPeriod(scopedLoads, period), thresholds, scopedExpenses, buildLoadEstimator(dataset, todayISO())),
     thresholds,
   );
   const query = scopeQuery(period, truckId);

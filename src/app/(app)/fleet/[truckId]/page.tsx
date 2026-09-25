@@ -1,3 +1,5 @@
+import { buildLoadEstimator } from "@/lib/load-estimates";
+import { todayISO } from "@/lib/periods";
 import type { Metadata } from "next";
 import { operatingLedger } from "@/lib/startup-costs";
 import Link from "next/link";
@@ -105,6 +107,7 @@ export default async function FleetUnitPage({
     loadsInPeriod(unitLoads, period),
     thresholds,
     unitExpenses,
+    buildLoadEstimator(dataset, todayISO()),
   )
     .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))
     .slice(0, 8);

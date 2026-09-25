@@ -1,3 +1,4 @@
+import { buildLoadEstimator } from "@/lib/load-estimates";
 import Link from "next/link";
 import { operatingLedger } from "@/lib/startup-costs";
 import { brokerNameKey, brokerNames as savedBrokerNames } from "@/lib/brokers";
@@ -64,7 +65,10 @@ export default async function LoadDetailPage({
   const load = dataset.loads.find((item) => item.id === id);
   if (!load) notFound();
 
-  const metrics = loadMetrics(load, thresholdsFromSettings(dataset.settings), dataset.expenses);
+  // Fuel and driver pay reach the ledger later; until then the load carries
+  // their estimate so its profit is not overstated.
+  const estimate = buildLoadEstimator(dataset, todayISO())(load);
+  const metrics = loadMetrics(load, thresholdsFromSettings(dataset.settings), dataset.expenses, estimate);
   const score = calculateLoadScore(
     metrics,
     thresholdsFromSettings(dataset.settings),
@@ -144,7 +148,7 @@ export default async function LoadDetailPage({
         <div className="min-w-0 space-y-4 lg:col-span-2">
         <LoadScoreBreakdown score={score} showBasis="trip" />
 
-        <TripWaterfall load={load} metrics={metrics} expenses={linkedExpenses} />
+        <TripWaterfall load={load} metrics={metrics} expenses={linkedExpenses} estimate={estimate} />
 
         <Card>
           <CardHeader>

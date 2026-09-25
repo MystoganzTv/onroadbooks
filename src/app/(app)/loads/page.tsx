@@ -1,3 +1,4 @@
+import { buildLoadEstimator } from "@/lib/load-estimates";
 import { brokerNames as savedBrokerNames } from "@/lib/brokers";
 import { operatingLedger } from "@/lib/startup-costs";
 import type { Metadata } from "next";
@@ -54,9 +55,8 @@ export default async function LoadsPage({
   const [params, session, locale] = await Promise.all([searchParams, requireSession(), getAppLocale()]);
   const dictionary = getWebDictionary(locale);
   const copy = dictionary.loads;
-  const { trucks, loads, expenses: ledgerExpenses, settings, drivers, subscription, paymentEvents, brokers: brokerProfiles } = await getDataset(
-    session.businessId,
-  );
+  const dataset = await getDataset(session.businessId);
+  const { trucks, loads, expenses: ledgerExpenses, settings, drivers, subscription, paymentEvents, brokers: brokerProfiles } = dataset;
   const period = periodFromSearchParams(params);
   const periodLabel = formatLocalePeriod(period, locale);
   const ratingThresholds = thresholdsFromSettings(settings);
@@ -67,7 +67,8 @@ export default async function LoadsPage({
   const expenses = operatingLedger(loads, ledgerExpenses);
   const scopedExpenses = expensesForTruck(expenses, scopeTruckId);
 
-  const periodLoads = withMetricsAll(loadsInPeriod(scopedLoads, period), ratingThresholds, scopedExpenses);
+  const estimate = buildLoadEstimator(dataset, todayISO());
+  const periodLoads = withMetricsAll(loadsInPeriod(scopedLoads, period), ratingThresholds, scopedExpenses, estimate);
   const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings, paymentEvents);
   const brokers = savedBrokerNames(loads, brokerProfiles);
   const feeDefaults = latestFeeDefaults(scopedLoads);

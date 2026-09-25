@@ -1,3 +1,4 @@
+import { buildLoadEstimator } from "@/lib/load-estimates";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Fuel } from "lucide-react";
@@ -52,9 +53,8 @@ export default async function ExpensesPage({
   const [params, session, locale, mode] = await Promise.all([searchParams, requireSession(), getAppLocale(), getViewMode()]);
   const simple = mode === "simple";
   const copy = getWebDictionary(locale).expenses;
-  const { trucks, loads, expenses, fuelEntries, maintenanceRecords, documents, settings, financialObligations, paymentEvents } = await getDataset(
-    session.businessId,
-  );
+  const dataset = await getDataset(session.businessId);
+  const { trucks, loads, expenses, fuelEntries, maintenanceRecords, documents, settings, financialObligations, paymentEvents } = dataset;
   const period = periodFromSearchParams(params);
   const ratingThresholds = thresholdsFromSettings(settings);
 
@@ -69,6 +69,7 @@ export default async function ExpensesPage({
     loadsInPeriod(scopedLoads, period),
     ratingThresholds,
     scopedExpenses,
+    buildLoadEstimator(dataset, todayISO()),
   );
   const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings, paymentEvents);
   const operatingPeriodExpenses = periodExpenses.filter((expense) =>
