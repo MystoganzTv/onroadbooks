@@ -485,6 +485,10 @@ test("R2 server uploads preserve 10 MB, enforce ownership/roles and serve privat
       owner.id,
     ]);
     // Exercise the actual browser uploader using a normal small attachment.
+    // The detailed form shows the load number and documents without toggling.
+    await page.context().addCookies([
+      { name: "onroad-view-mode", value: "detailed", url: new URL(page.url()).origin },
+    ]);
     await page.goto("/loads?month=2026-08&period=month");
     await page
       .getByRole("button", { name: /^Add load$/i })

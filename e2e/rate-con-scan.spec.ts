@@ -106,7 +106,7 @@ test("a scanned rate confirmation fills the load form and is filed with the load
   await page.getByRole("button", { name: "Add load", exact: true }).last().click();
   // The first save in a cold dev server also loads the location database.
   await expect(form).toBeHidden({ timeout: 30_000 });
-  await expect(page.getByText("Laredo").first()).toBeVisible();
+  await expect(page.getByText("Laredo").filter({ visible: true }).first()).toBeVisible();
 
   const dataset = JSON.parse(await fs.readFile(dataFile, "utf8")) as {
     loads: {

@@ -133,17 +133,8 @@ async function smokeThreeTruckLedger() {
       }),
       /another truck/,
     );
-    await assert.rejects(
-      () => repository.createFuelEntry({
-        truckId: third.id,
-        date: "2026-08-20",
-        gallons: 10,
-        pricePerGallon: 4,
-        totalCost: 40,
-        loadId: load101.id,
-      }),
-      /another truck/,
-    );
+    // Fuel purchases belong to the truck and are never linked to a load, so a
+    // load id on the input is not a cross-truck link to reject.
 
     await repository.createExpense({
       truckId: first.id,
@@ -225,8 +216,8 @@ async function smokeThreeTruckLedger() {
       assert.equal(expense.truckId, load?.truckId, `${expense.description} follows its load's unit`);
     }
     for (const entry of dataset.fuelEntries) {
-      const load = dataset.loads.find((row) => row.id === entry.loadId);
-      assert.equal(entry.truckId, load?.truckId, "fuel and its load stay on the same unit");
+      // Fuel is a truck purchase, never a trip cost: no load link survives.
+      assert.equal(entry.loadId ?? null, null, "fuel purchases are not linked to a load");
       assert.equal(
         dataset.expenses.find((row) => row.id === entry.expenseId)?.truckId,
         entry.truckId,

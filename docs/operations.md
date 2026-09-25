@@ -78,25 +78,30 @@ live endpoint retry indefinitely.
 
 ## What CI costs, and why it runs the way it does
 
-The repository is public, so Actions minutes are unlimited and nothing in
-`.github/workflows/ci.yml` is shaped by a bill. Every gate runs on every push:
-types, lint, the money maths, the browser suite, the real-Postgres suite and
-the build.
+The repository is public, so Actions minutes are not billed. CI is still kept
+lean, because a slow or noisy suite gets ignored — and for nine pushes in a row
+it was red on stale tests while every push mailed a failure.
 
-What is still trimmed costs no safety:
+`.github/workflows/ci.yml` — every push to main and every pull request:
 
-- **main and pull requests only.** Pushing a work branch used to run everything
-  twice, once for the push and again for the PR.
-- **Nothing runs for a commit that only touches `mobile/`, `docs/` or
-  Markdown.** No job here tests Swift or an ADR — that is waste and noise, not
-  thrift.
-- **Chromium is cached** against `package-lock.json`, so it downloads only when
-  Playwright's version changes.
+- **verify**: types, lint and the unit/money tests.
+- **browser**: the whole Playwright suite against a production build of the
+  commit (`E2E_PRODUCTION_SERVER=1` makes the web server `next start`). The
+  build is the one Vercel runs, so it is not repeated as a separate step.
+  Locally, `npm run test:e2e` still uses `next dev`.
 
-If the repository is ever made private, minutes become metered (2,000/month on
-the free plan) and this has to shrink again. The order to cut in: the build
-first (Vercel already builds every push), then the browser and Postgres jobs
-back to pull requests and a nightly schedule. Never the fast gates.
+`.github/workflows/database.yml` — the Prisma/Postgres store and the
+Neon/Drizzle/Auth.js/R2 suite. On push it runs only when database, auth,
+storage, script or lockfile paths change (on push and on pull requests), on
+demand, and nightly at 09:17 UTC.
+
+Trimmed without costing safety: main and pull requests only; commits that only
+touch `mobile/`, `docs/` or Markdown start nothing in either workflow; a newer
+push cancels the run it replaces; Chromium is cached.
+
+If minutes ever become metered (a private repository gets 2,000/month on the
+free plan), the next cut is the browser suite on push, back to pull requests
+and the nightly run. Never the fast gates.
 
 ## Database migrations and production deployment
 

@@ -51,13 +51,13 @@ test("permanent account actions live in their proper settings sections", async (
   await expect(page.getByRole("heading", { name: "Business & finances" })).toBeVisible();
   await page.goto("/loads");
   await expect(page.getByRole("heading", { name: "Loads" })).toBeVisible();
-  await expect(page.getByText("Booked revenue", { exact: true })).toBeVisible();
+  await expect(page.getByText("Trip profit", { exact: true }).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Display settings" }).first().click();
   await page.getByRole("menuitemradio", { name: /Español/ }).click();
   await expect(page.getByRole("heading", { name: "Cargas" })).toBeVisible();
-  await expect(page.getByText("Ingresos registrados", { exact: true })).toBeVisible();
-  await expect(page.getByText("Booked revenue", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Ganancia del viaje", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Trip profit", { exact: true })).toHaveCount(0);
 
   // Billing explains access and ownership without sending an established
   // business back into onboarding. A direct visit still has a safe exit.

@@ -271,7 +271,7 @@ test.describe.serial("critical browser flows", () => {
     await expect(page.getByRole("button", { name: "Simple", exact: true })).toHaveAttribute("aria-pressed", "true");
     const summary = page.getByRole("region", { name: "Period summary" });
     await expect(summary).toContainText("$700.00");
-    await expect(summary).toContainText("$494.50");
+    await expect(summary).toContainText("$574.50");
     await expect(page.getByRole("heading", { name: "Business health", exact: true })).toHaveCount(0);
     await expect(page.getByText("Each recorded load counts as income received.", { exact: false })).toBeVisible();
     await page.screenshot({ path: "/tmp/onroad-dashboard-simple.png", fullPage: true });
@@ -289,7 +289,7 @@ test.describe.serial("critical browser flows", () => {
     await expect(page.getByRole("button", { name: "Simple", exact: true })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("columnheader")).toHaveCount(4);
     await expect(page.getByRole("columnheader", { name: "Trip profit" })).toBeVisible();
-    await expect(page.getByRole("table")).toContainText("$620.00");
+    await expect(page.getByRole("table")).toContainText("$700.00");
     await page.getByRole("textbox", { name: "Search loads" }).fill("does-not-exist");
     await expect(page.getByRole("table")).toHaveCount(0);
     await page.getByRole("textbox", { name: "Search loads" }).fill("");
@@ -315,7 +315,7 @@ test.describe.serial("critical browser flows", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({ path: "/tmp/onroad-loads-simple-mobile.png", fullPage: true });
     await expect(page.getByRole("button", { name: "Ver detalle", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("list", { name: "Cargas", exact: true })).toContainText("$620.00");
+    await expect(page.getByRole("list", { name: "Cargas", exact: true })).toContainText("$700.00");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     expect(await fs.readFile(dataFile, "utf8")).toBe(datasetBefore);
     expect(browserErrors).toEqual([]);
@@ -397,21 +397,14 @@ test.describe.serial("critical browser flows", () => {
       await page.goto("/expenses?month=2026-08&period=month");
       await page.getByRole("button", { name: "Add expense", exact: true }).first().click();
       const form = page.getByRole("dialog", { name: "Add expense" });
-      const recurring = form.getByRole("switch", { name: "Recurring", exact: true });
-      await expect(recurring).not.toBeChecked();
+      // A new expense is one-off; repeating is managed from Recurring
+      // expenses, not with a switch on every entry.
+      await expect(form.getByRole("switch", { name: "Recurring", exact: true })).toHaveCount(0);
       await form.locator("#expense-date").fill("2026-08-20");
       await form.locator("#expense-amount").fill("75");
       await form.locator("#expense-description").fill("E2E monthly subscription");
-      await recurring.check();
       await form.getByRole("button", { name: "Add expense", exact: true }).click();
       await expect(form).toBeHidden();
-      const row = page.getByRole("row").filter({ hasText: "E2E monthly subscription" });
-      await row.getByRole("button", { name: "Edit expense", exact: true }).click();
-      const edit = page.getByRole("dialog", { name: "Edit expense" });
-      await expect(edit.getByRole("switch", { name: "Recurring", exact: true })).toBeChecked();
-      await edit.getByRole("switch", { name: "Recurring", exact: true }).uncheck();
-      await edit.getByRole("button", { name: "Save changes", exact: true }).click();
-      await expect(edit).toBeHidden();
       const saved = JSON.parse(await fs.readFile(dataFile, "utf8"));
       expect(saved.expenses.find((expense: { description: string }) => expense.description === "E2E monthly subscription").recurring).toBe(false);
       await page.goto("/dashboard?month=2026-09&period=month");
@@ -543,7 +536,6 @@ test.describe.serial("critical browser flows", () => {
     await dialog.locator("#expense-category").click();
     await page.getByRole("option", { name: "Loan / truck payment" }).click();
     await dialog.locator("#expense-description").fill("BIZON optional payment");
-    await expect(dialog.getByRole("switch", { name: "Recurring", exact: true })).not.toBeChecked();
     await expect(dialog.getByRole("switch", { name: "Separate principal and interest (optional)" })).not.toBeChecked();
     await dialog.getByRole("button", { name: "Add expense", exact: true }).click();
     await expect(dialog).toBeHidden();
@@ -555,7 +547,6 @@ test.describe.serial("critical browser flows", () => {
     await edit.getByRole("switch", { name: "Separate principal and interest (optional)" }).check();
     await edit.getByLabel("Loan interest").fill("13");
     await expect(edit.getByLabel("Loan principal")).toHaveValue("500");
-    await edit.getByRole("switch", { name: "Recurring", exact: true }).check();
     await edit.getByRole("button", { name: "Save changes", exact: true }).click();
     await expect(edit).toBeHidden();
     await expect(row).toContainText("Loan payment");
@@ -620,7 +611,6 @@ test.describe.serial("critical browser flows", () => {
     await editDialog.getByLabel("Date").fill("2026-09-02");
     await editDialog.getByLabel("Description").fill("AMEX September payment");
     await editDialog.getByLabel("Bank or lender").fill("American Express");
-    await editDialog.getByRole("switch", { name: "Recurring", exact: true }).check();
     await editDialog.getByLabel("Obligation name").fill("Amex Business Card");
     await editDialog.getByLabel("Expected monthly payment").fill("525");
     await editDialog.getByRole("switch", { name: "Active financing" }).uncheck();
@@ -1000,9 +990,9 @@ test.describe.serial("critical browser flows", () => {
     await login(page);
     await page.goto("/invoices");
     const row = page.getByRole("row").filter({ hasText: "E2E-LOAD-1" });
-    await row.getByRole("button", { name: "Invoice", exact: true }).click();
+    await row.getByRole("button", { name: "Generate invoice PDF", exact: true }).click();
     await page.getByLabel("Customer").fill("E2E Broker LLC");
-    await page.getByRole("button", { name: "Save invoice", exact: true }).click();
+    await page.getByRole("button", { name: "Generate PDF", exact: true }).click();
     await expect(page.getByRole("dialog")).toBeHidden();
     await expect(row).toContainText("INV-2026-");
 
@@ -1017,10 +1007,21 @@ test.describe.serial("critical browser flows", () => {
     await expect(page.getByText("Filing is incomplete")).toBeVisible();
     await expect(page.getByText(/not assigned to a jurisdiction/)).toBeVisible();
 
-    const xlsx = await page.request.get("/api/export/loads?month=2026-08&period=full&format=xlsx");
-    expect(xlsx.status()).toBe(200);
-    expect(xlsx.headers()["content-type"]).toContain("spreadsheetml");
-    expect((await xlsx.body()).subarray(0, 2).toString()).toBe("PK");
+    // Fetched from the page so the session cookie rides along exactly as it
+    // does for the owner: it is Secure under a production server, and the
+    // test runner's own request client will not send that over plain http.
+    const xlsx = await page.evaluate(async () => {
+      const response = await fetch("/api/export/loads?month=2026-08&period=full&format=xlsx");
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      return {
+        status: response.status,
+        type: response.headers.get("content-type") ?? "",
+        magic: String.fromCharCode(bytes[0], bytes[1]),
+      };
+    });
+    expect(xlsx.status).toBe(200);
+    expect(xlsx.type).toContain("spreadsheetml");
+    expect(xlsx.magic).toBe("PK");
   });
 
   test("broker contacts reuse historical names and keep load history after a rename", async ({ page }) => {

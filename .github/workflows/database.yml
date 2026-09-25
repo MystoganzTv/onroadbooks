@@ -1,0 +1,140 @@
+name: Database suites
+
+# The stores against real PostgreSQL: the Prisma store, and the Neon/Drizzle
+# store with Auth.js and private R2 documents. They take the longest and only
+# break when the storage layer does, so on push they run when that code
+# changes, and so do pull requests that touch it. The nightly run catches what a
+# UI change broke indirectly (the R2 upload flow drives the load form).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "prisma/**"
+      - "prisma.config.ts"
+      - "drizzle/**"
+      - "drizzle.config.ts"
+      - "src/db/**"
+      - "src/lib/db/**"
+      - "src/lib/auth/**"
+      - "src/lib/storage/**"
+      - "src/app/api/auth/**"
+      - "src/app/api/documents/**"
+      - "scripts/**"
+      - "e2e/database-backend.spec.ts"
+      - "playwright.database.config.ts"
+      - "package-lock.json"
+      - ".github/workflows/database.yml"
+  pull_request:
+    paths:
+      - "prisma/**"
+      - "prisma.config.ts"
+      - "drizzle/**"
+      - "drizzle.config.ts"
+      - "src/db/**"
+      - "src/lib/db/**"
+      - "src/lib/auth/**"
+      - "src/lib/storage/**"
+      - "src/app/api/auth/**"
+      - "src/app/api/documents/**"
+      - "scripts/**"
+      - "e2e/database-backend.spec.ts"
+      - "playwright.database.config.ts"
+      - "package-lock.json"
+      - ".github/workflows/database.yml"
+  schedule:
+    # 09:17 UTC, early morning in Virginia; off the top of the hour.
+    - cron: "17 9 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: database-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  postgres:
+    name: The Postgres store, against a real database
+    # The suite in `verify` proves the arithmetic against the JSON store, and
+    # `store-contract` only compares the two stores' method NAMES. Everything
+    # the Prisma store does differently -- foreign keys, transactions,
+    # generated ids, the snapshot JSON column -- is only ever exercised here.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: onroad_books
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATA_SOURCE: postgres
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/onroad_books?schema=public
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/onroad_books?schema=public
+      DOCUMENT_STORAGE: local
+      AUTH_SECRET: ci-only-not-a-real-secret
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Apply versioned migrations
+        run: npm run db:migrate:deploy
+
+      - name: Harden database access
+        run: npm run db:harden
+
+      - name: Verify migrations match the Prisma schema
+        run: npm run db:migrate:verify
+
+      - name: Seed the demo dataset
+        run: npm run db:seed
+
+      - name: Smoke check the store
+        run: npm run smoke:postgres
+
+  drizzle:
+    name: Neon contracts, Auth.js and R2 protocol
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      AUTH_SECRET: ci-only-not-a-real-secret-longer-than-32-characters
+      PG_BIN: /usr/lib/postgresql/18/bin
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: PostgreSQL 18 tools for disposable databases
+        run: |
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/pgdg.gpg
+          sudo sed -i 's|deb |deb [signed-by=/usr/share/keyrings/pgdg.gpg] |' /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-18
+      - name: Install
+        run: npm ci
+      - name: Both SQL repository contracts
+        run: npm run test:database
+      - name: Install browser
+        run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+      - name: Auth.js, Drizzle and private document flows
+        run: npm run test:browser:storage

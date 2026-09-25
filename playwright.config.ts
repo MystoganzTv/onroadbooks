@@ -19,7 +19,11 @@ export default defineConfig({
     video: "retain-on-failure",
   },
   webServer: {
-    command: "npm run dev -- --hostname 127.0.0.1 --port 4173",
+    // CI builds once and serves the production bundle: a cold `next dev`
+    // compiles every page on first visit, which was most of the suite's time.
+    command: process.env.E2E_PRODUCTION_SERVER
+      ? "npm run start -- --hostname 127.0.0.1 --port 4173"
+      : "npm run dev -- --hostname 127.0.0.1 --port 4173",
     url: baseURL,
     reuseExistingServer: false,
     timeout: 120_000,

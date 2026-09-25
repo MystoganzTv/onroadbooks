@@ -1,19 +1,22 @@
 name: CI
 
-# The repository is public, so Actions minutes are unlimited and nothing here
-# is shaped by a bill. What stays are the changes that cost no safety:
+# Runs on every push to main and every pull request. It is the part of the
+# suite that can break on any change:
 #
-#   - main and pull requests only. Pushing a work branch used to run the whole
-#     suite twice, once for the push and again for the PR.
-#   - Swift changes run in the separate iOS workflow on macOS. Markdown and
-#     ADR-only commits still start no job because neither app artifact changes.
-#   - Chromium is cached against package-lock.json, because downloading the
-#     same binary every run is a minute of nothing.
+#   verify   types, lint and the money maths                   (~1.5 min)
+#   browser  the whole app in Chromium, against a production    (~3 min)
+#            build of this commit -- the build is the one Vercel
+#            would run, so it is not repeated as its own step
 #
-# Every gate runs on every push again: types, lint, the money maths, the
-# browser suite and the real-Postgres suite. When minutes were metered those
-# last two were cut back to nightly; free minutes buy that safety back, and
-# safety is what they were.
+# The two database suites (Prisma/Postgres and Neon/Drizzle/R2) live in
+# database.yml: they run when database, auth or storage code changes, on pull
+# requests, and nightly. See docs/operations.md.
+#
+# Trimmed without costing safety:
+#   - main and pull requests only; a work branch no longer runs twice.
+#   - Swift, docs and Markdown-only commits start no job here.
+#   - a newer push to the same branch cancels the run it replaces.
+#   - Chromium is cached against package-lock.json.
 on:
   push:
     branches: [main]
@@ -51,9 +54,9 @@ jobs:
       AUTH_SECRET: ci-only-not-a-real-secret
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -83,9 +86,9 @@ jobs:
       AUTH_SECRET: ci-only-not-a-real-secret
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -111,93 +114,14 @@ jobs:
         if: steps.browser-cache.outputs.cache-hit != 'true'
         run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install chromium
 
-      - name: Browser tests
-        run: npm run test:e2e
-
+      # One production build serves the whole suite. A cold `next dev`
+      # compiled every page on its first visit, which was most of the time.
       - name: Build
         run: npm run build
-
-  postgres:
-    name: The Postgres store, against a real database
-    # The suite in `verify` proves the arithmetic against the JSON store, and
-    # `store-contract` only compares the two stores' method NAMES. Everything
-    # the Prisma store does differently -- foreign keys, transactions,
-    # generated ids, the snapshot JSON column -- is only ever exercised here.
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    services:
-      postgres:
-        image: postgres:16
         env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: onroad_books
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+          NEXT_PUBLIC_APP_URL: http://127.0.0.1:4173
 
-    env:
-      DATA_SOURCE: postgres
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/onroad_books?schema=public
-      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/onroad_books?schema=public
-      DOCUMENT_STORAGE: local
-      AUTH_SECRET: ci-only-not-a-real-secret
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install
-        run: npm ci
-
-      - name: Apply versioned migrations
-        run: npm run db:migrate:deploy
-
-      - name: Harden database access
-        run: npm run db:harden
-
-      - name: Verify migrations match the Prisma schema
-        run: npm run db:migrate:verify
-
-      - name: Seed the demo dataset
-        run: npm run db:seed
-
-      - name: Smoke check the store
-        run: npm run smoke:postgres
-
-  drizzle:
-    name: Neon contracts, Auth.js and R2 protocol
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      AUTH_SECRET: ci-only-not-a-real-secret-longer-than-32-characters
-      PG_BIN: /usr/lib/postgresql/18/bin
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - name: PostgreSQL 18 tools for disposable databases
-        run: |
-          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/pgdg.gpg
-          sudo sed -i 's|deb |deb [signed-by=/usr/share/keyrings/pgdg.gpg] |' /etc/apt/sources.list.d/pgdg.list
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq postgresql-18
-      - name: Install
-        run: npm ci
-      - name: Both SQL repository contracts
-        run: npm run test:database
-      - name: Install browser
-        run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
-      - name: Auth.js, Drizzle and private document flows
-        run: npm run test:browser:storage
+      - name: Browser tests
+        run: npm run test:e2e
+        env:
+          E2E_PRODUCTION_SERVER: "1"

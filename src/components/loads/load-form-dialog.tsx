@@ -1027,7 +1027,9 @@ export function LoadFormDialog({
 
             </FormSection> : null}
 
-            {!isEdit ? <FormSection title={copy.documents} expanded={!simple}>
+            {/* Open whenever something is attached, e.g. the rate confirmation
+                the form was read from, so the owner sees it will be filed. */}
+            {!isEdit ? <FormSection title={copy.documents} expanded={!simple || attachments.length > 0}>
               <DocumentUploader
                 owner="LOAD"
                 pending={attachments}

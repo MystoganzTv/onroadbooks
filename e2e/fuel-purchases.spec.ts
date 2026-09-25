@@ -91,6 +91,8 @@ test("truck purchases stay separate from estimated trip fuel", async ({ page }) 
   const afterEdit = JSON.parse(await fs.readFile(dataFile, "utf8")) as Dataset;
   expect(afterEdit.loads.find((row) => row.id === load.id)?.fuelCost).toBe(180);
 
+  // An expense is no longer tied to a load: a toll bill cannot be split per
+  // trip, so it stays a truck cost and the trip breakdown does not move.
   await page.goto("/expenses?month=2026-09&period=month");
   await page.getByRole("button", { name: "Add expense", exact: true }).first().click();
   const expenseDialog = page.getByRole("dialog");
@@ -98,14 +100,16 @@ test("truck purchases stay separate from estimated trip fuel", async ({ page }) 
   await page.getByRole("option", { name: "Tolls", exact: true }).click();
   await expenseDialog.locator("#expense-amount").fill("35");
   await expenseDialog.locator("#expense-description").fill("Trip bridge toll");
-  await expenseDialog.locator("#expense-load").click();
-  await page.getByRole("option").filter({ hasText: load.originCity }).click();
+  await expect(expenseDialog.locator("#expense-load")).toHaveCount(0);
+  await expect(expenseDialog.getByText("Link to load", { exact: true })).toHaveCount(0);
   await expenseDialog.getByRole("button", { name: "Add expense", exact: true }).click();
   await expect(expenseDialog).toBeHidden();
+  const withToll = JSON.parse(await fs.readFile(dataFile, "utf8")) as Dataset;
+  expect(withToll.expenses.find((row) => row.description === "Trip bridge toll")?.loadId).toBeNull();
   await page.goto(`/loads/${load.id}`);
-  await expect(page.getByText("Trip bridge toll", { exact: true })).toBeVisible();
+  await expect(page.getByText("Trip bridge toll", { exact: true })).toHaveCount(0);
   const breakdown = page.locator("div.rounded-lg").filter({ has: page.getByRole("heading", { name: "Trip cost breakdown", exact: true }) });
-  await expect(breakdown).toContainText("$215.00");
+  await expect(breakdown).toContainText("$180.00");
   await page.screenshot({ path: "/tmp/onroad-load-expenses.png", fullPage: true });
 
   // Explicitly enabling reporting reveals its fields and navigation again.
