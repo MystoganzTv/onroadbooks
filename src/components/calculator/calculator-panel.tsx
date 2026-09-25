@@ -750,10 +750,10 @@ function EvaluateResult({
               deadheadMiles: toNumber(values.deadheadMiles),
               grossRate: toNumber(values.grossRate),
               fuelCost: estimate.fuelCost,
-              tolls: estimate.tolls,
+              // Tolls and other costs stay planning numbers: posted from a quote
+              // they would land in Expenses on top of the real toll bill.
               dispatchFee: estimate.dispatch,
               factoringFee: estimate.factoring,
-              otherExpenses: estimate.otherCost,
             }}
             trigger={
               <Button type="button" variant="outline" size="sm">

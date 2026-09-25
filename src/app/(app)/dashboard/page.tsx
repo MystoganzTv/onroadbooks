@@ -47,6 +47,7 @@ import {
 } from "@/lib/calculations";
 import { periodBuckets } from "@/lib/chart-data";
 import { getDataset } from "@/lib/db";
+import { latestFeeDefaults } from "@/lib/load-fees";
 import { hasFleetAccess, planAllows } from "@/lib/plans";
 import {
   expensesForTruck,
@@ -273,6 +274,7 @@ export default async function DashboardPage({
       defaultTruckId={truckId}
       defaultDate={defaultEntryDate(period)}
       ratingThresholds={ratingThresholds}
+      feeDefaults={latestFeeDefaults(loads)}
     />
   ) : null;
   const expenseAction = roleCan(role, "manage_expenses") ? (

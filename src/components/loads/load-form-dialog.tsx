@@ -40,8 +40,15 @@ import {
 } from "@/components/documents/document-uploader";
 import { createLoadAction, updateLoadAction } from "@/lib/actions/loads";
 import { div, roundMoney, type RatingThresholds } from "@/lib/calculations";
-import { formatMiles, formatMoney, formatRateValue } from "@/lib/formatters";
+import { formatMiles, formatMoney, formatPercent, formatRateValue } from "@/lib/formatters";
 import { interpolate } from "@/lib/i18n/dictionaries";
+import {
+  exactPercentOfRate,
+  feeFromPercent,
+  percentOfRate,
+  type FeeDefaults,
+  type FeeMode,
+} from "@/lib/load-fees";
 import { loadSchema } from "@/lib/schemas";
 import { todayISO } from "@/lib/periods";
 import { orderedTrucks } from "@/lib/fleet";
@@ -97,8 +104,11 @@ interface FormState {
   grossRate: string;
   fuelCost: string;
   tolls: string;
+  /** What the owner typed: a percent of the rate or dollars, per the mode. */
   dispatchFee: string;
+  dispatchMode: FeeMode;
   factoringFee: string;
+  factoringMode: FeeMode;
   otherExpenses: string;
   jurisdictionMiles: JurisdictionRow[];
   notes: string;
@@ -135,7 +145,9 @@ function emptyState(defaultDate: string, truckId: string): FormState {
     fuelCost: "",
     tolls: "",
     dispatchFee: "",
+    dispatchMode: "pct",
     factoringFee: "",
+    factoringMode: "pct",
     otherExpenses: "",
     jurisdictionMiles: [],
     notes: "",
@@ -165,8 +177,8 @@ function stateFromLoad(load: Load): FormState {
     grossRate: String(load.grossRate),
     fuelCost: load.fuelCost ? String(load.fuelCost) : "",
     tolls: load.tolls ? String(load.tolls) : "",
-    dispatchFee: load.dispatchFee ? String(load.dispatchFee) : "",
-    factoringFee: load.factoringFee ? String(load.factoringFee) : "",
+    ...feeState("dispatch", load.dispatchFee, load.grossRate),
+    ...feeState("factoring", load.factoringFee, load.grossRate),
     otherExpenses: load.otherExpenses ? String(load.otherExpenses) : "",
     jurisdictionMiles: load.jurisdictionMiles.map((row, index) => ({
       id: `${row.jurisdiction}-${index}`,
@@ -217,6 +229,10 @@ function applyPrefill(state: FormState, prefill?: LoadPrefill): FormState {
   const whole = (value: number | undefined) =>
     value !== undefined && Number.isFinite(value) && value > 0 ? String(Math.round(value)) : "";
 
+  const grossRate = put(prefill.grossRate) || state.grossRate;
+  const given = (value: number | undefined): value is number =>
+    value !== undefined && Number.isFinite(value) && value > 0;
+
   return {
     ...state,
     date: prefill.date || state.date,
@@ -236,13 +252,53 @@ function applyPrefill(state: FormState, prefill?: LoadPrefill): FormState {
       prefill.deadheadMiles !== undefined
         ? String(Math.round(prefill.deadheadMiles))
         : state.deadheadMiles,
-    grossRate: put(prefill.grossRate) || state.grossRate,
+    grossRate,
     fuelCost: put(prefill.fuelCost) || state.fuelCost,
     tolls: put(prefill.tolls) || state.tolls,
-    dispatchFee: put(prefill.dispatchFee) || state.dispatchFee,
-    factoringFee: put(prefill.factoringFee) || state.factoringFee,
+    ...(given(prefill.dispatchFee) ? feeState("dispatch", prefill.dispatchFee, toNumber(grossRate)) : {}),
+    ...(given(prefill.factoringFee) ? feeState("factoring", prefill.factoringFee, toNumber(grossRate)) : {}),
     otherExpenses: put(prefill.otherExpenses) || state.otherExpenses,
   };
+}
+
+/**
+ * A stored fee shown the way it was most likely entered: as a percent when a
+ * clean percentage of the rate reproduces it to the cent, otherwise dollars.
+ */
+function feeInput(fee: number, grossRate: number): { value: string; mode: FeeMode } {
+  const pct = exactPercentOfRate(fee, grossRate);
+  if (pct !== null) return { value: String(pct), mode: "pct" };
+  if (fee > 0) return { value: String(roundMoney(fee)), mode: "amount" };
+  return { value: "", mode: "pct" };
+}
+
+function feeState(kind: "dispatch", fee: number, grossRate: number): Pick<FormState, "dispatchFee" | "dispatchMode">;
+function feeState(kind: "factoring", fee: number, grossRate: number): Pick<FormState, "factoringFee" | "factoringMode">;
+function feeState(kind: "dispatch" | "factoring", fee: number, grossRate: number) {
+  const { value, mode } = feeInput(fee, grossRate);
+  return kind === "dispatch"
+    ? { dispatchFee: value, dispatchMode: mode }
+    : { factoringFee: value, factoringMode: mode };
+}
+
+/** A new load starts at the rates the owner used on their latest load. */
+function withFeeDefaults(state: FormState, defaults?: FeeDefaults): FormState {
+  if (!defaults) return state;
+  return {
+    ...state,
+    dispatchFee: defaults.dispatchPct ? String(defaults.dispatchPct) : state.dispatchFee,
+    dispatchMode: defaults.dispatchPct ? "pct" : state.dispatchMode,
+    factoringFee: defaults.factoringPct ? String(defaults.factoringPct) : state.factoringFee,
+    factoringMode: defaults.factoringPct ? "pct" : state.factoringMode,
+  };
+}
+
+function feeAmount(input: string, mode: FeeMode, grossRate: number): number {
+  return mode === "pct" ? feeFromPercent(grossRate, toNumber(input)) : roundMoney(toNumber(input));
+}
+
+function percentLabel(pct: number): string {
+  return formatPercent(pct, Number.isInteger(pct) ? 0 : Number.isInteger(pct * 10) ? 1 : 2);
 }
 
 interface LoadFormDialogProps {
@@ -254,6 +310,8 @@ interface LoadFormDialogProps {
   defaultTruckId?: string | null;
   defaultDate?: string;
   ratingThresholds?: RatingThresholds;
+  /** Dispatch / factoring percentages a NEW load starts with. */
+  feeDefaults?: FeeDefaults;
   /** Pass `null` for a form opened from elsewhere, with no button of its own. */
   trigger?: React.ReactNode;
   /** Seed values for a NEW load, e.g. handed over by the load calculator. */
@@ -277,6 +335,7 @@ export function LoadFormDialog({
   drivers = [],
   defaultTruckId,
   defaultDate,
+  feeDefaults,
   trigger,
   prefill,
   initialAttachments,
@@ -290,6 +349,7 @@ export function LoadFormDialog({
   const copy = dictionary.loads;
   const isEdit = Boolean(load);
   const prefillKey = JSON.stringify(prefill ?? null);
+  const feeDefaultsKey = JSON.stringify(feeDefaults ?? null);
 
   /**
    * Which unit ran the load. A retired truck stays selectable only while an
@@ -313,12 +373,15 @@ export function LoadFormDialog({
       load
         ? stateFromLoad(load)
         : applyPrefill(
-            emptyState(defaultDate ?? todayISO(), defaultTruck),
+            withFeeDefaults(
+              emptyState(defaultDate ?? todayISO(), defaultTruck),
+              (JSON.parse(feeDefaultsKey) as FeeDefaults | null) ?? undefined,
+            ),
             prefillKey === "null" ? undefined : (JSON.parse(prefillKey) as LoadPrefill),
           ),
     // Serialised so a freshly built prefill object on every keystroke does not
     // re-seed the form while the dialog is open.
-    [load, defaultDate, defaultTruck, prefillKey],
+    [load, defaultDate, defaultTruck, prefillKey, feeDefaultsKey],
   );
 
   const [uncontrolledOpen, setUncontrolledOpen] = React.useState(false);
@@ -380,6 +443,8 @@ export function LoadFormDialog({
   const deadheadMiles = toNumber(values.deadheadMiles);
   const grossRate = toNumber(values.grossRate);
   const totalMiles = loadedMiles + deadheadMiles;
+  const dispatchAmount = feeAmount(values.dispatchFee, values.dispatchMode, grossRate);
+  const factoringAmount = feeAmount(values.factoringFee, values.factoringMode, grossRate);
   const assignedJurisdictionMiles = values.jurisdictionMiles.reduce(
     (total, row) => total + toNumber(row.totalMiles),
     0,
@@ -416,8 +481,8 @@ export function LoadFormDialog({
       grossRate,
       fuelCost: toNumber(values.fuelCost),
       tolls: toNumber(values.tolls),
-      dispatchFee: toNumber(values.dispatchFee),
-      factoringFee: toNumber(values.factoringFee),
+      dispatchFee: dispatchAmount,
+      factoringFee: factoringAmount,
       otherExpenses: toNumber(values.otherExpenses),
       costsPosted: load?.costsPosted ?? true,
       // Preserve legacy metadata. Reporting a load already records its income.
@@ -433,6 +498,18 @@ export function LoadFormDialog({
       // honour these acknowledgements.
       locationOverrides,
     };
+
+    const percentErrors: Record<string, string> = {};
+    for (const [field, mode] of [["dispatchFee", values.dispatchMode], ["factoringFee", values.factoringMode]] as const) {
+      const pct = toNumber(values[field]);
+      if (mode === "pct" && (pct < 0 || pct > 100)) percentErrors[field] = copy.feePercentRange;
+    }
+    if (Object.keys(percentErrors).length > 0) {
+      setErrors(percentErrors);
+      toast.error(copy.feePercentRange);
+      requestAnimationFrame(() => focusFirstError("load-form"));
+      return;
+    }
 
     const parsed = loadSchema.safeParse(payload);
     if (!parsed.success) {
@@ -649,6 +726,38 @@ export function LoadFormDialog({
                   required
                 />
               </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <FeeField
+                id="load-dispatch"
+                label={copy.dispatch}
+                value={values.dispatchFee}
+                mode={values.dispatchMode}
+                grossRate={grossRate}
+                amount={dispatchAmount}
+                error={errors.dispatchFee}
+                onValueChange={(value) => set("dispatchFee", value)}
+                onModeChange={(mode) => setValues((prev) => ({
+                  ...prev,
+                  dispatchMode: mode,
+                  dispatchFee: convertFee(prev.dispatchFee, prev.dispatchMode, mode, grossRate),
+                }))}
+              />
+              <FeeField
+                id="load-factoring"
+                label={copy.factoring}
+                value={values.factoringFee}
+                mode={values.factoringMode}
+                grossRate={grossRate}
+                amount={factoringAmount}
+                error={errors.factoringFee}
+                onValueChange={(value) => set("factoringFee", value)}
+                onModeChange={(mode) => setValues((prev) => ({
+                  ...prev,
+                  factoringMode: mode,
+                  factoringFee: convertFee(prev.factoringFee, prev.factoringMode, mode, grossRate),
+                }))}
+              />
             </div>
             {/* Live calculation strip -- the reason this form is fast. */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-md border border-border bg-surface-sunken px-3 py-2.5 sm:grid-cols-3">
@@ -964,5 +1073,88 @@ function Calc({
         {value}
       </span>
     </div>
+  );
+}
+
+/** Re-expresses what was typed when the owner flips between % and $. */
+function convertFee(input: string, from: FeeMode, to: FeeMode, grossRate: number): string {
+  if (from === to || !input.trim()) return input;
+  const amount = feeAmount(input, from, grossRate);
+  if (to === "amount") return amount > 0 ? String(amount) : "";
+  const pct = percentOfRate(amount, grossRate);
+  return pct ? String(pct) : "";
+}
+
+function FeeField({
+  id,
+  label,
+  value,
+  mode,
+  grossRate,
+  amount,
+  error,
+  onValueChange,
+  onModeChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  mode: FeeMode;
+  grossRate: number;
+  amount: number;
+  error?: string;
+  onValueChange: (value: string) => void;
+  onModeChange: (mode: FeeMode) => void;
+}) {
+  const { dictionary } = useLanguage();
+  const copy = dictionary.loads;
+  const pct = percentOfRate(amount, grossRate);
+  // Nothing to show until there is a rate to take the fee from.
+  const hint = toNumber(value) > 0 && grossRate > 0
+    ? mode === "pct"
+      ? interpolate(copy.feeIsAmount, { amount: formatMoney(amount) })
+      : pct !== null ? interpolate(copy.feeIsPercent, { pct: percentLabel(pct) }) : undefined
+    : undefined;
+
+  return (
+    <Field label={label} htmlFor={id} error={error} hint={hint}>
+      <div className="flex gap-1.5">
+        <Input
+          id={id}
+          type="number"
+          inputMode="decimal"
+          min={0}
+          max={mode === "pct" ? 100 : undefined}
+          step="0.01"
+          value={value}
+          onChange={(e) => onValueChange(e.target.value)}
+          aria-invalid={Boolean(error)}
+          placeholder="0"
+          className="min-w-0 flex-1"
+        />
+        <div
+          role="group"
+          aria-label={label}
+          className="flex shrink-0 overflow-hidden rounded-md border border-border"
+        >
+          {(["pct", "amount"] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              aria-pressed={mode === option}
+              aria-label={interpolate(option === "pct" ? copy.feeAsPercent : copy.feeAsAmount, { fee: label })}
+              onClick={() => onModeChange(option)}
+              className={`min-w-9 px-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                mode === option
+                  ? "bg-foreground text-background"
+                  : "bg-transparent text-muted-foreground hover:bg-surface-sunken"
+              }`}
+            >
+              {option === "pct" ? "%" : "$"}
+            </button>
+          ))}
+        </div>
+      </div>
+    </Field>
   );
 }

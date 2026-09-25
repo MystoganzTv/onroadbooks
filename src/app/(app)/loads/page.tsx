@@ -30,6 +30,7 @@ import { overheadCostPerMile, trailingCostBasis } from "@/lib/finance";
 import { defaultEntryDate, todayISO } from "@/lib/periods";
 import { hasFleetAccess } from "@/lib/plans";
 import { isRateConScanConfigured } from "@/lib/rate-con/extract";
+import { latestFeeDefaults } from "@/lib/load-fees";
 import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
 import { formatLocalePeriod } from "@/lib/i18n-format";
 import { getAppLocale } from "@/lib/i18n-server";
@@ -66,6 +67,7 @@ export default async function LoadsPage({
   const periodLoads = withMetricsAll(loadsInPeriod(scopedLoads, period), ratingThresholds, scopedExpenses);
   const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings, paymentEvents);
   const brokers = savedBrokerNames(loads, brokerProfiles);
+  const feeDefaults = latestFeeDefaults(scopedLoads);
 
   const tripExpenses = periodLoads.reduce((sum, load) => sum + load.metrics.tripExpenses, 0);
   const tripProfit = periodLoads.reduce((sum, load) => sum + load.metrics.tripProfit, 0);
@@ -92,6 +94,7 @@ export default async function LoadsPage({
                 defaultTruckId={scopeTruckId}
                 defaultDate={defaultEntryDate(period)}
                 ratingThresholds={ratingThresholds}
+                feeDefaults={feeDefaults}
               />
             )}
             <LoadFormDialog
@@ -101,6 +104,7 @@ export default async function LoadsPage({
               defaultTruckId={scopeTruckId}
               defaultDate={defaultEntryDate(period)}
               ratingThresholds={ratingThresholds}
+              feeDefaults={feeDefaults}
             />
           </div>
         }

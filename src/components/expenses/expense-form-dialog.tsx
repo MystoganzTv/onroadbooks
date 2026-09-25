@@ -42,7 +42,6 @@ import { createExpenseAction, updateExpenseAction } from "@/lib/actions/expenses
 import { roundMoney } from "@/lib/calculations";
 import { behaviorOf, categoryLabel, EXPENSE_CATEGORIES } from "@/lib/categories";
 import { formatMoney } from "@/lib/formatters";
-import { formatLocaleDate } from "@/lib/i18n-format";
 import { todayISO } from "@/lib/periods";
 import { isMonthlyRecurringExpense, optedInRecurringNotes } from "@/lib/recurring-expenses";
 import { expenseSchema } from "@/lib/schemas";
@@ -195,21 +194,12 @@ export function ExpenseFormDialog({
     setValues((prev) => ({ ...prev, [key]: value }));
 
   const behavior = values.behavior ?? behaviorOf(values.category, categoryBehavior);
+  // Expenses are no longer tied to a load from this form: the owner cannot
+  // split a toll bill across trips. A link written by an older build is kept
+  // as-is on edit (and dropped if the truck or category no longer fits) so
+  // saving an old row never silently re-prices a past load.
   const canLinkToLoad = ["FUEL", "TOLLS", "DISPATCH", "FACTORING", "OTHER"].includes(values.category);
   const isFinancingPayment = FINANCING_PAYMENT_CATEGORIES.has(values.category);
-
-  // A linked load is not just a label: it determines which unit caused the
-  // cost. Only offer loads from the selected truck, and keep an existing
-  // historical link visible only while that same truck remains selected.
-  const linkOptions = React.useMemo(() => {
-    if (!values.charge || values.charge === BUSINESS) return [];
-    const matching = loads.filter((load) => load.truckId === values.charge);
-    const visible = matching.slice(0, 40);
-    const linkedId = expense?.loadId;
-    if (!linkedId || visible.some((l) => l.id === linkedId)) return visible;
-    const linked = matching.find((l) => l.id === linkedId);
-    return linked ? [linked, ...visible] : visible;
-  }, [loads, expense?.loadId, values.charge]);
 
   function changeCharge(charge: string) {
     setValues((prev) => {
@@ -510,50 +500,24 @@ export function ExpenseFormDialog({
                   placeholder={copy.optional}
                 />
               </Field>
-              {canLinkToLoad ? <Field
-                label={copy.linkToLoad}
-                htmlFor="expense-load"
-                hint={
-                  values.charge === BUSINESS
-                    ? copy.overheadNoLoad
-                    : copy.truckLoadsOnly
-                }
-              >
-                <Select value={values.loadId} onValueChange={(value) => set("loadId", value)}>
-                  <SelectTrigger id="expense-load" disabled={values.charge === BUSINESS}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">{copy.notLinked}</SelectItem>
-                    {/* The list is period-filtered, so a link made in another
-                        period would otherwise render as a blank selection. */}
-                    {linkOptions.map((load) => (
-                      <SelectItem key={load.id} value={load.id}>
-                        {formatLocaleDate(load.date, locale, "short")} · {load.originCity} {copy.routeConnector} {load.destinationCity}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field> : null}
+              {!isFinancingPayment ? (
+                <Field
+                  label={copy.receiptNumber}
+                  htmlFor="expense-receipt"
+                  hint={copy.receiptReference}
+                  error={errors.receiptNumber}
+                >
+                  <Input
+                    id="expense-receipt"
+                    maxLength={80}
+                    aria-invalid={Boolean(errors.receiptNumber)}
+                    value={values.receiptNumber}
+                    onChange={(e) => set("receiptNumber", e.target.value)}
+                    placeholder={copy.optional}
+                  />
+                </Field>
+              ) : null}
             </div>
-
-            {!isFinancingPayment ? (
-              <Field
-                label={copy.receiptNumber}
-                htmlFor="expense-receipt"
-                hint={copy.receiptReference}
-                error={errors.receiptNumber}
-              >
-                <Input
-                  id="expense-receipt"
-                  maxLength={80}
-                  aria-invalid={Boolean(errors.receiptNumber)}
-                  value={values.receiptNumber}
-                  onChange={(e) => set("receiptNumber", e.target.value)}
-                  placeholder={copy.optional}
-                />
-              </Field>
-            ) : null}
 
             <Field
               label={copy.notes}

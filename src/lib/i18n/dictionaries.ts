@@ -1465,6 +1465,8 @@ const en = {
     verifiedLocation: "Verified location", suggestions: "{label} suggestions", searchingLocations: "Searching locations…",
     noMatchingLocation: "No matching location. You can keep a manual entry.", manualSaved: "It will be saved as a manual location.",
     chooseOrConfirm: "Choose a suggestion or confirm it.", useState: "Use {state}", keepEntered: "Keep as entered", stateCode: "ST",
+    feeAsPercent: "Enter {fee} as a percent of the rate", feeAsAmount: "Enter {fee} in dollars", feeIsAmount: "= {amount}", feeIsPercent: "= {pct} of the rate",
+    feePercentRange: "Use a percentage from 0 to 100.",
   },
   ifta: {
     metadataTitle: "IFTA", title: "IFTA", scopeDescription: "Decide truck by truck which units belong in the quarterly IFTA filing.",
@@ -3157,6 +3159,8 @@ const es: DictionaryShape<typeof en> = {
     verifiedLocation: "Ubicación verificada", suggestions: "Sugerencias para {label}", searchingLocations: "Buscando ubicaciones…",
     noMatchingLocation: "No hay una ubicación coincidente. Puedes conservar una entrada manual.", manualSaved: "Se guardará como ubicación manual.",
     chooseOrConfirm: "Elige una sugerencia o confírmala.", useState: "Usar {state}", keepEntered: "Conservar como está", stateCode: "Estado",
+    feeAsPercent: "Ingresar {fee} como porcentaje de la tarifa", feeAsAmount: "Ingresar {fee} en dólares", feeIsAmount: "= {amount}", feeIsPercent: "= {pct} de la tarifa",
+    feePercentRange: "Usa un porcentaje de 0 a 100.",
   },
   ifta: {
     metadataTitle: "IFTA", title: "IFTA", scopeDescription: "Decide camión por camión qué unidades pertenecen a la declaración trimestral de IFTA.",

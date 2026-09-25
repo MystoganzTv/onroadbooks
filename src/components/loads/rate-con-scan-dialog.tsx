@@ -18,6 +18,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import type { RatingThresholds } from "@/lib/calculations";
+import type { FeeDefaults } from "@/lib/load-fees";
 import { optimizeDocumentFile } from "@/lib/document-optimization";
 import { formatMiles, formatMoney, formatNumber } from "@/lib/formatters";
 import { interpolate } from "@/lib/i18n/dictionaries";
@@ -63,6 +64,7 @@ interface RateConScanDialogProps {
   defaultTruckId?: string | null;
   defaultDate?: string;
   ratingThresholds?: RatingThresholds;
+  feeDefaults?: FeeDefaults;
 }
 
 type Stage = "idle" | "working" | "result";
@@ -76,6 +78,7 @@ export function RateConScanDialog({
   defaultTruckId,
   defaultDate,
   ratingThresholds,
+  feeDefaults,
 }: RateConScanDialogProps) {
   const { dictionary, locale } = useLanguage();
   const copy = dictionary.rateCon;
@@ -314,6 +317,7 @@ export function RateConScanDialog({
         defaultTruckId={defaultTruckId}
         defaultDate={defaultDate}
         ratingThresholds={ratingThresholds}
+        feeDefaults={feeDefaults}
         trigger={null}
         prefill={handoff?.prefill}
         initialAttachments={handoff?.attachments}
