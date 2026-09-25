@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { operatingLedger } from "@/lib/startup-costs";
 
 import { getMobileSession } from "@/lib/auth/mobile";
 import { div, summarizeFuel, thresholdsFromSettings } from "@/lib/calculations";
@@ -63,7 +64,9 @@ export async function GET(request: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const dataset = await getRepository(session.businessId).getDataset();
-  const { loads, expenses, settings, goals, fuelEntries, subscription, trucks } = dataset;
+  const { loads, settings, goals, fuelEntries, subscription, trucks } = dataset;
+  // Same operating ledger as the web calculator: setup spend is not a running cost.
+  const expenses = operatingLedger(loads, dataset.expenses);
 
   if (!planAllows(subscription, "cockpit")) {
     return NextResponse.json({ error: capabilityRefusal("cockpit") }, { status: 403 });

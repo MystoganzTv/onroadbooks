@@ -1,4 +1,5 @@
 import { revalidatePath } from "next/cache";
+import { operatingLedger } from "@/lib/startup-costs";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { fieldErrorsFrom } from "@/lib/actions/types";
@@ -26,7 +27,8 @@ export async function GET(request: NextRequest) {
 
   const period = periodFromSearchParams(Object.fromEntries(request.nextUrl.searchParams));
   const dataset = await getRepository(session.businessId).getDataset();
-  const { loads, expenses, settings } = dataset;
+  const { loads, settings } = dataset;
+  const expenses = operatingLedger(loads, dataset.expenses);
 
   const thresholds = thresholdsFromSettings(settings);
   const scored = scoreLoads(

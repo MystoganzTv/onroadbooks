@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { operatingLedger } from "@/lib/startup-costs";
 
 import { CalculatorPanel, type CalculatorDefaults } from "@/components/calculator/calculator-panel";
 import { TruckSwitcher } from "@/components/fleet/truck-switcher";
@@ -65,7 +66,10 @@ export default async function CalculatorPage({
   ]);
   const copy = getWebDictionary(locale).calculator;
   const dataset = await getDataset(session.businessId);
-  const { trucks, loads, expenses, fuelEntries, settings, goals } = dataset;
+  const { trucks, loads, fuelEntries, settings, goals } = dataset;
+  // A cost per mile that includes the setup period would price every quote
+  // to repay the startup investment on one load.
+  const expenses = operatingLedger(loads, dataset.expenses);
 
   if (!planAllows(dataset.subscription, "cockpit")) {
     return (

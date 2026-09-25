@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { operatingLedger } from "@/lib/startup-costs";
 
 import { getMobileSession } from "@/lib/auth/mobile";
 import { getRepository } from "@/lib/db";
@@ -52,7 +53,10 @@ export async function GET(request: NextRequest) {
   const today = todayISO();
 
   const dataset = await getRepository(session.businessId).getDataset();
-  const { loads, expenses, settings, goals, reserveAccounts, reserveTransactions, paymentEvents, financialObligations } = dataset;
+  const { loads, expenses: ledgerExpenses, settings, goals, reserveAccounts, reserveTransactions, paymentEvents, financialObligations } = dataset;
+
+  // Operating results start at the first load, exactly as on the web dashboard.
+  const expenses = operatingLedger(loads, ledgerExpenses);
 
   // The web dashboard guards owner planning with `cockpit && ownerPlanning`
   // (see the dashboard page). Role alone would hand a Solo account the

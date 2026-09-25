@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { operatingLedger } from "@/lib/startup-costs";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -69,7 +70,7 @@ export default async function FleetPage({
     getAppLocale(),
   ]);
   const copy = getWebDictionary(locale).fleet;
-  const { trucks, loads, expenses, settings, subscription, paymentEvents } = await getDataset(
+  const { trucks, loads, expenses: ledgerExpenses, settings, subscription, paymentEvents } = await getDataset(
     session.businessId,
   );
 
@@ -79,6 +80,7 @@ export default async function FleetPage({
   if (!hasFleetAccess(subscription)) redirect("/truck");
 
   const period = periodFromSearchParams(params);
+  const expenses = operatingLedger(loads, ledgerExpenses);
   const fleet = calculateFleetSummary(orderedTrucks(trucks), loads, expenses, period, settings, paymentEvents);
   const summary = summarizePeriod(loads, expenses, period, settings, paymentEvents);
   const { best, weakest } = fleetExtremes(fleet);

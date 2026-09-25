@@ -1501,6 +1501,7 @@ const en = {
   },
   dashboard: {
     metadataTitle: "Dashboard", title: "Business overview", description: "Revenue, costs, mileage, and cash available in one place.", loadCalculator: "Load calculator",
+    startupTitle: "Startup investment", startupBody: "Spent before your first load on {date}. It is kept out of profit and cost per mile so they show the truck while it runs, and it still counts in Expenses, Reports and your tax totals.", startupLink: "See expenses",
     bottomLine: "The bottom line", load: "load", loads: "loads", cockpitGate: "Plan optional reserves for tax and maintenance, and see the amount available after those suggestions.",
     businessHealth: "Business health", healthDescription: "What a mile costs, and whether the pace holds", totalMiles: "Total miles", loadedMiles: "Loaded miles", deadheadMiles: "Deadhead miles",
     actualCostMile: "Actual cost / mile", actualNotProrated: "actual, not prorated", revenueMile: "Revenue / mile", allMiles: "all miles", loadsCompleted: "Loads completed", collected: "collected",
@@ -3195,6 +3196,7 @@ const es: DictionaryShape<typeof en> = {
   },
   dashboard: {
     metadataTitle: "Resumen", title: "Resumen del negocio", description: "Ingresos, gastos, millas y efectivo disponible en un solo lugar.", loadCalculator: "Calculadora de cargas",
+    startupTitle: "Inversión de arranque", startupBody: "Gastado antes de tu primera carga, el {date}. No entra en la ganancia ni en el costo por milla, para que reflejen el camión trabajando, y sigue contando en Gastos, Reportes y tus totales de impuestos.", startupLink: "Ver gastos",
     bottomLine: "El resultado", load: "carga", loads: "cargas", cockpitGate: "Reserva impuestos y mantenimiento al cerrar cada quincena y descubre qué dinero realmente puedes retirar.",
     businessHealth: "Salud del negocio", healthDescription: "Cuánto cuesta cada milla y si el ritmo es sostenible", totalMiles: "Millas totales", loadedMiles: "Millas cargadas", deadheadMiles: "Millas vacías",
     actualCostMile: "Costo real / milla", actualNotProrated: "real, no prorrateado", revenueMile: "Ingresos / milla", allMiles: "todas las millas", loadsCompleted: "Cargas completadas", collected: "cobrado",

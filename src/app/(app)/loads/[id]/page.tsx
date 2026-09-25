@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { operatingLedger } from "@/lib/startup-costs";
 import { brokerNameKey, brokerNames as savedBrokerNames } from "@/lib/brokers";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -71,7 +72,7 @@ export default async function LoadDetailPage({
   );
   const allocationBasis = trailingCostBasis(
     dataset.loads,
-    dataset.expenses,
+    operatingLedger(dataset.loads, dataset.expenses),
     dataset.settings,
     todayISO(),
   );

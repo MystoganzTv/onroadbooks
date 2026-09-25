@@ -1,4 +1,5 @@
 import { brokerNames as savedBrokerNames } from "@/lib/brokers";
+import { operatingLedger } from "@/lib/startup-costs";
 import type { Metadata } from "next";
 
 import { ModeView, ViewModeToggle } from "@/components/shared/view-mode";
@@ -53,7 +54,7 @@ export default async function LoadsPage({
   const [params, session, locale] = await Promise.all([searchParams, requireSession(), getAppLocale()]);
   const dictionary = getWebDictionary(locale);
   const copy = dictionary.loads;
-  const { trucks, loads, expenses, settings, drivers, subscription, paymentEvents, brokers: brokerProfiles } = await getDataset(
+  const { trucks, loads, expenses: ledgerExpenses, settings, drivers, subscription, paymentEvents, brokers: brokerProfiles } = await getDataset(
     session.businessId,
   );
   const period = periodFromSearchParams(params);
@@ -62,6 +63,8 @@ export default async function LoadsPage({
 
   const scopeTruckId = truckFromSearchParams(params, trucks);
   const scopedLoads = loadsForTruck(loads, scopeTruckId);
+  // Operating views start at the first load; setup spend is reported apart.
+  const expenses = operatingLedger(loads, ledgerExpenses);
   const scopedExpenses = expensesForTruck(expenses, scopeTruckId);
 
   const periodLoads = withMetricsAll(loadsInPeriod(scopedLoads, period), ratingThresholds, scopedExpenses);
