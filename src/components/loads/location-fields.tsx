@@ -158,8 +158,11 @@ export function LocationFields({
   }
 
   const showResults = open && city.trim().length >= 2;
+  // Judged once the owner has stopped picking from the list. Shown while
+  // typing, the warning appeared and vanished with every lookup and pushed
+  // the rest of the form up and down under the cursor.
   const showWarning =
-    city.trim().length >= 2 && state.trim().length === 2 && review && !review.valid;
+    !showResults && city.trim().length >= 2 && state.trim().length === 2 && review && !review.valid;
   const alternatives = review?.alternatives.filter((location) => location.state !== state) ?? [];
 
   return (
