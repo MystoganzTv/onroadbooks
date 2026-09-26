@@ -1045,28 +1045,36 @@ test.describe.serial("critical browser flows", () => {
     await row.getByRole("button", { name: "Add contact details", exact: true }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByLabel("Company name", { exact: false })).toHaveValue("E2E Brokerage");
-    await dialog.getByLabel("Contact name", { exact: true }).fill("Alex Dispatch");
-    await dialog.getByLabel("Phone", { exact: true }).fill("555-0100");
-    await dialog.getByLabel("Extension", { exact: true }).fill("0012");
-    await dialog.getByLabel("Email", { exact: true }).fill("dispatch@example.test");
     await dialog.getByLabel("MC number", { exact: true }).fill("123456");
     await dialog.getByLabel("Notes", { exact: true }).fill("Call before pickup");
     await dialog.getByRole("button", { name: "Save changes", exact: true }).click();
     await expect(page).toHaveURL(/\/brokers\/[^/]+$/);
     await expect(page.getByRole("heading", { name: "E2E Brokerage", exact: true })).toBeVisible();
-    await expect(page.getByRole("link", { name: "dispatch@example.test", exact: true })).toHaveAttribute("href", "mailto:dispatch@example.test");
     await expect(page.getByRole("link", { name: "E2E-LOAD-1", exact: true })).toBeVisible();
+    // The people at a broker are contacts, each with a direct extension.
+    for (const [name, ext, email] of [["Alex Dispatch", "0012", "dispatch@example.test"], ["Sam Nights", "0099", null]] as const) {
+      await page.getByRole("button", { name: "Add contact", exact: true }).click();
+      const person = page.getByRole("dialog");
+      await person.getByLabel("Contact name", { exact: false }).fill(name);
+      await person.getByLabel("Phone", { exact: true }).fill("555-0100");
+      await person.getByLabel("Extension", { exact: true }).fill(ext);
+      if (email) await person.getByLabel("Email", { exact: true }).fill(email);
+      await person.getByRole("button", { name: "Save changes", exact: true }).click();
+      await expect(person).toBeHidden();
+    }
+    await expect(page.getByRole("link", { name: "dispatch@example.test", exact: true })).toHaveAttribute("href", "mailto:dispatch@example.test");
     await expect(page.getByRole("link", { name: "555-0100 ext. 0012", exact: true })).toHaveAttribute("href", "tel:555-0100;ext=0012");
+    await expect(page.getByRole("link", { name: "555-0100 ext. 0099", exact: true })).toBeVisible();
     await page.goto("/brokers");
-    await expect(page.getByRole("link", { name: "555-0100 ext. 0012", exact: true })).toBeVisible();
+    await expect(page.getByRole("row").filter({ hasText: "E2E Brokerage" })).toContainText("Alex Dispatch, Sam Nights");
     await page.getByRole("link", { name: "E2E Brokerage", exact: true }).click();
     await page.getByRole("button", { name: "Edit broker", exact: true }).click();
-    await expect(page.getByRole("dialog").getByLabel("Extension", { exact: true })).toHaveValue("0012");
     await page.getByRole("dialog").getByLabel("Company name", { exact: false }).fill("Updated Brokerage");
     await page.getByRole("dialog").getByRole("button", { name: "Save changes", exact: true }).click();
     await expect(page.getByRole("dialog")).toBeHidden();
     await expect(page.getByRole("heading", { name: "Updated Brokerage", exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "E2E-LOAD-1", exact: true })).toBeVisible();
+    await expect(page.getByText("Alex Dispatch", { exact: true })).toBeVisible();
     await page.screenshot({ path: "/tmp/onroad-broker-profile.png", fullPage: true });
     await page.goto(`/loads/${load.id}`);
     await expect(page.getByRole("link", { name: "Updated Brokerage", exact: true })).toBeVisible();

@@ -1861,3 +1861,66 @@ describe("expense financial treatment", () => {
     await repo.deleteExpense(created.id);
   });
 });
+
+describe("broker contacts, merge and delete", () => {
+  const company = { phone: null, mcNumber: null, address: null, notes: null };
+
+  it("folds a person's profile into the company: contact, loads and notes move, the duplicate goes", async () => {
+    const target = await repo.saveBroker(null, { ...company, name: "Merge Freight", phone: "800-555-0100" });
+    const person = await repo.saveBroker(null, {
+      ...company,
+      name: "Chris Agent",
+      contactName: "Chris Agent",
+      phone: "800-555-0100",
+      phoneExtension: "36438",
+      email: "chris@merge.test",
+      notes: "Rate con for PO 1",
+    });
+    const load = await repo.createLoad(loadInput({ truckId: (await repo.getDataset()).trucks[0].id, broker: "Chris Agent", loadNumber: "MERGE-1" }));
+    const kept = await repo.createLoad(loadInput({ truckId: (await repo.getDataset()).trucks[0].id, broker: "chris agent", brokerContact: "Dana", loadNumber: "MERGE-2" }));
+
+    const merged = await repo.mergeBroker(person.id, target.id);
+    assert.equal(merged.id, target.id);
+    assert.deepEqual(
+      merged.contacts?.map(({ name, phone, phoneExtension, email }) => ({ name, phone, phoneExtension, email })),
+      [{ name: "Chris Agent", phone: "800-555-0100", phoneExtension: "36438", email: "chris@merge.test" }],
+    );
+    assert.equal(merged.notes, "Rate con for PO 1");
+
+    const dataset = await repo.getDataset();
+    assert.equal(dataset.brokers?.some((row) => row.id === person.id), false, "the duplicate profile is removed");
+    const moved = dataset.loads.find((row) => row.id === load.id)!;
+    assert.equal(moved.broker, "Merge Freight");
+    assert.equal(moved.brokerContact, "Chris Agent", "the load remembers who it was booked with");
+    const other = dataset.loads.find((row) => row.id === kept.id)!;
+    assert.equal(other.broker, "Merge Freight");
+    assert.equal(other.brokerContact, "Dana", "a load's own contact is never overwritten");
+
+    await assert.rejects(repo.mergeBroker(target.id, target.id), /different broker/);
+    await repo.deleteLoad(load.id);
+    await repo.deleteLoad(kept.id);
+    await repo.deleteBroker(target.id);
+  });
+
+  it("keeps several people under one broker and deletes the profile without touching its loads", async () => {
+    const broker = await repo.saveBroker(null, { ...company, name: "Contacts Co" });
+    const saved = await repo.saveBrokerContacts(broker.id, [
+      { id: "bc_one", name: "Branden", phone: "800-555-0101", phoneExtension: "11", email: null, notes: null },
+      { id: "bc_two", name: "Michael", phone: null, phoneExtension: null, email: "michael@contacts.test", notes: "Nights" },
+    ]);
+    assert.deepEqual(saved.contacts?.map((contact) => contact.name), ["Branden", "Michael"]);
+    // Editing the company leaves its people alone.
+    const renamed = await repo.saveBroker(broker.id, { ...company, name: "Contacts Co", mcNumber: "MC-1" });
+    assert.deepEqual(renamed.contacts?.map((contact) => contact.name), ["Branden", "Michael"]);
+
+    const load = await repo.createLoad(loadInput({ truckId: (await repo.getDataset()).trucks[0].id, broker: "Contacts Co", brokerContact: "Branden", loadNumber: "DEL-1" }));
+    await repo.deleteBroker(broker.id);
+    const dataset = await repo.getDataset();
+    assert.equal(dataset.brokers?.some((row) => row.id === broker.id), false);
+    const after = dataset.loads.find((row) => row.id === load.id)!;
+    assert.equal(after.broker, "Contacts Co", "deleting a profile never rewrites load history");
+    assert.equal(after.brokerContact, "Branden");
+    await assert.rejects(repo.deleteBroker(broker.id), /does not belong/);
+    await repo.deleteLoad(load.id);
+  });
+});

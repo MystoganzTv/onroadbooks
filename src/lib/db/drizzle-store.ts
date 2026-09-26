@@ -1,4 +1,4 @@
-import { brokerNameKey } from "../brokers";
+import { brokerContactsOf, brokerNameKey, clearedLegacyContact, planBrokerMerge } from "../brokers";
 import { recurringSeriesExpenseIds } from "../recurring-expenses";
 import "server-only";
 import { assertFuelExpenseSource } from "../fuel-expenses";
@@ -37,6 +37,7 @@ import {
 import type {
   Business,
   Broker,
+  BrokerContact,
   User,
   Dataset,
   Driver,
@@ -1328,7 +1329,7 @@ export class DrizzleRepository implements Repository {
     }));
 
     const dataset: Dataset = {
-      brokers: brokerRows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() })),
+      brokers: brokerRows.map((row) => ({ ...row, contacts: brokerContactsOf(row), createdAt: row.createdAt.toISOString() })),
       users: [],
       business: {
         id: business.id,
@@ -1924,7 +1925,59 @@ export class DrizzleRepository implements Repository {
       if (linked.length) await tx.update(s.load).set(updateValues(s.load, { broker: data.name })).where(and(eq(s.load.businessId, business.id), inArray(s.load.id, linked)));
       return oneRow(tx.update(s.broker).set(updateValues(s.broker, data)).where(and(eq(s.broker.id, existing.id), eq(s.broker.businessId, business.id))).returning());
     });
-    return { ...row, createdAt: row.createdAt.toISOString() };
+    return { ...row, contacts: brokerContactsOf(row), createdAt: row.createdAt.toISOString() };
+  }
+
+  async saveBrokerContacts(brokerId: string, contacts: BrokerContact[]): Promise<Broker> {
+    const client = await this.clientProvider();
+    const business = await this.business(client);
+    const existing = await client.query.broker.findFirst({ where: and(eq(s.broker.id, brokerId), eq(s.broker.businessId, business.id)) });
+    if (!existing) throw new Error("That broker does not belong to this workspace.");
+    const row = await oneRow(client.update(s.broker)
+      .set(updateValues(s.broker, { contacts, ...clearedLegacyContact(existing) }))
+      .where(and(eq(s.broker.id, existing.id), eq(s.broker.businessId, business.id)))
+      .returning());
+    return { ...row, contacts: brokerContactsOf(row), createdAt: row.createdAt.toISOString() };
+  }
+
+  async mergeBroker(sourceId: string, targetId: string): Promise<Broker> {
+    if (sourceId === targetId) throw new Error("Choose a different broker to merge into.");
+    const client = await this.clientProvider();
+    const business = await this.business(client);
+    const row = await client.transaction(async (tx) => {
+      const scope = (id: string) => and(eq(s.broker.id, id), eq(s.broker.businessId, business.id));
+      const [source, target] = await Promise.all([
+        tx.query.broker.findFirst({ where: scope(sourceId) }),
+        tx.query.broker.findFirst({ where: scope(targetId) }),
+      ]);
+      if (!source || !target) throw new Error("That broker does not belong to this workspace.");
+      const plan = planBrokerMerge(source, target);
+      const loads = await tx.query.load.findMany({ where: eq(s.load.businessId, business.id), columns: { id: true, broker: true, brokerContact: true } });
+      const moved = loads.filter((load) => brokerNameKey(load.broker ?? "") === source.nameKey);
+      if (moved.length) {
+        await tx.update(s.load).set(updateValues(s.load, { broker: target.name }))
+          .where(and(eq(s.load.businessId, business.id), inArray(s.load.id, moved.map((load) => load.id))));
+        const withoutContact = moved.filter((load) => !load.brokerContact?.trim()).map((load) => load.id);
+        if (plan.loadContact && withoutContact.length) {
+          await tx.update(s.load).set(updateValues(s.load, { brokerContact: plan.loadContact }))
+            .where(and(eq(s.load.businessId, business.id), inArray(s.load.id, withoutContact)));
+        }
+      }
+      await tx.delete(s.broker).where(scope(source.id));
+      return oneRow(tx.update(s.broker)
+        .set(updateValues(s.broker, { ...plan.target, ...clearedLegacyContact(target) }))
+        .where(scope(target.id)).returning());
+    });
+    return { ...row, contacts: brokerContactsOf(row), createdAt: row.createdAt.toISOString() };
+  }
+
+  async deleteBroker(id: string): Promise<void> {
+    const client = await this.clientProvider();
+    const business = await this.business(client);
+    const rows = await client.delete(s.broker)
+      .where(and(eq(s.broker.id, id), eq(s.broker.businessId, business.id)))
+      .returning({ id: s.broker.id });
+    if (!rows.length) throw new Error("That broker does not belong to this workspace.");
   }
 
   async createDriver(input: DriverInput): Promise<Driver> {

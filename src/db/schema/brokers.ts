@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
-import { foreignKey, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { foreignKey, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import type { BrokerContact } from "../../lib/types";
 import { business } from "./businesses";
 
 export const broker = pgTable("Broker", {
@@ -14,6 +15,8 @@ export const broker = pgTable("Broker", {
   mcNumber: text("mcNumber"),
   address: text("address"),
   notes: text("notes"),
+  /** The people at this broker. See migration 0012. */
+  contacts: jsonb("contacts").$type<BrokerContact[]>().notNull().default(sql`'[]'::jsonb`),
   createdAt: timestamp("createdAt", { precision: 3, mode: "date" }).notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp("updatedAt", { precision: 3, mode: "date" }).notNull().$onUpdateFn(() => new Date()),
 }, (table) => [

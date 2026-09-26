@@ -1,4 +1,4 @@
-import { brokerNameKey } from "../brokers";
+import { brokerContactsOf, brokerNameKey, clearedLegacyContact, planBrokerMerge } from "../brokers";
 import { recurringSeriesExpenseIds } from "../recurring-expenses";
 import "server-only";
 import { assertFuelExpenseSource } from "../fuel-expenses";
@@ -39,6 +39,7 @@ import { expenseMirrorSource, mirrorRefusal } from "../mirrored-expenses";
 import type {
   Business,
   Broker,
+  BrokerContact,
   Dataset,
   Driver,
   DriverSettlement,
@@ -285,6 +286,11 @@ function migrate(dataset: Dataset): Dataset {
   // catalogue decides what it becomes -- Individual, the old single-truck
   // plan, keeps the cockpit it was sold and becomes OnRoad Pro.
   dataset.brokers ??= [];
+  // Same move as SQL migration 0012: the legacy person becomes a contact.
+  for (const broker of dataset.brokers) {
+    broker.contacts = brokerContactsOf(broker);
+    Object.assign(broker, clearedLegacyContact(broker));
+  }
   dataset.subscription.plan = getPlan(dataset.subscription.plan).id;
   if (!Array.isArray(dataset.reserveAccounts) || dataset.reserveAccounts.length === 0) {
     dataset.reserveAccounts = defaultReserveAccounts(businessId);
@@ -1168,16 +1174,58 @@ export class JsonRepository implements Repository {
       if (brokers.some((row) => row.nameKey === nameKey && row.id !== id)) {
         throw new Error("A broker with that name already exists.");
       }
-      const row: Broker = { ...input, name: input.name.trim(), nameKey,
+      // An omitted legacy field keeps its value, as in the SQL stores.
+      const given = Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
+      const row: Broker = {
+        contactName: null, phoneExtension: null, email: null, contacts: [],
+        ...existing, ...given, name: input.name.trim(), nameKey,
         id: existing?.id ?? newId("broker"), businessId: dataset.business.id,
-        createdAt: existing?.createdAt ?? new Date().toISOString() };
+        createdAt: existing?.createdAt ?? new Date().toISOString(),
+      } as Broker;
       if (existing) {
         for (const load of dataset.loads) {
           if (brokerNameKey(load.broker ?? "") === existing.nameKey) load.broker = row.name;
         }
         Object.assign(existing, row);
       } else brokers.push(row);
-      return row;
+      return { ...row, contacts: brokerContactsOf(row) };
+    }, this.businessId);
+  }
+
+  async saveBrokerContacts(brokerId: string, contacts: BrokerContact[]): Promise<Broker> {
+    return mutate((dataset) => {
+      const broker = dataset.brokers?.find((row) => row.id === brokerId);
+      if (!broker) throw new Error("That broker does not belong to this workspace.");
+      Object.assign(broker, { contacts, ...clearedLegacyContact(broker) });
+      return { ...broker };
+    }, this.businessId);
+  }
+
+  async mergeBroker(sourceId: string, targetId: string): Promise<Broker> {
+    if (sourceId === targetId) throw new Error("Choose a different broker to merge into.");
+    return mutate((dataset) => {
+      const brokers = dataset.brokers ??= [];
+      const source = brokers.find((row) => row.id === sourceId);
+      const target = brokers.find((row) => row.id === targetId);
+      if (!source || !target) throw new Error("That broker does not belong to this workspace.");
+      const plan = planBrokerMerge(source, target);
+      for (const load of dataset.loads) {
+        if (brokerNameKey(load.broker ?? "") !== source.nameKey) continue;
+        load.broker = target.name;
+        if (!load.brokerContact?.trim() && plan.loadContact) load.brokerContact = plan.loadContact;
+      }
+      dataset.brokers = brokers.filter((row) => row.id !== source.id);
+      Object.assign(target, plan.target, clearedLegacyContact(target));
+      return { ...target };
+    }, this.businessId);
+  }
+
+  async deleteBroker(id: string): Promise<void> {
+    return mutate((dataset) => {
+      if (!dataset.brokers?.some((row) => row.id === id)) {
+        throw new Error("That broker does not belong to this workspace.");
+      }
+      dataset.brokers = dataset.brokers.filter((row) => row.id !== id);
     }, this.businessId);
   }
 

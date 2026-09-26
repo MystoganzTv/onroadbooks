@@ -1,4 +1,4 @@
-import { brokerNameKey } from "../brokers";
+import { brokerContactsOf, brokerNameKey, clearedLegacyContact, planBrokerMerge } from "../brokers";
 import { recurringSeriesExpenseIds } from "../recurring-expenses";
 import "server-only";
 import { assertFuelExpenseSource } from "../fuel-expenses";
@@ -13,6 +13,7 @@ import {
 import type {
   Business,
   Broker,
+  BrokerContact,
   User,
   Dataset,
   Driver,
@@ -147,6 +148,18 @@ export async function checkPostgresConnection(): Promise<void> {
 }
 
 type DecimalLike = { toNumber(): number } | number | null | undefined;
+
+type PrismaBrokerRow = Omit<Broker, "contacts" | "createdAt"> & { contacts: Prisma.JsonValue; createdAt: Date };
+
+/** Prisma types the JSON column loosely; the app only ever writes BrokerContact[]. */
+function asBrokerRow(row: PrismaBrokerRow): Omit<Broker, "createdAt"> {
+  return { ...row, contacts: Array.isArray(row.contacts) ? (row.contacts as unknown as BrokerContact[]) : [] };
+}
+
+function toBroker(row: PrismaBrokerRow): Broker {
+  const broker = asBrokerRow(row);
+  return { ...broker, contacts: brokerContactsOf(broker), createdAt: row.createdAt.toISOString() };
+}
 
 function num(value: DecimalLike): number {
   if (value === null || value === undefined) return 0;
@@ -942,7 +955,7 @@ export class PrismaRepository implements Repository {
     }));
 
     const dataset: Dataset = {
-      brokers: brokerRows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() })),
+      brokers: brokerRows.map((row) => ({ ...row, contacts: brokerContactsOf(asBrokerRow(row)), createdAt: row.createdAt.toISOString() })),
       users: [],
       business: {
         id: business.id,
@@ -1426,7 +1439,59 @@ export class PrismaRepository implements Repository {
       await tx.load.updateMany({ where: { businessId: business.id, id: { in: linked } }, data: { broker: data.name } });
       return tx.broker.update({ where: { id: existing.id }, data });
     });
-    return { ...row, createdAt: row.createdAt.toISOString() };
+    return toBroker(row);
+  }
+
+  async saveBrokerContacts(brokerId: string, contacts: BrokerContact[]): Promise<Broker> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const existing = await client.broker.findFirst({ where: { id: brokerId, businessId: business.id } });
+    if (!existing) throw new Error("That broker does not belong to this workspace.");
+    const row = await client.broker.update({
+      where: { id: existing.id },
+      data: { contacts: contacts as unknown as Prisma.InputJsonValue, ...clearedLegacyContact(existing) },
+    });
+    return toBroker(row);
+  }
+
+  async mergeBroker(sourceId: string, targetId: string): Promise<Broker> {
+    if (sourceId === targetId) throw new Error("Choose a different broker to merge into.");
+    const client = await getClient();
+    const business = await this.business(client);
+    const row = await client.$transaction(async (tx) => {
+      const [source, target] = await Promise.all([
+        tx.broker.findFirst({ where: { id: sourceId, businessId: business.id } }),
+        tx.broker.findFirst({ where: { id: targetId, businessId: business.id } }),
+      ]);
+      if (!source || !target) throw new Error("That broker does not belong to this workspace.");
+      const plan = planBrokerMerge(asBrokerRow(source), asBrokerRow(target));
+      const loads = await tx.load.findMany({ where: { businessId: business.id }, select: { id: true, broker: true, brokerContact: true } });
+      const moved = loads.filter((load) => brokerNameKey(load.broker ?? "") === source.nameKey);
+      if (moved.length) {
+        await tx.load.updateMany({ where: { businessId: business.id, id: { in: moved.map((load) => load.id) } }, data: { broker: target.name } });
+        const withoutContact = moved.filter((load) => !load.brokerContact?.trim()).map((load) => load.id);
+        if (plan.loadContact && withoutContact.length) {
+          await tx.load.updateMany({ where: { businessId: business.id, id: { in: withoutContact } }, data: { brokerContact: plan.loadContact } });
+        }
+      }
+      await tx.broker.delete({ where: { id: source.id } });
+      return tx.broker.update({
+        where: { id: target.id },
+        data: {
+          ...plan.target,
+          contacts: plan.target.contacts as unknown as Prisma.InputJsonValue,
+          ...clearedLegacyContact(target),
+        },
+      });
+    });
+    return toBroker(row);
+  }
+
+  async deleteBroker(id: string): Promise<void> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const { count } = await client.broker.deleteMany({ where: { id, businessId: business.id } });
+    if (!count) throw new Error("That broker does not belong to this workspace.");
   }
 
   async createDriver(input: DriverInput): Promise<Driver> {

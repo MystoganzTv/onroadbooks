@@ -434,15 +434,34 @@ export interface MaintenanceDue {
 export type ProfitabilityRating = "GREAT" | "GOOD" | "MARGINAL" | "BAD";
 
 /** Aggregate root loaded once per request and reused by every calculation. */
+/** A person at a broker -- one of several agents at the same company. */
+export interface BrokerContact {
+  id: string;
+  name: string;
+  phone: string | null;
+  phoneExtension: string | null;
+  email: string | null;
+  notes: string | null;
+}
+
 export interface Broker {
   id: string;
   businessId: string;
+  /** The company, e.g. "TQL". */
   name: string;
   nameKey: string;
+  /**
+   * Legacy single contact. Kept so older rows and clients still read, but the
+   * people at a broker now live in `contacts`; migration 0012 copied this one
+   * across.
+   */
   contactName: string | null;
+  /** The company's main line. A contact's own number or extension is on the contact. */
   phone: string | null;
   phoneExtension?: string | null;
   email: string | null;
+  /** The people the owner books with there. */
+  contacts?: BrokerContact[];
   mcNumber: string | null;
   address: string | null;
   notes: string | null;

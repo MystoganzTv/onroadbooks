@@ -1,15 +1,15 @@
-import { brokerNameKey } from "./brokers";
-import type { Broker, Load } from "./types";
+import { brokerContactsOf, brokerNameKey } from "./brokers";
+import type { Load } from "./types";
 
 /**
  * The people the owner has booked with at each broker, keyed by the broker's
  * name key: every contact already written on a load, plus the contact saved
- * on the broker's profile. Feeds the load form's suggestions, so choosing
+ * under the broker's profile. Feeds the load form's suggestions, so choosing
  * TQL offers the agents already worked with there.
  */
 export function brokerContactNames(
   loads: Pick<Load, "broker" | "brokerContact">[],
-  brokers: Pick<Broker, "name" | "contactName">[] = [],
+  brokers: Parameters<typeof brokerContactsOf>[0][] = [],
 ): Record<string, string[]> {
   const byBroker = new Map<string, Map<string, string>>();
   const add = (broker: string | null | undefined, contact: string | null | undefined) => {
@@ -21,7 +21,9 @@ export function brokerContactNames(
     byBroker.set(key, contacts);
   };
   for (const load of loads) add(load.broker, load.brokerContact);
-  for (const broker of brokers) add(broker.name, broker.contactName);
+  for (const broker of brokers) {
+    for (const contact of brokerContactsOf(broker)) add(broker.name, contact.name);
+  }
   return Object.fromEntries(
     [...byBroker].map(([key, contacts]) => [key, [...contacts.values()].sort((a, b) => a.localeCompare(b))]),
   );

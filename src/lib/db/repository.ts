@@ -10,6 +10,7 @@
 import type {
   Business,
   Broker,
+  BrokerContact,
   User,
   Dataset,
   Driver,
@@ -330,10 +331,26 @@ export interface SubscriptionInput {
   providerSubscriptionId?: string | null;
 }
 
-export type BrokerInput = Pick<Broker, "name" | "contactName" | "phone" | "phoneExtension" | "email" | "mcNumber" | "address" | "notes">;
+/**
+ * The company fields. The legacy single-contact fields are optional: the web
+ * form no longer sends them (people are `contacts`), and an omitted field is
+ * left as it is.
+ */
+export type BrokerInput = Pick<Broker, "name" | "phone" | "mcNumber" | "address" | "notes"> &
+  Partial<Pick<Broker, "contactName" | "phoneExtension" | "email">>;
 
 export interface Repository {
   saveBroker(id: string | null, input: BrokerInput): Promise<Broker>;
+  /** Replaces the people saved under a broker. */
+  saveBrokerContacts(brokerId: string, contacts: BrokerContact[]): Promise<Broker>;
+  /**
+   * Folds `sourceId` into `targetId`: contacts move, the source's loads are
+   * renamed to the target (keeping their own contact, or taking the source's
+   * one person), and the source profile is removed. See `planBrokerMerge`.
+   */
+  mergeBroker(sourceId: string, targetId: string): Promise<Broker>;
+  /** Removes the profile only. Loads keep the broker name they were booked under. */
+  deleteBroker(id: string): Promise<void>;
   /** Everything the app needs for a request, in one read. */
   getDataset(): Promise<Dataset>;
 

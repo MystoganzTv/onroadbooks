@@ -38,6 +38,10 @@ const en = {
   scanBusy: "That is a lot of scans in one hour. Try again shortly.",
   scanUnreadable: "We could not find a rate confirmation in that file. Check the file and try again.",
   scanFailed: "The rate confirmation could not be read right now. Try again in a moment.",
+  brokerDuplicate: "A broker with that name already exists.",
+  brokerMissing: "That broker does not belong to this workspace.",
+  brokerMergeSelf: "Choose a different broker to merge into.",
+  brokerContactDuplicate: "That contact is already on this broker.",
 } as const;
 
 const es: { [K in keyof typeof en]: string } = {
@@ -78,6 +82,10 @@ const es: { [K in keyof typeof en]: string } = {
   scanBusy: "Son muchos escaneos en una hora. Inténtalo un poco más tarde.",
   scanUnreadable: "No encontramos una confirmación de tarifa en ese archivo. Revísalo e inténtalo otra vez.",
   scanFailed: "No se pudo leer la confirmación de tarifa ahora mismo. Inténtalo en un momento.",
+  brokerDuplicate: "Ya existe un broker con ese nombre.",
+  brokerMissing: "Ese broker no pertenece a este espacio de trabajo.",
+  brokerMergeSelf: "Elige otro broker para fusionarlo.",
+  brokerContactDuplicate: "Ese contacto ya está en este broker.",
 };
 
 const englishToKey = new Map<string, keyof typeof en>(

@@ -85,6 +85,13 @@
       "when": 1790383862920,
       "tag": "0011_owner-operator-and-contribution-floors",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790388156565,
+      "tag": "0012_broker-contacts",
+      "breakpoints": true
     }
   ]
 }
