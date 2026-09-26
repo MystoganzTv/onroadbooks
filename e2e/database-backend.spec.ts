@@ -486,8 +486,10 @@ test("R2 server uploads preserve 10 MB, enforce ownership/roles and serve privat
     ]);
     // Exercise the actual browser uploader using a normal small attachment.
     // The detailed form shows the load number and documents without toggling.
+    // The page has only made API requests so far, so page.url() is still
+    // about:blank; the cookie belongs to the app's own origin.
     await page.context().addCookies([
-      { name: "onroad-view-mode", value: "detailed", url: new URL(page.url()).origin },
+      { name: "onroad-view-mode", value: "detailed", url: new URL(test.info().project.use.baseURL!).origin },
     ]);
     await page.goto("/loads?month=2026-08&period=month");
     await page
@@ -559,9 +561,21 @@ test("cron and verified Stripe events use Drizzle, isolate workspaces and tolera
     const owner = (
       await db.query('SELECT "businessId" FROM "User" WHERE email=$1', [email])
     ).rows[0];
+    // The job posts only what the owner marked as recurring (truck-profile
+    // estimates never reach the ledger), so seed one monthly insurance
+    // payment two months back; it is due on the 1st of the current month.
+    const truck = (
+      await db.query('SELECT id FROM "Truck" WHERE "businessId"=$1 LIMIT 1', [
+        owner.businessId,
+      ])
+    ).rows[0];
+    const templateMonth = new Date();
+    templateMonth.setUTCDate(1);
+    templateMonth.setUTCMonth(templateMonth.getUTCMonth() - 2);
     await db.query(
-      'UPDATE "Truck" SET "monthlyInsurance"=123.45 WHERE "businessId"=$1',
-      [owner.businessId],
+      `INSERT INTO "Expense" (id,"businessId","truckId",date,scope,category,description,amount,recurring,"updatedAt")
+       VALUES ('exp_fixture_recurring',$1,$2,$3,'TRUCK','INSURANCE','Truck insurance',123.45,true,now())`,
+      [owner.businessId, truck.id, templateMonth.toISOString().slice(0, 10)],
     );
     expect(
       (await page.request.get("/api/cron/monthly-expenses")).status(),
@@ -578,10 +592,11 @@ test("cron and verified Stripe events use Drizzle, isolate workspaces and tolera
     expect((await second.json()).expensesPosted).toBe(0);
     const expenses = (
       await db.query(
-        'SELECT amount::text FROM "Expense" WHERE "businessId"=$1 AND category=$2',
-        [owner.businessId, "INSURANCE"],
+        'SELECT amount::text FROM "Expense" WHERE "businessId"=$1 AND category=$2 AND id<>$3',
+        [owner.businessId, "INSURANCE", "exp_fixture_recurring"],
       )
     ).rows;
+    // Posted exactly once for this month, even after the second run.
     expect(expenses).toEqual([{ amount: "123.45" }]);
     const others = async () =>
       (
