@@ -21,6 +21,7 @@ import {
 function extraction(overrides: Partial<Record<keyof RateConExtraction, unknown>> = {}) {
   return rateConExtractionSchema.parse({
     broker: "Coyote Logistics",
+    brokerContact: "Dana Ortiz",
     loadNumber: "18827411",
     pickupDate: "2026-04-06",
     deliveryDate: "2026-04-08",
@@ -77,6 +78,7 @@ describe("normalizing an extraction", () => {
     const fields = normalizeExtraction(extraction());
     assert.deepEqual(fields, {
       broker: "Coyote Logistics",
+      brokerContact: "Dana Ortiz",
       loadNumber: "18827411",
       date: "2026-04-06",
       deliveryDate: "2026-04-08",

@@ -5,7 +5,7 @@ import { assertFuelExpenseSource } from "../fuel-expenses";
 
 import type { Prisma } from "@/generated/prisma";
 
-import { roundMoney } from "../calculations";
+import { DEFAULT_RATING_THRESHOLDS, roundMoney } from "../calculations";
 import {
   allocateDriverSettlementNetPay,
   calculateDriverPay,
@@ -893,9 +893,9 @@ export class PrismaRepository implements Repository {
       // reserve, warn only when overdue) must survive a round trip.
       taxReservePct: settingNumber(business.settings?.taxReservePct, 20),
       maintenanceReservePct: settingNumber(business.settings?.maintenanceReservePct, 5),
-      ratingGreatPerMile: settingNumber(business.settings?.ratingGreatPerMile, 2),
-      ratingGoodPerMile: settingNumber(business.settings?.ratingGoodPerMile, 1.5),
-      ratingMarginalPerMile: settingNumber(business.settings?.ratingMarginalPerMile, 1),
+      ratingGreatPerMile: settingNumber(business.settings?.ratingGreatPerMile, DEFAULT_RATING_THRESHOLDS.great),
+      ratingGoodPerMile: settingNumber(business.settings?.ratingGoodPerMile, DEFAULT_RATING_THRESHOLDS.good),
+      ratingMarginalPerMile: settingNumber(business.settings?.ratingMarginalPerMile, DEFAULT_RATING_THRESHOLDS.marginal),
       deadheadWarnPct: settingNumber(business.settings?.deadheadWarnPct, 20),
       maintenanceWarnMiles: business.settings?.maintenanceWarnMiles ?? 2000,
       maintenanceWarnDays: business.settings?.maintenanceWarnDays ?? 30,
@@ -1023,6 +1023,7 @@ export class PrismaRepository implements Repository {
           defaultTruckId: row.defaultTruckId,
           payType: row.payType,
           payRate: num(row.payRate),
+          isOwnerOperator: row.isOwnerOperator,
           active: row.active,
           createdAt: row.createdAt.toISOString(),
         }),
@@ -1076,6 +1077,7 @@ export class PrismaRepository implements Repository {
           destinationCity: row.destinationCity,
           destinationState: row.destinationState,
           broker: row.broker,
+          brokerContact: row.brokerContact,
           loadNumber: row.loadNumber,
           equipmentType: row.equipmentType as EquipmentType | null,
           loadCapacity: row.loadCapacity as LoadCapacity | null,
@@ -1198,6 +1200,7 @@ export class PrismaRepository implements Repository {
       destinationCity: input.destinationCity.trim(),
       destinationState: input.destinationState.trim().toUpperCase(),
       broker: input.broker?.trim() || null,
+      brokerContact: input.brokerContact?.trim() || null,
       loadNumber: input.loadNumber?.trim() || null,
       equipmentType: input.equipmentType ?? null,
       loadCapacity: input.loadCapacity ?? null,
@@ -1440,6 +1443,7 @@ export class PrismaRepository implements Repository {
         defaultTruckId,
         payType: input.payType,
         payRate: input.payRate,
+        isOwnerOperator: input.isOwnerOperator ?? false,
       },
     });
     const dataset = await this.getDataset();
@@ -1460,6 +1464,7 @@ export class PrismaRepository implements Repository {
         defaultTruckId,
         payType: input.payType,
         payRate: input.payRate,
+        ...(input.isOwnerOperator === undefined ? {} : { isOwnerOperator: input.isOwnerOperator }),
       },
     });
     if (updated.count !== 1) throw new Error("That driver does not belong to this workspace.");

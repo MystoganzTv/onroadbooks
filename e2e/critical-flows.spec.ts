@@ -336,7 +336,9 @@ test.describe.serial("critical browser flows", () => {
       await nav.getByRole("button", { name: "More tools" }).click();
       await page.getByRole("button", { name: "Add load", exact: true }).first().click();
       const dialog = page.getByRole("dialog", { name: "Add load" });
-      await expect(dialog.locator("#load-broker")).toBeHidden();
+      // Who the load was booked with stays on the short form: broker and contact.
+      await expect(dialog.locator("#load-broker")).toBeVisible();
+      await expect(dialog.locator("#load-broker-contact")).toBeVisible();
       await expect(dialog.getByText("Status", { exact: true })).toHaveCount(0);
       await dialog.locator("#load-date").fill("2026-08-31");
       await dialog.locator("#load-origin-city").fill("Richmond");
@@ -355,7 +357,7 @@ test.describe.serial("critical browser flows", () => {
       await page.getByRole("button", { name: "Edit", exact: true }).click();
       const edit = page.getByRole("dialog", { name: "Edit load" });
       await edit.getByText("Delivery, customer and other details", { exact: true }).click();
-      await edit.locator("#load-broker").fill("Keep this broker");
+      await edit.locator("#load-number").fill("KEEP-4471");
       await edit.locator("#load-delivery-date").fill("2026-08-30");
       await edit.getByText("Delivery, customer and other details", { exact: true }).click();
       await edit.getByRole("button", { name: "Save changes", exact: true }).click();
@@ -363,12 +365,12 @@ test.describe.serial("critical browser flows", () => {
       await edit.locator("#load-delivery-date").fill("2026-09-01");
       await edit.getByRole("button", { name: "Detailed", exact: true }).click();
       await expect(edit.getByRole("button", { name: "Detailed", exact: true })).toHaveAttribute("aria-pressed", "true");
-      await expect(edit.locator("#load-broker")).toHaveValue("Keep this broker");
+      await expect(edit.locator("#load-number")).toHaveValue("KEEP-4471");
       await edit.getByRole("button", { name: "Simple", exact: true }).click();
-      await expect(edit.locator("#load-broker")).toBeHidden();
+      await expect(edit.locator("#load-number")).toBeHidden();
       await edit.getByRole("button", { name: "Save changes", exact: true }).click();
       await expect(edit).toBeHidden();
-      await expect(page.getByText(/Keep this broker/).first()).toBeVisible();
+      await expect(page.getByText(/KEEP-4471/).first()).toBeVisible();
       await expect(page.getByRole("button", { name: "Record payment", exact: true })).toHaveCount(0);
       await expect(page.getByText("Remaining balance", { exact: true })).toHaveCount(0);
       const saved = JSON.parse(await fs.readFile(dataFile, "utf8"));
@@ -786,7 +788,7 @@ test.describe.serial("critical browser flows", () => {
 
     await page.getByRole("tab", { name: "What should I ask?" }).click();
     await expect(page.getByRole("heading", { name: "Current offer vs thresholds" })).toBeVisible();
-    await expect(page.getByText("$183.38")).toBeVisible();
+    await expect(page.getByText("$510.19")).toBeVisible();
     await expect(page.getByText(/already meets or exceeds your Great profitability threshold/)).toBeVisible();
     await expect(page.getByText("Suggested counteroffer")).toHaveCount(0);
 
@@ -797,7 +799,7 @@ test.describe.serial("critical browser flows", () => {
     await expect(page.getByText("Direct cost break-even")).toBeVisible();
     await expect(page.getByText("True operating break-even")).toBeVisible();
     await expect(page.getByText("Suggested opening quote")).toBeVisible();
-    await expect(page.getByText("$950")).toBeVisible();
+    await expect(page.getByText("$625")).toBeVisible();
 
     const noFinancing = page.getByRole("checkbox", { name: "This truck has no financing" });
     await expect(noFinancing).toBeVisible();
@@ -866,13 +868,15 @@ test.describe.serial("critical browser flows", () => {
 
     // Threshold comparisons are inclusive: equality belongs to the higher
     // band. Decimal offers retain cents while counters round up to $25.
-    await assertBand("916.62", "Great load", null);
-    await assertBand("850.25", "Good load", "$950");
-    await assertBand("753.22", "Good load", "$950");
-    await assertBand("650.50", "Marginal load", "$800");
-    await assertBand("589.81", "Marginal load", "$800");
-    await assertBand("589.80", "Below minimum", "$800");
-    await assertBand("500.25", "Below minimum", "$800");
+    // Bands are contribution profit per total mile ($1.00 / $0.60 / $0.30)
+    // on 317 miles with $255.12 of fixed trip costs and 3% factoring.
+    await assertBand("589.81", "Great load", null);
+    await assertBand("550.25", "Good load", "$625");
+    await assertBand("459.09", "Good load", "$625");
+    await assertBand("400.50", "Marginal load", "$500");
+    await assertBand("361.05", "Marginal load", "$500");
+    await assertBand("361.04", "Below minimum", "$500");
+    await assertBand("300.25", "Below minimum", "$500");
   });
 
   test("load calculator is keyboard operable and announces changing decisions", async ({ page }) => {
@@ -901,6 +905,9 @@ test.describe.serial("critical browser flows", () => {
       page.locator("#calc-factoring"),
       page.getByRole("group", { name: "Factoring fee unit" }).getByRole("button", { name: "%" }),
       page.getByRole("group", { name: "Factoring fee unit" }).getByRole("button", { name: "$" }),
+      page.locator("#calc-driver-pay"),
+      page.getByRole("group", { name: "Driver pay unit" }).getByRole("button", { name: "%" }),
+      page.getByRole("group", { name: "Driver pay unit" }).getByRole("button", { name: "$" }),
       page.getByRole("checkbox", { name: "This truck has no financing" }),
     ];
     for (const control of keyboardOrder) {
@@ -923,7 +930,7 @@ test.describe.serial("critical browser flows", () => {
 
     await offerContext.focus();
     await page.keyboard.press("Enter");
-    await page.locator("#calc-gross").fill("850.25");
+    await page.locator("#calc-gross").fill("550.25");
     await page.locator("#calc-loaded").fill("275");
     await page.locator("#calc-deadhead").fill("42");
     await page.locator("#calc-fuel").fill("5.50");
@@ -933,7 +940,7 @@ test.describe.serial("critical browser flows", () => {
     await targetTab.focus();
     await page.keyboard.press("Enter");
     await expect(page.getByTestId("offer-announcement")).toHaveText(
-      "Good load. Suggested counteroffer $950.",
+      "Good load. Suggested counteroffer $625.",
     );
     await page.locator("#calc-gross").fill("1100");
     await expect(page.getByTestId("offer-announcement")).toHaveText(
@@ -956,7 +963,7 @@ test.describe.serial("critical browser flows", () => {
     ]) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await page.goto("/calculator");
-      await page.locator("#calc-gross").fill("500.25");
+      await page.locator("#calc-gross").fill("300.25");
       await page.locator("#calc-loaded").fill("275");
       await page.locator("#calc-deadhead").fill("42");
       await page.locator("#calc-fuel").fill("5.50");
@@ -1040,6 +1047,7 @@ test.describe.serial("critical browser flows", () => {
     await expect(dialog.getByLabel("Company name", { exact: false })).toHaveValue("E2E Brokerage");
     await dialog.getByLabel("Contact name", { exact: true }).fill("Alex Dispatch");
     await dialog.getByLabel("Phone", { exact: true }).fill("555-0100");
+    await dialog.getByLabel("Extension", { exact: true }).fill("0012");
     await dialog.getByLabel("Email", { exact: true }).fill("dispatch@example.test");
     await dialog.getByLabel("MC number", { exact: true }).fill("123456");
     await dialog.getByLabel("Notes", { exact: true }).fill("Call before pickup");
@@ -1048,7 +1056,12 @@ test.describe.serial("critical browser flows", () => {
     await expect(page.getByRole("heading", { name: "E2E Brokerage", exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "dispatch@example.test", exact: true })).toHaveAttribute("href", "mailto:dispatch@example.test");
     await expect(page.getByRole("link", { name: "E2E-LOAD-1", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "555-0100 ext. 0012", exact: true })).toHaveAttribute("href", "tel:555-0100;ext=0012");
+    await page.goto("/brokers");
+    await expect(page.getByRole("link", { name: "555-0100 ext. 0012", exact: true })).toBeVisible();
+    await page.getByRole("link", { name: "E2E Brokerage", exact: true }).click();
     await page.getByRole("button", { name: "Edit broker", exact: true }).click();
+    await expect(page.getByRole("dialog").getByLabel("Extension", { exact: true })).toHaveValue("0012");
     await page.getByRole("dialog").getByLabel("Company name", { exact: false }).fill("Updated Brokerage");
     await page.getByRole("dialog").getByRole("button", { name: "Save changes", exact: true }).click();
     await expect(page.getByRole("dialog")).toBeHidden();

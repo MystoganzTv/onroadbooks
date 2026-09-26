@@ -1,0 +1,1 @@
+ALTER TABLE "Broker" ADD COLUMN "phoneExtension" text;

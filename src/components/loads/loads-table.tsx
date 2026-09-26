@@ -107,6 +107,7 @@ interface LoadsTableProps {
   simple?: boolean;
   loads: LoadWithMetrics[];
   brokers: string[];
+  brokerContacts?: Record<string, string[]>;
   trucks?: Truck[];
   drivers?: Driver[];
   defaultTruckId?: string | null;
@@ -121,6 +122,7 @@ interface LoadsTableProps {
 export function LoadsTable({
   loads,
   brokers,
+  brokerContacts,
   trucks = [],
   drivers = [],
   defaultTruckId,
@@ -329,6 +331,7 @@ export function LoadsTable({
             ) : (
               <LoadFormDialog
                 brokers={brokers}
+                brokerContacts={brokerContacts}
                 trucks={trucks}
                 drivers={drivers}
                 defaultTruckId={defaultTruckId}

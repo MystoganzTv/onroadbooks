@@ -78,6 +78,7 @@ export const loadSchema = z
       .length(2, "Use a 2-letter state")
       .regex(/^[A-Za-z]{2}$/, "Use a 2-letter state"),
     broker: z.string().trim().max(120).optional().nullable(),
+    brokerContact: z.string().trim().max(120).optional().nullable(),
     loadNumber: z.string().trim().max(60).optional().nullable(),
     equipmentType: z
       .enum(["BOX_TRUCK", "DRY_VAN", "REEFER", "FLATBED", "POWER_ONLY", "SPRINTER_VAN", "OTHER"])
@@ -455,6 +456,7 @@ export const driverSchema = z
       .number({ invalid_type_error: "Enter a pay rate" })
       .min(0.01, "Pay rate must be greater than zero")
       .max(100_000, "That pay rate looks too large"),
+    isOwnerOperator: z.boolean().optional(),
   })
   .refine((value) => value.payType !== "PERCENT_GROSS" || value.payRate <= 100, {
     message: "Percent of gross cannot exceed 100%",

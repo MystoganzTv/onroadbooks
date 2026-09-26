@@ -1,3 +1,4 @@
+import { brokerContactNames } from "@/lib/broker-contacts";
 import { buildLoadEstimator } from "@/lib/load-estimates";
 import { brokerNames as savedBrokerNames } from "@/lib/brokers";
 import type { Metadata } from "next";
@@ -277,6 +278,7 @@ export default async function DashboardPage({
   const loadAction = roleCan(role, "manage_loads") ? (
     <LoadFormDialog
       brokers={brokerNames}
+      brokerContacts={brokerContactNames(loads, dataset.brokers)}
       trucks={trucks}
       drivers={hasFleetAccess(dataset.subscription) ? drivers : []}
       defaultTruckId={truckId}

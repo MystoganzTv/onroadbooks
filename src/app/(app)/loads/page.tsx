@@ -1,3 +1,4 @@
+import { brokerContactNames } from "@/lib/broker-contacts";
 import { buildLoadEstimator } from "@/lib/load-estimates";
 import { brokerNames as savedBrokerNames } from "@/lib/brokers";
 import { operatingLedger } from "@/lib/startup-costs";
@@ -71,6 +72,7 @@ export default async function LoadsPage({
   const periodLoads = withMetricsAll(loadsInPeriod(scopedLoads, period), ratingThresholds, scopedExpenses, estimate);
   const summary = summarizePeriod(scopedLoads, scopedExpenses, period, settings, paymentEvents);
   const brokers = savedBrokerNames(loads, brokerProfiles);
+  const brokerContacts = brokerContactNames(loads, brokerProfiles);
   const feeDefaults = latestFeeDefaults(scopedLoads);
 
   const tripExpenses = periodLoads.reduce((sum, load) => sum + load.metrics.tripExpenses, 0);
@@ -93,6 +95,7 @@ export default async function LoadsPage({
             {isRateConScanConfigured() && (
               <RateConScanDialog
                 brokers={brokers}
+                brokerContacts={brokerContacts}
                 trucks={trucks}
                 drivers={hasFleetAccess(subscription) ? drivers : []}
                 defaultTruckId={scopeTruckId}
@@ -103,6 +106,7 @@ export default async function LoadsPage({
             )}
             <LoadFormDialog
               brokers={brokers}
+              brokerContacts={brokerContacts}
               trucks={trucks}
               drivers={hasFleetAccess(subscription) ? drivers : []}
               defaultTruckId={scopeTruckId}
@@ -131,6 +135,7 @@ export default async function LoadsPage({
             simple
             loads={periodLoads}
             brokers={brokers}
+            brokerContacts={brokerContacts}
             trucks={trucks}
             drivers={hasFleetAccess(subscription) ? drivers : []}
             defaultTruckId={scopeTruckId}
@@ -218,6 +223,7 @@ export default async function LoadsPage({
         <LoadsTable
           loads={periodLoads}
           brokers={brokers}
+          brokerContacts={brokerContacts}
           trucks={trucks}
           drivers={hasFleetAccess(subscription) ? drivers : []}
           defaultTruckId={scopeTruckId}

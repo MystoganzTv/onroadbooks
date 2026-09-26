@@ -79,3 +79,22 @@ describe("trip cost estimates", () => {
     assert.equal(buildLoadEstimator(dataset, "2026-09-20")({ ...trip, driverId: null }).driverPay, undefined);
   });
 });
+
+describe("broker contacts", async () => {
+  const { brokerContactNames } = await import("../broker-contacts");
+  it("groups the agents booked with under their broker", () => {
+    assert.deepEqual(
+      brokerContactNames(
+        [
+          { broker: "TQL", brokerContact: "Michael Reagan" },
+          { broker: "tql ", brokerContact: "Christopher Sanchez" },
+          { broker: "TQL", brokerContact: " michael reagan" },
+          { broker: "Coyote", brokerContact: null },
+          { broker: null, brokerContact: "Nobody" },
+        ],
+        [{ name: "TQL", contactName: "Branden Elam" }],
+      ),
+      { tql: ["Branden Elam", "Christopher Sanchez", "Michael Reagan"] },
+    );
+  });
+});

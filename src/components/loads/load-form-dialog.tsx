@@ -60,6 +60,7 @@ import { LocationFields } from "./location-fields";
 
 const FIELD_LABELS: Record<string, string> = {
   broker: "Broker",
+  brokerContact: "Broker contact",
   loadNumber: "Load number",
   notes: "Notes",
   deliveryDate: "Delivery date",
@@ -92,6 +93,7 @@ interface FormState {
   destinationCity: string;
   destinationState: string;
   broker: string;
+  brokerContact: string;
   loadNumber: string;
   equipmentType: EquipmentType | "UNSPECIFIED";
   loadCapacity: LoadCapacity | "UNSPECIFIED";
@@ -132,6 +134,7 @@ function emptyState(defaultDate: string, truckId: string): FormState {
     destinationCity: "",
     destinationState: "",
     broker: "",
+    brokerContact: "",
     loadNumber: "",
     equipmentType: "BOX_TRUCK",
     loadCapacity: "FULL",
@@ -165,6 +168,7 @@ function stateFromLoad(load: Load): FormState {
     destinationCity: load.destinationCity,
     destinationState: load.destinationState,
     broker: load.broker ?? "",
+    brokerContact: load.brokerContact ?? "",
     loadNumber: load.loadNumber ?? "",
     equipmentType: load.equipmentType ?? "UNSPECIFIED",
     loadCapacity: load.loadCapacity ?? "UNSPECIFIED",
@@ -207,6 +211,7 @@ export interface LoadPrefill {
   destinationCity?: string;
   destinationState?: string;
   broker?: string;
+  brokerContact?: string;
   loadNumber?: string;
   equipmentType?: EquipmentType;
   equipmentLengthFt?: number;
@@ -242,6 +247,7 @@ function applyPrefill(state: FormState, prefill?: LoadPrefill): FormState {
     destinationCity: prefill.destinationCity ?? state.destinationCity,
     destinationState: prefill.destinationState ?? state.destinationState,
     broker: prefill.broker ?? state.broker,
+    brokerContact: prefill.brokerContact ?? state.brokerContact,
     loadNumber: prefill.loadNumber ?? state.loadNumber,
     equipmentType: prefill.equipmentType ?? state.equipmentType,
     equipmentLengthFt: whole(prefill.equipmentLengthFt) || state.equipmentLengthFt,
@@ -304,6 +310,8 @@ function percentLabel(pct: number): string {
 interface LoadFormDialogProps {
   load?: Load;
   brokers?: string[];
+  /** Contacts already booked with, by broker name key (see broker-contacts.ts). */
+  brokerContacts?: Record<string, string[]>;
   trucks?: Truck[];
   drivers?: Driver[];
   /** Preselects the unit the page is currently scoped to. */
@@ -331,6 +339,7 @@ interface LoadFormDialogProps {
 export function LoadFormDialog({
   load,
   brokers = [],
+  brokerContacts = {},
   trucks = [],
   drivers = [],
   defaultTruckId,
@@ -465,6 +474,7 @@ export function LoadFormDialog({
       destinationCity: values.destinationCity,
       destinationState: values.destinationState,
       broker: values.broker || null,
+      brokerContact: values.brokerContact || null,
       loadNumber: values.loadNumber || null,
       equipmentType: values.equipmentType === "UNSPECIFIED" ? null : values.equipmentType,
       loadCapacity: values.loadCapacity === "UNSPECIFIED" ? null : values.loadCapacity,
@@ -519,7 +529,7 @@ export function LoadFormDialog({
       // fields, and move focus to the first one.
       const fieldLabels = locale === "es" ? {
         ...FIELD_LABELS,
-        broker: copy.broker, loadNumber: copy.loadNumberLabel, notes: copy.notes,
+        broker: copy.broker, brokerContact: copy.brokerContact, loadNumber: copy.loadNumberLabel, notes: copy.notes,
         deliveryDate: copy.deliveryDate, endingOdometer: copy.endingOdometer,
         originCity: copy.originCity, destinationCity: copy.destinationCity,
         loadedMiles: copy.loadedMiles, deadheadMiles: copy.deadheadMiles,
@@ -759,6 +769,41 @@ export function LoadFormDialog({
                 }))}
               />
             </div>
+            {/* Who the load was booked through: the company, and the person there. */}
+            <div className="grid grid-cols-2 gap-3">
+              <Field label={copy.broker} htmlFor="load-broker" error={errors.broker}>
+                <Input
+                  id="load-broker"
+                  list="broker-list"
+                  maxLength={120}
+                  aria-invalid={Boolean(errors.broker)}
+                  value={values.broker}
+                  onChange={(e) => set("broker", e.target.value)}
+                  placeholder={copy.brokerPlaceholder}
+                />
+                <datalist id="broker-list">
+                  {brokers.map((broker) => (
+                    <option key={broker} value={broker} />
+                  ))}
+                </datalist>
+              </Field>
+              <Field label={copy.brokerContact} htmlFor="load-broker-contact" error={errors.brokerContact} hint={copy.brokerContactHint}>
+                <Input
+                  id="load-broker-contact"
+                  list="broker-contact-list"
+                  maxLength={120}
+                  aria-invalid={Boolean(errors.brokerContact)}
+                  value={values.brokerContact}
+                  onChange={(e) => set("brokerContact", e.target.value)}
+                  placeholder={copy.optional}
+                />
+                <datalist id="broker-contact-list">
+                  {(brokerContacts[values.broker.trim().toLowerCase()] ?? []).map((contact) => (
+                    <option key={contact} value={contact} />
+                  ))}
+                </datalist>
+              </Field>
+            </div>
             {/* Live calculation strip -- the reason this form is fast. */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-md border border-border bg-surface-sunken px-3 py-2.5 sm:grid-cols-3">
               <Calc label={copy.totalMiles} value={formatMiles(totalMiles)} />
@@ -777,22 +822,6 @@ export function LoadFormDialog({
                   onChange={(e) => set("deliveryDate", e.target.value)}
                   aria-invalid={Boolean(errors.deliveryDate)}
                 />
-              </Field>
-              <Field label={copy.broker} htmlFor="load-broker" error={errors.broker}>
-                <Input
-                  id="load-broker"
-                  list="broker-list"
-                  maxLength={120}
-                  aria-invalid={Boolean(errors.broker)}
-                  value={values.broker}
-                  onChange={(e) => set("broker", e.target.value)}
-                  placeholder={copy.optional}
-                />
-                <datalist id="broker-list">
-                  {brokers.map((broker) => (
-                    <option key={broker} value={broker} />
-                  ))}
-                </datalist>
               </Field>
               <Field label={copy.loadNumberLabel} htmlFor="load-number" error={errors.loadNumber}>
                 <Input

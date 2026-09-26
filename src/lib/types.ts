@@ -170,6 +170,8 @@ export interface Load {
   destinationCity: string;
   destinationState: string;
   broker: string | null;
+  /** The person at the broker this load was booked with. */
+  brokerContact?: string | null;
   loadNumber: string | null;
   equipmentType: EquipmentType | null;
   loadCapacity: LoadCapacity | null;
@@ -439,6 +441,7 @@ export interface Broker {
   nameKey: string;
   contactName: string | null;
   phone: string | null;
+  phoneExtension?: string | null;
   email: string | null;
   mcNumber: string | null;
   address: string | null;
@@ -744,6 +747,12 @@ export interface Driver {
   defaultTruckId: string | null;
   payType: DriverPayType;
   payRate: number;
+  /**
+   * This driver is the business owner. Their pay is still a business cost in
+   * the Business view; it only unlocks the Owner-Operator view of a load.
+   * Set explicitly -- never inferred from a name.
+   */
+  isOwnerOperator?: boolean;
   active: boolean;
   createdAt: string;
 }

@@ -11,3 +11,11 @@ export function brokerNames(loads: Load[], brokers: Broker[] = []): string[] {
   }
   return [...names.values()].sort((a, b) => a.localeCompare(b));
 }
+
+export function brokerPhoneLabel(broker: Broker): string {
+  return `${broker.phone ?? ""}${broker.phoneExtension ? ` ext. ${broker.phoneExtension}` : ""}`;
+}
+
+export function brokerPhoneHref(broker: Broker): string {
+  return `tel:${broker.phone ?? ""}${broker.phoneExtension ? `;ext=${encodeURIComponent(broker.phoneExtension)}` : ""}`;
+}

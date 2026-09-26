@@ -56,6 +56,7 @@ The format is in [0000-template.md](0000-template.md); the practice itself is
 | [0017](0017-plans-in-code.md) | Plan catalogue in code, limits enforced server-side | Accepted |
 | [0022](0022-price-by-depth-not-by-taxes.md) | Price by depth — ledger, cockpit, fleet — and sell nothing that is not built | Accepted |
 | [0027](0027-read-the-rate-confirmation-never-file-it.md) | A model may read a document; it never files, decides or reaches the ledger | Accepted |
+| [0028](0028-load-profitability-perspectives.md) | Business, Driver and Owner-Operator views of a load; rating floors on the contribution scale | Accepted |
 
 ### Craft
 

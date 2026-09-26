@@ -119,13 +119,16 @@ export async function accountRepositoryContract(
   const load = await repo.createLoad(loadInput);
   assert.equal(load.date, "2024-02-29");
   assert.equal(load.grossRate, 2500.01);
-  const contact = { name: "Example Brokerage", contactName: "Dispatch Team", phone: "555-0100", email: "dispatch@example.test", mcNumber: "123456", address: "Example address", notes: "Call before arrival" };
+  const contact = { name: "Example Brokerage", contactName: "Dispatch Team", phone: "555-0100", phoneExtension: "0012", email: "dispatch@example.test", mcNumber: "123456", address: "Example address", notes: "Call before arrival" };
   const broker = await repo.saveBroker(null, contact);
   assert.equal((await repo.getDataset()).brokers?.find((row) => row.id === broker.id)?.email, contact.email);
   await assert.rejects(repo.saveBroker(null, { ...contact, name: "  EXAMPLE BROKERAGE  " }), /already exists/);
   await assert.rejects(foreign.saveBroker(broker.id, contact), /does not belong/);
   const updatedBroker = await repo.saveBroker(broker.id, { ...contact, name: "Renamed Brokerage", phone: "555-0200" });
   assert.equal(updatedBroker.phone, "555-0200");
+  assert.equal((await repo.getDataset()).brokers?.find((row) => row.id === broker.id)?.phoneExtension, "0012");
+  await repo.saveBroker(broker.id, { ...contact, name: "Renamed Brokerage", phoneExtension: null });
+  assert.equal((await repo.getDataset()).brokers?.find((row) => row.id === broker.id)?.phoneExtension, null);
   assert.equal((await repo.getDataset()).loads.find((row) => row.id === load.id)?.broker, "Renamed Brokerage");
 
   await assert.rejects(foreign.updateLoad(load.id, loadInput));

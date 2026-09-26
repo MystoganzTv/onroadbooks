@@ -18,11 +18,17 @@
  * worth running. The score adds nuance; it does not overrule the threshold.
  */
 
-import { rateLoad, type RatingThresholds } from "../calculations";
+import { DEFAULT_RATING_THRESHOLDS, rateLoad, type RatingThresholds } from "../calculations";
 import type { LoadMetrics, LoadWithMetrics, ProfitabilityRating } from "../types";
 
 export const SCORE_WEIGHTS = { profitPerMile: 50, margin: 30, deadhead: 20 } as const;
-export const FULL_MARGIN_PCT = 60;
+/**
+ * Contribution margin that earns the full 30. Margin is after the driver's
+ * pay: with a 33 % driver, fuel and ~10 % in fees, 60 % (the pre-ADR-0028
+ * mark, set before driver pay was a trip cost) was out of reach for every
+ * hired-driver load. 40 % is a strong load on that basis.
+ */
+export const FULL_MARGIN_PCT = 40;
 /** Profit per mile that earns the full 50, as a multiple of the GREAT floor. */
 export const PPM_FULL_MARKS_MULTIPLE = 1.25;
 
@@ -49,7 +55,7 @@ export function calculateLoadScore(
   thresholds: RatingThresholds,
   deadheadWarnPct: number,
 ): LoadScore {
-  const greatFloor = thresholds.great > 0 ? thresholds.great : 2;
+  const greatFloor = thresholds.great > 0 ? thresholds.great : DEFAULT_RATING_THRESHOLDS.great;
   const ppmTarget = greatFloor * PPM_FULL_MARKS_MULTIPLE;
   const deadheadFloor = Math.max(0, deadheadWarnPct) * 2;
 

@@ -78,6 +78,7 @@ export interface LoadInput {
   destinationCity: string;
   destinationState: string;
   broker?: string | null;
+  brokerContact?: string | null;
   loadNumber?: string | null;
   equipmentType?: EquipmentType | null;
   loadCapacity?: LoadCapacity | null;
@@ -265,6 +266,8 @@ export interface DriverInput {
   defaultTruckId?: string | null;
   payType: DriverPayType;
   payRate: number;
+  /** Omitted leaves the stored value unchanged on update; false on create. */
+  isOwnerOperator?: boolean;
 }
 
 export interface DriverSettlementInput {
@@ -327,7 +330,7 @@ export interface SubscriptionInput {
   providerSubscriptionId?: string | null;
 }
 
-export type BrokerInput = Pick<Broker, "name" | "contactName" | "phone" | "email" | "mcNumber" | "address" | "notes">;
+export type BrokerInput = Pick<Broker, "name" | "contactName" | "phone" | "phoneExtension" | "email" | "mcNumber" | "address" | "notes">;
 
 export interface Repository {
   saveBroker(id: string | null, input: BrokerInput): Promise<Broker>;

@@ -22,8 +22,8 @@ export function BrokerFormDialog({ broker, initialName = "", trigger }: { broker
   const [pending, startTransition] = React.useTransition();
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const formId = React.useId();
-  const fields = ["name", "contactName", "phone", "email", "mcNumber", "address", "notes"] as const;
-  const labels = { name: copy.name, contactName: copy.contact, phone: copy.phone, email: copy.email, mcNumber: copy.mc, address: copy.address, notes: copy.notes };
+  const fields = ["name", "contactName", "phone", "phoneExtension", "email", "mcNumber", "address", "notes"] as const;
+  const labels = { name: copy.name, contactName: copy.contact, phone: copy.phone, phoneExtension: copy.extension, email: copy.email, mcNumber: copy.mc, address: copy.address, notes: copy.notes };
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -51,7 +51,7 @@ export function BrokerFormDialog({ broker, initialName = "", trigger }: { broker
         {fields.map((key) => <Field key={key} label={labels[key]} htmlFor={`${formId}-${key}`} required={key === "name"} error={errors[key]}>
           {key === "notes" || key === "address"
             ? <Textarea id={`${formId}-${key}`} name={key} defaultValue={broker?.[key] ?? ""} maxLength={key === "notes" ? 4000 : 500} />
-            : <Input id={`${formId}-${key}`} name={key} defaultValue={broker?.[key] ?? (key === "name" ? initialName : "")} type={key === "email" ? "email" : key === "phone" ? "tel" : "text"} maxLength={key === "email" ? 254 : key === "phone" ? 60 : key === "mcNumber" ? 40 : 120} required={key === "name"} aria-invalid={Boolean(errors[key])} />}
+            : <Input id={`${formId}-${key}`} name={key} defaultValue={broker?.[key] ?? (key === "name" ? initialName : "")} type={key === "email" ? "email" : key === "phone" ? "tel" : "text"} maxLength={key === "phoneExtension" ? 20 : key === "email" ? 254 : key === "phone" ? 60 : key === "mcNumber" ? 40 : 120} required={key === "name"} aria-invalid={Boolean(errors[key])} />}
         </Field>)}
       </form></DialogBody>
       <DialogFooter><Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={pending}>{dictionary.common.cancel}</Button><Button form={formId} type="submit" size="sm" disabled={pending}>{pending ? <Loader2 className="animate-spin" /> : null}{dictionary.common.saveChanges}</Button></DialogFooter>

@@ -127,6 +127,7 @@ export function migrateLoad(load: Load): Load {
   load.costsPosted ??= false;
   load.driverId ??= null;
   load.driverPay ??= 0;
+  load.brokerContact ??= null;
   return load;
 }
 

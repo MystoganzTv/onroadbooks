@@ -1,3 +1,6 @@
+import { buildLoadProfitability } from "@/lib/finance/load-perspectives";
+import { LoadProfitabilityCard } from "@/components/loads/load-profitability-card";
+import { brokerContactNames } from "@/lib/broker-contacts";
 import { buildLoadEstimator } from "@/lib/load-estimates";
 import Link from "next/link";
 import { operatingLedger } from "@/lib/startup-costs";
@@ -25,10 +28,11 @@ import { hasFleetAccess } from "@/lib/plans";
 import {
   isDeadheadElevated,
   loadMetrics,
-  roundMoney,
   thresholdsFromSettings,
+  tripExpenseLines,
 } from "@/lib/calculations";
 import {
+  hasSufficientOperatingCostBasis,
   overheadCostPerMile,
   trailingCostBasis,
 } from "@/lib/finance/cost-per-mile";
@@ -80,15 +84,19 @@ export default async function LoadDetailPage({
     dataset.settings,
     todayISO(),
   );
-  const allocatedOperatingCosts = roundMoney(
-    metrics.totalMiles * overheadCostPerMile(allocationBasis),
-  );
-  const fullyLoadedOperatingProfit = roundMoney(
-    metrics.tripProfit - allocatedOperatingCosts,
-  );
-  const debtCashBurden = roundMoney(
-    metrics.totalMiles * allocationBasis.debtServicePerMile,
-  );
+  // Business, Driver and Owner-Operator views of the same trip lines and the
+  // same allocation basis as the waterfall and the rating above.
+  const assignedDriver = dataset.drivers.find((driver) => driver.id === load.driverId);
+  const profitability = buildLoadProfitability({
+    grossRevenue: load.grossRate,
+    loadedMiles: load.loadedMiles,
+    deadheadMiles: load.deadheadMiles,
+    lines: tripExpenseLines(load, dataset.expenses, estimate),
+    allocatedCostPerMile: overheadCostPerMile(allocationBasis),
+    allocationAvailable: hasSufficientOperatingCostBasis(allocationBasis),
+    debtServicePerMile: allocationBasis.debtServicePerMile,
+    driverIsOwner: assignedDriver?.isOwnerOperator === true,
+  });
   const brokerProfile = dataset.brokers?.find((row) => row.nameKey === brokerNameKey(load.broker ?? ""));
   const brokers = savedBrokerNames(dataset.loads, dataset.brokers);
   const linkedExpenses = dataset.expenses.filter((expense) => expense.loadId === load.id);
@@ -107,7 +115,7 @@ export default async function LoadDetailPage({
           <p className="mt-0.5 text-sm text-muted-foreground">
             {copy.pickup} {formatLocaleDate(load.date, locale, "long")}
             {load.deliveryDate ? ` - ${copy.delivery} ${formatLocaleDate(load.deliveryDate, locale, "long")}` : ""}
-            {load.broker ? <> - {brokerProfile ? <Link className="text-primary hover:underline" href={`/brokers/${brokerProfile.id}`}>{load.broker}</Link> : load.broker}</> : null}
+            {load.broker ? <> - {brokerProfile ? <Link className="text-primary hover:underline" href={`/brokers/${brokerProfile.id}`}>{load.broker}</Link> : load.broker}{load.brokerContact ? ` (${load.brokerContact})` : ""}</> : null}
             {load.loadNumber ? ` - ${interpolate(copy.loadNumber, { number: load.loadNumber })}` : ""}
             {dataset.trucks.length > 1
               ? ` - ${dataset.trucks.find((t) => t.id === load.truckId)?.name ?? copy.unknownTruck}`
@@ -130,6 +138,7 @@ export default async function LoadDetailPage({
           <LoadFormDialog
             load={load}
             brokers={brokers}
+            brokerContacts={brokerContactNames(dataset.loads, dataset.brokers)}
             trucks={dataset.trucks}
             drivers={hasFleetAccess(dataset.subscription) ? dataset.drivers : []}
             ratingThresholds={thresholdsFromSettings(dataset.settings)}
@@ -150,31 +159,11 @@ export default async function LoadDetailPage({
 
         <TripWaterfall load={load} metrics={metrics} expenses={linkedExpenses} estimate={estimate} />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{copy.profitabilityLayers}</CardTitle>
-            <span className="text-2xs text-muted-foreground">
-              {interpolate(copy.ratingBasis, { basis: allocationBasis.basisLabel })}
-            </span>
-          </CardHeader>
-          <CardContent className="space-y-3 p-4">
-            <Layer label={copy.grossRate} value={load.grossRate} />
-            <Layer label={copy.directTripCosts} value={-metrics.tripExpenses} />
-            <Layer label={copy.contributionProfit} value={metrics.tripProfit} strong />
-            <Separator />
-            <Layer label={copy.allocatedEstimate} value={-allocatedOperatingCosts} />
-            <Layer
-              label={copy.estimatedFullyLoaded}
-              value={fullyLoadedOperatingProfit}
-              strong
-            />
-            <Separator />
-            <Layer label={copy.debtSeparate} value={-debtCashBurden} />
-            <p className="text-2xs text-muted-foreground">
-              {copy.debtRatingExplanation}
-            </p>
-          </CardContent>
-        </Card>
+        <LoadProfitabilityCard
+          profitability={profitability}
+          allocatedRate={overheadCostPerMile(allocationBasis)}
+          basisLabel={allocationBasis.basisLabel}
+        />
 
         <Card>
           <CardHeader>
@@ -320,25 +309,3 @@ export default async function LoadDetailPage({
   );
 }
 
-function Layer({
-  label,
-  value,
-  strong = false,
-}: {
-  label: string;
-  value: number;
-  strong?: boolean;
-}) {
-  return (
-    <div className="flex items-baseline justify-between gap-4">
-      <span className={strong ? "text-sm font-semibold" : "text-sm text-muted-foreground"}>
-        {label}
-      </span>
-      <span
-        className={`tnum text-sm ${strong ? "font-semibold" : ""} ${value < 0 ? "text-neg" : ""}`}
-      >
-        {formatMoney(value)}
-      </span>
-    </div>
-  );
-}

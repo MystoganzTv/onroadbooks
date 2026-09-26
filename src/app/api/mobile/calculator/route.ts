@@ -1,3 +1,4 @@
+import { calculatorDriverPay } from "@/lib/driver-pay";
 import { NextResponse, type NextRequest } from "next/server";
 import { operatingLedger } from "@/lib/startup-costs";
 
@@ -143,6 +144,10 @@ export async function GET(request: NextRequest) {
       mpg: fuel.milesPerGallon ?? null,
       dispatchPct: Math.round(div(dispatchPaid, grossRevenue) * 1000) / 10,
       factoringPct: Math.round(div(factoringPaid, grossRevenue) * 1000) / 10,
+      // Web parity: the calculator counts the truck's driver. The iOS app
+      // ignores fields it does not know yet.
+      driverPayMode: calculatorDriverPay(dataset.drivers, selectedTruck.id).mode,
+      driverPayValue: calculatorDriverPay(dataset.drivers, selectedTruck.id).value,
       overheadPerMile: overheadCostPerMile(basis) + (sharedOverheadPerMile ?? 0),
       debtServicePerMile: basis.debtServicePerMile,
       trueCostPerMile: basis.trueCostPerMile + (sharedOverheadPerMile ?? 0),

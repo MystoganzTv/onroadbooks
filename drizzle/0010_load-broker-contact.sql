@@ -1,0 +1,1 @@
+ALTER TABLE "Load" ADD COLUMN "brokerContact" text;

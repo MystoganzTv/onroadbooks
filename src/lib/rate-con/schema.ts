@@ -42,6 +42,11 @@ export const RATE_CON_TOOL_SCHEMA = {
       description:
         "The broker or shipper paying the carrier, as printed on the document. Not the carrier, not the factoring company.",
     },
+    brokerContact: {
+      type: ["string", "null"],
+      description:
+        "The person at the broker who booked this load (carrier sales rep, agent or broker contact), name only, as printed. Not the carrier's driver or dispatcher.",
+    },
     loadNumber: {
       type: ["string", "null"],
       description: "The broker's load, order or pro number for this shipment.",
@@ -88,6 +93,7 @@ export const RATE_CON_TOOL_SCHEMA = {
   },
   required: [
     "broker",
+    "brokerContact",
     "loadNumber",
     "pickupDate",
     "deliveryDate",
@@ -114,6 +120,7 @@ const loose = z.union([z.string(), z.number(), z.boolean(), z.null()]).catch(nul
 
 export const rateConExtractionSchema = z.object({
   broker: loose,
+  brokerContact: loose,
   loadNumber: loose,
   pickupDate: loose,
   deliveryDate: loose,
@@ -134,6 +141,7 @@ export type RateConExtraction = z.infer<typeof rateConExtractionSchema>;
 /** The load-form fields a rate confirmation can fill, already cleaned up. */
 export interface RateConFields {
   broker: string | null;
+  brokerContact: string | null;
   loadNumber: string | null;
   date: string | null;
   deliveryDate: string | null;
@@ -321,6 +329,7 @@ function cleanEquipment(value: unknown): EquipmentType | null {
 export function normalizeExtraction(raw: RateConExtraction): RateConFields {
   const fields: RateConFields = {
     broker: cleanText(raw.broker, 120),
+    brokerContact: cleanText(raw.brokerContact, 120),
     loadNumber: cleanText(raw.loadNumber, 60),
     date: cleanDate(raw.pickupDate),
     deliveryDate: cleanDate(raw.deliveryDate),

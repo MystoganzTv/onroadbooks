@@ -94,11 +94,22 @@ export function pctChange(current: number, previous: number): number {
 /* ---- Load level ----------------------------------------------------- */
 
 /** Default rating thresholds, used when no settings are supplied. */
+/**
+ * Contribution Profit per TOTAL mile -- after every direct trip cost AND the
+ * driver's pay. Not gross RPM: a box truck grossing $2.00/mi keeps well under
+ * $1.00/mi once fuel, fees and a 33 % driver are paid. The original $2 / $1.50
+ * / $1 floors date from before driver pay was a trip cost and sat on the
+ * gross-rate scale, so no hired-driver load could ever rate above BAD
+ * (ADR-0028). These are only defaults; the owner's settings decide.
+ */
 export const DEFAULT_RATING_THRESHOLDS: RatingThresholds = {
-  great: 2,
-  good: 1.5,
-  marginal: 1,
+  great: 1,
+  good: 0.6,
+  marginal: 0.3,
 };
+
+/** Every business still on the pre-ADR-0028 factory floors. */
+export const LEGACY_RATING_THRESHOLDS: RatingThresholds = { great: 2, good: 1.5, marginal: 1 };
 
 export interface RatingThresholds {
   great: number;

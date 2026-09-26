@@ -12,6 +12,7 @@ export const driver = pgTable("Driver", {
   defaultTruckId: text("defaultTruckId"),
   payType: enums.driverPayType("payType").notNull(),
   payRate: numeric("payRate", { precision: 12, scale: 4 }).notNull(),
+  isOwnerOperator: boolean("isOwnerOperator").notNull().default(false),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("createdAt", { precision: 3, mode: "date", withTimezone: false }).notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp("updatedAt", { precision: 3, mode: "date", withTimezone: false }).notNull().$onUpdateFn(() => new Date()),

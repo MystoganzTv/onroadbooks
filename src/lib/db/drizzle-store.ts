@@ -29,7 +29,7 @@ import {
   type DatabaseExecutor,
 } from "./drizzle-queries";
 
-import { roundMoney } from "../calculations";
+import { DEFAULT_RATING_THRESHOLDS, roundMoney } from "../calculations";
 import {
   allocateDriverSettlementNetPay,
   calculateDriverPay,
@@ -1268,15 +1268,15 @@ export class DrizzleRepository implements Repository {
       ),
       ratingGreatPerMile: settingNumber(
         business.settings?.ratingGreatPerMile,
-        2,
+        DEFAULT_RATING_THRESHOLDS.great,
       ),
       ratingGoodPerMile: settingNumber(
         business.settings?.ratingGoodPerMile,
-        1.5,
+        DEFAULT_RATING_THRESHOLDS.good,
       ),
       ratingMarginalPerMile: settingNumber(
         business.settings?.ratingMarginalPerMile,
-        1,
+        DEFAULT_RATING_THRESHOLDS.marginal,
       ),
       deadheadWarnPct: settingNumber(business.settings?.deadheadWarnPct, 20),
       maintenanceWarnMiles: business.settings?.maintenanceWarnMiles ?? 2000,
@@ -1409,6 +1409,7 @@ export class DrizzleRepository implements Repository {
           defaultTruckId: row.defaultTruckId,
           payType: row.payType,
           payRate: num(row.payRate),
+          isOwnerOperator: row.isOwnerOperator,
           active: row.active,
           createdAt: row.createdAt.toISOString(),
         }),
@@ -1462,6 +1463,7 @@ export class DrizzleRepository implements Repository {
           destinationCity: row.destinationCity,
           destinationState: row.destinationState,
           broker: row.broker,
+          brokerContact: row.brokerContact,
           loadNumber: row.loadNumber,
           equipmentType: row.equipmentType as EquipmentType | null,
           loadCapacity: row.loadCapacity as LoadCapacity | null,
@@ -1591,6 +1593,7 @@ export class DrizzleRepository implements Repository {
       destinationCity: input.destinationCity.trim(),
       destinationState: input.destinationState.trim().toUpperCase(),
       broker: input.broker?.trim() || null,
+      brokerContact: input.brokerContact?.trim() || null,
       loadNumber: input.loadNumber?.trim() || null,
       equipmentType: input.equipmentType ?? null,
       loadCapacity: input.loadCapacity ?? null,
@@ -1941,6 +1944,7 @@ export class DrizzleRepository implements Repository {
             defaultTruckId,
             payType: input.payType,
             payRate: input.payRate,
+            isOwnerOperator: input.isOwnerOperator ?? false,
           }),
         )
         .returning(),
@@ -1965,6 +1969,7 @@ export class DrizzleRepository implements Repository {
             defaultTruckId,
             payType: input.payType,
             payRate: input.payRate,
+            ...(input.isOwnerOperator === undefined ? {} : { isOwnerOperator: input.isOwnerOperator }),
           }),
         )
         .where(and(eq(s.driver.id, id), eq(s.driver.businessId, business.id)))

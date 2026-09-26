@@ -401,9 +401,9 @@ model FinancialSettings {
   fleetOverheadAllocation String @default("UNALLOCATED")
 
   /// Profit-per-total-mile floors for the load profitability rating.
-  ratingGreatPerMile    Decimal @default(2) @db.Decimal(8, 2)
-  ratingGoodPerMile     Decimal @default(1.5) @db.Decimal(8, 2)
-  ratingMarginalPerMile Decimal @default(1) @db.Decimal(8, 2)
+  ratingGreatPerMile    Decimal @default(1) @db.Decimal(8, 2)
+  ratingGoodPerMile     Decimal @default(0.6) @db.Decimal(8, 2)
+  ratingMarginalPerMile Decimal @default(0.3) @db.Decimal(8, 2)
 
   /// Deadhead share of total miles that triggers a warning.
   deadheadWarnPct      Decimal @default(20) @db.Decimal(5, 2)
@@ -486,6 +486,7 @@ model Load {
   destinationCity  String
   destinationState String    @db.VarChar(2)
   broker           String?
+  brokerContact    String?
   loadNumber       String?
 
   equipmentType     EquipmentType?
@@ -646,6 +647,7 @@ model Driver {
   defaultTruck   Truck?        @relation("DriverDefaultTruck", fields: [defaultTruckId], references: [id], onDelete: SetNull)
   payType        DriverPayType
   payRate        Decimal       @db.Decimal(12, 4)
+  isOwnerOperator Boolean      @default(false)
   active         Boolean       @default(true)
 
   createdAt DateTime @default(now())
@@ -835,6 +837,7 @@ model Broker {
   nameKey String
   contactName String?
   phone String?
+  phoneExtension String?
   email String?
   mcNumber String?
   address String?

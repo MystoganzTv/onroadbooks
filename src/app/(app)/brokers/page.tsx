@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth";
 import { getDataset } from "@/lib/db";
-import { brokerNameKey, brokerNames } from "@/lib/brokers";
+import { brokerPhoneLabel, brokerPhoneHref, brokerNameKey, brokerNames } from "@/lib/brokers";
 import { getAppLocale } from "@/lib/i18n-server";
 import { getWebDictionary } from "@/lib/i18n/dictionaries";
 import { formatMoney } from "@/lib/formatters";
@@ -34,7 +34,7 @@ export default async function BrokersPage() {
           return <TableRow key={brokerNameKey(name)}>
             <TableCell>{profile ? <Link className="font-medium text-primary hover:underline" href={`/brokers/${profile.id}`}>{name}</Link> : <span className="font-medium">{name}</span>}</TableCell>
             <TableCell>{profile?.contactName ?? "—"}</TableCell>
-            <TableCell>{profile?.phone ? <a className="text-primary hover:underline" href={`tel:${profile.phone}`}>{profile.phone}</a> : "—"}</TableCell>
+            <TableCell>{profile?.phone ? <a className="text-primary hover:underline" href={brokerPhoneHref(profile)}>{brokerPhoneLabel(profile)}</a> : "—"}</TableCell>
             <TableCell>{profile?.email ? <a className="text-primary hover:underline" href={`mailto:${profile.email}`}>{profile.email}</a> : "—"}</TableCell>
             <TableCell className="text-right tnum">{loads.length}</TableCell><TableCell className="text-right tnum">{formatMoney(loads.reduce((sum, load) => sum + load.grossRate, 0))}</TableCell>
             <TableCell>{profile ? <Button asChild variant="ghost" size="sm"><Link href={`/brokers/${profile.id}`}>{copy.profile}</Link></Button> : canManage ? <BrokerFormDialog initialName={name} trigger={<Button variant="outline" size="sm">{copy.addContact}</Button>} /> : null}</TableCell>

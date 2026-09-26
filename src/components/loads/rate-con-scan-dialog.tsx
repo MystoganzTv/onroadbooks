@@ -59,6 +59,7 @@ import { LoadFormDialog, type LoadPrefill } from "./load-form-dialog";
 
 interface RateConScanDialogProps {
   brokers?: string[];
+  brokerContacts?: Record<string, string[]>;
   trucks?: Truck[];
   drivers?: Driver[];
   defaultTruckId?: string | null;
@@ -73,6 +74,7 @@ const MAX_SCAN_MB = Math.round(MAX_SCAN_BYTES / 1024 / 1024);
 
 export function RateConScanDialog({
   brokers = [],
+  brokerContacts,
   trucks = [],
   drivers = [],
   defaultTruckId,
@@ -164,6 +166,7 @@ export function RateConScanDialog({
         destinationCity: f.destinationCity ?? undefined,
         destinationState: f.destinationState ?? undefined,
         broker: f.broker ?? undefined,
+        brokerContact: f.brokerContact ?? undefined,
         loadNumber: f.loadNumber ?? undefined,
         equipmentType: f.equipmentType ?? undefined,
         equipmentLengthFt: f.equipmentLengthFt ?? undefined,
@@ -180,6 +183,7 @@ export function RateConScanDialog({
 
   const fieldLabels: Record<RateConField, string> = {
     broker: loadsCopy.broker,
+    brokerContact: loadsCopy.brokerContact,
     loadNumber: loadsCopy.loadNumberLabel,
     date: loadsCopy.pickupDate,
     deliveryDate: loadsCopy.deliveryDate,
@@ -312,6 +316,7 @@ export function RateConScanDialog({
 
       <LoadFormDialog
         brokers={brokers}
+        brokerContacts={brokerContacts}
         trucks={trucks}
         drivers={drivers}
         defaultTruckId={defaultTruckId}
@@ -347,6 +352,7 @@ function summaryRows(
   };
 
   push(labels.broker, f.broker);
+  push(labels.brokerContact, f.brokerContact);
   push(labels.loadNumber, f.loadNumber);
   if (f.originCity || f.destinationCity) {
     const origin = [f.originCity, f.originState].filter(Boolean).join(", ");

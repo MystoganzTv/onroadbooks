@@ -229,6 +229,7 @@ async function main() {
         destinationCity: load.destinationCity,
         destinationState: load.destinationState,
         broker: load.broker,
+        brokerContact: load.brokerContact ?? null,
         loadNumber: load.loadNumber,
         equipmentType: load.equipmentType,
         loadCapacity: load.loadCapacity,

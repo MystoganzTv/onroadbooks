@@ -6,7 +6,7 @@ import { assertFuelExpenseSource } from "../fuel-expenses";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { roundMoney } from "../calculations";
+import { DEFAULT_RATING_THRESHOLDS, roundMoney } from "../calculations";
 import { defaultCategoryBehavior } from "../categories";
 import { dataDirectory } from "../data-directory";
 import {
@@ -171,9 +171,9 @@ async function seedFresh(): Promise<Dataset> {
       taxReservePct: 20,
       maintenanceReservePct: 5,
       categoryBehavior: defaultCategoryBehavior(),
-      ratingGreatPerMile: 2,
-      ratingGoodPerMile: 1.5,
-      ratingMarginalPerMile: 1,
+      ratingGreatPerMile: DEFAULT_RATING_THRESHOLDS.great,
+      ratingGoodPerMile: DEFAULT_RATING_THRESHOLDS.good,
+      ratingMarginalPerMile: DEFAULT_RATING_THRESHOLDS.marginal,
       deadheadWarnPct: 20,
       maintenanceWarnMiles: 2000,
       maintenanceWarnDays: 30,
@@ -307,9 +307,9 @@ function migrate(dataset: Dataset): Dataset {
   dataset.settings = {
     ...dataset.settings,
     categoryBehavior: dataset.settings?.categoryBehavior ?? defaultCategoryBehavior(),
-    ratingGreatPerMile: dataset.settings?.ratingGreatPerMile ?? 2,
-    ratingGoodPerMile: dataset.settings?.ratingGoodPerMile ?? 1.5,
-    ratingMarginalPerMile: dataset.settings?.ratingMarginalPerMile ?? 1,
+    ratingGreatPerMile: dataset.settings?.ratingGreatPerMile ?? DEFAULT_RATING_THRESHOLDS.great,
+    ratingGoodPerMile: dataset.settings?.ratingGoodPerMile ?? DEFAULT_RATING_THRESHOLDS.good,
+    ratingMarginalPerMile: dataset.settings?.ratingMarginalPerMile ?? DEFAULT_RATING_THRESHOLDS.marginal,
     deadheadWarnPct: dataset.settings?.deadheadWarnPct ?? 20,
     maintenanceWarnMiles: dataset.settings?.maintenanceWarnMiles ?? 2000,
     maintenanceWarnDays: dataset.settings?.maintenanceWarnDays ?? 30,
@@ -430,6 +430,7 @@ function loadFromInput(
     destinationCity: input.destinationCity.trim(),
     destinationState: input.destinationState.trim().toUpperCase(),
     broker: input.broker?.trim() || null,
+    brokerContact: input.brokerContact?.trim() || null,
     loadNumber: input.loadNumber?.trim() || null,
     equipmentType: input.equipmentType ?? null,
     loadCapacity: input.loadCapacity ?? null,
@@ -994,9 +995,9 @@ export class JsonAuthStore implements AuthStore {
         taxReservePct: 20,
         maintenanceReservePct: 5,
         categoryBehavior: defaultCategoryBehavior(),
-        ratingGreatPerMile: 2,
-        ratingGoodPerMile: 1.5,
-        ratingMarginalPerMile: 1,
+        ratingGreatPerMile: DEFAULT_RATING_THRESHOLDS.great,
+        ratingGoodPerMile: DEFAULT_RATING_THRESHOLDS.good,
+        ratingMarginalPerMile: DEFAULT_RATING_THRESHOLDS.marginal,
         deadheadWarnPct: 20,
         maintenanceWarnMiles: 2000,
         maintenanceWarnDays: 30,
@@ -1194,6 +1195,7 @@ export class JsonRepository implements Repository {
         defaultTruckId,
         payType: input.payType,
         payRate: roundMoney(input.payRate),
+        isOwnerOperator: input.isOwnerOperator ?? false,
         active: true,
         createdAt: new Date().toISOString(),
       };
@@ -1217,6 +1219,7 @@ export class JsonRepository implements Repository {
         defaultTruckId,
         payType: input.payType,
         payRate: roundMoney(input.payRate),
+        isOwnerOperator: input.isOwnerOperator ?? dataset.drivers[index].isOwnerOperator ?? false,
       };
       dataset.drivers[index] = driver;
       return driver;

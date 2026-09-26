@@ -9,6 +9,7 @@ export const broker = pgTable("Broker", {
   nameKey: text("nameKey").notNull(),
   contactName: text("contactName"),
   phone: text("phone"),
+  phoneExtension: text("phoneExtension"),
   email: text("email"),
   mcNumber: text("mcNumber"),
   address: text("address"),

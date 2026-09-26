@@ -1,5 +1,6 @@
 "use client";
 
+import { DEFAULT_RATING_THRESHOLDS } from "@/lib/calculations";
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, RotateCcw, Save } from "lucide-react";
@@ -144,9 +145,9 @@ export function SettingsForm({
   function resetDefaults() {
     setTaxPct("20");
     setMaintenancePct("5");
-    setRatingGreat("2");
-    setRatingGood("1.5");
-    setRatingMarginal("1");
+    setRatingGreat(String(DEFAULT_RATING_THRESHOLDS.great));
+    setRatingGood(String(DEFAULT_RATING_THRESHOLDS.good));
+    setRatingMarginal(String(DEFAULT_RATING_THRESHOLDS.marginal));
     setDeadheadWarn("20");
     setWarnMiles("2000");
     setWarnDays("30");

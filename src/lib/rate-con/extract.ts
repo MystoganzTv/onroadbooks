@@ -57,6 +57,7 @@ Rules:
 - loadedMiles only when the document prints a mileage. Do not compute the distance between the two cities.
 - Use the FIRST pickup and the LAST delivery when the load has multiple stops.
 - broker is the party paying the carrier, not the carrier and not a factoring company.
+- brokerContact is the person at that broker who booked the load (the carrier sales rep or agent), name only.
 - Dates as YYYY-MM-DD. If a date has no year on the document, return null rather than guessing one.`;
 
 export type RateConScan =

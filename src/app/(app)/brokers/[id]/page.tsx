@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { requireSession } from "@/lib/auth";
 import { getDataset } from "@/lib/db";
-import { brokerNameKey } from "@/lib/brokers";
+import { brokerPhoneLabel, brokerPhoneHref, brokerNameKey } from "@/lib/brokers";
 import { getAppLocale } from "@/lib/i18n-server";
 import { getWebDictionary } from "@/lib/i18n/dictionaries";
 import { formatMoney } from "@/lib/formatters";
@@ -30,7 +30,7 @@ export default async function BrokerPage({ params }: { params: Promise<{ id: str
     <PageHeader title={broker.name} actions={roleCan(session.role ?? "VIEWER", "manage_loads") ? <BrokerFormDialog broker={broker} trigger={<Button variant="outline" size="sm">{copy.edit}</Button>} /> : undefined} />
     <Card><CardContent className="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3">
       {([[copy.contact, broker.contactName], [copy.mc, broker.mcNumber], [copy.address, broker.address]] as const).map(([label, value]) => value ? <div key={label}><p className="label-xs">{label}</p><p className="mt-1 whitespace-pre-wrap">{value}</p></div> : null)}
-      {broker.phone ? <div><p className="label-xs">{copy.phone}</p><a className="mt-1 block text-primary hover:underline" href={`tel:${broker.phone}`}>{broker.phone}</a></div> : null}
+      {broker.phone ? <div><p className="label-xs">{copy.phone}</p><a className="mt-1 block text-primary hover:underline" href={brokerPhoneHref(broker)}>{brokerPhoneLabel(broker)}</a></div> : null}
       {broker.email ? <div><p className="label-xs">{copy.email}</p><a className="mt-1 block break-all text-primary hover:underline" href={`mailto:${broker.email}`}>{broker.email}</a></div> : null}
       {broker.notes ? <div className="sm:col-span-2 lg:col-span-3"><p className="label-xs">{copy.notes}</p><p className="mt-1 whitespace-pre-wrap text-sm">{broker.notes}</p></div> : null}
       {!broker.contactName && !broker.phone && !broker.email && !broker.mcNumber && !broker.address && !broker.notes ? <p className="text-sm text-muted-foreground">{copy.noContact}</p> : null}

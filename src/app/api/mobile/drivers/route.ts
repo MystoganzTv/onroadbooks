@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
     active: driver.active,
     payType: driver.payType,
     payRate: driver.payRate,
+    isOwnerOperator: driver.isOwnerOperator ?? false,
     reference: driver.reference,
     defaultTruckId: driver.defaultTruckId,
   }));
