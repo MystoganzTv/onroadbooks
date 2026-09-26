@@ -1,6 +1,4 @@
-import { calculatorDriverPay } from "@/lib/driver-pay";
 import { NextResponse, type NextRequest } from "next/server";
-import { operatingLedger } from "@/lib/startup-costs";
 
 import { getMobileSession } from "@/lib/auth/mobile";
 import { div, summarizeFuel, thresholdsFromSettings } from "@/lib/calculations";
@@ -68,7 +66,7 @@ export async function GET(request: NextRequest) {
   const dataset = await getRepository(session.businessId).getDataset();
   const { loads, settings, goals, fuelEntries, subscription, trucks } = dataset;
   // Same operating ledger as the web calculator: setup spend is not a running cost.
-  const expenses = operatingLedger(loads, dataset.expenses);
+  const expenses = dataset.expenses;
 
   if (!planAllows(subscription, "cockpit")) {
     return NextResponse.json({ error: capabilityRefusal("cockpit") }, { status: 403 });
@@ -148,10 +146,6 @@ export async function GET(request: NextRequest) {
       mpg: selectedTruck.referenceMpg ?? fuel.milesPerGallon ?? null,
       dispatchPct: Math.round(div(dispatchPaid, grossRevenue) * 1000) / 10,
       factoringPct: Math.round(div(factoringPaid, grossRevenue) * 1000) / 10,
-      // Web parity: the calculator counts the truck's driver (iOS seeds its
-      // "Pago al chofer" field from these).
-      driverPayMode: calculatorDriverPay(dataset.drivers, selectedTruck.id).mode,
-      driverPayValue: calculatorDriverPay(dataset.drivers, selectedTruck.id).value,
       overheadPerMile: overheadCostPerMile(basis) + (sharedOverheadPerMile ?? 0),
       debtServicePerMile: basis.debtServicePerMile,
       trueCostPerMile: basis.trueCostPerMile + (sharedOverheadPerMile ?? 0),

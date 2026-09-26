@@ -401,9 +401,9 @@ model FinancialSettings {
   fleetOverheadAllocation String @default("UNALLOCATED")
 
   /// Profit-per-total-mile floors for the load profitability rating.
-  ratingGreatPerMile    Decimal @default(1) @db.Decimal(8, 2)
-  ratingGoodPerMile     Decimal @default(0.6) @db.Decimal(8, 2)
-  ratingMarginalPerMile Decimal @default(0.3) @db.Decimal(8, 2)
+  ratingGreatPerMile    Decimal @default(1.25) @db.Decimal(8, 2)
+  ratingGoodPerMile     Decimal @default(0.9) @db.Decimal(8, 2)
+  ratingMarginalPerMile Decimal @default(0.6) @db.Decimal(8, 2)
 
   /// Deadhead share of total miles that triggers a warning.
   deadheadWarnPct      Decimal @default(20) @db.Decimal(5, 2)

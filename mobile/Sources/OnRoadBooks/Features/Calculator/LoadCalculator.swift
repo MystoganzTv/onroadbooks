@@ -10,12 +10,10 @@ import Foundation
 ///   Dispatch         = percent of gross, or a flat amount
 ///   Factoring        = percent of gross, or a flat amount
 ///   Other            = entered
-///   Driver pay       = percent of gross, or a flat amount per load
 ///   Overhead         = total miles x overhead cost per mile
 ///
-/// Business view: the driver is paid before the load contributes anything,
-/// so Contribution Profit = gross - direct trip costs - driver pay, and the
-/// rating scores that per total mile (ADR 0028).
+/// Owner-operator: no driver wage is a load cost, so Contribution Profit =
+/// gross - direct trip costs, rated per total mile (ADR 0031).
 ///
 /// `overheadPerMile` is meant to be the truck's own historical cost per
 /// mile with fuel, tolls, dispatch and factoring already removed — those
@@ -42,10 +40,9 @@ struct LoadEstimate {
     let dispatch: Double
     let factoring: Double
     let otherCost: Double
-    let driverPay: Double
     let overhead: Double
     let debtService: Double
-    /// Direct trip costs: fuel, tolls, dispatch, factoring, other. Never driver pay.
+    /// Direct trip costs: fuel, tolls, dispatch, factoring, other.
     let tripCost: Double
     let totalCost: Double
     let contributionProfit: Double
@@ -123,8 +120,6 @@ enum LoadCalculatorMath {
         factoringMode: FeeMode,
         factoringValue: Double,
         otherCost: Double,
-        driverPayMode: FeeMode = .percent,
-        driverPayValue: Double = 0,
         overheadPerMile: Double,
         debtServicePerMile: Double,
         thresholds: RatingThresholds
@@ -140,13 +135,12 @@ enum LoadCalculatorMath {
         let dispatch = feeAmount(mode: dispatchMode, value: dispatchValue, gross: grossRate)
         let factoring = feeAmount(mode: factoringMode, value: factoringValue, gross: grossRate)
         let other = roundMoney(max(0, otherCost))
-        let driverPay = feeAmount(mode: driverPayMode, value: driverPayValue, gross: grossRate)
         let overhead = roundMoney(totalMiles * max(0, overheadPerMile))
         let debtService = roundMoney(totalMiles * max(0, debtServicePerMile))
 
         let tripCost = roundMoney(fuelCost + tollsAmt + dispatch + factoring + other)
-        let totalCost = roundMoney(tripCost + driverPay + overhead)
-        let contributionProfit = roundMoney(grossRate - tripCost - driverPay)
+        let totalCost = roundMoney(tripCost + overhead)
+        let contributionProfit = roundMoney(grossRate - tripCost)
         let contributionProfitPerMile = div(contributionProfit, totalMiles)
         let contributionMargin = grossRate > 0 ? div(contributionProfit, grossRate) * 100 : 0
         let profit = roundMoney(contributionProfit - overhead)
@@ -161,8 +155,6 @@ enum LoadCalculatorMath {
             CostLine(label: "Dispatch", amount: dispatch, note: dispatchMode == .percent ? "\(Self.percentText(dispatchValue))% of gross" : "Flat fee"),
             CostLine(label: "Factoring", amount: factoring, note: factoringMode == .percent ? "\(Self.percentText(factoringValue))% of gross" : "Flat fee"),
             CostLine(label: "Other costs", amount: other, note: nil),
-            CostLine(label: "Driver pay", amount: driverPay,
-                     note: driverPayMode == .percent ? "\(Self.percentText(driverPayValue))% of gross" : "Flat per load"),
         ]
 
         return LoadEstimate(
@@ -174,7 +166,6 @@ enum LoadCalculatorMath {
             dispatch: dispatch,
             factoring: factoring,
             otherCost: other,
-            driverPay: driverPay,
             overhead: overhead,
             debtService: debtService,
             tripCost: tripCost,
@@ -193,8 +184,8 @@ enum LoadCalculatorMath {
 
     /// R = (C + P) / (1 - f) — solving for the rate that clears a target
     /// profit per mile, given fixed costs C and a combined dispatch + factoring
-    /// + driver-pay share of gross f (see the header comment in the web source
-    /// for the algebra).
+    /// share of gross f (see the header comment in the web source for the
+    /// algebra).
     static func targetRate(
         loadedMiles: Double,
         deadheadMiles: Double,
@@ -206,8 +197,6 @@ enum LoadCalculatorMath {
         factoringMode: FeeMode,
         factoringValue: Double,
         otherCost: Double,
-        driverPayMode: FeeMode = .percent,
-        driverPayValue: Double = 0,
         overheadPerMile: Double,
         debtServicePerMile: Double,
         thresholds: RatingThresholds,
@@ -223,12 +212,10 @@ enum LoadCalculatorMath {
 
         let flatFees =
             (dispatchMode == .amount ? max(0, dispatchValue) : 0) +
-            (factoringMode == .amount ? max(0, factoringValue) : 0) +
-            (driverPayMode == .amount ? max(0, driverPayValue) : 0)
+            (factoringMode == .amount ? max(0, factoringValue) : 0)
         let feeRate =
             (dispatchMode == .percent ? max(0, dispatchValue) : 0) / 100 +
-            (factoringMode == .percent ? max(0, factoringValue) : 0) / 100 +
-            (driverPayMode == .percent ? max(0, driverPayValue) : 0) / 100
+            (factoringMode == .percent ? max(0, factoringValue) : 0) / 100
 
         let directCost = roundMoney(fuelCost + tollsAmt + other + flatFees)
         let fixedCost = roundMoney(directCost + overhead)

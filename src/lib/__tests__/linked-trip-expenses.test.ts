@@ -21,17 +21,18 @@ describe("expenses recorded against a load", () => {
     const { load, expense } = fixture();
     const before = JSON.stringify({ load, expense });
     const metrics = loadMetrics(load, undefined, [expense]);
-    assert.equal(metrics.tripExpenses, 200);
-    assert.equal(metrics.tripProfit, 800);
-    assert.equal(metrics.profitPerMile, 8);
+    // Fuel 100 + tolls 20 + the linked toll 30. Driver pay (50) is not a load cost.
+    assert.equal(metrics.tripExpenses, 150);
+    assert.equal(metrics.tripProfit, 850);
+    assert.equal(metrics.profitPerMile, 8.5);
     assert.equal(tripExpenseLines(load, [expense]).find((line) => line.key === "tolls")?.amount, 50);
     assert.deepEqual(withMetricsAll([load], undefined, [expense])[0].metrics, metrics);
     assert.equal(JSON.stringify({ load, expense }), before);
-    assert.equal(loadMetrics(load, undefined, []).tripProfit, 830);
-    assert.equal(loadMetrics(load, undefined, [{ ...expense, amount: 40 }]).tripProfit, 790);
+    assert.equal(loadMetrics(load, undefined, []).tripProfit, 880);
+    assert.equal(loadMetrics(load, undefined, [{ ...expense, amount: 40 }]).tripProfit, 840);
   });
 
-  it("counts generated load and driver costs once and ignores fuel, debt and unrelated rows", () => {
+  it("counts generated load costs once and ignores driver pay, fuel, debt and unrelated rows", () => {
     const { dataset, load, expense } = fixture();
     dataset.loads = [load];
     dataset.expenses = [expense];
@@ -45,7 +46,7 @@ describe("expenses recorded against a load", () => {
       { ...expense, id: "other-business", businessId: "another", amount: 100 },
       { ...expense, id: "overhead", loadId: null, amount: 100 },
     );
-    assert.equal(loadMetrics(load, undefined, dataset.expenses).tripExpenses, 200);
+    assert.equal(loadMetrics(load, undefined, dataset.expenses).tripExpenses, 150);
   });
 
   it("groups independent dispatch, factoring and other costs in the same waterfall", () => {
@@ -59,6 +60,6 @@ describe("expenses recorded against a load", () => {
     assert.equal(lines.find((line) => line.key === "dispatch")?.amount, 40);
     assert.equal(lines.find((line) => line.key === "factoring")?.amount, 25);
     assert.equal(lines.find((line) => line.key === "other")?.amount, 10);
-    assert.equal(loadMetrics(load, undefined, expenses).tripExpenses, 245);
+    assert.equal(loadMetrics(load, undefined, expenses).tripExpenses, 195);
   });
 });

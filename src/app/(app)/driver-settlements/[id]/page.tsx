@@ -1,3 +1,4 @@
+import { FLEET_VISIBLE } from "@/lib/product";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -30,6 +31,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function DriverSettlementDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  // Hidden in the owner-operator product (ADR 0031); see lib/product.ts.
+  if (!FLEET_VISIBLE) redirect("/drivers");
   const [{ id }, session, locale] = await Promise.all([params, requireSession(), getAppLocale()]);
   const dictionary = getWebDictionary(locale);
   const copy = dictionary.driverPay;

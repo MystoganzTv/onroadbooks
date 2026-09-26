@@ -1,3 +1,4 @@
+import { FLEET_VISIBLE } from "@/lib/product";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -34,6 +35,8 @@ export default async function DriverSettlementsPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  // Hidden in the owner-operator product (ADR 0031); see lib/product.ts.
+  if (!FLEET_VISIBLE) redirect("/drivers");
   const [params, session, locale] = await Promise.all([searchParams, requireSession(), getAppLocale()]);
   const copy = getWebDictionary(locale).driverPay;
   if (!roleCan(session.role ?? "VIEWER", "manage_driver_settlements")) redirect("/dashboard");

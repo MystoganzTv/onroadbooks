@@ -7,6 +7,7 @@ import { getDataset } from "@/lib/db";
 import { activeTrucks, primaryTruck } from "@/lib/fleet";
 import { isPlatformAdminEmail } from "@/lib/platform-admin";
 import { hasFleetAccess } from "@/lib/plans";
+import { FLEET_VISIBLE } from "@/lib/product";
 import { fleetIftaApplicability } from "@/lib/ifta-eligibility";
 import { getAppLocale } from "@/lib/i18n-server";
 
@@ -25,7 +26,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Fleet is a paid service, not a mode inferred from how many truck rows
   // happen to exist. A non-Fleet account always presents one primary unit.
   const running = activeTrucks(trucks);
-  const hasFleet = hasFleetAccess(subscription);
+  // Owner-operator product: one truck on screen even on a Fleet grant (ADR 0031).
+  const hasFleet = FLEET_VISIBLE && hasFleetAccess(subscription);
 
   return (
     <LanguageProvider initialLocale={locale}>

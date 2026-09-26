@@ -669,9 +669,6 @@ private struct CalculatorDefaultsDTO: Decodable {
     let mpg: Double?
     let dispatchPct: Double
     let factoringPct: Double
-    /// "PCT" or "AMOUNT". Optional so an older server still decodes.
-    let driverPayMode: String?
-    let driverPayValue: Double?
     let overheadPerMile: Double
     let debtServicePerMile: Double
     let trueCostPerMile: Double
@@ -696,8 +693,6 @@ private struct CalculatorDefaultsDTO: Decodable {
         CalculatorDefaults(
             fuelPrice: fuelPrice, mpg: mpg,
             dispatchPct: dispatchPct, factoringPct: factoringPct,
-            driverPayMode: driverPayMode == "AMOUNT" ? .amount : .percent,
-            driverPayValue: driverPayValue ?? 0,
             overheadPerMile: overheadPerMile, debtServicePerMile: debtServicePerMile,
             trueCostPerMile: trueCostPerMile,
             basisLabel: basisLabel, basisMiles: basisMiles, basisSufficient: basisSufficient,

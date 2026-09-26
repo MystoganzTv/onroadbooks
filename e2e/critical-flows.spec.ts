@@ -1,4 +1,5 @@
 import { promises as fs } from "node:fs";
+import { FLEET_VISIBLE } from "../src/lib/product";
 import path from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
@@ -788,7 +789,7 @@ test.describe.serial("critical browser flows", () => {
 
     await page.getByRole("tab", { name: "What should I ask?" }).click();
     await expect(page.getByRole("heading", { name: "Current offer vs thresholds" })).toBeVisible();
-    await expect(page.getByText("$510.19")).toBeVisible();
+    await expect(page.getByText("$428.48")).toBeVisible();
     await expect(page.getByText(/already meets or exceeds your Great profitability threshold/)).toBeVisible();
     await expect(page.getByText("Suggested counteroffer")).toHaveCount(0);
 
@@ -799,7 +800,7 @@ test.describe.serial("critical browser flows", () => {
     await expect(page.getByText("Direct cost break-even")).toBeVisible();
     await expect(page.getByText("True operating break-even")).toBeVisible();
     await expect(page.getByText("Suggested opening quote")).toBeVisible();
-    await expect(page.getByText("$625")).toBeVisible();
+    await expect(page.getByText("$700")).toBeVisible();
 
     const noFinancing = page.getByRole("checkbox", { name: "This truck has no financing" });
     await expect(noFinancing).toBeVisible();
@@ -868,15 +869,15 @@ test.describe.serial("critical browser flows", () => {
 
     // Threshold comparisons are inclusive: equality belongs to the higher
     // band. Decimal offers retain cents while counters round up to $25.
-    // Bands are contribution profit per total mile ($1.00 / $0.60 / $0.30)
-    // on 317 miles with $255.12 of fixed trip costs and 3% factoring.
-    await assertBand("589.81", "Great load", null);
-    await assertBand("550.25", "Good load", "$625");
-    await assertBand("459.09", "Good load", "$625");
-    await assertBand("400.50", "Marginal load", "$500");
-    await assertBand("361.05", "Marginal load", "$500");
-    await assertBand("361.04", "Below minimum", "$500");
-    await assertBand("300.25", "Below minimum", "$500");
+    // Bands are contribution profit per total mile ($1.25 / $0.90 / $0.60,
+    // ADR 0031) on 317 miles with $255.12 of fixed trip costs and 3% factoring.
+    await assertBand("671.52", "Great load", null);
+    await assertBand("650.25", "Good load", "$700");
+    await assertBand("557.13", "Good load", "$700");
+    await assertBand("500.50", "Marginal load", "$600");
+    await assertBand("459.09", "Marginal load", "$600");
+    await assertBand("459.08", "Below minimum", "$600");
+    await assertBand("400.25", "Below minimum", "$600");
   });
 
   test("load calculator is keyboard operable and announces changing decisions", async ({ page }) => {
@@ -905,9 +906,6 @@ test.describe.serial("critical browser flows", () => {
       page.locator("#calc-factoring"),
       page.getByRole("group", { name: "Factoring fee unit" }).getByRole("button", { name: "%" }),
       page.getByRole("group", { name: "Factoring fee unit" }).getByRole("button", { name: "$" }),
-      page.locator("#calc-driver-pay"),
-      page.getByRole("group", { name: "Driver pay unit" }).getByRole("button", { name: "%" }),
-      page.getByRole("group", { name: "Driver pay unit" }).getByRole("button", { name: "$" }),
       page.getByRole("checkbox", { name: "This truck has no financing" }),
     ];
     for (const control of keyboardOrder) {
@@ -930,7 +928,7 @@ test.describe.serial("critical browser flows", () => {
 
     await offerContext.focus();
     await page.keyboard.press("Enter");
-    await page.locator("#calc-gross").fill("550.25");
+    await page.locator("#calc-gross").fill("650.25");
     await page.locator("#calc-loaded").fill("275");
     await page.locator("#calc-deadhead").fill("42");
     await page.locator("#calc-fuel").fill("5.50");
@@ -940,7 +938,7 @@ test.describe.serial("critical browser flows", () => {
     await targetTab.focus();
     await page.keyboard.press("Enter");
     await expect(page.getByTestId("offer-announcement")).toHaveText(
-      "Good load. Suggested counteroffer $625.",
+      "Good load. Suggested counteroffer $700.",
     );
     await page.locator("#calc-gross").fill("1100");
     await expect(page.getByTestId("offer-announcement")).toHaveText(
@@ -1087,15 +1085,9 @@ test.describe.serial("critical browser flows", () => {
     await expect(page.locator('#broker-list option[value="Updated Brokerage"]')).toHaveCount(1);
   });
 
-  test("Fleet owner adds a driver, assigns a load and posts a frozen statement", async ({ page }) => {
-    await mutateDataset((dataset) => {
-      dataset.subscription.plan = "FLEET";
-      dataset.subscription.status = "ACTIVE";
-      dataset.subscription.currentPeriodEnd = null;
-      dataset.subscription.providerCustomerId = null;
-      dataset.subscription.providerSubscriptionId = null;
-    });
-
+  test("owner-operator adds a driver, assigns a load and sees earnings only on Drivers", async ({ page }) => {
+    // ADR 0031: drivers are on every plan, their pay is never a load cost,
+    // and Fleet / Driver Pay are hidden.
     await login(page);
     await page.goto("/drivers");
     await page.getByRole("button", { name: "Add driver", exact: true }).first().click();
@@ -1114,56 +1106,27 @@ test.describe.serial("critical browser flows", () => {
     });
 
     await page.goto("/drivers");
-    await expect(page.getByText("Estimated unpaid", { exact: true })).toHaveCount(0);
-    await expect(page.getByText("Unsettled loads", { exact: true })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Open Driver Pay", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Open Driver Pay", exact: true })).toHaveCount(0);
     const driverHref = await page.getByRole("link", { name: "Jordan Miles", exact: true }).getAttribute("href");
     await page.goto(`${driverHref!.split("?")[0]}?month=2026-08&period=full`);
     await expect(page.getByRole("heading", { name: "Jordan Miles" })).toBeVisible();
     await expect(page.getByText("Pay by load", { exact: true })).toBeVisible();
     await expect(page.getByRole("row").filter({ hasText: "E2E-LOAD-2" })).toContainText("$210.00");
-
-    await page.goto("/driver-settlements");
-    await page.getByRole("button", { name: "Prepare statement" }).first().click();
-    await page.locator("#statement-start").fill("2026-08-01");
-    await page.locator("#statement-end").fill("2026-08-31");
-    await page.getByRole("button", { name: "Prepare draft" }).click();
-    await expect(page).toHaveURL(/\/driver-settlements\/[^/]+$/);
-    await expect(page.getByText("Draft", { exact: true }).first()).toBeVisible();
-    await page.getByRole("button", { name: "Add adjustment" }).click();
-    await page.locator("#adjustment-amount").fill("35");
-    await page.locator("#adjustment-reason").fill("Detention at receiver");
-    await page.getByRole("button", { name: "Add to draft" }).click();
-    await expect(page.getByText("Detention at receiver")).toBeVisible();
-    await expect(page.getByText("Gross pay → adjustments → net pay")).toBeVisible();
-
-    // Back controls follow the path the owner actually took. They must not
-    // guess a fixed destination and discard list/detail context.
-    const statementUrl = page.url();
-    await page.getByRole("button", { name: "Back", exact: true }).click();
-    await expect(page).toHaveURL(/\/driver-settlements$/);
-    await page.getByRole("link", { name: "View", exact: true }).click();
-    await expect(page).toHaveURL(statementUrl);
-    await page.getByRole("link", { name: /Richmond, VA → Frederick, MD/ }).click();
-    await expect(page).toHaveURL(/\/loads\/[^/]+$/);
-    await page.getByRole("button", { name: "Back", exact: true }).click();
-    await expect(page).toHaveURL(statementUrl);
-
-    await page.getByRole("button", { name: "Mark paid" }).click();
-    await page.getByRole("button", { name: "Post payment" }).click();
-    await expect(page.getByText(/^Paid /).first()).toBeVisible();
-    await page.goto(`${driverHref!.split("?")[0]}?month=2026-08&period=full`);
-    const earningsRow = page.getByRole("row").filter({ hasText: "E2E-LOAD-2" });
-    await expect(earningsRow).toContainText("$210.00");
-    await expect(earningsRow).toContainText("$245.00");
+    await expect(page.getByRole("button", { name: "Prepare statement" })).toHaveCount(0);
     await page.screenshot({ path: "/tmp/onroad-driver-earnings.png", fullPage: true });
     await page.goto("/drivers?month=2026-08&period=month");
     await expect(page.getByRole("row").filter({ hasText: "Jordan Miles" })).toContainText("$210.00");
-    await page.screenshot({ path: "/tmp/onroad-drivers-pay.png", fullPage: true });
 
+    // Hidden surfaces send the owner back to what they replaced.
+    await page.goto("/driver-settlements");
+    await expect(page).toHaveURL(/\/drivers$/);
+    await page.goto("/fleet");
+    await expect(page).toHaveURL(/\/truck$/);
+    await expect(page.getByRole("navigation").getByRole("link", { name: "Fleet", exact: true })).toHaveCount(0);
   });
 
   test("Fleet calculator keeps truck history and financing confirmation scoped", async ({ page }) => {
+    test.skip(!FLEET_VISIBLE, "Fleet is hidden in the owner-operator product (ADR 0031).");
     await login(page);
     await page.goto("/truck");
     await page.getByRole("button", { name: "Add truck", exact: true }).click();
@@ -1283,6 +1246,13 @@ test.describe.serial("critical browser flows", () => {
 
   test("role boundaries are visible and enforced in the browser", async ({ page }) => {
     await mutateDataset((dataset) => {
+      // Team seats come with a (complimentary) Fleet grant, as for an
+      // accountant invited by the owner.
+      dataset.subscription.plan = "FLEET";
+      dataset.subscription.status = "ACTIVE";
+      dataset.subscription.currentPeriodEnd = null;
+      dataset.subscription.providerCustomerId = null;
+      dataset.subscription.providerSubscriptionId = null;
       const owner = dataset.users.find((user) => user.email === ownerEmail);
       if (!owner) throw new Error("E2E owner was not created.");
       const now = new Date().toISOString();
@@ -1333,8 +1303,9 @@ test.describe.serial("critical browser flows", () => {
     await expect(page.getByText("Reserve balances, rules and movements are available only to the workspace owner.")).toBeVisible();
     await page.goto("/settlements");
     await expect(page.getByText(/Owner Settlement close\/reopen controls are available only/)).toBeVisible();
+    // Driver Pay is hidden for everyone (ADR 0031).
     await page.goto("/driver-settlements");
-    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page).toHaveURL(/\/drivers$/);
 
     await page.context().clearCookies();
     await login(page, "dispatcher.e2e@example.com");

@@ -264,11 +264,6 @@ struct CalculatorDefaults {
     let mpg: Double?
     let dispatchPct: Double
     let factoringPct: Double
-    /// The pay terms of the driver assigned to this truck: 33% of gross comes
-    /// as (.percent, 33), a flat per-load rate as (.amount, rate). No driver
-    /// (or an older server that does not send it) is (.percent, 0).
-    let driverPayMode: FeeMode
-    let driverPayValue: Double
     /// True cost per mile with fuel, tolls, dispatch and factoring REMOVED —
     /// those four are entered explicitly, and a rate that still contained them
     /// would charge them twice.

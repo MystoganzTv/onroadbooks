@@ -3,7 +3,6 @@ import { LoadProfitabilityCard } from "@/components/loads/load-profitability-car
 import { brokerContactNames } from "@/lib/broker-contacts";
 import { buildLoadEstimator } from "@/lib/load-estimates";
 import Link from "next/link";
-import { operatingLedger } from "@/lib/startup-costs";
 import { brokerNameKey, brokerNames as savedBrokerNames } from "@/lib/brokers";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -24,7 +23,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { requireSession } from "@/lib/auth";
 import { getDataset } from "@/lib/db";
-import { hasFleetAccess } from "@/lib/plans";
 import {
   isDeadheadElevated,
   loadMetrics,
@@ -80,13 +78,12 @@ export default async function LoadDetailPage({
   );
   const allocationBasis = trailingCostBasis(
     dataset.loads,
-    operatingLedger(dataset.loads, dataset.expenses),
+    dataset.expenses,
     dataset.settings,
     todayISO(),
   );
   // Business, Driver and Owner-Operator views of the same trip lines and the
   // same allocation basis as the waterfall and the rating above.
-  const assignedDriver = dataset.drivers.find((driver) => driver.id === load.driverId);
   const profitability = buildLoadProfitability({
     grossRevenue: load.grossRate,
     loadedMiles: load.loadedMiles,
@@ -95,7 +92,6 @@ export default async function LoadDetailPage({
     allocatedCostPerMile: overheadCostPerMile(allocationBasis),
     allocationAvailable: hasSufficientOperatingCostBasis(allocationBasis),
     debtServicePerMile: allocationBasis.debtServicePerMile,
-    driverIsOwner: assignedDriver?.isOwnerOperator === true,
   });
   const brokerProfile = dataset.brokers?.find((row) => row.nameKey === brokerNameKey(load.broker ?? ""));
   const brokers = savedBrokerNames(dataset.loads, dataset.brokers);
@@ -140,7 +136,7 @@ export default async function LoadDetailPage({
             brokers={brokers}
             brokerContacts={brokerContactNames(dataset.loads, dataset.brokers)}
             trucks={dataset.trucks}
-            drivers={hasFleetAccess(dataset.subscription) ? dataset.drivers : []}
+            drivers={dataset.drivers}
             ratingThresholds={thresholdsFromSettings(dataset.settings)}
             trigger={
               <Button variant="outline" size="sm">

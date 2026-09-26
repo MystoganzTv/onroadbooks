@@ -1,5 +1,6 @@
 "use client";
 
+import { FLEET_VISIBLE } from "@/lib/product";
 import type { ComponentType, ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import {
@@ -335,7 +336,7 @@ export function PlanCard({
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{copy.plansDescription}</p>
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{copy.viewModesDescription}</p>
           </div>
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className={cn("grid gap-4", FLEET_VISIBLE ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
             {ONE_TRUCK_PLANS.map((id) => (
               <OneTruckPlan
                 key={id}
@@ -345,7 +346,7 @@ export function PlanCard({
                 managedBilling={managedBilling}
               />
             ))}
-            <PlanTile
+            {FLEET_VISIBLE ? <PlanTile
               plan={fleet}
               truckLabel={copy.upToTrucks.replace("{count}", String(fleet.truckLimit))}
               highlighted={fleetActive}
@@ -361,9 +362,9 @@ export function PlanCard({
                   )
                 ) : managedBilling ? <PortalForm>{copy.manageBilling}</PortalForm> : undefined
               }
-            />
+            /> : null}
           </div>
-          <p className="mt-4 text-xs leading-relaxed text-muted-foreground">{copy.fleetNote}</p>
+          {FLEET_VISIBLE ? <p className="mt-4 text-xs leading-relaxed text-muted-foreground">{copy.fleetNote}</p> : null}
         </section>
 
         <p className="text-2xs leading-relaxed text-muted-foreground">

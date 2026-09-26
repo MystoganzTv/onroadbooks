@@ -196,19 +196,3 @@ export function driverLoadEarnings(driver: Driver, loads: Load[], settlements: D
     paidOn: lines.get(load.id)?.paidOn ?? null,
   }));
 }
-
-/**
- * The pay the load calculator should assume for a truck: its active default
- * driver's terms, when they are a share of gross or a flat fee. Per-mile
- * terms depend on the miles being quoted, so they start at zero for the
- * owner to fill in rather than being guessed.
- */
-export function calculatorDriverPay(
-  drivers: Pick<Driver, "active" | "defaultTruckId" | "payType" | "payRate">[],
-  truckId: string | null,
-): { mode: "PCT" | "AMOUNT"; value: number } {
-  const driver = drivers.find((row) => row.active && truckId && row.defaultTruckId === truckId);
-  if (driver?.payType === "PERCENT_GROSS") return { mode: "PCT", value: driver.payRate };
-  if (driver?.payType === "FLAT_PER_LOAD") return { mode: "AMOUNT", value: driver.payRate };
-  return { mode: "PCT", value: 0 };
-}

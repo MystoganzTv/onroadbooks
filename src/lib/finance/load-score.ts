@@ -23,12 +23,12 @@ import type { LoadMetrics, LoadWithMetrics, ProfitabilityRating } from "../types
 
 export const SCORE_WEIGHTS = { profitPerMile: 50, margin: 30, deadhead: 20 } as const;
 /**
- * Contribution margin that earns the full 30. Margin is after the driver's
- * pay: with a 33 % driver, fuel and ~10 % in fees, 60 % (the pre-ADR-0028
- * mark, set before driver pay was a trip cost) was out of reach for every
- * hired-driver load. 40 % is a strong load on that basis.
+ * Contribution margin that earns the full 30. An owner-operator's margin is
+ * after fuel and fees only (no driver wage, ADR-0031), so a strong load keeps
+ * about 60 % of gross. (It was 40 % while a hired driver's pay was a load
+ * cost, ADR-0028.)
  */
-export const FULL_MARGIN_PCT = 40;
+export const FULL_MARGIN_PCT = 60;
 /** Profit per mile that earns the full 50, as a multiple of the GREAT floor. */
 export const PPM_FULL_MARKS_MULTIPLE = 1.25;
 

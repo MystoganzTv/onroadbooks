@@ -2,9 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 
-import { repositoryWith } from "./guards";
+import { requireWritableSession } from "@/lib/auth";
+import { getRepository } from "@/lib/db";
 import { driverSchema } from "@/lib/schemas";
 import { fieldErrorsFrom, type ActionResult } from "./types";
+
+/**
+ * Drivers are on every plan in the owner-operator product (ADR 0031): who ran
+ * a load and what they earned. No Fleet capability is required.
+ */
+async function driverRepository() {
+  return getRepository((await requireWritableSession("manage_drivers")).businessId);
+}
 
 function revalidateDrivers() {
   revalidatePath("/drivers");
@@ -22,7 +31,7 @@ export async function createDriverAction(values: unknown): Promise<ActionResult>
     };
   }
   try {
-    const driver = await (await repositoryWith("fleet", "manage_drivers")).createDriver(parsed.data);
+    const driver = await (await driverRepository()).createDriver(parsed.data);
     revalidateDrivers();
     return { ok: true, id: driver.id };
   } catch (error) {
@@ -40,7 +49,7 @@ export async function updateDriverAction(id: string, values: unknown): Promise<A
     };
   }
   try {
-    await (await repositoryWith("fleet", "manage_drivers")).updateDriver(id, parsed.data);
+    await (await driverRepository()).updateDriver(id, parsed.data);
     revalidateDrivers();
     return { ok: true, id };
   } catch (error) {
@@ -50,7 +59,7 @@ export async function updateDriverAction(id: string, values: unknown): Promise<A
 
 export async function setDriverActiveAction(id: string, active: boolean): Promise<ActionResult> {
   try {
-    await (await repositoryWith("fleet", "manage_drivers")).setDriverActive(id, active);
+    await (await driverRepository()).setDriverActive(id, active);
     revalidateDrivers();
     return { ok: true, id };
   } catch (error) {

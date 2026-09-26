@@ -114,14 +114,14 @@ describe("loadMetrics", () => {
 
   it("rates on profit per total mile, so deadhead can sink a high rate", () => {
     // The load board shows $4.00/loaded mile against $3.00/loaded mile. Once
-    // the 360 empty miles are counted the "better" load pays $0.40 per mile
+    // the 330 empty miles are counted the "better" load pays $0.70 per mile
     // driven and the plain one pays $3.00.
     const clean = loadMetrics(load({ grossRate: 300, loadedMiles: 100, deadheadMiles: 0 }));
-    const dirty = loadMetrics(load({ grossRate: 160, loadedMiles: 40, deadheadMiles: 360 }));
+    const dirty = loadMetrics(load({ grossRate: 280, loadedMiles: 70, deadheadMiles: 330 }));
     assert.equal(clean.revenuePerLoadedMile, 3);
     assert.equal(dirty.revenuePerLoadedMile, 4); // the better-looking rate
     assert.equal(clean.profitPerMile, 3);
-    assert.equal(dirty.profitPerMile, 0.4);
+    assert.equal(dirty.profitPerMile, 0.7);
     assert.equal(clean.rating, "GREAT");
     assert.equal(dirty.rating, "MARGINAL"); // but the worse load
   });

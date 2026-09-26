@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { operatingLedger } from "@/lib/startup-costs";
 
 import { AnalyticsTabs } from "@/components/cockpit/analytics-tabs";
 import { TruckSwitcher } from "@/components/fleet/truck-switcher";
@@ -70,7 +69,7 @@ export default async function CostPerMilePage({
   // the costs it caused, with no share of overhead imputed to it.
   const truckId = truckFromSearchParams(params, trucks);
   const loads = loadsForTruck(allLoads, truckId);
-  const expenses = expensesForTruck(operatingLedger(allLoads, allExpenses), truckId);
+  const expenses = expensesForTruck(allExpenses, truckId);
 
   const summary = summarizePeriod(loads, expenses, period, settings, paymentEvents);
   const cost = calculateTrueCostPerMile(

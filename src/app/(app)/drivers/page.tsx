@@ -4,7 +4,6 @@ import { loadsInPeriod, roundMoney } from "@/lib/calculations";
 import { formatMoney, formatMiles } from "@/lib/formatters";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
 import { DriverFormDialog } from "@/components/drivers/driver-form-dialog";
 import { DriverRowActions } from "@/components/drivers/driver-row-actions";
@@ -12,12 +11,10 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireSession } from "@/lib/auth";
 import { getDataset } from "@/lib/db";
 import { driverPayDescription, driverLoadEarnings } from "@/lib/driver-pay";
-import { hasFleetAccess } from "@/lib/plans";
 import { roleCan } from "@/lib/roles";
 import { Users } from "lucide-react";
 import { getAppLocale } from "@/lib/i18n-server";
@@ -34,9 +31,7 @@ export default async function DriversPage({ searchParams }: { searchParams: Prom
   const copy = getWebDictionary(locale).drivers;
   const common = getWebDictionary(locale).common;
   const dataset = await getDataset(session.businessId);
-  if (!hasFleetAccess(dataset.subscription)) redirect("/truck");
   const canManage = roleCan(session.role ?? "VIEWER", "manage_drivers");
-  const canManagePay = roleCan(session.role ?? "VIEWER", "manage_driver_settlements");
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
@@ -44,7 +39,6 @@ export default async function DriversPage({ searchParams }: { searchParams: Prom
         title={copy.title}
         description={copy.description}
         actions={<>
-          {canManagePay ? <Button asChild variant="outline" size="sm"><Link href="/driver-settlements">{copy.openDriverPay}</Link></Button> : null}
           {canManage ? <DriverFormDialog trucks={dataset.trucks} /> : null}
         </>}
       />

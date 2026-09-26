@@ -1,6 +1,4 @@
-import { calculatorDriverPay } from "@/lib/driver-pay";
 import type { Metadata } from "next";
-import { operatingLedger } from "@/lib/startup-costs";
 
 import { CalculatorPanel, type CalculatorDefaults } from "@/components/calculator/calculator-panel";
 import { TruckSwitcher } from "@/components/fleet/truck-switcher";
@@ -69,9 +67,7 @@ export default async function CalculatorPage({
   const copy = getWebDictionary(locale).calculator;
   const dataset = await getDataset(session.businessId);
   const { trucks, loads, fuelEntries, settings, goals } = dataset;
-  // A cost per mile that includes the setup period would price every quote
-  // to repay the startup investment on one load.
-  const expenses = operatingLedger(loads, dataset.expenses);
+  const expenses = dataset.expenses;
 
   if (!planAllows(dataset.subscription, "cockpit")) {
     return (
@@ -142,7 +138,6 @@ export default async function CalculatorPage({
       (obligation) => obligation.truckId === selectedTruck.id && obligation.active,
     );
 
-  const driverPayDefault = calculatorDriverPay(dataset.drivers, selectedTruck.id);
   const defaults: CalculatorDefaults = {
     // The same price and MPG a load on this truck is estimated with (ADR 0030).
     fuelPrice: recentFuelPrice(scopedFuelEntries, selectedTruck.id, today)?.pricePerGallon
@@ -150,9 +145,6 @@ export default async function CalculatorPage({
     mpg: selectedTruck.referenceMpg ?? fuel.milesPerGallon ?? 0,
     dispatchPct: Math.round(div(dispatchPaid, grossRevenue) * 1000) / 10,
     factoringPct: Math.round(div(factoringPaid, grossRevenue) * 1000) / 10,
-    // The business view counts the driver even when the owner drives.
-    driverPayMode: driverPayDefault.mode,
-    driverPayValue: driverPayDefault.value,
     overheadPerMile: overheadCostPerMile(basis) + (sharedOverheadPerMile ?? 0),
     debtServicePerMile: basis.debtServicePerMile,
     trueCostPerMile: basis.trueCostPerMile + (sharedOverheadPerMile ?? 0),

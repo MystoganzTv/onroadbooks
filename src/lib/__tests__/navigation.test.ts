@@ -49,11 +49,13 @@ describe("progressive navigation", () => {
     }).enabled, true);
   });
 
-  it("keeps owner planning and driver pay out of unrelated roles", () => {
+  it("keeps owner planning out of unrelated roles, and Fleet surfaces out of the owner-operator menu", () => {
     assert.equal(isNavVisibleToRole(item("/reserves"), "OWNER"), true);
     assert.equal(isNavVisibleToRole(item("/reserves"), "BOOKKEEPER"), false);
-    assert.equal(isNavVisibleToRole(item("/driver-settlements"), "ADMIN"), true);
-    assert.equal(isNavVisibleToRole(item("/driver-settlements"), "BOOKKEEPER"), false);
+    // ADR 0031: Fleet and Driver Pay are hidden; Drivers is on every plan.
+    assert.equal(PRIMARY_NAV.some((candidate) => candidate.href === "/driver-settlements"), false);
+    assert.equal(PRIMARY_NAV.some((candidate) => candidate.href === "/fleet"), false);
+    assert.equal(item("/drivers").fleetOnly ?? false, false);
     assert.equal(isNavVisibleToRole(item("/financing"), "BOOKKEEPER"), true);
     assert.equal(isNavVisibleToRole(item("/financing"), "DISPATCHER"), false);
     assert.equal(PRIMARY_NAV.some((candidate) => candidate.href === "/team"), false);

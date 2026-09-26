@@ -1,25 +1,24 @@
 /**
- * LOAD PROFITABILITY, THREE PERSPECTIVES
- * ======================================
+ * LOAD PROFITABILITY (owner-operator)
+ * ===================================
  *
- * One load answers three different questions, and mixing them is how a
- * profitability screen starts lying:
+ * OnRoad Books is built for the owner-operator: the owner drives the truck,
+ * so no driver wage sits between the load and the business. One view answers
+ * "what did this load leave the business?":
  *
- *   BUSINESS        "Was this load profitable for the company after paying
- *                    the driver?" Driver pay is always a cost here, even
- *                    when the owner drives -- it is what answers "would this
- *                    load still work with a hired driver?"
- *   DRIVER          "What did the driver earn for doing it?" Compensation per
- *                    mile (and per hour, once hours are recorded). Never the
- *                    business's profit.
- *   OWNER-OPERATOR  "What did the owner receive, when the owner drove?"
- *                    Driver compensation plus business contribution, shown as
- *                    two parts. It is NOT profit: half of it is pay for labour.
+ *   Gross Revenue
+ *   - Direct Trip Costs            fuel, tolls, dispatch, factoring, other
+ *   = Contribution Profit          per total mile and as a margin
+ *   - Allocated Operating Costs    trailing cost per mile x total miles
+ *   = Estimated Net Business Profit
+ *
+ * Debt service is shown beside it, never subtracted. Drivers are kept only to
+ * record who ran a load and what they earned (the Drivers page); their pay is
+ * not a cost of the load (ADR 0031).
  *
  * This module only regroups numbers the ledger already produces --
  * `tripExpenseLines` for the trip, the trailing cost basis for allocated
  * operating costs -- so nothing is computed twice or from a second source.
- *
  * Per-mile figures always divide by TOTAL miles (loaded + deadhead). Loaded
  * RPM is kept as the freight-market rate a broker quotes, and only that.
  */
@@ -30,7 +29,7 @@ export interface LoadProfitabilityInput {
   grossRevenue: number;
   loadedMiles: number;
   deadheadMiles: number;
-  /** Every trip cost line, driver pay included (see `tripExpenseLines`). */
+  /** Every trip cost line (see `tripExpenseLines`). */
   lines: TripExpenseLine[];
   /** Operating cost per mile left after direct trip costs (`overheadCostPerMile`). */
   allocatedCostPerMile: number;
@@ -41,24 +40,17 @@ export interface LoadProfitabilityInput {
   allocationAvailable?: boolean;
   /** Debt service per mile: a cash burden, never part of profit. */
   debtServicePerMile: number;
-  /** True only when the load's assigned driver is marked as the owner. */
-  driverIsOwner: boolean;
-  /** Recorded trip hours, when known. The product does not record them yet. */
-  tripHours?: number | null;
 }
 
-export interface BusinessView {
+export interface LoadProfitability {
   grossRevenue: number;
   grossRpm: number;
   loadedRpm: number;
   loadedMiles: number;
   deadheadMiles: number;
   totalMiles: number;
-  /** Fuel, tolls, dispatch, factoring and other trip costs; not driver pay. */
+  /** Fuel, tolls, dispatch, factoring and other trip costs. */
   directTripCosts: number;
-  driverCompensation: number;
-  /** Driver pay is the expected amount from the driver's terms, not yet paid. */
-  driverCompensationExpected: boolean;
   contributionProfit: number;
   contributionPerMile: number;
   /** Percent of gross revenue. */
@@ -72,51 +64,18 @@ export interface BusinessView {
   debtServiceBurden: number;
 }
 
-export interface DriverView {
-  driverCompensation: number;
-  expected: boolean;
-  payPerTotalMile: number;
-  payPerLoadedMile: number;
-  totalMiles: number;
-  loadedMiles: number;
-  tripHours: number | null;
-  payPerHour: number | null;
-}
-
-export interface OwnerOperatorView {
-  driverCompensation: number;
-  businessContribution: number;
-  /** Compensation + contribution. Not profit -- see the module comment. */
-  ownerEconomicBenefit: number;
-  estimatedNetBusinessProfit: number;
-}
-
-export interface LoadProfitability {
-  business: BusinessView;
-  driver: DriverView;
-  /** Null unless the load's driver is explicitly the owner. */
-  ownerOperator: OwnerOperatorView | null;
-  /** No driver pay on the load: labour is missing from the business view. */
-  noDriverPay: boolean;
-}
-
 export function buildLoadProfitability(input: LoadProfitabilityInput): LoadProfitability {
   const loadedMiles = Math.max(0, input.loadedMiles || 0);
   const deadheadMiles = Math.max(0, input.deadheadMiles || 0);
   const totalMiles = loadedMiles + deadheadMiles;
   const grossRevenue = input.grossRevenue || 0;
 
-  const driverLine = input.lines.find((line) => line.key === "driverPay");
-  const driverCompensation = roundMoney(driverLine?.amount ?? 0);
-  const directTripCosts = roundMoney(
-    input.lines.filter((line) => line.key !== "driverPay").reduce((total, line) => total + line.amount, 0),
-  );
-  const contributionProfit = roundMoney(grossRevenue - directTripCosts - driverCompensation);
+  const directTripCosts = roundMoney(input.lines.reduce((total, line) => total + line.amount, 0));
+  const contributionProfit = roundMoney(grossRevenue - directTripCosts);
   const allocatedOperatingCosts = roundMoney(totalMiles * Math.max(0, input.allocatedCostPerMile || 0));
   const estimatedNetBusinessProfit = roundMoney(contributionProfit - allocatedOperatingCosts);
-  const tripHours = input.tripHours && input.tripHours > 0 ? input.tripHours : null;
 
-  const business: BusinessView = {
+  return {
     grossRevenue,
     grossRpm: div(grossRevenue, totalMiles),
     loadedRpm: div(grossRevenue, loadedMiles),
@@ -124,8 +83,6 @@ export function buildLoadProfitability(input: LoadProfitabilityInput): LoadProfi
     deadheadMiles,
     totalMiles,
     directTripCosts,
-    driverCompensation,
-    driverCompensationExpected: Boolean(driverLine?.estimated),
     contributionProfit,
     contributionPerMile: div(contributionProfit, totalMiles),
     contributionMargin: div(contributionProfit, grossRevenue) * 100,
@@ -134,28 +91,5 @@ export function buildLoadProfitability(input: LoadProfitabilityInput): LoadProfi
     estimatedNetBusinessProfit,
     netProfitPerMile: div(estimatedNetBusinessProfit, totalMiles),
     debtServiceBurden: roundMoney(totalMiles * Math.max(0, input.debtServicePerMile || 0)),
-  };
-
-  return {
-    business,
-    driver: {
-      driverCompensation,
-      expected: business.driverCompensationExpected,
-      payPerTotalMile: div(driverCompensation, totalMiles),
-      payPerLoadedMile: div(driverCompensation, loadedMiles),
-      totalMiles,
-      loadedMiles,
-      tripHours,
-      payPerHour: tripHours ? div(driverCompensation, tripHours) : null,
-    },
-    ownerOperator: input.driverIsOwner
-      ? {
-          driverCompensation,
-          businessContribution: contributionProfit,
-          ownerEconomicBenefit: roundMoney(driverCompensation + contributionProfit),
-          estimatedNetBusinessProfit,
-        }
-      : null,
-    noDriverPay: driverCompensation <= 0,
   };
 }

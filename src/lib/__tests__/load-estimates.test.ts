@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { loadMetrics, tripExpenseLines } from "../calculations";
 import { buildLoadEstimator } from "../load-estimates";
 import { buildSeedDataset } from "../seed/seed-data";
-import type { Dataset, Driver, DriverSettlement, Expense, Load } from "../types";
+import type { Dataset, Driver, Expense, Load } from "../types";
 
 function fixture() {
   const seed = buildSeedDataset();
@@ -80,28 +80,11 @@ describe("trip cost estimates", () => {
     assert.equal(buildLoadEstimator(dataset, "2026-09-20")(load("t", "2026-09-15", 308)).fuelCost, undefined);
   });
 
-  it("expects the driver's pay from their terms until the settlement is paid", () => {
+  it("never turns a driver's pay terms into a load cost", () => {
     const { dataset, load, driver } = fixture();
-    const trip = load("t", "2026-09-15", 308, { grossRate: 300, driverId: driver.id });
-    assert.equal(buildLoadEstimator(dataset, "2026-09-20")(trip).driverPay, 99);
-    assert.equal(tripExpenseLines(trip, [], { driverPay: 99 }).find((l) => l.key === "driverPay")?.estimated, true);
-
-    const statement = (status: DriverSettlement["status"], payAmount: number): DriverSettlement => ({
-      id: "s", businessId: dataset.business.id, driverId: driver.id, periodStart: "2026-09-01",
-      periodEnd: "2026-09-15", status, paidOn: status === "PAID" ? "2026-09-16" : null, notes: null,
-      adjustments: [], createdAt: "2026-09-16T00:00:00.000Z",
-      lines: [{ id: "l", settlementId: "s", loadId: trip.id, truckId: trip.truckId, grossRevenue: 300,
-        loadedMiles: 308, totalMiles: 308, payType: "PERCENT_GROSS", payRate: 33, payAmount,
-        expenseId: null, createdAt: "2026-09-16T00:00:00.000Z" }],
-    });
-    dataset.driverSettlements = [statement("DRAFT", 105)];
-    assert.equal(buildLoadEstimator(dataset, "2026-09-20")(trip).driverPay, 105);
-    dataset.driverSettlements = [statement("PAID", 105)];
-    assert.equal(buildLoadEstimator(dataset, "2026-09-20")(trip).driverPay, undefined);
-    // Paid pay is on the load itself and needs no estimate.
-    assert.equal(buildLoadEstimator(dataset, "2026-09-20")({ ...trip, driverPay: 105 }).driverPay, undefined);
-    // No driver on the load, nothing to expect.
-    assert.equal(buildLoadEstimator(dataset, "2026-09-20")({ ...trip, driverId: null }).driverPay, undefined);
+    const trip = load("t", "2026-09-15", 308, { grossRate: 300, driverId: driver.id, driverPay: 99 });
+    assert.equal("driverPay" in buildLoadEstimator(dataset, "2026-09-20")(trip), false);
+    assert.equal(tripExpenseLines(trip).some((line) => line.key === "driverPay"), false);
   });
 });
 

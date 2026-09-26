@@ -35,6 +35,7 @@ import { thresholdsFrom, upcomingMaintenance } from "@/lib/maintenance";
 import { calculateMaintenanceHealth } from "@/lib/finance/maintenance-health";
 import { calculateReserveBalances, reserveBalanceFor } from "@/lib/finance/reserves";
 import { todayISO } from "@/lib/periods";
+import { FLEET_VISIBLE } from "@/lib/product";
 import { fuelReferenceCheck } from "@/lib/fuel-estimate";
 import { truckFuelBasis } from "@/lib/load-estimates";
 import { formatMoneyCompact, formatNumber, formatRate } from "@/lib/formatters";
@@ -60,7 +61,7 @@ export default async function TruckPage({
   // One unit at a time: miles remaining and reserve coverage are facts about a
   // specific odometer, not about a fleet.
   const trucks = orderedTrucks(dataset.trucks);
-  const fleetAccount = hasFleetAccess(dataset.subscription);
+  const fleetAccount = FLEET_VISIBLE && hasFleetAccess(dataset.subscription);
   const primary = primaryTruck(trucks);
   const selectedId = fleetAccount ? truckFromSearchParams(params, trucks) : primary.id;
   const truck = truckById(trucks, selectedId) ?? primary;
@@ -143,7 +144,7 @@ export default async function TruckPage({
         aria-labelledby="account-mode-title"
         className="overflow-hidden rounded-xl border border-border bg-card"
       >
-        <div className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between lg:p-5">
+        {FLEET_VISIBLE ? <div className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between lg:p-5">
           <div className="flex min-w-0 items-start gap-3.5">
             <span
               className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-primary/25 bg-primary/10 text-primary"
@@ -188,9 +189,9 @@ export default async function TruckPage({
               <TruckDialog canAdd={allowance.canAdd} limitReason={allowance.reason} />
             ) : null}
           </div>
-        </div>
+        </div> : null}
 
-        <div className="border-t border-border bg-surface-sunken/50 p-4 lg:px-5">
+        <div className={cn("bg-surface-sunken/50 p-4 lg:px-5", FLEET_VISIBLE && "border-t border-border")}>
           <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
             <div>
               <p className="text-xs font-semibold text-foreground">

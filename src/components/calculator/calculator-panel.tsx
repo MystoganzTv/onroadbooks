@@ -42,9 +42,6 @@ export interface CalculatorDefaults {
   mpg: number;
   dispatchPct: number;
   factoringPct: number;
-  /** The truck's usual driver's pay, when their terms fit % of gross or a flat fee. */
-  driverPayMode: FeeMode;
-  driverPayValue: number;
   overheadPerMile: number;
   debtServicePerMile: number;
   trueCostPerMile: number;
@@ -79,8 +76,6 @@ interface Values {
   dispatchValue: string;
   factoringMode: FeeMode;
   factoringValue: string;
-  driverPayMode: FeeMode;
-  driverPayValue: string;
   otherCost: string;
   targetProfitPerMile: string;
 }
@@ -99,8 +94,6 @@ function initialValues(defaults: CalculatorDefaults): Values {
     dispatchValue: defaults.dispatchPct ? String(defaults.dispatchPct) : "0",
     factoringMode: "PCT",
     factoringValue: defaults.factoringPct ? String(defaults.factoringPct) : "0",
-    driverPayMode: defaults.driverPayMode,
-    driverPayValue: defaults.driverPayValue ? String(defaults.driverPayValue) : "0",
     otherCost: "",
     targetProfitPerMile: defaults.targetProfitPerMile
       ? defaults.targetProfitPerMile.toFixed(2)
@@ -214,8 +207,6 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
     dispatchValue: toNumber(values.dispatchValue),
     factoringMode: values.factoringMode,
     factoringValue: toNumber(values.factoringValue),
-    driverPayMode: values.driverPayMode,
-    driverPayValue: toNumber(values.driverPayValue),
     otherCost: toNumber(values.otherCost),
     overheadPerMile: defaults.overheadPerMile,
     debtServicePerMile: noFinancingConfirmed ? 0 : defaults.debtServicePerMile,
@@ -404,14 +395,6 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
               onMode={(mode) => set("factoringMode", mode)}
               onValue={(value) => set("factoringValue", value)}
             />
-            <FeeField
-              id="driver-pay"
-              label={copy.driverPay}
-              mode={values.driverPayMode}
-              value={values.driverPayValue}
-              onMode={(mode) => set("driverPayMode", mode)}
-              onValue={(value) => set("driverPayValue", value)}
-            />
 
             <div className="rounded-md border border-dashed border-border bg-surface-sunken/50 p-3">
               <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -571,9 +554,7 @@ function EvaluateResult({
           ? copy.dispatch
           : line.key === "factoring"
             ? copy.factoring
-            : line.key === "driverPay"
-              ? copy.driverPay
-              : copy.otherCosts;
+            : copy.otherCosts;
     const hint = line.key === "fuel"
       ? toNumber(values.mpg) > 0
         ? interpolate(copy.fuelLineHint, {
@@ -590,11 +571,7 @@ function EvaluateResult({
           ? values.factoringMode === "PCT"
             ? interpolate(copy.percentGross, { percent: values.factoringValue })
             : copy.flatFee
-          : line.key === "driverPay"
-            ? values.driverPayMode === "PCT"
-              ? interpolate(copy.percentGross, { percent: values.driverPayValue })
-              : copy.flatFee
-            : undefined;
+          : undefined;
     return { label, hint };
   };
   const hasBrokerOffer = values.grossRate.trim().length > 0 && toNumber(values.grossRate) > 0;

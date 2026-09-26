@@ -1,6 +1,6 @@
 # ADR 0028: Three load perspectives, and rating floors on the contribution scale
 
-- **Status:** Accepted
+- **Status:** Partly superseded by [ADR-0031](0031-owner-operator-product.md) (driver pay is no longer a load cost; one view; new floors)
 - **Date:** 2026-09-25
 - **Deciders:** Enrique Padrón
 - **Tags:** money | product

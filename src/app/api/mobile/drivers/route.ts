@@ -4,7 +4,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { fieldErrorsFrom } from "@/lib/actions/types";
 import { getMobileSession, requireMobileWrite } from "@/lib/auth/mobile";
 import { getRepository } from "@/lib/db";
-import { hasFleetAccess, capabilityRefusal } from "@/lib/plans";
 import { driverSchema } from "@/lib/schemas";
 
 export const runtime = "nodejs";
@@ -22,17 +21,12 @@ export async function GET(request: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const dataset = await getRepository(session.businessId).getDataset();
-  if (!hasFleetAccess(dataset.subscription)) {
-    return NextResponse.json({ error: capabilityRefusal("fleet") }, { status: 403 });
-  }
-
   const drivers = dataset.drivers.map((driver) => ({
     id: driver.id,
     name: driver.name,
     active: driver.active,
     payType: driver.payType,
     payRate: driver.payRate,
-    isOwnerOperator: driver.isOwnerOperator ?? false,
     reference: driver.reference,
     defaultTruckId: driver.defaultTruckId,
   }));

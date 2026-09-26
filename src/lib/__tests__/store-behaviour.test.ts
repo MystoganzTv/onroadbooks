@@ -972,8 +972,8 @@ describe("upgrading an older ledger", { skip: Boolean(SQL_BACKEND) }, () => {
       [],
       "an older ledger never gains mirrored trip costs on upgrade",
     );
-    // A file with no floors gets the current defaults (ADR-0028).
-    assert.equal(dataset.settings.ratingGreatPerMile, 1);
+    // A file with no floors gets the current defaults (ADR-0031).
+    assert.equal(dataset.settings.ratingGreatPerMile, 1.25);
     assert.equal(dataset.settings.deadheadWarnPct, 20);
     assert.equal(dataset.settings.maintenanceWarnMiles, 2000);
     assert.ok(dataset.settings.categoryBehavior);

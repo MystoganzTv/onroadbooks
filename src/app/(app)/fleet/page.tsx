@@ -1,5 +1,5 @@
+import { FLEET_VISIBLE } from "@/lib/product";
 import type { Metadata } from "next";
-import { operatingLedger } from "@/lib/startup-costs";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -64,6 +64,8 @@ export default async function FleetPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
+  // Hidden in the owner-operator product (ADR 0031); see lib/product.ts.
+  if (!FLEET_VISIBLE) redirect("/truck");
   const [params, session, locale] = await Promise.all([
     searchParams,
     requireSession(),
@@ -80,7 +82,7 @@ export default async function FleetPage({
   if (!hasFleetAccess(subscription)) redirect("/truck");
 
   const period = periodFromSearchParams(params);
-  const expenses = operatingLedger(loads, ledgerExpenses);
+  const expenses = ledgerExpenses;
   const fleet = calculateFleetSummary(orderedTrucks(trucks), loads, expenses, period, settings, paymentEvents);
   const summary = summarizePeriod(loads, expenses, period, settings, paymentEvents);
   const { best, weakest } = fleetExtremes(fleet);

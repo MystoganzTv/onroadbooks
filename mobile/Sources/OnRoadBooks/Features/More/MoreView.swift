@@ -3,10 +3,10 @@ import SwiftUI
 /// Everything from the web app's `NAV_GROUPS` (`src/components/shell/nav-items.ts`)
 /// that isn't already a tab.
 ///
-/// Every row here is now a real screen except Plans & Billing. The three
-/// `fleetOnly` ones are built and gated exactly as the web gates them: on a
-/// Solo or Pro business they open and explain, in the server's own sentence,
-/// that Fleet covers them — a lock with a reason rather than a dead end.
+/// Every row here is now a real screen except Plans & Billing. OnRoad Books
+/// is an owner-operator product (ADR 0031): Fleet and Driver Pay stay built
+/// (FleetView, DriverPayView) but are not listed, and Drivers -- who ran a
+/// load and what they earned -- is open on every plan, as on the web.
 private struct MoreItem: Identifiable {
     let id = UUID()
     let title: String
@@ -24,18 +24,16 @@ private let moreGroups: [MoreGroup] = [
     MoreGroup(title: "Operate", items: [
         MoreItem(title: "Load Calculator", icon: "sum", fleetOnly: false), // "calculator" isn't a real SF Symbol -- caught live on Enrique's simulator
         MoreItem(title: "Fuel", icon: "fuelpump.fill", fleetOnly: false),
-        MoreItem(title: "Drivers", icon: "person.crop.circle", fleetOnly: true),
+        MoreItem(title: "Drivers", icon: "person.crop.circle", fleetOnly: false),
     ]),
     MoreGroup(title: "Money", items: [
         MoreItem(title: "Invoices", icon: "doc.text.fill", fleetOnly: false),
-        MoreItem(title: "Driver Pay", icon: "list.clipboard.fill", fleetOnly: true),
         MoreItem(title: "Reserves", icon: "building.columns.fill", fleetOnly: false),
     ]),
     MoreGroup(title: "Intelligence", items: [
         MoreItem(title: "IFTA", icon: "mappin.and.ellipse", fleetOnly: false),
         MoreItem(title: "Analytics", icon: "chart.bar.fill", fleetOnly: false),
         MoreItem(title: "Reports", icon: "chart.bar.doc.horizontal.fill", fleetOnly: false),
-        MoreItem(title: "Fleet", icon: "truck.box.fill", fleetOnly: true),
         MoreItem(title: "Truck", icon: "steeringwheel", fleetOnly: false),
     ]),
 ]

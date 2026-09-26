@@ -100,22 +100,21 @@ ledger (ADR 0030).
 
 **Load profitability score** -- every load is rated GREAT / GOOD / MARGINAL / BAD
 on **Contribution Profit per total mile**, never on gross rate per mile. Gross
-Rate minus fuel, tolls, dispatch, factoring, other trip costs and Driver Pay,
-divided by loaded *plus* deadhead miles. Debt Service never changes the rating.
+Rate minus fuel, tolls, dispatch, factoring and other trip costs, divided by
+loaded *plus* deadhead miles. Debt Service never changes the rating.
 miles. A $4.19/loaded-mile broker running 35% deadhead rates below a $3.87 broker
 running clean -- and the app says so. Thresholds are editable in Settings
-(defaults $1.00 / $0.60 / $0.30 contribution per total mile; see ADR 0028 for why
-the old $2.00 / $1.50 / $1.00 gross-RPM-sized floors were replaced).
+(defaults $1.25 / $0.90 / $0.60 contribution per total mile; ADR 0031).
 
-**Load profitability perspectives** -- the load detail page shows the same load
-three ways. **Business** (default): Gross Revenue, Direct Trip Costs, Driver
-Compensation, Contribution Profit, then Allocated Operating Costs and Estimated
-Net Business Profit when the trailing cost basis is sufficient. **Driver**: Driver
-Compensation per total mile, per loaded mile and per hour when trip hours are
-known. **Owner-Operator** (only when the assigned driver is marked "This driver is
-the owner"): Owner Economic Benefit = Driver Compensation + Business Contribution,
-shown as its two parts and never called profit. The load rating always scores the
-Business view.
+**Owner-operator product** (ADR 0031) -- OnRoad Books is built for one owner
+running one truck. The load detail page shows one profitability ladder: Gross
+Revenue, Direct Trip Costs, Contribution Profit, then Allocated Operating Costs
+and Estimated Net Business Profit when the trailing cost basis is sufficient.
+Drivers are kept to record who ran a load and what they earned -- shown only on
+the Drivers page, never as a load cost. Fleet (several units, the Fleet page and
+plan, driver pay statements) stays in the code behind `FLEET_VISIBLE` in
+`src/lib/product.ts` and is not shown. Every expense counts from the day it is
+dated; there is no separate "startup investment" period.
 
 **Trip cost breakdown** -- the load detail page opens on a waterfall: gross rate at
 the top, every cost taken off it with proportional bars, trip profit at the bottom,
@@ -314,12 +313,11 @@ returns `0` rather than `Infinity` or `NaN`. See
 | Revenue / Loaded Mile | Gross Rate / Loaded Miles |
 | Revenue / Total Mile | Gross Rate / Total Miles |
 | Gross RPM / Loaded RPM | Gross Revenue / Total Miles; Gross Revenue / Loaded Miles (freight-market metrics, never scored) |
-| Direct Trip Costs | Fuel + tolls + dispatch + factoring + other trip costs (driver pay is shown separately as Driver Compensation) |
-| Contribution Profit | Gross Rate - Direct Trip Costs - Driver Compensation |
+| Direct Trip Costs | Fuel + tolls + dispatch + factoring + other trip costs (driver pay is not a load cost) |
+| Contribution Profit | Gross Rate - Direct Trip Costs |
 | Contribution / Mile (load) | Contribution Profit / Total Miles |
 | Allocated Operating Costs (load) | Total Miles x overhead per mile (trailing basis); shown only when the basis is sufficient |
 | Estimated Net Business Profit | Contribution Profit - Allocated Operating Costs (debt service shown separately) |
-| Owner Economic Benefit | Driver Compensation + Contribution Profit, only for owner-driven loads; not a profit figure |
 | Booked Revenue | sum of load gross rates in the performance period |
 | Collected Revenue | payment events dated in the cash period; legacy fallback only when the paid date is known |
 | Accounts Receivable | Booked Revenue - all customer payments recorded against those loads |
@@ -331,7 +329,7 @@ returns `0` rather than `Infinity` or `NaN`. See
 | Deadhead cost | Deadhead Miles x Variable Cost per Mile |
 | Deadhead cost / total mile | Deadhead Cost / Total Miles |
 | Rate dilution | Revenue per Loaded Mile - Revenue per Total Mile |
-| Load rating | GREAT >= $1.00, GOOD >= $0.60, MARGINAL >= $0.30, else BAD (Contribution Profit per **total** mile, thresholds editable; debt service never changes it) |
+| Load rating | GREAT >= $1.25, GOOD >= $0.90, MARGINAL >= $0.60, else BAD (Contribution Profit per **total** mile, thresholds editable; debt service never changes it) |
 | Actual cost per mile | Operating Expenses / Period Total Miles (loaded + deadhead), never prorated; debt service is separate |
 | Trailing cost basis | the same, over a rolling 90 days -- used by the calculator, target rate and deadhead costing |
 | Overhead per mile | trailing cost per mile minus fuel, tolls, dispatch and factoring (subtracted as dollars, divided once) |

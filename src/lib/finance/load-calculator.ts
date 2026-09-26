@@ -49,9 +49,6 @@ export interface LoadEstimateInput {
   factoringMode: FeeMode;
   factoringValue: number;
   otherCost: number;
-  /** The driver's pay for this load. Omitted means no driver pay. */
-  driverPayMode?: FeeMode;
-  driverPayValue?: number;
   /** Historical overhead per mile. See `overheadCostPerMile`. */
   overheadPerMile: number;
   /** Historical debt-service cash burden; never used by the load rating. */
@@ -76,7 +73,6 @@ export interface LoadEstimate {
   dispatch: number;
   factoring: number;
   otherCost: number;
-  driverPay: number;
   overhead: number;
   debtService: number;
   /** Fuel + tolls + dispatch + factoring + other. What the trip itself costs. */
@@ -126,14 +122,12 @@ export function calculateLoadEstimate(
   const dispatch = feeAmount(input.dispatchMode, input.dispatchValue, grossRate);
   const factoring = feeAmount(input.factoringMode, input.factoringValue, grossRate);
   const otherCost = roundMoney(Math.max(0, input.otherCost));
-  const driverPay = feeAmount(input.driverPayMode ?? "AMOUNT", input.driverPayValue ?? 0, grossRate);
   const overhead = roundMoney(totalMiles * Math.max(0, input.overheadPerMile));
   const debtService = roundMoney(totalMiles * Math.max(0, input.debtServicePerMile ?? 0));
 
   const tripCost = roundMoney(fuelCost + tolls + dispatch + factoring + otherCost);
-  const totalCost = roundMoney(tripCost + driverPay + overhead);
-  // Business view: the driver is paid before the load contributes anything.
-  const contributionProfit = roundMoney(grossRate - tripCost - driverPay);
+  const totalCost = roundMoney(tripCost + overhead);
+  const contributionProfit = roundMoney(grossRate - tripCost);
   const contributionProfitPerMile = div(contributionProfit, totalMiles);
   const contributionMargin = div(contributionProfit, grossRate) * 100;
   const fullyLoadedOperatingProfit = roundMoney(contributionProfit - overhead);
@@ -166,12 +160,6 @@ export function calculateLoadEstimate(
       note: input.factoringMode === "PCT" ? `${input.factoringValue}% of gross` : "Flat fee",
     },
     { key: "other", label: "Other costs", amount: otherCost },
-    {
-      key: "driverPay",
-      label: "Driver pay",
-      amount: driverPay,
-      note: (input.driverPayMode ?? "AMOUNT") === "PCT" ? `${input.driverPayValue ?? 0}% of gross` : "Flat per load",
-    },
   ].filter((line) => line.amount > 0 || line.key === "fuel");
 
   return {
@@ -185,7 +173,6 @@ export function calculateLoadEstimate(
     dispatch,
     factoring,
     otherCost,
-    driverPay,
     overhead,
     debtService,
     tripCost,
@@ -233,8 +220,6 @@ export interface TargetRateInput {
   factoringMode: FeeMode;
   factoringValue: number;
   otherCost: number;
-  driverPayMode?: FeeMode;
-  driverPayValue?: number;
   overheadPerMile: number;
   debtServicePerMile?: number;
   /** What the owner wants to clear, per total mile. */
@@ -346,8 +331,8 @@ export function compareOfferToThresholds(
  * Dispatch and factoring are usually a cut of the rate, so they move when the
  * rate moves and cannot simply be added to the cost. With
  *
- *   f = dispatch% + factoring% + driver pay%   (as a fraction)
- *   C = fuel + tolls + other + overhead + any FLAT dispatch/factoring/driver pay
+ *   f = dispatch% + factoring%   (as a fraction)
+ *   C = fuel + tolls + other + overhead + any FLAT dispatch/factoring
  *   P = target profit = target profit per mile x total miles
  *
  * the rate has to satisfy   R - C - fR = P,   which gives
@@ -369,17 +354,13 @@ export function calculateTargetRate(
   const overhead = roundMoney(totalMiles * Math.max(0, input.overheadPerMile));
   const debtService = roundMoney(totalMiles * Math.max(0, input.debtServicePerMile ?? 0));
 
-  const driverPayMode = input.driverPayMode ?? "AMOUNT";
-  const driverPayValue = Math.max(0, input.driverPayValue ?? 0);
   const flatFees = roundMoney(
     (input.dispatchMode === "AMOUNT" ? Math.max(0, input.dispatchValue) : 0) +
-      (input.factoringMode === "AMOUNT" ? Math.max(0, input.factoringValue) : 0) +
-      (driverPayMode === "AMOUNT" ? driverPayValue : 0),
+      (input.factoringMode === "AMOUNT" ? Math.max(0, input.factoringValue) : 0),
   );
   const grossFeeRate =
     (input.dispatchMode === "PCT" ? Math.max(0, input.dispatchValue) : 0) / 100 +
-    (input.factoringMode === "PCT" ? Math.max(0, input.factoringValue) : 0) / 100 +
-    (driverPayMode === "PCT" ? driverPayValue : 0) / 100;
+    (input.factoringMode === "PCT" ? Math.max(0, input.factoringValue) : 0) / 100;
 
   const directFixedCost = roundMoney(fuelCost + tolls + otherCost + flatFees);
   const fixedTripCost = roundMoney(directFixedCost + overhead);
@@ -416,21 +397,21 @@ export function calculateTargetRate(
       label: "Minimum acceptable",
       ppm: thresholds.marginal,
       numerator: directFixedCost + thresholds.marginal * totalMiles,
-      description: `Contributes $${thresholds.marginal.toFixed(2)}/mi after direct trip costs and driver pay -- your MARGINAL floor.`,
+      description: `Contributes $${thresholds.marginal.toFixed(2)}/mi after direct trip costs -- your MARGINAL floor.`,
     },
     {
       key: "good",
       label: "Good rate",
       ppm: thresholds.good,
       numerator: directFixedCost + thresholds.good * totalMiles,
-      description: `Contributes $${thresholds.good.toFixed(2)}/mi after direct trip costs and driver pay -- rates as GOOD.`,
+      description: `Contributes $${thresholds.good.toFixed(2)}/mi after direct trip costs -- rates as GOOD.`,
     },
     {
       key: "great",
       label: "Great rate",
       ppm: thresholds.great,
       numerator: directFixedCost + thresholds.great * totalMiles,
-      description: `Contributes $${thresholds.great.toFixed(2)}/mi after direct trip costs and driver pay -- rates as GREAT.`,
+      description: `Contributes $${thresholds.great.toFixed(2)}/mi after direct trip costs -- rates as GREAT.`,
     },
     {
       key: "target",

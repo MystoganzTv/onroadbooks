@@ -50,8 +50,7 @@ import {
 import { periodBuckets } from "@/lib/chart-data";
 import { getDataset } from "@/lib/db";
 import { latestFeeDefaults } from "@/lib/load-fees";
-import { operatingLedger, startupCosts } from "@/lib/startup-costs";
-import { hasFleetAccess, planAllows } from "@/lib/plans";
+import { planAllows } from "@/lib/plans";
 import {
   expensesForTruck,
   loadsForTruck,
@@ -83,7 +82,6 @@ import {
 } from "@/lib/finance";
 import {
   formatMiles,
-  formatMoney,
   formatMoneyCompact,
   formatNumber,
   formatPercent,
@@ -100,8 +98,8 @@ import {
 import { defaultEntryDate, previousPeriod, todayISO } from "@/lib/periods";
 import { roleCan } from "@/lib/roles";
 import { cn } from "@/lib/utils";
-import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
-import { formatLocaleDate, formatLocalePeriod } from "@/lib/i18n-format";
+import { getWebDictionary } from "@/lib/i18n/dictionaries";
+import { formatLocalePeriod } from "@/lib/i18n-format";
 import { getAppLocale } from "@/lib/i18n-server";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -166,12 +164,7 @@ export default async function DashboardPage({
   // to that unit's own loads and its own direct costs.
   const truckId = truckFromSearchParams(params, trucks);
   const loads = truckId ? loadsForTruck(allLoads, truckId) : allLoads;
-  // Operating results start at the first load. What was spent getting the
-  // truck on the road is shown once, as the startup investment, instead of
-  // as a loss the first loads could never cover.
-  const ledger = operatingLedger(allLoads, allExpenses);
-  const expenses = truckId ? expensesForTruck(ledger, truckId) : ledger;
-  const startup = startupCosts(allLoads, allExpenses, period, truckId);
+  const expenses = truckId ? expensesForTruck(allExpenses, truckId) : allExpenses;
 
   const ratingThresholds = thresholdsFromSettings(settings);
   const summary = buildFinancialSummary(
@@ -280,7 +273,7 @@ export default async function DashboardPage({
       brokers={brokerNames}
       brokerContacts={brokerContactNames(loads, dataset.brokers)}
       trucks={trucks}
-      drivers={hasFleetAccess(dataset.subscription) ? drivers : []}
+      drivers={drivers}
       defaultTruckId={truckId}
       defaultDate={defaultEntryDate(period)}
       ratingThresholds={ratingThresholds}
@@ -359,21 +352,6 @@ export default async function DashboardPage({
 
       <ActionableProblemList problems={actionableProblems} />
 
-      {startup.total > 0 && startup.operatingSince ? (
-        <div className="flex flex-col gap-2 rounded-md border border-border bg-surface-sunken px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-          <div className="min-w-0 flex-1 space-y-0.5">
-            <p className="text-sm font-medium text-foreground">
-              {copy.startupTitle} · <span className="tnum">{formatMoney(startup.total)}</span>
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {interpolate(copy.startupBody, { date: formatLocaleDate(startup.operatingSince, locale) })}
-            </p>
-          </div>
-          <Button asChild variant="outline" size="sm" className="shrink-0 self-start sm:self-center">
-            <Link href={`/expenses?${query}`}>{copy.startupLink}</Link>
-          </Button>
-        </div>
-      ) : null}
 
       <ModeView simple={
         <>

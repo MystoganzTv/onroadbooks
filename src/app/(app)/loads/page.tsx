@@ -1,7 +1,6 @@
 import { brokerContactNames } from "@/lib/broker-contacts";
 import { buildLoadEstimator } from "@/lib/load-estimates";
 import { brokerNames as savedBrokerNames } from "@/lib/brokers";
-import { operatingLedger } from "@/lib/startup-costs";
 import type { Metadata } from "next";
 
 import { ModeView, ViewModeToggle } from "@/components/shared/view-mode";
@@ -31,7 +30,6 @@ import {
 import { expensesForTruck, loadsForTruck, orderedTrucks } from "@/lib/fleet";
 import { overheadCostPerMile, trailingCostBasis } from "@/lib/finance";
 import { defaultEntryDate, todayISO } from "@/lib/periods";
-import { hasFleetAccess } from "@/lib/plans";
 import { isRateConScanConfigured } from "@/lib/rate-con/extract";
 import { latestFeeDefaults } from "@/lib/load-fees";
 import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
@@ -57,7 +55,7 @@ export default async function LoadsPage({
   const dictionary = getWebDictionary(locale);
   const copy = dictionary.loads;
   const dataset = await getDataset(session.businessId);
-  const { trucks, loads, expenses: ledgerExpenses, settings, drivers, subscription, paymentEvents, brokers: brokerProfiles } = dataset;
+  const { trucks, loads, expenses: ledgerExpenses, settings, drivers, paymentEvents, brokers: brokerProfiles } = dataset;
   const period = periodFromSearchParams(params);
   const periodLabel = formatLocalePeriod(period, locale);
   const ratingThresholds = thresholdsFromSettings(settings);
@@ -65,7 +63,7 @@ export default async function LoadsPage({
   const scopeTruckId = truckFromSearchParams(params, trucks);
   const scopedLoads = loadsForTruck(loads, scopeTruckId);
   // Operating views start at the first load; setup spend is reported apart.
-  const expenses = operatingLedger(loads, ledgerExpenses);
+  const expenses = ledgerExpenses;
   const scopedExpenses = expensesForTruck(expenses, scopeTruckId);
 
   const estimate = buildLoadEstimator(dataset, todayISO());
@@ -97,7 +95,7 @@ export default async function LoadsPage({
                 brokers={brokers}
                 brokerContacts={brokerContacts}
                 trucks={trucks}
-                drivers={hasFleetAccess(subscription) ? drivers : []}
+                drivers={drivers}
                 defaultTruckId={scopeTruckId}
                 defaultDate={defaultEntryDate(period)}
                 ratingThresholds={ratingThresholds}
@@ -108,7 +106,7 @@ export default async function LoadsPage({
               brokers={brokers}
               brokerContacts={brokerContacts}
               trucks={trucks}
-              drivers={hasFleetAccess(subscription) ? drivers : []}
+              drivers={drivers}
               defaultTruckId={scopeTruckId}
               defaultDate={defaultEntryDate(period)}
               ratingThresholds={ratingThresholds}
@@ -137,7 +135,7 @@ export default async function LoadsPage({
             brokers={brokers}
             brokerContacts={brokerContacts}
             trucks={trucks}
-            drivers={hasFleetAccess(subscription) ? drivers : []}
+            drivers={drivers}
             defaultTruckId={scopeTruckId}
             defaultDate={defaultEntryDate(period)}
             ratingThresholds={ratingThresholds}
@@ -225,7 +223,7 @@ export default async function LoadsPage({
           brokers={brokers}
           brokerContacts={brokerContacts}
           trucks={trucks}
-          drivers={hasFleetAccess(subscription) ? drivers : []}
+          drivers={drivers}
           defaultTruckId={scopeTruckId}
           defaultDate={defaultEntryDate(period)}
           ratingThresholds={ratingThresholds}

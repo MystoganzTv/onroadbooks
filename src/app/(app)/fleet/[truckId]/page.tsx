@@ -1,7 +1,7 @@
+import { FLEET_VISIBLE } from "@/lib/product";
 import { buildLoadEstimator } from "@/lib/load-estimates";
 import { todayISO } from "@/lib/periods";
 import type { Metadata } from "next";
-import { operatingLedger } from "@/lib/startup-costs";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ExternalLink } from "lucide-react";
@@ -66,6 +66,8 @@ export default async function FleetUnitPage({
   params: Promise<{ truckId: string }>;
   searchParams: Promise<SearchParams>;
 }) {
+  // Hidden in the owner-operator product (ADR 0031); see lib/product.ts.
+  if (!FLEET_VISIBLE) redirect("/truck");
   const [{ truckId }, queryParams, session, locale] = await Promise.all([
     params,
     searchParams,
@@ -82,7 +84,7 @@ export default async function FleetUnitPage({
   const period = periodFromSearchParams(queryParams);
   const query = scopeQuery(period, truck.id);
   const unitLoads = loadsForTruck(dataset.loads, truck.id);
-  const ledger = operatingLedger(dataset.loads, dataset.expenses);
+  const ledger = dataset.expenses;
   const unitExpenses = expensesForTruck(ledger, truck.id);
   const summary = summarizePeriod(unitLoads, unitExpenses, period, dataset.settings, dataset.paymentEvents);
   const fleet = calculateFleetSummary(

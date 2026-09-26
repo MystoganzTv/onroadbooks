@@ -25,6 +25,7 @@ import { formatLocalePeriod } from "@/lib/i18n-format";
 import { getAppLocale } from "@/lib/i18n-server";
 import { periodFromSearchParams, param, type SearchParams } from "@/lib/period-params";
 import { hasFleetAccess } from "@/lib/plans";
+import { FLEET_VISIBLE } from "@/lib/product";
 import { roleCan } from "@/lib/roles";
 import { todayISO } from "@/lib/periods";
 
@@ -122,7 +123,7 @@ export default async function SettingsPage({
                   preview={preview}
                   previewLabel={formatLocalePeriod(period, locale)}
                   reserveAccounts={reserveAccounts}
-                  hasFleet={hasFleet}
+                  hasFleet={FLEET_VISIBLE && hasFleet}
                 />
               ) : (
                 <Card>

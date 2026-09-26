@@ -13,7 +13,6 @@ import {
   ShieldCheck,
   Truck,
   UserRound,
-  ClipboardList,
   MapPinned,
   type LucideIcon,
 } from "lucide-react";
@@ -66,7 +65,9 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/calculator", label: "Load Calculator", icon: Calculator },
       { href: "/expenses", label: "Expenses", icon: Receipt },
       { href: "/fuel", label: "Fuel", icon: Fuel },
-      { href: "/drivers", label: "Drivers", icon: UserRound, fleetOnly: true },
+      // Owner-operator product (ADR 0031): drivers are listed with what they
+      // earned, on every plan. Fleet and Driver Pay stay built but hidden.
+      { href: "/drivers", label: "Drivers", icon: UserRound },
     ],
   },
   {
@@ -77,14 +78,6 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Financing",
         icon: BadgeDollarSign,
         roles: ["OWNER", "ADMIN", "BOOKKEEPER"],
-      },
-      {
-        href: "/driver-settlements",
-        label: "Driver Pay",
-        icon: ClipboardList,
-        fleetOnly: true,
-        requires: "DRIVER_PAY",
-        roles: ["OWNER", "ADMIN"],
       },
       { href: "/reserves", label: "Reserves", icon: Landmark, roles: ["OWNER"] },
     ],
@@ -101,7 +94,6 @@ export const NAV_GROUPS: NavGroup[] = [
         requires: "ACTIVITY",
       },
       { href: "/reports", label: "Reports", icon: BarChart3, requires: "ACTIVITY" },
-      { href: "/fleet", label: "Fleet", icon: Truck, fleetOnly: true },
       { href: "/truck", label: "Truck", icon: Truck },
     ],
   },

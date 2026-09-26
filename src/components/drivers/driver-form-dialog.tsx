@@ -25,7 +25,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -60,7 +59,6 @@ export function DriverFormDialog({
     driver?.payType ?? "PERCENT_GROSS",
   );
   const [payRate, setPayRate] = React.useState(driver ? String(driver.payRate) : "");
-  const [isOwnerOperator, setIsOwnerOperator] = React.useState(driver?.isOwnerOperator ?? false);
 
   React.useEffect(() => {
     if (!open) return;
@@ -69,7 +67,6 @@ export function DriverFormDialog({
     setDefaultTruckId(driver?.defaultTruckId ?? "NO_DEFAULT");
     setPayType(driver?.payType ?? "PERCENT_GROSS");
     setPayRate(driver ? String(driver.payRate) : "");
-    setIsOwnerOperator(driver?.isOwnerOperator ?? false);
     setErrors({});
   }, [open, driver]);
 
@@ -83,7 +80,6 @@ export function DriverFormDialog({
       defaultTruckId: defaultTruckId === "NO_DEFAULT" ? null : defaultTruckId,
       payType,
       payRate: payRate.trim() === "" ? Number.NaN : Number(payRate),
-      isOwnerOperator,
     };
     const parsed = driverSchema.safeParse(values);
     if (!parsed.success) {
@@ -202,13 +198,6 @@ export function DriverFormDialog({
                   onChange={(event) => setPayRate(event.target.value)}
                 />
               </Field>
-            </div>
-            <div className="flex items-start justify-between gap-3 rounded-lg border border-border p-3">
-              <div>
-                <label htmlFor="driver-owner-operator" className="text-sm font-medium">{copy.ownerOperator}</label>
-                <p className="mt-1 text-xs text-muted-foreground">{copy.ownerOperatorHint}</p>
-              </div>
-              <Switch id="driver-owner-operator" checked={isOwnerOperator} onCheckedChange={setIsOwnerOperator} />
             </div>
           </form>
         </DialogBody>

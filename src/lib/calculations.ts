@@ -95,21 +95,23 @@ export function pctChange(current: number, previous: number): number {
 
 /** Default rating thresholds, used when no settings are supplied. */
 /**
- * Contribution Profit per TOTAL mile -- after every direct trip cost AND the
- * driver's pay. Not gross RPM: a box truck grossing $2.00/mi keeps well under
- * $1.00/mi once fuel, fees and a 33 % driver are paid. The original $2 / $1.50
- * / $1 floors date from before driver pay was a trip cost and sat on the
- * gross-rate scale, so no hired-driver load could ever rate above BAD
- * (ADR-0028). These are only defaults; the owner's settings decide.
+ * Contribution Profit per TOTAL mile -- after every direct trip cost, for an
+ * owner-operator who drives the truck (no driver wage in the load). Not gross
+ * RPM: a box truck grossing $1.86/mi keeps about $1.10/mi after fuel,
+ * dispatch and factoring. History: $2 / $1.50 / $1 were gross-RPM sized;
+ * $1 / $0.60 / $0.30 were set while a hired driver's pay was a load cost
+ * (ADR-0028); these replace them now that it is not (ADR-0031). Only
+ * defaults -- the owner's settings decide.
  */
 export const DEFAULT_RATING_THRESHOLDS: RatingThresholds = {
-  great: 1,
-  good: 0.6,
-  marginal: 0.3,
+  great: 1.25,
+  good: 0.9,
+  marginal: 0.6,
 };
 
-/** Every business still on the pre-ADR-0028 factory floors. */
+/** Businesses still on an earlier set of factory floors. */
 export const LEGACY_RATING_THRESHOLDS: RatingThresholds = { great: 2, good: 1.5, marginal: 1 };
+export const DRIVER_ERA_RATING_THRESHOLDS: RatingThresholds = { great: 1, good: 0.6, marginal: 0.3 };
 
 export interface RatingThresholds {
   great: number;
@@ -157,14 +159,16 @@ export interface TripExpenseLine {
   key: string;
   label: string;
   amount: number;
-  /** True when the amount is an estimate (fuel) or not yet paid (driver pay). */
+  /** True when the amount is an estimate (fuel before its receipt is in). */
   estimated?: boolean;
 }
 
 /**
  * Every trip cost on a load, itemised for the waterfall. `estimate` fills the
- * two costs that reach the ledger later -- see load-estimates.ts -- and only
- * where the load itself records nothing.
+ * fuel that reaches the ledger later -- see load-estimates.ts -- only where the
+ * load itself records none. Driver pay is not a trip cost: the app is built
+ * for the owner-operator, and a driver's earnings live on the Drivers page
+ * only (ADR 0031).
  */
 export function tripExpenseLines(
   load: Load,
@@ -172,24 +176,22 @@ export function tripExpenseLines(
   estimate: TripCostEstimate = {},
 ): TripExpenseLine[] {
   const fuel = num(load.fuelCost) > 0 ? num(load.fuelCost) : num(estimate.fuelCost);
-  const driverPay = num(load.driverPay) > 0 ? num(load.driverPay) : num(estimate.driverPay);
   const lines: TripExpenseLine[] = [
     { key: "fuel", label: "Estimated fuel", amount: fuel, estimated: fuel > 0 && !(num(load.fuelCost) > 0) },
     { key: "tolls", label: "Tolls", amount: load.tolls },
     { key: "dispatch", label: "Dispatch", amount: load.dispatchFee },
     { key: "factoring", label: "Factoring", amount: load.factoringFee },
     { key: "other", label: "Other", amount: load.otherExpenses },
-    { key: "driverPay", label: "Driver Pay", amount: driverPay, estimated: driverPay > 0 && !(num(load.driverPay) > 0) },
   ].map((line) => ({ ...line, amount: num(line.amount) }));
   const categoryKeys: Record<string, string> = {
-    TOLLS: "tolls", DISPATCH: "dispatch", FACTORING: "factoring", DRIVER_PAY: "driverPay",
+    TOLLS: "tolls", DISPATCH: "dispatch", FACTORING: "factoring",
   };
   for (const expense of expenses) {
     if (expense.loadId !== load.id || expense.businessId !== load.businessId ||
-        expense.category === "FUEL" || isDebtServiceExpense(expense)) continue;
+        expense.category === "FUEL" || expense.category === "DRIVER_PAY" ||
+        isDebtServiceExpense(expense)) continue;
     // Generated ledger rows already represent the cost fields above.
-    if (lines.some((line) => expense.id === `expload_${load.id}_${line.key}`) ||
-        (expense.category === "DRIVER_PAY" && expense.id.startsWith("expdriver_"))) continue;
+    if (lines.some((line) => expense.id === `expload_${load.id}_${line.key}`)) continue;
     const line = lines.find((line) => line.key === (categoryKeys[expense.category] ?? "other"))!;
     line.amount += num(expense.amount);
   }
