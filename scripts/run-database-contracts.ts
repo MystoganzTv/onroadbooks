@@ -125,6 +125,7 @@ async function main() {
               "tsx",
               "--test",
               "src/lib/__tests__/store-behaviour.test.ts",
+              "src/lib/__tests__/auth-security.test.ts",
             ],
         {
           stdio: "inherit",

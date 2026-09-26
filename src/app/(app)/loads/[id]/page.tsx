@@ -157,8 +157,6 @@ export default async function LoadDetailPage({
 
         <LoadProfitabilityCard
           profitability={profitability}
-          allocatedRate={overheadCostPerMile(allocationBasis)}
-          basisLabel={allocationBasis.basisLabel}
         />
 
         <Card>
@@ -304,4 +302,3 @@ export default async function LoadDetailPage({
     </div>
   );
 }
-

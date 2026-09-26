@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { foreignKey, index, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { foreignKey, index, integer, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import * as enums from "./enums";
 import { business } from "./businesses";
 
@@ -8,6 +8,7 @@ export const user = pgTable("User", {
   email: text("email").notNull(),
   name: text("name"),
   passwordHash: text("passwordHash").notNull(),
+  authVersion: integer("authVersion").notNull().default(0),
   role: enums.memberRole("role").notNull().default("OWNER"),
   invitedAt: timestamp("invitedAt", { precision: 3, mode: "date", withTimezone: false }),
   joinedAt: timestamp("joinedAt", { precision: 3, mode: "date", withTimezone: false }).default(sql`CURRENT_TIMESTAMP`),

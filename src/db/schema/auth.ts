@@ -1,5 +1,6 @@
 import {
   index,
+  integer,
   pgSchema,
   text,
   timestamp,
@@ -47,3 +48,16 @@ export const authInvitation = authSchema.table(
     index("Invitation_expiry_idx").on(table.expiresAt),
   ],
 );
+
+export const passwordReset = authSchema.table("PasswordReset", {
+  tokenHash: text("tokenHash").primaryKey(),
+  userId: text("userId").notNull().references(() => user.id, { onDelete: "cascade", onUpdate: "cascade" }),
+  authVersion: integer("authVersion").notNull(),
+  expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
+}, (table) => [uniqueIndex("PasswordReset_user_key").on(table.userId), index("PasswordReset_expiry_idx").on(table.expiresAt)]);
+
+export const authRateLimit = authSchema.table("RateLimit", {
+  key: text("key").primaryKey(),
+  attempts: integer("attempts").notNull(),
+  resetAt: timestamp("resetAt", { withTimezone: true }).notNull(),
+}, (table) => [index("RateLimit_expiry_idx").on(table.resetAt)]);

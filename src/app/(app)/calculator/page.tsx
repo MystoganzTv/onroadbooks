@@ -5,36 +5,22 @@ import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import { PageHeader } from "@/components/shared/page-header";
 import { PlanGate } from "@/components/shared/plan-gate";
 import { requireSession } from "@/lib/auth";
-import { div, summarizeFuel, thresholdsFromSettings } from "@/lib/calculations";
+import { div, thresholdsFromSettings } from "@/lib/calculations";
 import { getDataset } from "@/lib/db";
 import {
   activeTrucks,
-  expensesForTruck,
   loadsForTruck,
   orderedTrucks,
-  overheadExpenses,
   primaryTruck,
   truckById,
 } from "@/lib/fleet";
-import {
-  hasSufficientOperatingCostBasis,
-  hasUnallocatedSharedOperatingCosts,
-  MIN_BASIS_MILES,
-  overheadCostPerMile,
-  sharedOperatingCostPerFleetMile,
-  trailingCostBasis,
-} from "@/lib/finance/cost-per-mile";
-import {
-  hasCompleteOperatingCostCoverage,
-  operatingCostCoverage,
-} from "@/lib/finance/cost-coverage";
+import { calculatorBusinessExpenses } from "@/lib/finance/calculator-business-expenses";
 import { todayISO } from "@/lib/periods";
 import { recentFuelPrice } from "@/lib/fuel-estimate";
 import { planAllows } from "@/lib/plans";
 import { getWebDictionary } from "@/lib/i18n/dictionaries";
 import { getAppLocale } from "@/lib/i18n-server";
 import { param, type SearchParams } from "@/lib/period-params";
-import { roleCan } from "@/lib/roles";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getAppLocale();
@@ -49,10 +35,7 @@ export async function generateMetadata(): Promise<Metadata> {
  *   Fuel price   the most recent price actually paid.
  *   Fees         the dispatch and factoring rates this truck has been paying,
  *                inferred from the ledger against Booked Revenue.
- *   Operating    trailing-90-day actual cost per mile with fuel, tolls, dispatch
- *                and factoring removed, because those are entered per load.
- *   Debt burden  trailing debt service per mile, shown separately and never
- *                used to classify the load.
+ *   Business expenses are shown for the current month, without allocation.
  */
 export default async function CalculatorPage({
   searchParams,
@@ -66,7 +49,7 @@ export default async function CalculatorPage({
   ]);
   const copy = getWebDictionary(locale).calculator;
   const dataset = await getDataset(session.businessId);
-  const { trucks, loads, fuelEntries, settings, goals } = dataset;
+  const { trucks, loads, fuelEntries, settings } = dataset;
   const expenses = dataset.expenses;
 
   if (!planAllows(dataset.subscription, "cockpit")) {
@@ -88,80 +71,21 @@ export default async function CalculatorPage({
   const selectedTruck = truckById(selectableTrucks, param(params, "truck"))
     ?? primaryTruck(selectableTrucks.length ? selectableTrucks : trucks);
   const scopedLoads = loadsForTruck(loads, selectedTruck.id);
-  const truckExpenses = expensesForTruck(expenses, selectedTruck.id);
-  // A one-truck business has only one honest destination for shared overhead.
-  // A Fleet does not: allocating its office/accounting/etc. costs requires an
-  // explicit policy, so those rows stay out of the unit basis until one exists.
-  const scopedExpenses = selectableTrucks.length > 1
-    ? truckExpenses
-    : [...truckExpenses, ...overheadExpenses(expenses)];
   const scopedFuelEntries = fuelEntries.filter((entry) => entry.truckId === selectedTruck.id);
-
-  const basis = trailingCostBasis(scopedLoads, scopedExpenses, settings, today);
-  const truckMileageBasisSufficient = basis.sufficient && basis.totalMiles >= MIN_BASIS_MILES;
-  const truckOperatingBasisSufficient = hasSufficientOperatingCostBasis(basis);
-  const hasSharedFleetOverhead = selectableTrucks.length > 1
-    && truckMileageBasisSufficient
-    && hasUnallocatedSharedOperatingCosts(expenses, basis, today);
-  const allocateSharedOverheadByMiles = hasSharedFleetOverhead
-    && settings.fleetOverheadAllocation === "FLEET_MILES";
-  const sharedOverheadPerMile = allocateSharedOverheadByMiles
-    ? sharedOperatingCostPerFleetMile(loads, expenses, basis)
-    : 0;
-  const sharedOverheadUnallocated = hasSharedFleetOverhead
-    && !allocateSharedOverheadByMiles;
-  const coverageExpenses = selectableTrucks.length > 1
-    && settings.fleetOverheadAllocation !== "FLEET_MILES"
-    ? truckExpenses
-    : [...truckExpenses, ...overheadExpenses(expenses)];
-  const costCoverage = operatingCostCoverage(
-    coverageExpenses,
-    basis,
-    selectedTruck.operatingCostExemptions,
-  );
-  const costCoverageComplete = hasCompleteOperatingCostCoverage(costCoverage);
-  const operatingCostAvailable = !sharedOverheadUnallocated
-    && costCoverageComplete
-    && (truckOperatingBasisSufficient || (sharedOverheadPerMile ?? 0) > 0);
-  const debtServiceRecorded = basis.sufficient
-    && basis.totalMiles >= MIN_BASIS_MILES
-    && basis.debtServiceTotal > 0;
-  const fuel = summarizeFuel(scopedFuelEntries, basis.totalMiles);
 
   const grossRevenue = scopedLoads.reduce((total, load) => total + load.grossRate, 0);
   const dispatchPaid = scopedLoads.reduce((total, load) => total + load.dispatchFee, 0);
   const factoringPaid = scopedLoads.reduce((total, load) => total + load.factoringFee, 0);
 
   const latestFuel = [...scopedFuelEntries].sort((a, b) => b.date.localeCompare(a.date))[0];
-  const hasActiveFinancing = (selectedTruck.monthlyPayment ?? 0) > 0
-    || dataset.financialObligations.some(
-      (obligation) => obligation.truckId === selectedTruck.id && obligation.active,
-    );
-
   const defaults: CalculatorDefaults = {
     // The same price and MPG a load on this truck is estimated with (ADR 0030).
     fuelPrice: recentFuelPrice(scopedFuelEntries, selectedTruck.id, today)?.pricePerGallon
-      ?? latestFuel?.pricePerGallon ?? fuel.averagePricePerGallon ?? 0,
-    mpg: selectedTruck.referenceMpg ?? fuel.milesPerGallon ?? 0,
+      ?? latestFuel?.pricePerGallon ?? 0,
+    mpg: selectedTruck.referenceMpg ?? 0,
     dispatchPct: Math.round(div(dispatchPaid, grossRevenue) * 1000) / 10,
     factoringPct: Math.round(div(factoringPaid, grossRevenue) * 1000) / 10,
-    overheadPerMile: overheadCostPerMile(basis) + (sharedOverheadPerMile ?? 0),
-    debtServicePerMile: basis.debtServicePerMile,
-    trueCostPerMile: basis.trueCostPerMile + (sharedOverheadPerMile ?? 0),
-    basisLabel: basis.basisLabel,
-    basisMiles: basis.totalMiles,
-    basisSufficient: operatingCostAvailable,
-    sharedOverheadUnallocated,
-    sharedOverheadPerMile: sharedOverheadPerMile ?? 0,
-    costCoverage,
-    costCoverageComplete,
-    debtServiceRecorded,
-    noFinancingConfirmed:
-      selectedTruck.financingConfirmedNone === true && !hasActiveFinancing,
-    canManageFinancing:
-      roleCan(session.role ?? "VIEWER", "manage_owner_finances") && !hasActiveFinancing,
-    canManageCostProfile: roleCan(session.role ?? "VIEWER", "manage_owner_finances"),
-    targetProfitPerMile: goals.targetProfitPerMile,
+    businessExpenses: calculatorBusinessExpenses(expenses, selectedTruck.id, today),
     deadheadWarnPct: settings.deadheadWarnPct,
     thresholds: thresholdsFromSettings(settings),
     brokers: [...new Set(scopedLoads.map((l) => l.broker).filter(Boolean))].sort() as string[],

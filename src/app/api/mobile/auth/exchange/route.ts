@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   // account still exists and still belongs where it claims. Same check
   // `getMobileSession` makes on every request.
   const user = await getAuthStore().findUserById(claims.userId);
-  if (!user || user.businessId !== claims.businessId) {
+  if (!user || user.businessId !== claims.businessId || user.email !== claims.email || (user.authVersion ?? 0) !== (claims.authVersion ?? 0)) {
     return NextResponse.json({ error: "That account is no longer available." }, { status: 401 });
   }
 
@@ -43,6 +43,7 @@ export async function POST(request: Request) {
     userId: user.id,
     businessId: user.businessId,
     email: user.email,
+    authVersion: user.authVersion ?? 0,
     exp,
   });
 
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
     token,
     expiresAt: new Date(exp * 1000).toISOString(),
     email: user.email,
+    authVersion: user.authVersion ?? 0,
     name: user.name,
   });
 }

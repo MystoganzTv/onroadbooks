@@ -216,6 +216,7 @@ model User {
   name         String?
   /// scrypt$<salt>$<hash>. Never selected into anything the client sees.
   passwordHash String
+  authVersion  Int        @default(0)
   role         MemberRole @default(OWNER)
   /// Set while an owner-created invitation is waiting to be accepted.
   invitedAt    DateTime?

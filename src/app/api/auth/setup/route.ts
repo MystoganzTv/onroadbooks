@@ -1,3 +1,4 @@
+import { authLimitResponse } from "@/lib/auth/rate-limit";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
@@ -22,6 +23,8 @@ export async function POST(request: Request) {
       { error: "Cross-origin signup is refused." },
       { status: 403 },
     );
+  const limited = await authLimitResponse(request, "signup");
+  if (limited) return limited;
   const store = getAuthStore();
 
   const parsed = setupSchema.safeParse(await request.json().catch(() => null));
@@ -57,6 +60,7 @@ export async function POST(request: Request) {
       userId: user.id,
       businessId: user.businessId,
       email: user.email,
+      authVersion: user.authVersion ?? 0,
       exp: sessionExpiry(),
     });
     (await cookies()).set(SESSION_COOKIE, token, SESSION_COOKIE_OPTIONS);

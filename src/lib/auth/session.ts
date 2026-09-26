@@ -26,6 +26,7 @@ const scrypt = promisify(scryptCb) as (
 export { SESSION_COOKIE, SESSION_MAX_AGE_SECONDS } from "./constants";
 
 export interface SessionPayload {
+  authVersion?: number;
   userId: string;
   businessId: string;
   email: string;

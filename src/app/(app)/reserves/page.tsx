@@ -9,7 +9,6 @@ import {
 import { ReserveTransactionDialog } from "@/components/reserves/reserve-transaction-dialog";
 import { MiniStat } from "@/components/dashboard/mini-stat";
 import { PeriodControls } from "@/components/dashboard/period-controls";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ViewModeToggle } from "@/components/shared/view-mode";
 import { getViewMode } from "@/lib/view-mode-server";
@@ -399,7 +398,7 @@ export default async function ReservesPage({
                                 month: "short",
                                 day: "numeric",
                               })}
-                              {txn.settlementId ? <> · <Link className="text-primary underline" href="/reports/settlements">{copy.fromClosedSettlement}</Link></> : null}
+                              {txn.settlementId ? <> · {copy.fromClosedSettlement}</> : null}
                             </p>
                           </div>
                           <div className="flex shrink-0 items-center gap-1">

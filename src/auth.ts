@@ -1,4 +1,5 @@
 import "server-only";
+import { enforceAuthLimit } from "@/lib/auth/rate-limit";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
@@ -39,10 +40,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
           email: { type: "email" },
           password: { type: "password" },
         },
-        async authorize(input) {
+        async authorize(input, request) {
           if (!usingAuthJs()) return null;
           const parsed = credentialsSchema.safeParse(input);
           if (!parsed.success) return null;
+          await enforceAuthLimit(request, "login", parsed.data.email);
           const user = await getAuthStore().findUserByEmail(parsed.data.email);
           if (
             !user ||
@@ -50,7 +52,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
             !(await verifyPassword(parsed.data.password, user.passwordHash))
           )
             return null;
-          return { id: user.id, email: user.email, name: user.name };
+          return { id: user.id, email: user.email, name: user.name, authVersion: user.authVersion ?? 0 };
         },
       }),
       Credentials({
@@ -59,11 +61,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
           token: { type: "text" },
           password: { type: "password" },
         },
-        async authorize(input) {
+        async authorize(input, request) {
           if (!usingAuthJs() || process.env.DATA_SOURCE !== "neon") return null;
+          await enforceAuthLimit(request, "invitation");
           try {
             const user = await acceptInvitation(input);
-            return { id: user.id, email: user.email, name: user.name };
+            return { id: user.id, email: user.email, name: user.name, authVersion: user.authVersion ?? 0 };
           } catch {
             return null;
           }
@@ -96,6 +99,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
             user.email = existing.email;
             user.name = existing.name;
             user.isNew = existing.isNew;
+            user.authVersion = existing.authVersion ?? 0;
           } catch {
             return false;
           }
@@ -105,16 +109,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
       async jwt({ token, user }) {
         if (user) {
           token.sub = user.id;
+          token.authVersion = user.authVersion ?? 0;
           token.newAccount = user.isNew === true;
         }
         // Revalidate even the Auth.js session endpoint. Removed accounts never
         // remain signed in; roles and workspace always come from our database.
-        if (!token.sub || !(await getAuthStore().findUserById(token.sub)))
-          return null;
+        const current = token.sub ? await getAuthStore().findUserById(token.sub) : null;
+        if (!current || (current.authVersion ?? 0) !== (token.authVersion ?? 0)) return null;
         return token;
       },
       async session({ session, token }) {
         session.user.id = token.sub!;
+        session.user.authVersion = Number(token.authVersion ?? 0);
         session.user.isNew = token.newAccount === true;
         return session;
       },

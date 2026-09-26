@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
     userId: session.userId,
     businessId: session.businessId,
     email: session.email,
+    authVersion: session.authVersion ?? 0,
     challenge,
     exp: handoffExpiry(),
   });

@@ -11,6 +11,8 @@ import { SESSION_COOKIE } from "@/lib/auth/constants";
  * request never reaches a page render at all.
  */
 const PUBLIC_PATHS = [
+  "/forgot-password",
+  "/reset-password",
   "/login",
   "/setup",
   "/invite/accept",

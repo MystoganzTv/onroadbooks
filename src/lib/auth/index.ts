@@ -20,12 +20,13 @@ export const getSession = cache(async (): Promise<SessionPayload | null> => {
       const current = await auth();
       if (current?.user?.id) {
         const user = await getAuthStore().findUserById(current.user.id);
-        if (!user || (user.role !== "OWNER" && !user.joinedAt)) return null;
+        if (!user || (user.authVersion ?? 0) !== (current.user.authVersion ?? 0) || (user.role !== "OWNER" && !user.joinedAt)) return null;
         return {
           userId: user.id,
           businessId: user.businessId,
           email: user.email,
           role: user.role,
+          authVersion: user.authVersion ?? 0,
           exp: Math.floor(Date.parse(current.expires) / 1000),
         };
       }
@@ -46,7 +47,8 @@ export const getSession = cache(async (): Promise<SessionPayload | null> => {
     if (
       !owner ||
       owner.businessId !== session.businessId ||
-      owner.email !== session.email
+      owner.email !== session.email ||
+      (owner.authVersion ?? 0) !== (session.authVersion ?? 0)
     ) {
       return null;
     }
@@ -56,6 +58,7 @@ export const getSession = cache(async (): Promise<SessionPayload | null> => {
       email: session.email,
       exp: session.exp,
       role: owner.role,
+      authVersion: owner.authVersion ?? 0,
     };
   } catch {
     return null;

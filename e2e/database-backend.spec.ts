@@ -2,6 +2,12 @@ import { expect, test } from "@playwright/test";
 import { Client } from "pg";
 import { createHmac } from "node:crypto";
 test.describe.configure({ mode: "serial" });
+test.beforeEach(async () => {
+  const db = new Client({ connectionString: process.env.NEON_DATABASE_URL });
+  await db.connect();
+  try { await db.query('DELETE FROM onroad_auth."RateLimit"'); }
+  finally { await db.end(); }
+});
 
 test("Drizzle serves protected routes, signup/login, ledger writes and tenant isolation", async ({
   page,
@@ -608,6 +614,7 @@ test("cron and verified Stripe events use Drizzle, isolate workspaces and tolera
     const before = await others();
     const subscription = {
       id: "sub_fixture_services",
+      created: 100,
       object: "subscription",
       customer: "cus_fixture_services",
       status: "active",
@@ -642,6 +649,7 @@ test("cron and verified Stripe events use Drizzle, isolate workspaces and tolera
         data: body,
       });
     };
+    await page.request.post("http://127.0.0.1:4576/fixture", { data: subscription });
     expect((await deliver(event, false)).status()).toBe(400);
     expect((await deliver(event)).status()).toBe(200);
     expect((await deliver(event)).status()).toBe(200);
@@ -677,6 +685,10 @@ test("cron and verified Stripe events use Drizzle, isolate workspaces and tolera
         )
       ).rows[0].status,
     ).toBe("ACTIVE");
+    await page.request.post("http://127.0.0.1:4576/fixture", { data: { ...subscription, status: "canceled" } });
+    // Even the original active event must preserve Stripe's current cancellation.
+    expect((await deliver(event)).status()).toBe(200);
+    expect((await db.query('SELECT status FROM "Subscription" WHERE "businessId"=$1', [owner.businessId])).rows[0].status).toBe("CANCELED");
     expect(
       (
         await deliver({
@@ -890,7 +902,7 @@ test("Money flow bars stay proportional before the first load and distinguish Ot
     await page.setViewportSize({ width: 1440, height: 1100 });
     await page.goto("/dashboard?month=2026-09&period=month");
     await page.getByRole("button", { name: "Detailed", exact: true }).click();
-    const flow = page.getByRole("region", { name: "Where the money went", exact: true }).locator("section");
+    const flow = page.locator("section").filter({ has: page.getByRole("heading", { name: "Where is my money?", exact: true }) });
     await expect(flow).toBeVisible();
     await expect(flow.getByText("Other", { exact: true })).toHaveCount(1);
     await expect(flow.getByText("Everything else", { exact: true })).toHaveCount(1);
@@ -907,4 +919,59 @@ test("Money flow bars stay proportional before the first load and distinguish Ot
   } finally {
     await client.end();
   }
+});
+
+test("password recovery revokes Auth.js and mobile sessions, and login limits cover direct callbacks", async ({ page, browser }) => {
+  const email = "password-recovery@example.test";
+  const oldPassword = "Recovery-old-password-2026";
+  expect((await page.request.post("/api/auth/setup", { data: { email, password: oldPassword, name: "Recovery Test" } })).status()).toBe(201);
+  const mobile = await (await page.request.post("/api/mobile/login", { data: { email, password: oldPassword } })).json();
+  expect(mobile.token).toBeTruthy();
+  const context = await browser.newContext();
+  const resetPage = await context.newPage();
+  const db = new Client({ connectionString: process.env.NEON_DATABASE_URL });
+  await db.connect();
+  try {
+    await resetPage.goto("/login");
+    await resetPage.getByRole("link", { name: "Forgot your password?" }).click();
+    await expect(resetPage.getByRole("heading", { name: "Recover your access" })).toBeVisible();
+    await resetPage.getByLabel("Email").fill("unknown-recovery@example.test");
+    await resetPage.getByRole("button", { name: "Send reset link" }).click();
+    await expect(resetPage.getByRole("status")).toContainText("If this account has a password");
+    const token = "T".repeat(43);
+    const { createHash } = await import("node:crypto");
+    await db.query(`INSERT INTO onroad_auth."PasswordReset" ("tokenHash", "userId", "authVersion", "expiresAt") SELECT $1,id,"authVersion",NOW()+interval '30 minutes' FROM "User" WHERE email=$2`, [createHash("sha256").update(token).digest("hex"), email]);
+    await resetPage.goto(`/reset-password#token=${token}`);
+    await resetPage.getByLabel("New password", { exact: true }).fill("Recovery-new-password-2026");
+    await resetPage.getByLabel("Confirm password").fill("Recovery-new-password-2026");
+    await resetPage.getByRole("button", { name: "Save password" }).click();
+    await expect(resetPage.getByRole("status")).toContainText("Password updated");
+    expect(resetPage.url()).not.toContain(token);
+    expect(await (await page.request.get("/api/auth/session")).json()).toBeNull();
+    expect((await page.request.get("/api/mobile/dashboard", { headers: { authorization: `Bearer ${mobile.token}` } })).status()).toBe(401);
+    expect((await context.request.post("/api/auth/reset-password", { data: { token, password: "Another-password-2026" } })).status()).toBe(400);
+    expect((await context.request.post("/api/auth/login", { data: { email, password: oldPassword } })).status()).toBe(401);
+    expect((await context.request.post("/api/auth/login", { data: { email, password: "Recovery-new-password-2026" } })).status()).toBe(200);
+    await context.clearCookies();
+    const baselineCsrf = await (await context.request.get("/api/auth/csrf")).json();
+    await context.request.post("/api/auth/callback/credentials", { form: { csrfToken: baselineCsrf.csrfToken, email, password: "Recovery-new-password-2026" } });
+    expect((await (await context.request.get("/api/auth/session")).json()).user.email).toBe(email);
+    // Shared account budget: direct Auth.js callbacks cannot bypass JSON/mobile limits.
+    for (let attempt = 0; attempt < 5; attempt++) await context.request.post("/api/mobile/login", { data: { email, password: "incorrect-password" } });
+    const denied = await context.request.post("/api/auth/login", { data: { email, password: "Recovery-new-password-2026" } });
+    expect(denied.status()).toBe(429);
+    expect(Number(denied.headers()["retry-after"])).toBeGreaterThan(0);
+    await context.clearCookies();
+    const { csrfToken } = await (await context.request.get("/api/auth/csrf")).json();
+    await context.request.post("/api/auth/callback/credentials", { form: { csrfToken, email, password: "Recovery-new-password-2026" } });
+    expect(await (await context.request.get("/api/auth/session")).json()).toBeNull();
+  } finally { await db.end(); await context.close(); }
+});
+
+test("signup and recovery requests reject abuse and cross-origin changes", async ({ request }) => {
+  for (let index = 0; index < 10; index++) expect((await request.post("/api/auth/setup", { data: {} })).status()).toBe(400);
+  expect((await request.post("/api/auth/setup", { data: { email: "blocked-signup@example.test", password: "Blocked-password-2026" } })).status()).toBe(429);
+  for (let index = 0; index < 5; index++) expect((await request.post("/api/auth/forgot-password", { data: { email: "absent-rate-test@example.test" } })).status()).toBe(200);
+  expect((await request.post("/api/auth/forgot-password", { data: { email: "ABSENT-RATE-TEST@example.test" } })).status()).toBe(429);
+  for (const route of ["forgot-password", "reset-password"]) expect((await request.post(`/api/auth/${route}`, { headers: { Origin: "https://untrusted.example" }, data: {} })).status()).toBe(403);
 });

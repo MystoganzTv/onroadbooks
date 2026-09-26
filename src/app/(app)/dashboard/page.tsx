@@ -20,8 +20,6 @@ import { LanePanel } from "@/components/cockpit/lane-panel";
 import { MoneyFlow } from "@/components/cockpit/money-flow";
 import { ReservesPanel } from "@/components/cockpit/reserves-panel";
 import { Section } from "@/components/cockpit/section";
-import { TodayCard } from "@/components/cockpit/today-card";
-import { TodayCashCard } from "@/components/cockpit/today-cash-card";
 import { PlanningCard } from "@/components/cockpit/planning-card";
 import { TruckHealthPanel } from "@/components/cockpit/truck-health-panel";
 import { MiniStat } from "@/components/dashboard/mini-stat";
@@ -63,7 +61,6 @@ import {
   buildCockpitInsights,
   calculateBrokerPerformance,
   buildFinancialSummary,
-  calculateDaySnapshot,
   calculateDeadheadCost,
   calculateGoalProgress,
   calculateLanePerformance,
@@ -71,7 +68,6 @@ import {
   calculateProjection,
   calculateReserveBalances,
   calculateTrueCostPerMile,
-  calculateCashActivity,
   calculateFinancialPlanning,
   trailingCostBasis,
   LANE_MIN_LOADS,
@@ -114,9 +110,9 @@ export async function generateMetadata(): Promise<Metadata> {
  * Read top to bottom, this page answers, in order:
  *
  *   Am I making money?              the hero band
- *   How did today go?               the Today strip
+ *   Where is my money?              the money flow
  *   What does a mile cost, and am I on track?   business health
- *   Where did the money go?         the money flow
+ *   How did revenue and costs change?         the daily chart
  *   Which loads were worth it?      load performance
  *   Who and where pays?             operations intelligence
  *   Am I saving enough?             reserves and truck health
@@ -203,11 +199,6 @@ export default async function DashboardPage({
   const deadhead = calculateDeadheadCost(summary, costBasis, settings, goals.maxDeadheadPct);
   const goalProgress = calculateGoalProgress(summary, goals, period);
   const projection = calculateProjection(summary, period, goals, today);
-  const day = calculateDaySnapshot(loads, expenses, today, goals);
-  const cashToday = calculateCashActivity(loads, expenses, paymentEvents, {
-    start: today,
-    end: today,
-  });
   const planning = calculateFinancialPlanning(
     goals,
     trailingCostBasis(loads, expenses, settings, today),
@@ -384,11 +375,16 @@ export default async function DashboardPage({
           ) : null}
         </Section>
 
-        {/* ---- Today ------------------------------------------------------ */}
-        <div className="grid gap-3 xl:grid-cols-2">
-          <TodayCard day={day} />
-          <TodayCashCard cash={cashToday} />
-        </div>
+        {/* ---- Money flow -------------------------------------------------- */}
+        <MoneyFlow
+          ownerPay={ownerPay}
+          categories={categories}
+          periodLabel={periodDisplayLabel}
+          showOwnerPlanning={ownerPlanning}
+          locale={locale}
+          copy={copy}
+          className="min-w-0"
+        />
 
         {/* ---- Business health -------------------------------------------- */}
         <Section
@@ -444,18 +440,8 @@ export default async function DashboardPage({
           </div>
         </Section>
 
-        {/* ---- Money flow -------------------------------------------------- */}
+        {/* ---- Revenue and expenses ---------------------------------------- */}
         <Section title={copy.moneyWent} description={periodDisplayLabel}>
-          <div className="grid gap-3 xl:grid-cols-3">
-            <MoneyFlow
-              ownerPay={ownerPay}
-              categories={categories}
-              periodLabel={periodDisplayLabel}
-              showOwnerPlanning={ownerPlanning}
-              locale={locale}
-              copy={copy}
-              className="min-w-0 xl:col-span-2"
-            />
             <Card className="min-w-0">
               <CardHeader>
                 <div className="flex items-center gap-2">
@@ -470,7 +456,6 @@ export default async function DashboardPage({
                 <RevenueExpenseChart data={buckets} />
               </CardContent>
             </Card>
-          </div>
         </Section>
 
         {/* ---- Load performance ------------------------------------------- */}

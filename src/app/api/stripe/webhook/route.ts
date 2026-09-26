@@ -58,7 +58,7 @@ export async function POST(request: Request) {
             ? session.subscription
             : session.subscription?.id;
         if (subscriptionId) {
-          await syncStripeSubscription(await getStripe().subscriptions.retrieve(subscriptionId));
+          await syncStripeSubscription(await getStripe().subscriptions.retrieve(subscriptionId, {}, { timeout: 10_000, maxNetworkRetries: 0 }));
         }
         break;
       }

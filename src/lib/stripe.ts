@@ -18,6 +18,13 @@ export function getStripe(): Stripe {
     stripeClient = new Stripe(required("STRIPE_SECRET_KEY"), {
       apiVersion: "2026-02-25.clover",
       typescript: true,
+      // Disposable browser tests exercise real signed webhooks against a local
+      // Stripe fixture. A real key or production build never uses this transport.
+      ...(process.env.NODE_ENV !== "production" &&
+        process.env.ONROAD_DISPOSABLE_DATABASE === "1" &&
+        process.env.STRIPE_SECRET_KEY === "sk_test_disposable_onroadbooks"
+        ? { host: "127.0.0.1", port: 4576, protocol: "http" as const, maxNetworkRetries: 0 }
+        : {}),
     });
   }
   return stripeClient;

@@ -1,9 +1,13 @@
 import "server-only";
 
+import { drizzle } from "drizzle-orm/node-postgres";
+import * as schema from "@/db/schema";
+import { DrizzleRepository } from "@/lib/db/drizzle-store";
 import type Stripe from "stripe";
 
 import { getRepository } from "@/lib/db";
-import { planForStripePrice } from "@/lib/stripe";
+import { withSecurityLock } from "@/lib/auth/security-store";
+import { getStripe, planForStripePrice } from "@/lib/stripe";
 import type { PlanId, SubscriptionStatus } from "@/lib/types";
 
 const PLAN_IDS = new Set<PlanId>(["SOLO", "OWNER", "FLEET"]);
@@ -54,29 +58,46 @@ function subscriptionPlan(subscription: Stripe.Subscription): PlanId | null {
  * The business id is accepted only from Stripe-signed subscription metadata.
  */
 export async function syncStripeSubscription(
-  stripeSubscription: Stripe.Subscription,
+  eventSubscription: Stripe.Subscription,
+  retrieve: (id: string) => Promise<Stripe.Subscription> = id => getStripe().subscriptions.retrieve(id, {}, { timeout: 10_000, maxNetworkRetries: 0 }),
 ): Promise<void> {
-  const businessId = stripeSubscription.metadata.onRoadBusinessId?.trim();
+  const businessId = eventSubscription.metadata.onRoadBusinessId?.trim();
   if (!businessId) throw new Error("Stripe subscription is missing its OnRoad business id.");
 
-  const plan = subscriptionPlan(stripeSubscription);
-  if (!plan) throw new Error("Stripe subscription does not use an OnRoad Books price.");
+  await withSecurityLock(`stripe:${businessId}`, async (client) => {
+    const repository = client
+      ? new DrizzleRepository(businessId, async () => drizzle(client, { schema }))
+      : getRepository(businessId);
+    const current = (await repository.getDataset()).subscription;
+    // Event payloads are historical snapshots. Re-read Stripe while holding the
+    // workspace lock, including for deletions and repeated events.
+    const stripeSubscription = await retrieve(eventSubscription.id);
+    if (stripeSubscription.metadata.onRoadBusinessId?.trim() !== businessId) throw new Error("Stripe workspace metadata changed");
+    const plan = subscriptionPlan(stripeSubscription);
+    if (!plan) throw new Error("Stripe subscription does not use an OnRoad Books price.");
 
-  const repository = getRepository(businessId);
-  const current = (await repository.getDataset()).subscription;
-  const providerCustomerId = customerId(stripeSubscription.customer);
-  if (
-    current.providerCustomerId &&
-    current.providerCustomerId !== providerCustomerId
-  ) {
-    throw new Error("Stripe customer does not match this OnRoad Books workspace.");
-  }
+    const providerCustomerId = customerId(stripeSubscription.customer);
+    if (
+      current.providerCustomerId &&
+      current.providerCustomerId !== providerCustomerId
+    ) {
+      throw new Error("Stripe customer does not match this OnRoad Books workspace.");
+    }
 
-  await repository.updateSubscription({
-    plan,
-    status: onRoadStatus(stripeSubscription.status),
-    currentPeriodEnd: periodEnd(stripeSubscription),
-    providerCustomerId,
-    providerSubscriptionId: stripeSubscription.id,
+    if (current.providerSubscriptionId && current.providerSubscriptionId !== stripeSubscription.id) {
+      const previous = await retrieve(current.providerSubscriptionId);
+      const terminal = previous.status === "canceled" || previous.status === "incomplete_expired";
+      const incomingTerminal = stripeSubscription.status === "canceled" || stripeSubscription.status === "incomplete_expired";
+      if (!terminal || stripeSubscription.created < previous.created ||
+        (stripeSubscription.created === previous.created && incomingTerminal)) return;
+    }
+
+    await repository.updateSubscription({
+      plan,
+      status: onRoadStatus(stripeSubscription.status),
+      currentPeriodEnd: periodEnd(stripeSubscription),
+      providerCustomerId,
+      providerSubscriptionId: stripeSubscription.id,
+    });
   });
 }

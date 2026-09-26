@@ -28,6 +28,7 @@ const CODE_TTL_SECONDS = 120;
 const DOMAIN = "onroad.mobile-handoff.v1";
 
 export interface HandoffClaims {
+  authVersion?: number;
   userId: string;
   businessId: string;
   email: string;

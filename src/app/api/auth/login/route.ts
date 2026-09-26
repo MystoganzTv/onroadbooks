@@ -1,3 +1,4 @@
+import { authLimitResponse, wrappedRateLimitResponse } from "@/lib/auth/rate-limit";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
@@ -40,7 +41,9 @@ export async function POST(request: Request) {
       });
       (await cookies()).set(SESSION_COOKIE, "", { path: "/", maxAge: 0 });
       return NextResponse.json({ ok: true });
-    } catch {
+    } catch (error) {
+      const limited = wrappedRateLimitResponse(error);
+      if (limited) return limited;
       return NextResponse.json(
         { error: "Email or password is incorrect." },
         { status: 401 },
@@ -48,6 +51,8 @@ export async function POST(request: Request) {
     }
   }
 
+  const limited = await authLimitResponse(request, "login", parsed.data.email);
+  if (limited) return limited;
   const user = await getAuthStore().findUserByEmail(parsed.data.email);
 
   // One message for both "no such account" and "wrong password", so the
@@ -66,6 +71,7 @@ export async function POST(request: Request) {
     userId: user.id,
     businessId: user.businessId,
     email: user.email,
+    authVersion: user.authVersion ?? 0,
     exp: sessionExpiry(),
   });
 

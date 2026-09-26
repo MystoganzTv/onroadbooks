@@ -18,6 +18,7 @@ export default defineConfig({
   timeout: 90_000,
   use: { baseURL, trace: "retain-on-failure", screenshot: "only-on-failure" },
   webServer: [
+    { command: "node --import tsx scripts/stripe-test-server.ts", url: "http://127.0.0.1:4576/ready", reuseExistingServer: false },
     ...(process.env.ONROAD_DISPOSABLE_STORAGE === "1"
       ? [
           {

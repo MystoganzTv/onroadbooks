@@ -38,7 +38,7 @@ export async function getMobileSession(request: Request): Promise<SessionPayload
 
   try {
     const owner = await getAuthStore().findUserById(session.userId);
-    if (!owner || owner.businessId !== session.businessId || owner.email !== session.email) {
+    if (!owner || owner.businessId !== session.businessId || owner.email !== session.email || (owner.authVersion ?? 0) !== (session.authVersion ?? 0)) {
       return null;
     }
     return {
@@ -47,6 +47,7 @@ export async function getMobileSession(request: Request): Promise<SessionPayload
       email: session.email,
       exp: session.exp,
       role: owner.role,
+      authVersion: owner.authVersion ?? 0,
     };
   } catch {
     return null;

@@ -175,6 +175,7 @@ export function AuthCard({
               required
             />
           </Field>
+          {!isSetup && <Link href="/forgot-password" className="block text-sm text-primary hover:underline">{copy.forgotPassword}</Link>}
 
           {error ? (
             <p

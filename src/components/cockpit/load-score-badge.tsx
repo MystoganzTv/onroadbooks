@@ -87,12 +87,12 @@ export function LoadScoreBreakdown({
       {showBasis === "trip" ? (
         <p className="mt-3 border-t border-current/20 pt-3 text-2xs opacity-70">
           Scored on this trip&apos;s own costs — what the load contributed. The Load Calculator
-          uses the same basis. Allocated operating costs and debt service are shown separately.
+          uses the same basis. Debt service is shown separately.
         </p>
       ) : showBasis === "loaded" ? (
         <p className="mt-3 border-t border-current/20 pt-3 text-2xs opacity-70">
-          Classified from Contribution Profit per total mile after direct trip costs. Allocated
-          operating costs and debt service are excluded from GREAT / GOOD / MARGINAL / BAD.
+          Classified from Contribution Profit per total mile after direct trip costs.
+          Debt service does not change GREAT / GOOD / MARGINAL / BAD.
         </p>
       ) : null}
     </div>

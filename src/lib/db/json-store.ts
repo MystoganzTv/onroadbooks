@@ -2396,3 +2396,16 @@ export class JsonRepository implements Repository {
     }, this.businessId);
   }
 }
+
+/** JSON development equivalent of the atomic SQL password/version update. */
+export async function resetJsonPassword(userId: string, authVersion: number, passwordHash: string): Promise<boolean> {
+  return serialise(async () => {
+    const data = await readDataset();
+    const user = data.users.find((row) => row.id === userId);
+    if (!user || (user.authVersion ?? 0) !== authVersion) return false;
+    user.passwordHash = passwordHash;
+    user.authVersion = authVersion + 1;
+    await persist(data);
+    return true;
+  });
+}

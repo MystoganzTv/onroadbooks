@@ -110,6 +110,7 @@ function domainUser(row: {
   email: string;
   name: string | null;
   passwordHash: string;
+  authVersion?: number;
   role: MemberRole;
   invitedAt: Date | null;
   joinedAt: Date | null;
@@ -122,6 +123,7 @@ function domainUser(row: {
     email: row.email,
     name: row.name,
     passwordHash: row.passwordHash,
+    authVersion: row.authVersion ?? 0,
     role: row.role,
     invitedAt: row.invitedAt?.toISOString() ?? null,
     joinedAt: row.joinedAt?.toISOString() ?? null,

@@ -237,3 +237,46 @@ a separate backup; the database stores their metadata, not their contents.
    Rerun the failed operation after remediation.
 5. Record detection time, customer impact, resolution, and the prevention
    added before closing the incident.
+
+### Password recovery and authentication throttling
+
+The public `/forgot-password` flow uses the existing `RESEND_API_KEY`,
+`AUTH_EMAIL_FROM` (default `OnRoad Books <no-reply@onroadbooks.com>`) and trusted
+`AUTH_URL`/`NEXT_PUBLIC_APP_URL`. Recovery links expire after 30 minutes, are single
+use, and replace earlier links. Tokens are stored only as SHA-256 hashes in
+`onroad_auth.PasswordReset`; the URL fragment avoids access-log/referrer leakage.
+Only existing, joined password accounts receive a link. Request responses are
+identical for unknown accounts, Google accounts and mail failures; mail failures
+emit `Password recovery delivery unavailable` for operations to investigate.
+
+Successful recovery increments `User.authVersion`, revoking previous browser,
+mobile and handoff credentials. Existing sessions use version zero for backwards
+compatibility. Do not roll back the additive `0015_auth-security` migration while
+this code is deployed. Rolling application code back before this change also
+removes reset-driven session revocation and the new attempt protection.
+
+Limits are persistent in `onroad_auth.RateLimit`, using HMAC identifiers and
+atomic increments. Vercel requests use `x-vercel-forwarded-for`; deployments behind
+another proxy must ensure the forwarded client address is overwritten by that
+trusted proxy. Never use the JSON development store in Vercel Production.
+
+| Operation | Per account | Per IP | Window |
+| --- | --- | --- | --- |
+| Password login (web, mobile and Auth.js callback combined) | 10 | 60 | 15 minutes |
+| Signup | — | 10 | 1 hour |
+| Recovery request | 5 | 20 | 1 hour |
+| Recovery confirmation | — | 20 | 15 minutes |
+| Invitation acceptance | — | 20 | 15 minutes |
+
+The budget counts attempts, including successful ones. JSON endpoints return 429
+with Retry-After; direct Auth.js callbacks refuse authentication through its error
+flow. Expired limiter entries are pruned in bounded batches. Do not clear live
+limits to make an automated probe pass. Security tests use disposable PostgreSQL
+and local provider fixtures (`npm run test:database`, `npm run test:browser:storage`).
+
+Stripe subscription events reconcile from Stripe under a transaction-scoped
+advisory lock for the business. The provider read and ledger subscription update
+occur inside that lock, and the database read/write use its connection. Contention
+or provider failure yields a retryable webhook error. The Stripe test transport
+is restricted to a nonproduction build, the disposable-database flag and an exact
+fake key; production always uses the Stripe API.

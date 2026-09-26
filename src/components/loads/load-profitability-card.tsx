@@ -14,12 +14,8 @@ import { cn } from "@/lib/utils";
  */
 export function LoadProfitabilityCard({
   profitability: business,
-  allocatedRate,
-  basisLabel,
 }: {
   profitability: LoadProfitability;
-  allocatedRate: number;
-  basisLabel: string;
 }) {
   const { dictionary } = useLanguage();
   const copy = dictionary.loads.perspectives;
@@ -59,23 +55,12 @@ export function LoadProfitabilityCard({
           strong
         />
         {business.allocationAvailable ? (
-          <>
-            <Step
-              label={copy.allocatedOperatingCosts}
-              hint={interpolate(copy.allocatedHint, {
-                miles: formatMiles(business.totalMiles),
-                rate: formatRateValue(allocatedRate),
-                basis: basisLabel,
-              })}
-              value={-business.allocatedOperatingCosts}
-            />
-            <Step
-              label={copy.estimatedNetBusinessProfit}
-              value={business.estimatedNetBusinessProfit}
-              aside={perMile(business.netProfitPerMile)}
-              strong
-            />
-          </>
+          <Step
+            label={copy.estimatedNetBusinessProfit}
+            value={business.estimatedNetBusinessProfit}
+            aside={perMile(business.netProfitPerMile)}
+            strong
+          />
         ) : (
           <Pending label={copy.estimatedNetBusinessProfit} note={copy.allocationUnavailable} />
         )}

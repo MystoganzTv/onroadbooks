@@ -2,5 +2,6 @@ import "next-auth";
 declare module "next-auth" {
   interface User {
     isNew?: boolean;
+    authVersion?: number;
   }
 }

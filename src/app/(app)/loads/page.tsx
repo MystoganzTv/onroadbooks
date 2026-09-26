@@ -193,14 +193,6 @@ export default async function LoadsPage({
             wrapText
           />
           <MiniStat
-            label={copy.allocatedOperatingCosts}
-            value={formatMoneyCompact(allocatedOperatingCosts)}
-            tone="negative"
-            sub={interpolate(copy.estimate, { basis: costBasis.basisLabel })}
-            help={copy.allocatedOperatingCostsHelp}
-            wrapText
-          />
-          <MiniStat
             label={copy.fullyLoadedProfit}
             value={formatMoneyCompact(fullyLoadedOperatingProfit)}
             tone={fullyLoadedOperatingProfit >= 0 ? "positive" : "negative"}

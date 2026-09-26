@@ -1,3 +1,4 @@
+import { authLimitResponse } from "@/lib/auth/rate-limit";
 import { NextResponse } from "next/server";
 
 import { getAuthStore } from "@/lib/db";
@@ -20,6 +21,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Enter your email and password." }, { status: 400 });
   }
 
+  const limited = await authLimitResponse(request, "login", parsed.data.email);
+  if (limited) return limited;
   const user = await getAuthStore().findUserByEmail(parsed.data.email);
   const valid = user ? await verifyPassword(parsed.data.password, user.passwordHash) : false;
   if (!user || !valid) {
@@ -31,6 +34,7 @@ export async function POST(request: Request) {
     userId: user.id,
     businessId: user.businessId,
     email: user.email,
+    authVersion: user.authVersion ?? 0,
     exp,
   });
 
@@ -38,6 +42,7 @@ export async function POST(request: Request) {
     token,
     expiresAt: new Date(exp * 1000).toISOString(),
     email: user.email,
+    authVersion: user.authVersion ?? 0,
     // For the greeting on the app's dashboard. Null when the account has no
     // name on it -- the app then greets without one rather than inventing
     // something out of the email address.

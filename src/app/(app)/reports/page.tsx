@@ -1,11 +1,7 @@
 import { buildLoadEstimator } from "@/lib/load-estimates";
 import type { Metadata } from "next";
-import Link from "next/link";
-import { History } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { ViewModeToggle } from "@/components/shared/view-mode";
 import { getViewMode } from "@/lib/view-mode-server";
-import { roleCan } from "@/lib/roles";
 
 import { RevenueExpenseChart } from "@/components/charts/revenue-expense-chart";
 import { TrendLineChart } from "@/components/charts/trend-line-chart";
@@ -153,10 +149,7 @@ export default async function ReportsPage({
             current: periodLong,
             previous: priorLong,
           })}
-          actions={<>
-            {roleCan(session.role ?? "VIEWER", "manage_owner_finances") ? <Button asChild size="sm" variant="outline"><Link href="/reports/settlements"><History />{copy.savedStatements}</Link></Button> : null}
-            <ExportMenu query={query} year={Number(period.month.slice(0, 4))} />
-          </>}
+          actions={<ExportMenu query={query} year={Number(period.month.slice(0, 4))} />}
         />
       </div>
 
@@ -347,7 +340,6 @@ export default async function ReportsPage({
                   amount: item.fixedAmount,
                   label: categoryLabel(item.category, locale),
                 }))}
-                total={summary.fixedExpenses}
                 locale={locale}
                 emptyText={copy.nothingRecorded}
               />
@@ -358,7 +350,6 @@ export default async function ReportsPage({
                   amount: item.variableAmount,
                   label: categoryLabel(item.category, locale),
                 }))}
-                total={summary.variableExpenses}
                 locale={locale}
                 emptyText={copy.nothingRecorded}
               />
@@ -398,7 +389,7 @@ function SplitBar({
   const fixedPct = total > 0 ? (fixed / total) * 100 : 0;
   const variablePct = total > 0 ? (variable / total) * 100 : 0;
   const money = (value: number) =>
-    new Intl.NumberFormat(localeTag(locale), { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
+    new Intl.NumberFormat(localeTag(locale), { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(value);
 
   return (
     <div>
@@ -423,13 +414,11 @@ function SplitBar({
 function BehaviorList({
   title,
   items,
-  total,
   locale,
   emptyText,
 }: {
   title: string;
   items: { category: string; label: string; amount: number }[];
-  total: number;
   locale: AppLocale;
   emptyText: string;
 }) {
@@ -438,10 +427,7 @@ function BehaviorList({
 
   return (
     <div className="rounded-md border border-border bg-surface-sunken p-3">
-      <div className="flex items-baseline justify-between">
-        <p className="label-xs">{title}</p>
-        <p className="tnum text-sm font-semibold">{money(total)}</p>
-      </div>
+      <p className="label-xs">{title}</p>
       {items.length === 0 ? (
         <p className="mt-2 text-2xs text-muted-foreground">{emptyText}</p>
       ) : (

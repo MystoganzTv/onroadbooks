@@ -65,7 +65,7 @@ export async function verifyDrizzleDeployment(client: Client) {
     );
     return {
       businessTables: 20,
-      authTables: 2,
+      authTables: 4,
       migrations: journal.entries.length,
     };
   } finally {

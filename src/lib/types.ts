@@ -68,6 +68,8 @@ export interface User {
   name: string | null;
   /** scrypt$<salt>$<hash>. Never leaves the server. */
   passwordHash: string;
+  /** Incremented on password reset to revoke existing sessions. */
+  authVersion?: number;
   role: MemberRole;
   invitedAt: string | null;
   joinedAt: string | null;

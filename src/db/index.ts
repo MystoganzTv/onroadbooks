@@ -42,6 +42,10 @@ function getNeonState() {
   return globalForNeon.onroadNeonState;
 }
 
+export function getNeonPool() {
+  return getNeonState().pool;
+}
+
 export function getNeonDatabase() {
   return getNeonState().database;
 }
