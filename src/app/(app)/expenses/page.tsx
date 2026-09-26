@@ -155,6 +155,9 @@ export default async function ExpensesPage({
           <ExpensesTable
             expenses={periodExpenses}
             mirrorSources={expenseMirrorSources({ expenses, fuelEntries, maintenanceRecords })}
+            fuelEntryIds={Object.fromEntries(
+              fuelEntries.flatMap((entry) => entry.expenseId ? [[entry.expenseId, entry.id]] : []),
+            )}
             documents={documents}
             loads={periodLoads}
             categoryBehavior={settings.categoryBehavior}

@@ -46,6 +46,7 @@ import {
   TableWrapper,
 } from "@/components/ui/table";
 import { deleteExpenseAction } from "@/lib/actions/expenses";
+import { deleteFuelEntryAction } from "@/lib/actions/fuel";
 import type { Document } from "@/lib/types";
 import { expenseBehaviorOf, categoryColor, categoryLabel, EXPENSE_CATEGORIES } from "@/lib/categories";
 import { formatMoney } from "@/lib/formatters";
@@ -88,6 +89,8 @@ interface ExpensesTableProps {
    * without this the table offered Edit and Delete on read-only rows.
    */
   mirrorSources?: Record<string, ExpenseMirrorSource>;
+  /** Resolve the purchase by its actual relation, including database-generated expense IDs. */
+  fuelEntryIds?: Record<string, string>;
   documents: Document[];
   loads: LoadWithMetrics[];
   categoryBehavior: Record<string, ExpenseBehavior>;
@@ -100,6 +103,7 @@ interface ExpensesTableProps {
 export function ExpensesTable({
   expenses,
   mirrorSources = {},
+  fuelEntryIds = {},
   documents,
   loads,
   categoryBehavior,
@@ -199,10 +203,13 @@ export function ExpensesTable({
 
   async function remove(expense: Expense) {
     setDeleting(expense.id);
-    const result = await deleteExpenseAction(expense.id);
+    const fuelEntryId = fuelEntryIds[expense.id];
+    const result = fuelEntryId
+      ? await deleteFuelEntryAction(fuelEntryId)
+      : await deleteExpenseAction(expense.id);
     setDeleting(null);
     if (result.ok) {
-      toast.success(expense.splitGroupId ? copy.paymentDeleted : copy.expenseDeleted, {
+      toast.success(fuelEntryId ? dictionary.fuel.fuelEntryDeleted : expense.splitGroupId ? copy.paymentDeleted : copy.expenseDeleted, {
         description: expense.description,
       });
       router.refresh();
@@ -387,8 +394,9 @@ export function ExpensesTable({
                 const isFixed = expenseBehaviorOf(expense, categoryBehavior) === "FIXED";
                 // Rows the app writes for you must be changed at their source.
                 // Load costs have a focused editor here that updates that
-                // source; the other mirrors point to their owning workflow.
+                // source; fuel deletion also removes the original purchase.
                 const mirrorSource = mirrorSources[expense.id];
+                const fuelEntryId = fuelEntryIds[expense.id];
                 const mirroredFuel = mirrorSource === "FUEL" || expense.id.startsWith("expfuel_");
                 const mirroredService = mirrorSource === "SERVICE" || expense.id.startsWith("expmaint_");
                 const mirroredLoad = mirrorSource === "LOAD" || expense.id.startsWith("expload_");
@@ -553,12 +561,13 @@ export function ExpensesTable({
                             </Link>
                           </Button>
                         ) : null}
-                        {mirrored ? null : (
+                        {mirrored && !fuelEntryId ? null : (
                         <ConfirmDelete
-                          entity={isPaymentGroup ? copy.payment : "expense"}
+                          entity={fuelEntryId ? dictionary.fuel.fillUp : isPaymentGroup ? copy.payment : "expense"}
                           label={`${expense.description} - ${formatMoney(displayAmount)}`}
                           consequences={
                             [
+                              ...(fuelEntryId ? [dictionary.fuel.matchingLedgerRow] : []),
                               ...(isPaymentGroup ? [copy.entirePaymentSplit] : []),
                               ...(documents.some((document) => paymentRows.length > 0
                                 ? paymentRows.some((row) => row.id === document.expenseId)
@@ -572,7 +581,7 @@ export function ExpensesTable({
                             <Button
                               variant="ghost"
                               size="icon-sm"
-                              aria-label={isPaymentGroup ? copy.deleteLoanPayment : copy.deleteExpense}
+                              aria-label={fuelEntryId ? dictionary.fuel.deleteEntry : isPaymentGroup ? copy.deleteLoanPayment : copy.deleteExpense}
                               disabled={deleting === expense.id}
                               className="text-muted-foreground hover:text-neg"
                             >

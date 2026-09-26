@@ -129,5 +129,38 @@ test("truck purchases stay separate from estimated trip fuel", async ({ page }) 
   await expect(page.getByLabel("Reference MPG", { exact: true })).toHaveValue("");
   await page.getByLabel("Reference MPG", { exact: true }).fill("8");
   await expect(page.getByLabel("Reference MPG", { exact: true })).toHaveValue("8");
+
+  // Database IDs have no expfuel_ prefix: deletion must follow the relation.
+  const beforeDelete = JSON.parse(await fs.readFile(dataFile, "utf8")) as Dataset;
+  const linkedPurchase = beforeDelete.fuelEntries.find((entry) => entry.id === purchase.id)!;
+  const linkedExpense = beforeDelete.expenses.find((entry) => entry.id === linkedPurchase.expenseId)!;
+  linkedExpense.id = "database-generated-fuel-expense";
+  linkedPurchase.expenseId = linkedExpense.id;
+  await fs.writeFile(dataFile, JSON.stringify(beforeDelete));
+
+  await page.goto("/expenses?month=2026-09&period=month");
+  await page.getByRole("button", { name: "Detailed", exact: true }).click();
+  const fuelExpenseRow = page.getByRole("row").filter({ hasText: "Fuel Test Station" });
+  await fuelExpenseRow.getByRole("button", { name: "Delete fuel entry", exact: true }).click();
+  const deleteDialog = page.getByRole("dialog");
+  await expect(deleteDialog).toContainText("Its matching Fuel row in the expense ledger");
+  await deleteDialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(fuelExpenseRow).toBeVisible();
+  const afterCancel = JSON.parse(await fs.readFile(dataFile, "utf8")) as Dataset;
+  expect(afterCancel.fuelEntries.some((entry) => entry.id === purchase.id)).toBe(true);
+  expect(afterCancel.expenses.some((entry) => entry.id === linkedExpense.id)).toBe(true);
+
+  await page.getByRole("button", { name: "Simple", exact: true }).click();
+  await fuelExpenseRow.getByRole("button", { name: "Delete fuel entry", exact: true }).click();
+  await deleteDialog.getByRole("button", { name: "Delete purchase", exact: true }).click();
+  await expect(deleteDialog).toBeHidden();
+  await expect(fuelExpenseRow).toHaveCount(0);
+  const afterDelete = JSON.parse(await fs.readFile(dataFile, "utf8")) as Dataset;
+  expect(afterDelete.fuelEntries.some((entry) => entry.id === purchase.id)).toBe(false);
+  expect(afterDelete.expenses.some((entry) => entry.id === linkedExpense.id)).toBe(false);
+  expect(afterDelete.expenses.some((entry) => entry.description === "Trip bridge toll")).toBe(true);
+  expect(afterDelete.loads.find((entry) => entry.id === load.id)?.fuelCost).toBe(180);
+  await page.goto("/fuel?month=2026-09&period=month");
+  await expect(page.getByRole("row").filter({ hasText: "Fuel Test Station" })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
