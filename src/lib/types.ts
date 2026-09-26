@@ -502,7 +502,7 @@ export interface LoadMetrics {
   totalMiles: number;
   revenuePerLoadedMile: number;
   revenuePerTotalMile: number;
-  /** fuel + tolls + dispatch + factoring + other + paid driver settlement */
+  /** fuel + tolls + dispatch + factoring + other (driver pay never enters, ADR 0031) */
   tripExpenses: number;
   tripProfit: number;
   /** Trip profit divided by TOTAL miles -- deadhead included, always. */

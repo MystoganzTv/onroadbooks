@@ -124,6 +124,14 @@ export function WelcomeFlow({ business, truck, settings, goals, planName, locale
   }
 
   function saveTruck() {
+    const currentOdometer =
+      toRequiredNumber(truckValues.currentOdometer) ?? truck.currentOdometer;
+    // The starter unit is created with a starting odometer of 0. Leaving it
+    // there made "miles driven" on the Truck page equal the whole odometer
+    // (266,900 mi for a used truck). The first reading entered here is where
+    // this business starts counting, the same rule the add-truck dialog uses.
+    const startingOdometer =
+      truck.startingOdometer > 0 ? truck.startingOdometer : currentOdometer;
     startTransition(async () => {
       const result = await updateTruckAction({
         name: truckValues.name.trim() || truck.name,
@@ -146,9 +154,8 @@ export function WelcomeFlow({ business, truck, settings, goals, planName, locale
           truckValues.iftaReportingEnabled === "UNDECIDED"
             ? null
             : truckValues.iftaReportingEnabled === "INCLUDED",
-        startingOdometer: truck.startingOdometer,
-        currentOdometer:
-          toRequiredNumber(truckValues.currentOdometer) ?? truck.currentOdometer,
+        startingOdometer,
+        currentOdometer,
       });
 
       if (result.ok) setStep(2);

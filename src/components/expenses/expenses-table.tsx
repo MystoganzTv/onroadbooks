@@ -55,11 +55,30 @@ import type { Expense, ExpenseBehavior, FinancialObligation, LoadWithMetrics, Tr
 import type { ExpenseMirrorSource } from "@/lib/mirrored-expenses";
 import { isMonthlyRecurringExpense } from "@/lib/recurring-expenses";
 import { cn } from "@/lib/utils";
+import { ColumnResizeHandle, useColumnResize, type ResizableColumn } from "@/components/ui/column-resize";
 import { ExpenseFormDialog } from "./expense-form-dialog";
 import { LoadExpenseFormDialog } from "./load-expense-form-dialog";
 import { DebtClassificationDialog } from "./debt-review-panel";
 
 type SortKey = "date" | "category" | "description" | "vendor" | "amount";
+
+// Column layouts for the resizable table. Description has no width: it fills
+// whatever the card has left, so the table never scrolls sideways on a
+// laptop. Actions holds two icon buttons and stays fixed.
+const DETAILED_COLUMNS: ResizableColumn[] = [
+  { key: "date", width: 80, minWidth: 64 },
+  { key: "category", width: 176, minWidth: 96 },
+  { key: "description" },
+  { key: "vendor", width: 148, minWidth: 72 },
+  { key: "amount", width: 108, minWidth: 84 },
+  { key: "actions", width: 84, fixed: true },
+];
+const SIMPLE_COLUMNS: ResizableColumn[] = [
+  { key: "date", width: 80, minWidth: 64 },
+  { key: "description" },
+  { key: "amount", width: 108, minWidth: 84 },
+  { key: "actions", width: 84, fixed: true },
+];
 
 interface ExpensesTableProps {
   expenses: Expense[];
@@ -201,6 +220,14 @@ export function ExpensesTable({
     });
   }
 
+  const tableContainerRef = React.useRef<HTMLDivElement | null>(null);
+  const resize = useColumnResize({
+    containerRef: tableContainerRef,
+    storageKey: simple ? "onroadbooks:expenses:columns:simple:v1" : "onroadbooks:expenses:columns:detailed:v1",
+    columns: simple ? SIMPLE_COLUMNS : DETAILED_COLUMNS,
+  });
+  const layout = simple ? SIMPLE_COLUMNS : DETAILED_COLUMNS;
+
   const columns: { key: SortKey; label: string; numeric?: boolean }[] = [
     { key: "date", label: copy.date },
     ...(!simple ? [{ key: "category" as const, label: copy.category }] : []),
@@ -302,8 +329,25 @@ export function ExpensesTable({
           }
         />
       ) : (
-        <TableWrapper>
-          <Table>
+        <TableWrapper ref={tableContainerRef}>
+          <Table
+            // Phones keep the natural auto layout and scroll sideways; from
+            // sm up the columns are fixed and sized by the owner.
+            className="sm:min-w-[var(--table-min)] sm:table-fixed"
+            style={{ "--table-min": `${resize.tableMinWidth}px` } as React.CSSProperties}
+          >
+            <colgroup>
+              {layout.map((column) => {
+                const width = resize.widthOf(column.key);
+                return (
+                  <col
+                    key={column.key}
+                    className={width != null ? "sm:w-[var(--col-w)]" : undefined}
+                    style={width != null ? ({ "--col-w": `${width}px` } as React.CSSProperties) : undefined}
+                  />
+                );
+              })}
+            </colgroup>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 {columns.map((column) => {
@@ -312,21 +356,22 @@ export function ExpensesTable({
                   return (
                     <TableHead
                       key={column.key}
-                      className={cn(column.numeric && "text-right")}
+                      className={cn("relative", column.numeric && "text-right")}
                       aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
                     >
                       <button
                         type="button"
                         onClick={() => toggleSort(column.key)}
                         className={cn(
-                          "inline-flex items-center gap-1 rounded-sm hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          "inline-flex max-w-full items-center gap-1 rounded-sm hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                           active && "text-foreground",
                           column.numeric && "flex-row-reverse",
                         )}
                       >
-                        {column.label}
-                        <Icon className="size-3 opacity-60" />
+                        <span className="truncate">{column.label}</span>
+                        <Icon className="size-3 shrink-0 opacity-60" />
                       </button>
+                      <ColumnResizeHandle state={resize} columnKey={column.key} label={copy.resizeColumn} />
                     </TableHead>
                   );
                 })}
@@ -358,8 +403,8 @@ export function ExpensesTable({
                     <TableCell className="text-muted-foreground">
                       {formatLocaleDate(expense.date, locale, { month: "short", day: "numeric" })}
                     </TableCell>
-                    {!simple ? <TableCell>
-                      <span className="inline-flex items-center gap-1.5">
+                    {!simple ? <TableCell className="sm:truncate">
+                      <span className="inline-flex max-w-full items-center gap-1.5">
                         <span
                           className="size-2 shrink-0 rounded-[2px]"
                           style={{ background: categoryColor(expense.category) }}
@@ -371,7 +416,10 @@ export function ExpensesTable({
                         </Badge>
                       </span>
                     </TableCell> : null}
-                    <TableCell className={simple ? "min-w-24 max-w-64 whitespace-normal break-words" : "max-w-[20rem] truncate"}>
+                    <TableCell
+                      className={simple ? "min-w-24 max-w-64 whitespace-normal break-words sm:max-w-none" : "max-w-[20rem] truncate sm:max-w-none"}
+                      title={simple ? undefined : expense.description}
+                    >
                       {paymentGroupId ? (
                         <button
                           type="button"
@@ -423,10 +471,10 @@ export function ExpensesTable({
                         </span>
                       ) : null}
                     </TableCell>
-                    {!simple ? <TableCell className="max-w-[13rem] truncate text-muted-foreground">
+                    {!simple ? <TableCell className="max-w-[13rem] truncate text-muted-foreground sm:max-w-none" title={expense.vendor ?? undefined}>
                       {expense.vendor ?? "--"}
                     </TableCell> : null}
-                    <TableCell className="text-right tnum font-medium text-neg">
+                    <TableCell className="truncate text-right tnum font-medium text-neg">
                       -{formatMoney(displayAmount)}
                     </TableCell>
                     <TableCell className="text-right">
