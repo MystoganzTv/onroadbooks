@@ -1,4 +1,4 @@
-import { brokerContactsOf, brokerNameKey, clearedLegacyContact, planBrokerMerge } from "../brokers";
+import { brokerContactsOf, brokerNameKey, clearedLegacyContact, planBrokerMerge, planNameIntoBroker } from "../brokers";
 import { recurringSeriesExpenseIds } from "../recurring-expenses";
 import "server-only";
 import { assertFuelExpenseSource } from "../fuel-expenses";
@@ -1215,6 +1215,25 @@ export class JsonRepository implements Repository {
         if (!load.brokerContact?.trim() && plan.loadContact) load.brokerContact = plan.loadContact;
       }
       dataset.brokers = brokers.filter((row) => row.id !== source.id);
+      Object.assign(target, plan.target, clearedLegacyContact(target));
+      return { ...target };
+    }, this.businessId);
+  }
+
+  async moveBrokerName(name: string, targetId: string): Promise<Broker> {
+    const key = brokerNameKey(name);
+    return mutate((dataset) => {
+      const brokers = dataset.brokers ??= [];
+      const target = brokers.find((row) => row.id === targetId);
+      if (!target) throw new Error("That broker does not belong to this workspace.");
+      if (!key || key === target.nameKey) throw new Error("Choose a different broker to merge into.");
+      if (brokers.some((row) => row.nameKey === key)) throw new Error("A broker with that name already exists.");
+      const plan = planNameIntoBroker(name, target);
+      for (const load of dataset.loads) {
+        if (brokerNameKey(load.broker ?? "") !== key) continue;
+        load.broker = target.name;
+        if (!load.brokerContact?.trim()) load.brokerContact = plan.loadContact;
+      }
       Object.assign(target, plan.target, clearedLegacyContact(target));
       return { ...target };
     }, this.businessId);

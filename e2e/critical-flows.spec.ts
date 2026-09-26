@@ -1041,8 +1041,9 @@ test.describe.serial("critical browser flows", () => {
     await page.getByRole("button", { name: "Save changes", exact: true }).click();
     await expect(page.getByRole("dialog")).toBeHidden();
     await page.goto("/brokers");
-    const row = page.getByRole("row").filter({ hasText: "E2E Brokerage" });
-    await row.getByRole("button", { name: "Add contact details", exact: true }).click();
+    // A name that is only on a load is listed apart from the broker profiles.
+    const unfiled = page.getByRole("listitem").filter({ hasText: "E2E Brokerage" });
+    await unfiled.getByRole("button", { name: "Create broker profile", exact: true }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByLabel("Company name", { exact: false })).toHaveValue("E2E Brokerage");
     await dialog.getByLabel("MC number", { exact: true }).fill("123456");
@@ -1066,7 +1067,10 @@ test.describe.serial("critical browser flows", () => {
     await expect(page.getByRole("link", { name: "555-0100 ext. 0012", exact: true })).toHaveAttribute("href", "tel:555-0100;ext=0012");
     await expect(page.getByRole("link", { name: "555-0100 ext. 0099", exact: true })).toBeVisible();
     await page.goto("/brokers");
-    await expect(page.getByRole("row").filter({ hasText: "E2E Brokerage" })).toContainText("Alex Dispatch, Sam Nights");
+    const profileRow = page.getByRole("row").filter({ hasText: "E2E Brokerage" });
+    await expect(profileRow).toContainText("Alex Dispatch");
+    await expect(profileRow).toContainText("Sam Nights");
+    await expect(profileRow).toContainText("ext. 0099");
     await page.getByRole("link", { name: "E2E Brokerage", exact: true }).click();
     await page.getByRole("button", { name: "Edit broker", exact: true }).click();
     await page.getByRole("dialog").getByLabel("Company name", { exact: false }).fill("Updated Brokerage");

@@ -446,6 +446,28 @@ export function LoadFormDialog({
     });
   };
 
+  // A person's name in the Broker field ("Branden Elam") is a contact at a
+  // broker. Offer the company instead of filing the person as one, and keep
+  // contact names out of the company suggestions.
+  const contactBroker = React.useMemo(() => {
+    const byKey = new Map(brokers.map((broker) => [broker.trim().toLowerCase(), broker]));
+    const owners = new Map<string, string>();
+    for (const [brokerKey, contacts] of Object.entries(brokerContacts)) {
+      const broker = byKey.get(brokerKey);
+      if (!broker) continue;
+      for (const contact of contacts) {
+        const key = contact.trim().toLowerCase();
+        if (key !== brokerKey && !owners.has(key)) owners.set(key, broker);
+      }
+    }
+    return owners;
+  }, [brokers, brokerContacts]);
+  const brokerSuggestions = React.useMemo(
+    () => brokers.filter((broker) => !contactBroker.has(broker.trim().toLowerCase())),
+    [brokers, contactBroker],
+  );
+  const contactOwner = contactBroker.get(values.broker.trim().toLowerCase()) ?? null;
+
   const showIfta = truckOptions.find((truck) => truck.id === values.truckId)?.iftaReportingEnabled === true;
 
   const loadedMiles = toNumber(values.loadedMiles);
@@ -782,10 +804,23 @@ export function LoadFormDialog({
                   placeholder={copy.brokerPlaceholder}
                 />
                 <datalist id="broker-list">
-                  {brokers.map((broker) => (
+                  {brokerSuggestions.map((broker) => (
                     <option key={broker} value={broker} />
                   ))}
                 </datalist>
+                {contactOwner ? (
+                  <button
+                    type="button"
+                    className="mt-1 text-left text-2xs text-primary hover:underline"
+                    onClick={() => {
+                      const person = values.broker.trim();
+                      set("broker", contactOwner);
+                      if (!values.brokerContact.trim()) set("brokerContact", person);
+                    }}
+                  >
+                    {interpolate(copy.brokerIsContact, { name: values.broker.trim(), broker: contactOwner })}
+                  </button>
+                ) : null}
               </Field>
               <Field label={copy.brokerContact} htmlFor="load-broker-contact" error={errors.brokerContact} hint={copy.brokerContactHint}>
                 <Input

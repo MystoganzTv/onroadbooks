@@ -352,6 +352,11 @@ export interface Repository {
   mergeBroker(sourceId: string, targetId: string): Promise<Broker>;
   /** Removes the profile only. Loads keep the broker name they were booked under. */
   deleteBroker(id: string): Promise<void>;
+  /**
+   * Moves the loads booked under a bare name (no profile) to a broker, and
+   * makes that name one of its contacts. See `planNameIntoBroker`.
+   */
+  moveBrokerName(name: string, targetId: string): Promise<Broker>;
   /** Everything the app needs for a request, in one read. */
   getDataset(): Promise<Dataset>;
 

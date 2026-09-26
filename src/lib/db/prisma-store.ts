@@ -1,4 +1,4 @@
-import { brokerContactsOf, brokerNameKey, clearedLegacyContact, planBrokerMerge } from "../brokers";
+import { brokerContactsOf, brokerNameKey, clearedLegacyContact, planBrokerMerge, planNameIntoBroker } from "../brokers";
 import { recurringSeriesExpenseIds } from "../recurring-expenses";
 import "server-only";
 import { assertFuelExpenseSource } from "../fuel-expenses";
@@ -1476,6 +1476,39 @@ export class PrismaRepository implements Repository {
         }
       }
       await tx.broker.delete({ where: { id: source.id } });
+      return tx.broker.update({
+        where: { id: target.id },
+        data: {
+          ...plan.target,
+          contacts: plan.target.contacts as unknown as Prisma.InputJsonValue,
+          ...clearedLegacyContact(target),
+        },
+      });
+    });
+    return toBroker(row);
+  }
+
+  async moveBrokerName(name: string, targetId: string): Promise<Broker> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const key = brokerNameKey(name);
+    const row = await client.$transaction(async (tx) => {
+      const target = await tx.broker.findFirst({ where: { id: targetId, businessId: business.id } });
+      if (!target) throw new Error("That broker does not belong to this workspace.");
+      if (!key || key === target.nameKey) throw new Error("Choose a different broker to merge into.");
+      if (await tx.broker.findFirst({ where: { businessId: business.id, nameKey: key } })) {
+        throw new Error("A broker with that name already exists.");
+      }
+      const plan = planNameIntoBroker(name, asBrokerRow(target));
+      const loads = await tx.load.findMany({ where: { businessId: business.id }, select: { id: true, broker: true, brokerContact: true } });
+      const moved = loads.filter((load) => brokerNameKey(load.broker ?? "") === key);
+      if (moved.length) {
+        await tx.load.updateMany({ where: { businessId: business.id, id: { in: moved.map((load) => load.id) } }, data: { broker: target.name } });
+        const withoutContact = moved.filter((load) => !load.brokerContact?.trim()).map((load) => load.id);
+        if (withoutContact.length) {
+          await tx.load.updateMany({ where: { businessId: business.id, id: { in: withoutContact } }, data: { brokerContact: plan.loadContact } });
+        }
+      }
       return tx.broker.update({
         where: { id: target.id },
         data: {

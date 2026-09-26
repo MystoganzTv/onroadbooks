@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { brokerContactsOf, mergeContacts, planBrokerMerge } from "../brokers";
+import { brokerContactsOf, mergeContacts, planBrokerMerge, planNameIntoBroker } from "../brokers";
 import { brokerContactNames } from "../broker-contacts";
 import type { Broker } from "../types";
 
@@ -61,5 +61,12 @@ describe("broker contacts", () => {
       { id: "2", name: "Branden", phone: null, phoneExtension: null, email: null, notes: null },
     ] });
     assert.deepEqual(brokerContactNames([{ broker: "tql", brokerContact: "Christopher" }], [row]), { tql: ["Branden", "Christopher", "Michael"] });
+  });
+
+  it("turns a load-only name into a contact of the chosen broker", () => {
+    const target = broker({ contacts: [{ id: "c", name: "Christopher Sanchez", phone: null, phoneExtension: "36438", email: null, notes: null }] });
+    const plan = planNameIntoBroker(" Michael Reagan ", target);
+    assert.deepEqual(plan.target.contacts.map((c) => c.name), ["Christopher Sanchez", "Michael Reagan"]);
+    assert.equal(plan.loadContact, "Michael Reagan");
   });
 });

@@ -134,3 +134,30 @@ export function clearedLegacyContact(broker: Pick<Broker, "contactName">): Parti
     ? { contactName: null, phoneExtension: null, email: null }
     : { contactName: null };
 }
+
+/**
+ * A name that only exists on loads ("Branden Elam" typed into the Broker
+ * field) is a person at a broker, not a company. Moving it: the loads are
+ * renamed to the broker and keep, or take, that person as their contact, and
+ * the person joins the broker's contacts. There is no profile to remove.
+ */
+export function planNameIntoBroker(name: string, target: BrokerLike): BrokerMerge {
+  const person: BrokerContact = {
+    id: `bc_${brokerNameKey(name).replace(/[^a-z0-9]+/g, "-")}`,
+    name: name.trim(),
+    phone: null,
+    phoneExtension: null,
+    email: null,
+    notes: null,
+  };
+  return {
+    target: {
+      contacts: mergeContacts(brokerContactsOf(target), [person]),
+      phone: target.phone ?? null,
+      mcNumber: target.mcNumber ?? null,
+      address: target.address ?? null,
+      notes: target.notes ?? null,
+    },
+    loadContact: person.name,
+  };
+}

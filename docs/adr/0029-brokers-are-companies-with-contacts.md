@@ -28,6 +28,14 @@ with that name already exists", and there was no way to delete a profile.
   renamed to the target and, when they have no contact of their own, take the
   source's one person; the source profile is removed. `planBrokerMerge` in
   `src/lib/brokers.ts` is the single rule; all three stores apply it.
+- **Names on loads are not companies.** A name typed in a load's Broker
+  field with no profile ("Branden Elam") is listed apart from the broker
+  profiles, under "Names on loads without a broker profile", with **Move to
+  broker** (its loads move to the chosen broker, keep or take that person as
+  their contact, and the name joins the broker's contacts — `planNameIntoBroker`,
+  `moveBrokerName`) or **Create broker profile** when it really is a company.
+  The load form recognises a contact's name typed as a broker and offers the
+  company instead, and leaves contact names out of its broker suggestions.
 - **Delete removes the profile only.** Loads keep the broker name they were
   booked under — that is history — and the confirmation says so.
 - **Migration 0012** (Drizzle `0012_broker-contacts`, Prisma

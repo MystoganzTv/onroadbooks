@@ -83,3 +83,14 @@ export async function deleteBrokerAction(id: string): Promise<ActionResult> {
     return { ok: false, error: error instanceof Error ? error.message : "Could not delete the broker." };
   }
 }
+
+export async function moveBrokerNameAction(name: string, targetId: string): Promise<ActionResult> {
+  try {
+    const session = await requireWritableSession("manage_loads");
+    const broker = await getRepository(session.businessId).moveBrokerName(name, targetId);
+    revalidateBrokers();
+    return { ok: true, id: broker.id };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Could not move those loads." };
+  }
+}

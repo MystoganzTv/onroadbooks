@@ -1,4 +1,4 @@
-import { brokerContactsOf, brokerNameKey, clearedLegacyContact, planBrokerMerge } from "../brokers";
+import { brokerContactsOf, brokerNameKey, clearedLegacyContact, planBrokerMerge, planNameIntoBroker } from "../brokers";
 import { recurringSeriesExpenseIds } from "../recurring-expenses";
 import "server-only";
 import { assertFuelExpenseSource } from "../fuel-expenses";
@@ -1968,6 +1968,35 @@ export class DrizzleRepository implements Repository {
       return oneRow(tx.update(s.broker)
         .set(updateValues(s.broker, { ...plan.target, ...clearedLegacyContact(target) }))
         .where(scope(target.id)).returning());
+    });
+    return { ...row, contacts: brokerContactsOf(row), createdAt: row.createdAt.toISOString() };
+  }
+
+  async moveBrokerName(name: string, targetId: string): Promise<Broker> {
+    const client = await this.clientProvider();
+    const business = await this.business(client);
+    const key = brokerNameKey(name);
+    const row = await client.transaction(async (tx) => {
+      const target = await tx.query.broker.findFirst({ where: and(eq(s.broker.id, targetId), eq(s.broker.businessId, business.id)) });
+      if (!target) throw new Error("That broker does not belong to this workspace.");
+      if (!key || key === target.nameKey) throw new Error("Choose a different broker to merge into.");
+      const profile = await tx.query.broker.findFirst({ where: and(eq(s.broker.businessId, business.id), eq(s.broker.nameKey, key)) });
+      if (profile) throw new Error("A broker with that name already exists.");
+      const plan = planNameIntoBroker(name, target);
+      const loads = await tx.query.load.findMany({ where: eq(s.load.businessId, business.id), columns: { id: true, broker: true, brokerContact: true } });
+      const moved = loads.filter((load) => brokerNameKey(load.broker ?? "") === key);
+      if (moved.length) {
+        await tx.update(s.load).set(updateValues(s.load, { broker: target.name }))
+          .where(and(eq(s.load.businessId, business.id), inArray(s.load.id, moved.map((load) => load.id))));
+        const withoutContact = moved.filter((load) => !load.brokerContact?.trim()).map((load) => load.id);
+        if (withoutContact.length) {
+          await tx.update(s.load).set(updateValues(s.load, { brokerContact: plan.loadContact }))
+            .where(and(eq(s.load.businessId, business.id), inArray(s.load.id, withoutContact)));
+        }
+      }
+      return oneRow(tx.update(s.broker)
+        .set(updateValues(s.broker, { ...plan.target, ...clearedLegacyContact(target) }))
+        .where(and(eq(s.broker.id, target.id), eq(s.broker.businessId, business.id))).returning());
     });
     return { ...row, contacts: brokerContactsOf(row), createdAt: row.createdAt.toISOString() };
   }

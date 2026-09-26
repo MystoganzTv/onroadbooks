@@ -1925,6 +1925,33 @@ describe("broker contacts, merge and delete", () => {
   });
 });
 
+describe("names on loads without a broker profile", () => {
+  it("moves a person's name into the company as a contact, with its loads", async () => {
+    const truckId = (await repo.getDataset()).trucks[0].id;
+    const target = await repo.saveBroker(null, { name: "Move Freight", phone: "800-555-0199", mcNumber: null, address: null, notes: null });
+    const load = await repo.createLoad(loadInput({ truckId, broker: "Branden Elam", loadNumber: "MOVE-1" }));
+    const other = await repo.createLoad(loadInput({ truckId, broker: "branden elam", brokerContact: "Dispatch desk", loadNumber: "MOVE-2" }));
+
+    const moved = await repo.moveBrokerName("Branden Elam", target.id);
+    assert.deepEqual(moved.contacts?.map((contact) => contact.name), ["Branden Elam"]);
+    const dataset = await repo.getDataset();
+    const first = dataset.loads.find((row) => row.id === load.id)!;
+    assert.equal(first.broker, "Move Freight");
+    assert.equal(first.brokerContact, "Branden Elam");
+    assert.equal(dataset.loads.find((row) => row.id === other.id)!.brokerContact, "Dispatch desk", "a load's own contact stays");
+    assert.equal(dataset.brokers?.some((row) => row.nameKey === "branden elam"), false, "no profile is created for the person");
+
+    // Moving the same person again only re-links loads; the contact is not duplicated.
+    const again = await repo.createLoad(loadInput({ truckId, broker: "Branden Elam", loadNumber: "MOVE-3" }));
+    const twice = await repo.moveBrokerName("Branden Elam", target.id);
+    assert.deepEqual(twice.contacts?.map((contact) => contact.name), ["Branden Elam"]);
+    await assert.rejects(repo.moveBrokerName("Move Freight", target.id), /different broker/);
+
+    for (const id of [load.id, other.id, again.id]) await repo.deleteLoad(id);
+    await repo.deleteBroker(target.id);
+  });
+});
+
 describe("truck reference MPG", () => {
   it("stores the owner's MPG as a number, keeps it when omitted and clears it on null", async () => {
     const truck = (await repo.getDataset()).trucks[0];
