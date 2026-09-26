@@ -109,8 +109,9 @@ lands. Kept as a possible later refinement.
 - Estimated Net Business Profit is shown as "—" until the trailing cost basis
   is sufficient (`hasSufficientOperatingCostBasis`), so it never repeats
   Contribution Profit with a $0.00 allocation.
-- The iOS calculator computes locally and does not have the driver-pay input
-  yet; the API already sends `driverPayMode` / `driverPayValue`.
+- The iOS calculator computes locally with the same model: a "Pago al chofer"
+  % / $ field seeded from `driverPayMode` / `driverPayValue`, subtracted before
+  contribution and included in the target-rate fee share.
 
 ## Guardrails
 

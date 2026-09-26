@@ -93,6 +93,7 @@ final class MockRepository: LedgerRepository {
     func fetchCalculatorDefaults() async throws -> CalculatorDefaults {
         CalculatorDefaults(
             fuelPrice: 4.465, mpg: 7.0, dispatchPct: 10, factoringPct: 3,
+            driverPayMode: .percent, driverPayValue: 33,
             overheadPerMile: 0.94, debtServicePerMile: 0.31, trueCostPerMile: 1.84,
             basisLabel: "últimos 90 días", basisMiles: 3339, basisSufficient: true,
             debtServiceAvailable: true,
@@ -109,7 +110,7 @@ final class MockRepository: LedgerRepository {
             debtServiceRecorded: true,
             noFinancingConfirmed: false,
             truckName: "Unit 1",
-            thresholds: RatingThresholds(great: 1.25, good: 0.75, marginal: 0.25)
+            thresholds: RatingThresholds(great: 1.00, good: 0.60, marginal: 0.30)
         )
     }
 

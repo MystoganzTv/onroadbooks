@@ -660,10 +660,18 @@ private struct CalculatorDefaultsDTO: Decodable {
         let marginal: Double
     }
 
+    struct CostCoverage: Decodable {
+        let group: String
+        let status: String
+    }
+
     let fuelPrice: Double?
     let mpg: Double?
     let dispatchPct: Double
     let factoringPct: Double
+    /// "PCT" or "AMOUNT". Optional so an older server still decodes.
+    let driverPayMode: String?
+    let driverPayValue: Double?
     let overheadPerMile: Double
     let debtServicePerMile: Double
     let trueCostPerMile: Double
@@ -673,12 +681,23 @@ private struct CalculatorDefaultsDTO: Decodable {
     let debtServiceAvailable: Bool
     let targetProfitPerMile: Double
     let deadheadWarnPct: Double
+    // Sent by the route since 63ab9e9; toDomain() read them but they were
+    // never declared here, so the target did not compile.
+    let costCoverage: [CostCoverage]
+    let costCoverageComplete: Bool
+    let sharedOverheadUnallocated: Bool
+    let sharedOverheadPerMile: Double
+    let debtServiceRecorded: Bool
+    let noFinancingConfirmed: Bool
+    let truckName: String?
     let thresholds: Thresholds
 
     func toDomain() -> CalculatorDefaults {
         CalculatorDefaults(
             fuelPrice: fuelPrice, mpg: mpg,
             dispatchPct: dispatchPct, factoringPct: factoringPct,
+            driverPayMode: driverPayMode == "AMOUNT" ? .amount : .percent,
+            driverPayValue: driverPayValue ?? 0,
             overheadPerMile: overheadPerMile, debtServicePerMile: debtServicePerMile,
             trueCostPerMile: trueCostPerMile,
             basisLabel: basisLabel, basisMiles: basisMiles, basisSufficient: basisSufficient,

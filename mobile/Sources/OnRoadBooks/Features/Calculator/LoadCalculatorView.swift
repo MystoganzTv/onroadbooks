@@ -52,6 +52,8 @@ struct LoadCalculatorView: View {
     @State private var dispatchValueText = ""
     @State private var factoringMode: FeeMode = .percent
     @State private var factoringValueText = ""
+    @State private var driverPayMode: FeeMode = .percent
+    @State private var driverPayValueText = ""
     @State private var otherCostText = ""
     @State private var overheadPerMileText = ""
     @State private var targetProfitPerMileText = ""
@@ -64,6 +66,7 @@ struct LoadCalculatorView: View {
     private var tolls: Double { OBNumber.parse(tollsText) ?? 0 }
     private var dispatchValue: Double { OBNumber.parse(dispatchValueText) ?? 0 }
     private var factoringValue: Double { OBNumber.parse(factoringValueText) ?? 0 }
+    private var driverPayValue: Double { OBNumber.parse(driverPayValueText) ?? 0 }
     private var otherCost: Double { OBNumber.parse(otherCostText) ?? 0 }
     private var overheadPerMile: Double { OBNumber.parse(overheadPerMileText) ?? 0 }
     private var targetProfitPerMile: Double { OBNumber.parse(targetProfitPerMileText) ?? 0 }
@@ -81,7 +84,8 @@ struct LoadCalculatorView: View {
     }
 
     private var thresholds: RatingThresholds {
-        defaults?.thresholds ?? RatingThresholds(great: 1.25, good: 0.75, marginal: 0.25)
+        // Offline fallback: the web's DEFAULT_RATING_THRESHOLDS (contribution per total mile).
+        defaults?.thresholds ?? RatingThresholds(great: 1.00, good: 0.60, marginal: 0.30)
     }
 
     private var estimate: LoadEstimate {
@@ -90,7 +94,9 @@ struct LoadCalculatorView: View {
             fuelPrice: fuelPrice, mpg: mpg, tolls: tolls,
             dispatchMode: dispatchMode, dispatchValue: dispatchValue,
             factoringMode: factoringMode, factoringValue: factoringValue,
-            otherCost: otherCost, overheadPerMile: overheadPerMile,
+            otherCost: otherCost,
+            driverPayMode: driverPayMode, driverPayValue: driverPayValue,
+            overheadPerMile: overheadPerMile,
             debtServicePerMile: defaults?.debtServicePerMile ?? 0,
             thresholds: thresholds
         )
@@ -102,7 +108,9 @@ struct LoadCalculatorView: View {
             fuelPrice: fuelPrice, mpg: mpg, tolls: tolls,
             dispatchMode: dispatchMode, dispatchValue: dispatchValue,
             factoringMode: factoringMode, factoringValue: factoringValue,
-            otherCost: otherCost, overheadPerMile: overheadPerMile,
+            otherCost: otherCost,
+            driverPayMode: driverPayMode, driverPayValue: driverPayValue,
+            overheadPerMile: overheadPerMile,
             debtServicePerMile: defaults?.debtServicePerMile ?? 0,
             thresholds: thresholds,
             targetProfitPerMile: targetProfitPerMile
@@ -174,6 +182,10 @@ struct LoadCalculatorView: View {
             mpgText = Self.seedText(seeded.mpg)
             dispatchValueText = Self.seedText(seeded.dispatchPct)
             factoringValueText = Self.seedText(seeded.factoringPct)
+            // The truck's driver terms, as on the web: 33% of gross, or a flat
+            // amount per load. Editable here for a one-off.
+            driverPayMode = seeded.driverPayMode
+            driverPayValueText = Self.seedText(seeded.driverPayValue)
             overheadPerMileText = seeded.basisSufficient
                 ? Self.seedText(seeded.overheadPerMile)
                 : ""
@@ -383,6 +395,7 @@ struct LoadCalculatorView: View {
                 OBNumberRow(label: "Tolls", prefix: "$", text: $tollsText)
                 feeRow("Dispatch", mode: $dispatchMode, text: $dispatchValueText)
                 feeRow("Factoring", mode: $factoringMode, text: $factoringValueText)
+                feeRow("Pago al chofer", mode: $driverPayMode, text: $driverPayValueText)
                 OBNumberRow(label: "Other costs", prefix: "$", text: $otherCostText)
                 VStack(alignment: .leading, spacing: 4) {
                     OBNumberRow(label: "Overhead / mi", prefix: "$", suffix: "/mi", text: $overheadPerMileText)
@@ -437,7 +450,7 @@ struct LoadCalculatorView: View {
                         .font(.caption)
                         .foregroundStyle(OBColor.warn)
                 } else if rates.impossible {
-                    Text("Dispatch + factoring fees add up to 100% or more of the rate — no rate can clear a profit at these fee settings.")
+                    Text("Dispatch, factoring and driver pay add up to 100% or more of the rate — no rate can clear a profit at these settings.")
                         .font(.caption)
                         .foregroundStyle(OBColor.neg)
                 } else if let comparison = offerComparison {

@@ -144,8 +144,8 @@ export async function GET(request: NextRequest) {
       mpg: fuel.milesPerGallon ?? null,
       dispatchPct: Math.round(div(dispatchPaid, grossRevenue) * 1000) / 10,
       factoringPct: Math.round(div(factoringPaid, grossRevenue) * 1000) / 10,
-      // Web parity: the calculator counts the truck's driver. The iOS app
-      // ignores fields it does not know yet.
+      // Web parity: the calculator counts the truck's driver (iOS seeds its
+      // "Pago al chofer" field from these).
       driverPayMode: calculatorDriverPay(dataset.drivers, selectedTruck.id).mode,
       driverPayValue: calculatorDriverPay(dataset.drivers, selectedTruck.id).value,
       overheadPerMile: overheadCostPerMile(basis) + (sharedOverheadPerMile ?? 0),
