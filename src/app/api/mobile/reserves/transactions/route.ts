@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const txn = await gate.repository.createReserveTransaction(parsed.data);
-    for (const path of ["/reserves", "/dashboard", "/settlements"]) revalidatePath(path);
+    for (const path of ["/reserves", "/dashboard"]) revalidatePath(path);
     return NextResponse.json({ id: txn.id }, { status: 201 });
   } catch (error) {
     return NextResponse.json(

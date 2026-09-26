@@ -12,7 +12,7 @@
  *   SOLO    the book      what happened. Loads, expenses, fuel, documents,
  *                         contribution profit per load, actual cost per mile.
  *   OWNER   the cockpit   what to do next. The load calculator and target
- *                         rate, brokers and lanes, deadhead, settlements,
+ *                         rate, brokers and lanes, deadhead,
  *                         reserves and Safe to Pay Yourself, goals and pace.
  *   FLEET   the units     which truck pays. Contribution per unit, business
  *                         overhead kept separate, up to eight trucks.
@@ -91,7 +91,6 @@ export const PLANS: Record<PlanId, Plan> = {
       "Deadhead costs based on your own expenses",
       "Tax and maintenance reserves, plus cash planning",
       "Monthly goals, pace and projections",
-      "Close and save half-month financial summaries",
     ],
     note: null,
   },

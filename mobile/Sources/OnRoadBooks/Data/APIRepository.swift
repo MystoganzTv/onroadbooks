@@ -396,15 +396,6 @@ final class APIRepository: LedgerRepository {
         try await directDelete("api/mobile/fuel/\(id)")
     }
 
-    @discardableResult
-    func setSettlementStatus(month: String, half: String, closed: Bool) async throws -> String {
-        try await directWrite(
-            "api/mobile/settlements",
-            method: "PATCH",
-            body: SettlementStatusDTO(month: month, half: half, status: closed ? "CLOSED" : "OPEN")
-        )
-    }
-
     func fetchExpenseDetail(id: String) async throws -> ExpenseDetail {
         try await get("api/mobile/expenses/\(id)", as: ExpenseDetailResponseDTO.self).toDomain()
     }
@@ -479,9 +470,6 @@ final class APIRepository: LedgerRepository {
             .statements.map { $0.toDomain() }
     }
 
-    func fetchSettlements() async throws -> [SettlementPeriod] {
-        try await get("api/mobile/settlements", as: SettlementsResponseDTO.self).settlements.map { $0.toDomain() }
-    }
 }
 
 // MARK: - Wire types (exact shape of the JSON the web routes return)
@@ -659,33 +647,12 @@ private struct CalculatorDefaultsDTO: Decodable {
         let good: Double
         let marginal: Double
     }
-
-    struct CostCoverage: Decodable {
-        let group: String
-        let status: String
-    }
-
     let fuelPrice: Double?
     let mpg: Double?
     let dispatchPct: Double
     let factoringPct: Double
-    let overheadPerMile: Double
-    let debtServicePerMile: Double
-    let trueCostPerMile: Double
-    let basisLabel: String
-    let basisMiles: Double
-    let basisSufficient: Bool
-    let debtServiceAvailable: Bool
-    let targetProfitPerMile: Double
+    let businessExpenses: CalculatorBusinessExpenses?
     let deadheadWarnPct: Double
-    // Sent by the route since 63ab9e9; toDomain() read them but they were
-    // never declared here, so the target did not compile.
-    let costCoverage: [CostCoverage]
-    let costCoverageComplete: Bool
-    let sharedOverheadUnallocated: Bool
-    let sharedOverheadPerMile: Double
-    let debtServiceRecorded: Bool
-    let noFinancingConfirmed: Bool
     let truckName: String?
     let thresholds: Thresholds
 
@@ -693,26 +660,9 @@ private struct CalculatorDefaultsDTO: Decodable {
         CalculatorDefaults(
             fuelPrice: fuelPrice, mpg: mpg,
             dispatchPct: dispatchPct, factoringPct: factoringPct,
-            overheadPerMile: overheadPerMile, debtServicePerMile: debtServicePerMile,
-            trueCostPerMile: trueCostPerMile,
-            basisLabel: basisLabel, basisMiles: basisMiles, basisSufficient: basisSufficient,
-            debtServiceAvailable: debtServiceAvailable,
-            targetProfitPerMile: targetProfitPerMile, deadheadWarnPct: deadheadWarnPct,
-            costCoverage: costCoverage.map {
-                OperatingCostCoverage(
-                    group: $0.group,
-                    status: OperatingCostCoverage.Status(rawValue: $0.status) ?? .unknown
-                )
-            },
-            costCoverageComplete: costCoverageComplete,
-            sharedOverheadUnallocated: sharedOverheadUnallocated,
-            sharedOverheadPerMile: sharedOverheadPerMile,
-            debtServiceRecorded: debtServiceRecorded,
-            noFinancingConfirmed: noFinancingConfirmed,
-            truckName: truckName,
-            thresholds: RatingThresholds(
-                great: thresholds.great, good: thresholds.good, marginal: thresholds.marginal
-            )
+            businessExpenses: businessExpenses,
+            deadheadWarnPct: deadheadWarnPct, truckName: truckName,
+            thresholds: RatingThresholds(great: thresholds.great, good: thresholds.good, marginal: thresholds.marginal)
         )
     }
 }
@@ -1253,60 +1203,7 @@ private struct DebtPaymentEditDTO: Encodable {
     }
 }
 
-private struct SettlementDTO: Decodable {
-    let id: String
-    let label: String
-    let status: String
-    let operatingProfit: Double
-    let reserveTotal: Double
-    let safeToPay: Double
-    let drifted: Bool
-    let month: String?
-    let half: String?
-    let closable: Bool?
-    let bookedRevenue: Double
-    let collectedRevenue: Double?
-    let accountsReceivable: Double?
-    let interestExpense: Double?
-    let principalPayment: Double?
-    let unallocatedDebtService: Double?
-    let debtService: Double?
-    let cashAfterDebtService: Double?
-
-    func toDomain() -> SettlementPeriod {
-        SettlementPeriod(
-            id: id,
-            label: label,
-            status: status == "OPEN" ? .open : .closed,
-            operatingProfit: operatingProfit,
-            reserveContributions: reserveTotal,
-            ownerDraw: safeToPay,
-            month: month,
-            half: half,
-            closable: closable ?? false,
-            bookedRevenue: bookedRevenue,
-            collectedRevenue: collectedRevenue,
-            accountsReceivable: accountsReceivable,
-            interestExpense: interestExpense,
-            principalPayment: principalPayment,
-            unallocatedDebtService: unallocatedDebtService,
-            debtService: debtService,
-            cashAfterDebtService: cashAfterDebtService,
-            drifted: drifted
-        )
-    }
-}
-
 /// `month` and `half` identify the window; `status` says which way.
-private struct SettlementStatusDTO: Encodable {
-    let month: String
-    let half: String
-    let status: String
-}
-
-private struct SettlementsResponseDTO: Decodable {
-    let settlements: [SettlementDTO]
-}
 
 private struct DashboardDTO: Decodable {
     struct Today: Decodable {

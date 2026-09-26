@@ -69,7 +69,7 @@ const en = {
       "Bookkeeping and profit tracking for owner-operators. Actual and normalized cost per mile, load screening before you book, cash-safe owner pay, and broker and lane scoring - all from your own ledger.",
   },
   banner: {
-    text: `Half-month settlements and reserve buckets are live. Free for ${TRIAL_DAYS} days, no card.`,
+    text: `Know your trip profit and plan your reserves. Free for ${TRIAL_DAYS} days, no card.`,
   },
   nav: {
     links: [
@@ -101,7 +101,7 @@ const en = {
       },
       {
         title: "Set Money Aside",
-        body: "Tax and maintenance reserved every time you close.",
+        body: "Track the money you set aside for tax and maintenance.",
       },
     ],
     cta: "Start Free Trial",
@@ -116,7 +116,6 @@ const en = {
       "Expenses",
       "Fuel",
       "Truck",
-      "Settlements",
       "Reserves",
       "Analytics",
       "Reports",
@@ -177,7 +176,7 @@ const en = {
       { title: "Track Loads", body: "Know which loads actually made money, and which only looked like it." },
       { title: "Manage Expenses", body: "Fuel, tolls, repairs, insurance, permits - with the receipt attached." },
       { title: "Real Profit Tracking", body: "Booked performance, collected cash and receivables shown separately." },
-      { title: "Reserve With Confidence", body: "Tax and maintenance funded every time you close a settlement." },
+      { title: "Reserve With Confidence", body: "Track reserve balances and record money set aside for tax and maintenance." },
       { title: "Reports That Help", body: "Print-ready monthly reports and a clean CSV export of everything." },
       { title: "Cab Or Kitchen Table", body: "The same books on the phone in the truck and the laptop at home." },
     ],
@@ -270,7 +269,6 @@ const en = {
           "Deadhead costs based on your own expenses",
           "Tax and maintenance reserves, plus cash planning",
           "Monthly goals, pace and projections",
-          "Close and save half-month financial summaries",
         ],
         note: null,
       },
@@ -314,7 +312,7 @@ const en = {
       },
       {
         q: "What happens to my data if I stop paying?",
-        a: "You keep reading and exporting it - loads, expenses, fuel, settlements, the lot - as CSV. Only writing closes. No hostage-taking and no export fee.",
+        a: "You keep reading and exporting it - loads, expenses, fuel, the lot - as CSV. Only writing closes. No hostage-taking and no export fee.",
       },
       {
         q: "Is the safe-to-pay number tax advice?",
@@ -347,7 +345,7 @@ const es: LandingCopy = {
       "Contabilidad y control de ganancia para owner-operators. Costo real y normalizado por milla, la carga evaluada antes de aceptarla, cuánto efectivo puedes pagarte después de reservas, y qué brokers y rutas rinden - todo desde tu propio libro.",
   },
   banner: {
-    text: `Ya están los cortes de quincena y las reservas. Gratis ${TRIAL_DAYS} días, sin tarjeta.`,
+    text: `Conoce la ganancia de tus viajes y planifica tus reservas. Gratis ${TRIAL_DAYS} días, sin tarjeta.`,
   },
   nav: {
     links: [
@@ -378,7 +376,7 @@ const es: LandingCopy = {
       },
       {
         title: "Aparta sin pensarlo",
-        body: "Impuestos y mantenimiento reservados en cada corte.",
+        body: "Controla el dinero apartado para impuestos y mantenimiento.",
       },
     ],
     cta: "Prueba gratis",
@@ -393,7 +391,6 @@ const es: LandingCopy = {
       "Gastos",
       "Diésel",
       "Camión",
-      "Cortes",
       "Reservas",
       "Análisis",
       "Reportes",
@@ -454,7 +451,7 @@ const es: LandingCopy = {
       { title: "Cargas", body: "Cuáles dejaron dinero de verdad y cuáles sólo lo parecían." },
       { title: "Gastos", body: "Diésel, peajes, reparaciones, seguro, permisos - con el recibo adjunto." },
       { title: "Ganancia real", body: "Rendimiento registrado, efectivo cobrado y cuentas por cobrar por separado." },
-      { title: "Reservas al día", body: "Impuestos y mantenimiento apartados en cada corte que cierras." },
+      { title: "Reservas al día", body: "Controla tus reservas y registra el dinero apartado para impuestos y mantenimiento." },
       { title: "Reportes útiles", body: "Reporte mensual listo para imprimir y exportación CSV de todo." },
       { title: "Cabina o cocina", body: "El mismo libro en el teléfono del camión y en la laptop de la casa." },
     ],
@@ -547,7 +544,6 @@ const es: LandingCopy = {
           "Costo de millas vacías según tus gastos",
           "Reservas para impuestos y mantenimiento, y planificación de efectivo",
           "Metas mensuales, ritmo y proyecciones",
-          "Cierre y guardado de resúmenes financieros quincenales",
         ],
         note: null,
       },
@@ -591,7 +587,7 @@ const es: LandingCopy = {
       },
       {
         q: "¿Qué pasa con mis datos si dejo de pagar?",
-        a: "Los sigues leyendo y exportando - cargas, gastos, diésel, cortes, todo - en CSV. Sólo se cierra la escritura. Ni secuestro de datos ni cobro por exportar.",
+        a: "Los sigues leyendo y exportando - cargas, gastos, diésel, todo - en CSV. Sólo se cierra la escritura. Ni secuestro de datos ni cobro por exportar.",
       },
       {
         q: "¿El número de \"puedes pagarte\" es asesoría fiscal?",

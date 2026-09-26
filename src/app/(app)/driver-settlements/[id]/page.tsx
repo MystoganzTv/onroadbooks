@@ -38,7 +38,7 @@ export default async function DriverSettlementDetailPage({ params }: { params: P
   const copy = dictionary.driverPay;
   if (!roleCan(session.role ?? "VIEWER", "manage_driver_settlements")) redirect("/dashboard");
   const dataset = await getDataset(session.businessId);
-  if (!hasFleetAccess(dataset.subscription)) redirect("/settlements");
+  if (!hasFleetAccess(dataset.subscription)) redirect("/drivers");
   const settlement = dataset.driverSettlements.find((row) => row.id === id);
   if (!settlement) notFound();
   const driver = dataset.drivers.find((row) => row.id === settlement.driverId);

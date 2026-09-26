@@ -70,9 +70,6 @@ struct RootTabView: View {
             ExpensesView(repository: repository)
                 .tabItem { Label("Expenses", systemImage: "creditcard.fill") }
 
-            SettlementsView(repository: repository)
-                .tabItem { Label("Settlements", systemImage: "wallet.pass.fill") }
-
             MoreView(repository: repository, accountLabel: accountLabel, appLock: appLock, onSignOut: onSignOut)
                 .tabItem { Label("More", systemImage: "ellipsis.circle.fill") }
         }

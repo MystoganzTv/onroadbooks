@@ -93,22 +93,11 @@ final class MockRepository: LedgerRepository {
     func fetchCalculatorDefaults() async throws -> CalculatorDefaults {
         CalculatorDefaults(
             fuelPrice: 4.465, mpg: 7.0, dispatchPct: 10, factoringPct: 3,
-            overheadPerMile: 0.94, debtServicePerMile: 0.31, trueCostPerMile: 1.84,
-            basisLabel: "últimos 90 días", basisMiles: 3339, basisSufficient: true,
-            debtServiceAvailable: true,
-            targetProfitPerMile: 0.75, deadheadWarnPct: 20,
-            costCoverage: [
-                .init(group: "INSURANCE", status: .recorded),
-                .init(group: "MAINTENANCE_REPAIRS", status: .recorded),
-                .init(group: "PERMITS_REGISTRATION", status: .notApplicable),
-                .init(group: "RECURRING_SERVICES", status: .unknown),
-            ],
-            costCoverageComplete: false,
-            sharedOverheadUnallocated: false,
-            sharedOverheadPerMile: 0,
-            debtServiceRecorded: true,
-            noFinancingConfirmed: false,
-            truckName: "Unit 1",
+            businessExpenses: CalculatorBusinessExpenses(month: "2026-08", total: 699.99, entries: [
+                .init(id: "demo-insurance", description: "Insurance", category: "INSURANCE", amount: 685, scope: "TRUCK"),
+                .init(id: "demo-software", description: "Software", category: "SOFTWARE", amount: 14.99, scope: "BUSINESS")
+            ]),
+            deadheadWarnPct: 20, truckName: "Unit 1",
             thresholds: RatingThresholds(great: 1.25, good: 0.90, marginal: 0.60)
         )
     }
@@ -381,11 +370,6 @@ final class MockRepository: LedgerRepository {
 
     func deleteFuelStop(id: String) async throws {
         fuel.removeAll { $0.id == id }
-    }
-
-    @discardableResult
-    func setSettlementStatus(month: String, half: String, closed: Bool) async throws -> String {
-        "\(month)-\(half)"
     }
 
     // MARK: Fleet — the demo account runs one truck, so these stay small.
@@ -709,15 +693,6 @@ final class MockRepository: LedgerRepository {
         case 0.50..<1.00: return .marginal
         default: return .bad
         }
-    }
-
-    func fetchSettlements() async throws -> [SettlementPeriod] {
-        [
-            SettlementPeriod(id: "s-aug-16", label: "Aug 16 – 31", status: .open, operatingProfit: 1802.40, reserveContributions: 0, ownerDraw: 0, month: "2026-08", half: "SECOND", closable: true, bookedRevenue: 4980.00, collectedRevenue: 3100.00, accountsReceivable: 1880.00, interestExpense: 100.00, principalPayment: 156.50, unallocatedDebtService: 0, debtService: 256.50, cashAfterDebtService: 1545.90, drifted: false),
-            SettlementPeriod(id: "s-aug-01", label: "Aug 1 – 15", status: .closed, operatingProfit: 1848.70, reserveContributions: 703.10, ownerDraw: 1145.60, month: "2026-08", half: "FIRST", closable: false, bookedRevenue: 5120.00, collectedRevenue: 5120.00, accountsReceivable: 0, interestExpense: 100.00, principalPayment: 156.50, unallocatedDebtService: 0, debtService: 256.50, cashAfterDebtService: 1592.20, drifted: true),
-            SettlementPeriod(id: "s-jul-16", label: "Jul 16 – 31", status: .closed, operatingProfit: 1710.05, reserveContributions: 649.90, ownerDraw: 1060.15, month: "2026-07", half: "SECOND", closable: false, bookedRevenue: 5120.00, collectedRevenue: 5120.00, accountsReceivable: 0, interestExpense: 100.00, principalPayment: 156.50, unallocatedDebtService: 0, debtService: 256.50, cashAfterDebtService: 1592.20, drifted: false),
-            SettlementPeriod(id: "s-jul-01", label: "Jul 1 – 15", status: .closed, operatingProfit: 1594.30, reserveContributions: 606.20, ownerDraw: 988.10, month: "2026-07", half: "FIRST", closable: false, bookedRevenue: 5120.00, collectedRevenue: 5120.00, accountsReceivable: 0, interestExpense: 100.00, principalPayment: 156.50, unallocatedDebtService: 0, debtService: 256.50, cashAfterDebtService: 1592.20, drifted: false),
-        ]
     }
 
     func fetchDashboard() async throws -> DashboardSnapshot {

@@ -16,9 +16,10 @@ de iOS — y ahora conectada de verdad al mismo backend que usa la web.
   `ProfitabilityRating` en el backend) y profit por milla.
 - **Expenses**: lista agrupada por categoría, con la categoría real del
   backend (`getCategory().label`), no una lista fija en la app.
-- **Settlements**: quincenas OPEN/CLOSED con su snapshot real.
-- **Load Calculator**: "¿me conviene este load?" y "¿qué tarifa pido?",
-  portado fórmula por fórmula de `src/lib/finance/load-calculator.ts`.
+- **Load Calculator**: un solo flujo "Should I take it?", con ganancia del
+  viaje, umbrales y contraoferta. Seguro y otros gastos del mes aparecen abajo
+  como referencia; no se asignan por milla ni se descuentan de la carga.
+  Web e iOS reciben los mismos valores de `calculator-defaults.ts`.
 - **More**: pantallas funcionales para Fuel, Invoices, Reserves, IFTA,
   Analytics, Reports, Fleet, Truck, Drivers y Driver Pay. Las funciones de
   Fleet respetan el plan y los permisos del negocio; Plans & Billing explica
@@ -83,10 +84,10 @@ llavero de Apple.
 Sources/OnRoadBooks/
   App/                  punto de entrada (OnRoadBooksApp.swift)
   AppRootView.swift     decide Login vs. modo demo vs. la app
-  RootTabView.swift     tab bar de 5 pestañas, una vez autenticado
+  RootTabView.swift     tab bar de 4 pestañas, una vez autenticado
   DesignSystem/         Theme.swift (colores portados de globals.css),
                         Components.swift (panel, badges, stat tiles)
-  Models/               Load, Expense, ReserveAccount, SettlementPeriod, ...
+  Models/               Load, Expense, ReserveAccount, CalculatorDefaults, ...
   Data/                 Repository.swift (protocolo),
                         MockRepository.swift (datos demo),
                         APIRepository.swift (cliente HTTP real + DTOs),
@@ -120,7 +121,7 @@ Por eso, en `OnroadBooks` (el repo de la web, no este) se agregaron:
 - `POST /api/mobile/login` — espejo de `/api/auth/login`, devuelve el
   token en el JSON en vez de ponerlo en una cookie.
 - Las rutas `/api/mobile/*` cubren dashboard, cargas, gastos, combustible,
-  facturas, reservas, cierres, reportes, IFTA y Fleet. Las lecturas reutilizan
+  facturas, reservas, reportes, IFTA y Fleet. Las lecturas reutilizan
   las mismas funciones de `lib/calculations` y `lib/finance` que usa la web;
   las escrituras pasan por sus mismas validaciones y reglas de negocio.
 
@@ -159,3 +160,15 @@ Antes de subirlo, instala una build Debug firmada en un iPhone físico y abre
 la app para verificar arranque, login y conexión con producción. El `.ipa`
 exportado usa distribución App Store y se instala mediante TestFlight, no
 directamente con `devicectl`.
+
+## Retirada de owner statements
+
+La pestaña y las acciones de cierre/reapertura se retiraron. Los enlaces web
+antiguos redirigen a Reports; `/api/mobile/settlements` responde 410 a clientes
+autenticados (401 sin sesión). Se conservan los snapshots históricos y los
+vínculos de reservas. Los pagos de choferes de Fleet son otra función.
+
+Los clientes ya instalados necesitan una nueva build para cambiar su interfaz.
+El backend conserva los campos antiguos de la calculadora con asignaciones en
+cero y disponibilidad falsa para no romper la decodificación de esas versiones.
+La build nueva solo utiliza costos del viaje y el contexto mensual separado.

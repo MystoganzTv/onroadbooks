@@ -41,7 +41,7 @@ export default async function DriverSettlementsPage({
   const copy = getWebDictionary(locale).driverPay;
   if (!roleCan(session.role ?? "VIEWER", "manage_driver_settlements")) redirect("/dashboard");
   const dataset = await getDataset(session.businessId);
-  if (!hasFleetAccess(dataset.subscription)) redirect("/settlements");
+  if (!hasFleetAccess(dataset.subscription)) redirect("/drivers");
 
   const period = periodFromSearchParams(params);
   const requestedDriver = param(params, "driver", "all");

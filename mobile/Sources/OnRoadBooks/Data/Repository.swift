@@ -8,7 +8,6 @@ protocol LedgerRepository {
     func fetchDashboard() async throws -> DashboardSnapshot
     func fetchLoads() async throws -> [Load]
     func fetchExpenses() async throws -> ExpenseLedger
-    func fetchSettlements() async throws -> [SettlementPeriod]
     func fetchFuel() async throws -> FuelLedger
     func fetchInvoices() async throws -> InvoiceLedger
     func fetchReserves() async throws -> ReserveLedger
@@ -57,18 +56,6 @@ protocol LedgerRepository {
     /// unlinked, not removed. The confirmation says so.
     func deleteExpense(id: String) async throws
     func deleteFuelStop(id: String) async throws
-
-    /// Close or reopen a half-month.
-    ///
-    /// Closing freezes a snapshot built on the SERVER from the rows as they
-    /// stand, and posts the reserve contributions that snapshot implies —
-    /// nothing the phone sends is trusted as the figures. Reopening reverses
-    /// exactly what the close wrote and nothing else.
-    ///
-    /// Never queued: this is the most consequential write in the product and
-    /// replaying it later, unwatched, against rows that have since changed is
-    /// not something to do on the owner's behalf.
-    @discardableResult func setSettlementStatus(month: String, half: String, closed: Bool) async throws -> String
 
     /// Files a photo against a record that already exists. Never queued: a
     /// receipt has nothing to attach itself to until the expense has an id from

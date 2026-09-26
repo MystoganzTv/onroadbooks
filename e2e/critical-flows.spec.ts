@@ -800,6 +800,20 @@ test.describe.serial("critical browser flows", () => {
       await expect(monthly).toContainText("DAT subscription");
       await expect(monthly).not.toContainText("Fuel excluded from reference");
       await expect(page.getByTestId("monthly-business-total")).toHaveText("$1,484.00");
+      const mobileLogin = await page.request.post("/api/mobile/login", { data: { email: ownerEmail, password } });
+      expect(mobileLogin.status()).toBe(200);
+      const { token } = await mobileLogin.json();
+      const headers = { Authorization: `Bearer ${token}` };
+      const mobileResponse = await page.request.get("/api/mobile/calculator", { headers });
+      expect(mobileResponse.status()).toBe(200);
+      const mobile = await mobileResponse.json();
+      expect(mobile.businessExpenses.total).toBe(1484);
+      expect(mobile.businessExpenses.entries.map((row: { id: string }) => row.id).sort())
+        .toEqual(["calc-dat", "calc-eld", "calc-insurance", "calc-parking"]);
+      expect(mobile.mpg).toBe(dataset.trucks[0].referenceMpg ?? null);
+      expect(mobile.overheadPerMile).toBe(0);
+      expect(mobile.debtServicePerMile).toBe(0);
+      expect(mobile.basisSufficient).toBe(false);
       await expect(monthly).toContainText("these amounts are not deducted from this trip");
       await page.locator("#calc-gross").fill("1100");
       await page.locator("#calc-loaded").fill("275");
@@ -1201,7 +1215,7 @@ test.describe.serial("critical browser flows", () => {
     await page.goto("/reserves");
     await expect(page.getByText("Reserve balances, rules and movements are available only to the workspace owner.")).toBeVisible();
     await page.goto("/settlements");
-    await expect(page.getByText(/Owner Settlement close\/reopen controls are available only/)).toBeVisible();
+    await expect(page).toHaveURL(/\/reports$/);
     // Driver Pay is hidden for everyone (ADR 0031).
     await page.goto("/driver-settlements");
     await expect(page).toHaveURL(/\/drivers$/);
@@ -1216,6 +1230,30 @@ test.describe.serial("critical browser flows", () => {
     await page.goto("/team");
     await expect(page).toHaveURL(/\/settings\?section=access$/);
     await expect(page.getByText("Only the workspace owner can invite people or change roles.")).toBeVisible();
+  });
+
+  test("retired owner statements redirect and reject mobile reads and writes without touching history", async ({ page }) => {
+    const before = await fs.readFile(dataFile, "utf8");
+    expect((await page.request.get("/api/mobile/settlements")).status()).toBe(401);
+    expect((await page.request.patch("/api/mobile/settlements", { data: {} })).status()).toBe(401);
+    const loginResponse = await page.request.post("/api/mobile/login", { data: { email: ownerEmail, password } });
+    expect(loginResponse.status()).toBe(200);
+    const { token } = await loginResponse.json();
+    const headers = { Authorization: `Bearer ${token}` };
+    expect((await page.request.get("/api/mobile/settlements", { headers })).status()).toBe(410);
+    for (const status of ["CLOSED", "OPEN"]) {
+      const response = await page.request.patch("/api/mobile/settlements", {
+        headers, data: { month: "2026-08", half: "FIRST", status },
+      });
+      expect(response.status()).toBe(410);
+    }
+    expect(await fs.readFile(dataFile, "utf8")).toBe(before);
+    await login(page);
+    for (const route of ["/settlements", "/reports/settlements"]) {
+      await page.goto(route);
+      await expect(page).toHaveURL(/\/reports$/);
+      await expect(page.getByRole("heading", { name: "Owner Settlements" })).toHaveCount(0);
+    }
   });
 
   test("authenticated shell remains usable at a phone viewport", async ({ page }) => {
@@ -1257,9 +1295,7 @@ test.describe.serial("critical browser flows", () => {
     ).toBeVisible();
 
     await page.goto("/settlements?month=2026-08&half=SECOND");
-    await expect(page.getByRole("heading", { name: "Owner Settlements" })).toBeVisible();
-    await expect(page.getByText("Half-month payday", { exact: true })).toBeVisible();
-    await expect(page.getByText("Available to you", { exact: true })).toBeVisible();
-    await expect(page.getByText(/Financial details · model v/)).toBeVisible();
+    await expect(page).toHaveURL(/\/reports$/);
+    await expect(page.getByText("Half-month payday", { exact: true })).toHaveCount(0);
   });
 });

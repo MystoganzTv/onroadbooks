@@ -257,39 +257,27 @@ struct RatingThresholds: Hashable {
 }
 
 /// What the calculator starts from, computed from this truck's own ledger.
+/// Monthly ledger context, never deducted from the proposed trip.
+struct CalculatorBusinessExpenses: Decodable {
+    struct Entry: Decodable, Identifiable {
+        let id: String
+        let description: String
+        let category: String
+        let amount: Double
+        let scope: String
+    }
+    let month: String
+    let total: Double
+    let entries: [Entry]
+}
+
 struct CalculatorDefaults {
-    /// Nil when nothing proves it. The app then leaves the field empty and
-    /// refuses to estimate rather than assuming a fleet average.
     let fuelPrice: Double?
     let mpg: Double?
     let dispatchPct: Double
     let factoringPct: Double
-    /// True cost per mile with fuel, tolls, dispatch and factoring REMOVED —
-    /// those four are entered explicitly, and a rate that still contained them
-    /// would charge them twice.
-    let overheadPerMile: Double
-    let debtServicePerMile: Double
-    let trueCostPerMile: Double
-    let basisLabel: String
-    let basisMiles: Double
-    /// The web's `operatingCostAvailable`: not a mileage test. False when a
-    /// cost group is unrecorded, when a Fleet's shared overhead has no
-    /// allocation policy, or when there is not enough history — and the screen
-    /// has to say which, rather than quietly costing a load against thin data.
-    let basisSufficient: Bool
-    let debtServiceAvailable: Bool
-    let targetProfitPerMile: Double
+    let businessExpenses: CalculatorBusinessExpenses?
     let deadheadWarnPct: Double
-    /// Why a refusal is a refusal. Without these the screen could only say
-    /// "more history needed", which is often not the reason at all.
-    let costCoverage: [OperatingCostCoverage]
-    let costCoverageComplete: Bool
-    let sharedOverheadUnallocated: Bool
-    let sharedOverheadPerMile: Double
-    let debtServiceRecorded: Bool
-    let noFinancingConfirmed: Bool
-    /// Which unit these defaults describe. The route scopes to a truck now,
-    /// as the web page does.
     let truckName: String?
     let thresholds: RatingThresholds
 }
@@ -614,40 +602,6 @@ struct ReserveAccount: Identifiable {
     let balance: Double
 }
 
-enum SettlementStatus: String { case open = "Open", closed = "Closed" }
-
-struct SettlementPeriod: Identifiable {
-    let id: String
-    let label: String                 // "Aug 1 – 15"
-    let status: SettlementStatus
-    let operatingProfit: Double
-    let reserveContributions: Double
-    let ownerDraw: Double
-    /// What closing this window needs. The id is opaque on purpose.
-    let month: String?
-    let half: String?
-    /// OPEN and the period has actually ended. A half-month cannot be closed
-    /// while it is still running — the server refuses it and says why.
-    let closable: Bool
-
-    /// The rows behind the web's "Detalles financieros" disclosure in
-    /// `settlement-detail.tsx`, in its order. Optional because the route sends
-    /// null for a period frozen under an older financial model — and null
-    /// prints as "—" there rather than as a zero, for the obvious reason.
-    let bookedRevenue: Double
-    let collectedRevenue: Double?
-    let accountsReceivable: Double?
-    let interestExpense: Double?
-    let principalPayment: Double?
-    let unallocatedDebtService: Double?
-    let debtService: Double?
-    let cashAfterDebtService: Double?
-
-    /// The books moved after this window was settled. Decoded and discarded
-    /// until now: a drifted close is money quietly frozen at the wrong number.
-    let drifted: Bool
-}
-
 struct DashboardSnapshot {
     let periodLabel: String            // "August 2026 · Full Month"
     let bookedRevenue: Double
@@ -704,7 +658,6 @@ struct FinancialPlanning: Equatable {
     /// and zero would read as an answer.
     var hasExpectedMiles: Bool { expectedMonthlyMiles > 0 }
 }
-
 
 /// A correction to an expense already in the books. Only the fields the phone
 /// shows — scope, truck, linked load, recurring and the receipt number are

@@ -14,7 +14,6 @@ function revalidateFinancing() {
   revalidatePath("/calculator");
   revalidatePath("/truck");
   revalidatePath("/reports");
-  revalidatePath("/settlements");
 }
 
 export async function createFinancialObligationAction(values: unknown): Promise<ActionResult> {

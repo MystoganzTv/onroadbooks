@@ -12,7 +12,14 @@ Los hallazgos de abajo describen el estado original. La corrección que acompañ
 - **Abuso:** límites en PostgreSQL por cuenta/IP, compartidos entre instancias y entre login web/móvil y el callback directo de Auth.js. También cubren registro, invitaciones y recuperación. Los identificadores se almacenan como HMAC; el servicio falla cerrado cuando el almacenamiento no está disponible.
 - **Pruebas:** se actualizaron las expectativas antiguas de Today y de la ubicación de Where is my money. Se añadieron pruebas de concurrencia, caducidad, replay, revocación, callbacks directos, respuestas 429 y eventos Stripe firmados sobre proveedores locales simulados. Verificación local final: 556 pruebas unitarias, 69 contratos por cada backend SQL (Prisma y Drizzle), 24 pruebas web con 1 omisión intencional de Fleet y 11 pruebas integradas Auth.js/Drizzle/Stripe/R2 aprobadas; tipos, lint y comprobación de migraciones correctos. El commit, CI y despliegue identificados se registran en el informe final.
 
-Esto cierra la implementación de los cuatro puntos solicitados. No convierte las pruebas con proveedores simulados en una certificación de cobros reales, recepción de correo ni restauración de documentos. Esas validaciones y las diferencias de producto descritas más abajo conservan su alcance original.
+Esto cierra la implementación de los cuatro puntos solicitados. No convierte las pruebas con proveedores simulados en una certificación de cobros reales, recepción de correo ni restauración de documentos. Las validaciones con servicios reales conservan su alcance original. Las dos diferencias de producto se corrigieron después, como se indica a continuación.
+
+## Corrección de coherencia web/iOS
+
+- Retirada completa de owner statements en las superficies del producto: landing y planes EN/ES, pantalla/acciones web y pestaña/repositorio nativo. `/settlements` y `/reports/settlements` redirigen a Reports; el endpoint móvil retirado responde 410 tras autenticar y 401 sin sesión. Los snapshots y movimientos históricos permanecen intactos; los pagos de choferes son independientes.
+- La calculadora iOS usa un solo flujo de oferta. Se retiraron rate context, costos operativos asignados, deuda asignada y objetivo personalizado. La ganancia del viaje y sus umbrales utilizan costos directos; los gastos registrados del mes aparecen abajo como referencia, sin reparto por milla. Web y API comparten los valores iniciales y el filtro mensual por camión.
+- Validación: 558 pruebas unitarias, 25 pruebas de navegador aprobadas y una omisión intencional de Fleet; tipos y lint sin errores. Las pruebas comprueban que la API retirada no altera el historial y que el gasto mensual cambia sin cambiar la ganancia del viaje. iOS compila para simulador Debug y dispositivo Release sin firma.
+- Alcance de entrega: desplegar el backend no reemplaza los binarios de iOS ya instalados. La interfaz móvil requiere distribuir/instalar una build nueva. El endpoint conserva valores neutrales para los campos antiguos para que esas versiones sigan decodificando la respuesta.
 
 ## Alcance y método
 

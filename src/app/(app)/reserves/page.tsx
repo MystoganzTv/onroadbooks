@@ -43,8 +43,8 @@ export async function generateMetadata(): Promise<Metadata> {
  * RESERVE BUCKETS.
  *
  * Balances are a running sum of signed movements, never a stored figure.
- * Contributions post automatically when a settlement closes; withdrawals and
- * corrections are entered by hand.
+ * Movements are recorded manually. Contributions from retired statements
+ * remain in the history to preserve existing balances.
  */
 export default async function ReservesPage({
   searchParams,

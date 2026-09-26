@@ -1,39 +1,14 @@
 import SwiftUI
 import UIKit
 
-/// "What rate should I ask? Is this load worth it?" — the two questions the web
-/// app's Load Calculator answers.
-///
-/// The user supplies a reference MPG. Ledger defaults include the price
-/// last paid for diesel, the dispatch and factoring
-/// percentages it actually pays, and its overhead per mile. It used to ship
-/// hardcoded guesses — 6.5 MPG, $3.85 diesel, $0.85/mi — which produced a
-/// confident verdict about somebody else's truck, at the exact moment a broker
-/// is waiting on the phone for an answer.
-///
-/// Nothing is assumed when nothing is known: an unproved MPG leaves the field
-/// empty and the calculator says it cannot cost the load, and an overhead not
-/// backed by enough recorded miles is labelled as such rather than used quietly.
+/// One offer decision using direct trip costs. Recorded business expenses
+/// appear separately as monthly context, exactly as on the web.
 struct LoadCalculatorView: View {
-    private enum RateContext: String, CaseIterable, Identifiable {
-        case brokerOffer
-        case noOffer
-
-        var id: String { rawValue }
-        var label: String {
-            switch self {
-            case .brokerOffer: return "Tengo oferta"
-            case .noOffer: return "Sin oferta"
-            }
-        }
-    }
-
     let repository: LedgerRepository
 
     @State private var defaults: CalculatorDefaults?
     @State private var isLoading = true
     @State private var refusal: String?
-    @State private var rateContext: RateContext = .brokerOffer
 
     /// Every input is held as TEXT, exactly like Add Load, Add Fuel and Add
     /// Expense do through `OBNumberRow`. A `TextField(value:format:)` bound
@@ -53,8 +28,6 @@ struct LoadCalculatorView: View {
     @State private var factoringMode: FeeMode = .percent
     @State private var factoringValueText = ""
     @State private var otherCostText = ""
-    @State private var overheadPerMileText = ""
-    @State private var targetProfitPerMileText = ""
 
     private var grossRate: Double { OBNumber.parse(grossRateText) ?? 0 }
     private var loadedMiles: Double { OBNumber.parse(loadedMilesText) ?? 0 }
@@ -65,8 +38,6 @@ struct LoadCalculatorView: View {
     private var dispatchValue: Double { OBNumber.parse(dispatchValueText) ?? 0 }
     private var factoringValue: Double { OBNumber.parse(factoringValueText) ?? 0 }
     private var otherCost: Double { OBNumber.parse(otherCostText) ?? 0 }
-    private var overheadPerMile: Double { OBNumber.parse(overheadPerMileText) ?? 0 }
-    private var targetProfitPerMile: Double { OBNumber.parse(targetProfitPerMileText) ?? 0 }
 
     /// Seeded values go in as text a person would have typed: no trailing
     /// zeros, and an empty field rather than a "0" that has to be deleted.
@@ -91,8 +62,8 @@ struct LoadCalculatorView: View {
             fuelPrice: fuelPrice, mpg: mpg, tolls: tolls,
             dispatchMode: dispatchMode, dispatchValue: dispatchValue,
             factoringMode: factoringMode, factoringValue: factoringValue,
-            otherCost: otherCost, overheadPerMile: overheadPerMile,
-            debtServicePerMile: defaults?.debtServicePerMile ?? 0,
+            otherCost: otherCost, overheadPerMile: 0,
+            debtServicePerMile: 0,
             thresholds: thresholds
         )
     }
@@ -103,15 +74,15 @@ struct LoadCalculatorView: View {
             fuelPrice: fuelPrice, mpg: mpg, tolls: tolls,
             dispatchMode: dispatchMode, dispatchValue: dispatchValue,
             factoringMode: factoringMode, factoringValue: factoringValue,
-            otherCost: otherCost, overheadPerMile: overheadPerMile,
-            debtServicePerMile: defaults?.debtServicePerMile ?? 0,
+            otherCost: otherCost, overheadPerMile: 0,
+            debtServicePerMile: 0,
             thresholds: thresholds,
-            targetProfitPerMile: targetProfitPerMile
+            targetProfitPerMile: 0
         )
     }
 
     private var offerComparison: OfferComparison? {
-        rateContext == .brokerOffer && grossRate > 0
+        grossRate > 0
             ? LoadCalculatorMath.compareOffer(grossRate, rates: rates)
             : nil
     }
@@ -136,11 +107,12 @@ struct LoadCalculatorView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: OBSpacing.lg) {
-                        if rateContext == .brokerOffer && grossRate > 0 && estimate.valid {
+                        if grossRate > 0 && estimate.valid {
                             resultCard
                         }
                         inputsCard
                         targetCard
+                        businessExpensesCard
                     }
                     .padding(.vertical, OBSpacing.md)
                 }
@@ -165,8 +137,7 @@ struct LoadCalculatorView: View {
         .task { await load() }
     }
 
-    /// Seeds every cost assumption from the ledger. Anything the ledger cannot
-    /// prove remains unavailable in the result instead of being presented as $0.
+    /// Uses the same trip defaults and separate monthly context as the web.
     private func load() async {
         do {
             let seeded = try await repository.fetchCalculatorDefaults()
@@ -175,10 +146,6 @@ struct LoadCalculatorView: View {
             mpgText = Self.seedText(seeded.mpg)
             dispatchValueText = Self.seedText(seeded.dispatchPct)
             factoringValueText = Self.seedText(seeded.factoringPct)
-            overheadPerMileText = seeded.basisSufficient
-                ? Self.seedText(seeded.overheadPerMile)
-                : ""
-            targetProfitPerMileText = Self.seedText(seeded.targetProfitPerMile)
             refusal = nil
         } catch APIError.refused(let message) {
             refusal = message
@@ -194,7 +161,7 @@ struct LoadCalculatorView: View {
 
     private var resultCard: some View {
         VStack(alignment: .leading, spacing: OBSpacing.sm) {
-            PanelHeader(title: "Is this load worth it?", trailing: nil)
+            PanelHeader(title: "Trip profit", trailing: nil)
             VStack(alignment: .leading, spacing: OBSpacing.sm) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
@@ -233,36 +200,8 @@ struct LoadCalculatorView: View {
 
                 Divider().overlay(OBColor.border)
 
-                // The web's EvaluateResult prints the whole ladder below
-                // contribution and says "Unavailable" with a reason where the
-                // basis does not support it. This screen computed every one of
-                // these -- overhead, debt service, the operating profit after
-                // both -- and displayed none of them, so contribution read as
-                // the answer when it is only the first rung. Same gates the
-                // target-rate side of this screen already honours.
-                availabilityRow(
-                    "Allocated operating costs",
-                    value: defaults?.basisSufficient == true ? -estimate.overhead : nil,
-                    unavailable: "More business cost history needed"
-                )
-                availabilityRow(
-                    "Fully-loaded operating profit",
-                    value: defaults?.basisSufficient == true ? estimate.profit : nil,
-                    unavailable: "Needs the operating cost basis above"
-                )
-                availabilityRow(
-                    "Debt service",
-                    value: defaults?.debtServiceAvailable == true ? -estimate.debtService : nil,
-                    unavailable: debtUnavailableReason
-                )
-                availabilityRow(
-                    "Cash after debt service",
-                    value: (defaults?.basisSufficient == true && defaults?.debtServiceAvailable == true)
-                        ? estimate.profit - estimate.debtService : nil,
-                    unavailable: "Needs both of the rows above"
-                )
-
-                Divider().overlay(OBColor.border)
+                Text("After fuel, tolls, dispatch, factoring and other trip costs. Monthly business expenses are shown separately below.")
+                    .font(.caption).foregroundStyle(OBColor.mutedForeground)
 
                 HStack {
                     Text("Gross rate").font(.subheadline.weight(.semibold)).foregroundStyle(OBColor.foreground)
@@ -277,64 +216,6 @@ struct LoadCalculatorView: View {
         }
         .obPanel()
         .padding(.horizontal, OBSpacing.md)
-    }
-
-    /// Says where the overhead came from, and refuses to imply it is his when
-    /// there are not enough recorded miles behind it.
-    /// The web's paragraph under the cost profile, branch for branch
-    /// (`calculator-panel.tsx`). It used to say "not enough miles recorded"
-    /// for every refusal, which was usually the wrong reason: the basis is
-    /// withheld when a cost group is unrecorded, or when a Fleet's shared
-    /// overhead has no allocation policy, and neither of those is mileage.
-    private var overheadNote: String {
-        guard let defaults else {
-            return "Sin conexión al ledger: este número no está sacado de tu camión."
-        }
-        let sharedNote = defaults.sharedOverheadPerMile > 0
-            ? " Incluye \(defaults.sharedOverheadPerMile.formatted(.currency(code: "USD").precision(.fractionLength(2))))/mi de overhead compartido de Fleet, asignado entre todas las millas de Fleet del mismo período."
-            : ""
-
-        if defaults.sharedOverheadUnallocated {
-            return "Este camión tiene suficiente historial, pero Fleet también tiene gastos compartidos del negocio. Hasta definir una política de asignación, OnRoad no presentará una tarifa parcial como punto de equilibrio operativo o de efectivo real."
-        }
-        if defaults.basisSufficient {
-            return "Basado en \(defaults.basisLabel): \(Int(defaults.basisMiles).formatted()) mi. Sin combustible, peajes, dispatch ni factoring — esos se cobran arriba." + sharedNote
-        }
-        if !defaults.costCoverageComplete {
-            return "Los puntos de equilibrio Operativo Real y de Efectivo permanecen no disponibles hasta que cada grupo de abajo aparezca registrado en este período de costos o se marque como no aplicable." + sharedNote
-        }
-        return "Registra al menos 500 millas y costos indirectos como seguro, mantenimiento, permisos o reparaciones. Los costos desconocidos quedan como no disponibles; la calificación sigue usando solo los costos directos del viaje." + sharedNote
-    }
-
-    /// The web's `CostCoverageChecklist`, read-only. Naming the group that is
-    /// missing is the whole difference between a refusal you can act on and
-    /// one that just says no.
-    @ViewBuilder
-    private var costProfileChecklist: some View {
-        if let defaults, !defaults.costCoverage.isEmpty, !defaults.costCoverageComplete {
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(defaults.costCoverage) { item in
-                    HStack(spacing: 6) {
-                        Image(systemName: item.status == .unknown ? "circle" : "checkmark.circle.fill")
-                            .font(.caption2)
-                            .foregroundStyle(item.status == .unknown ? OBColor.warn : OBColor.pos)
-                        Text(item.label)
-                            .font(.caption2)
-                            .foregroundStyle(item.status == .unknown ? OBColor.foreground : OBColor.mutedForeground)
-                        if item.status == .notApplicable {
-                            Text("no aplica")
-                                .font(.system(size: 9))
-                                .foregroundStyle(OBColor.mutedForeground)
-                        }
-                        Spacer()
-                    }
-                }
-                Text("Se marcan como no aplicables desde la web.")
-                    .font(.system(size: 9))
-                    .foregroundStyle(OBColor.mutedForeground)
-            }
-            .padding(.top, 2)
-        }
     }
 
     /// Fuel estimates need a reference MPG supplied by the user.
@@ -360,20 +241,7 @@ struct LoadCalculatorView: View {
         VStack(alignment: .leading, spacing: 0) {
             PanelHeader(title: "Trip Details", trailing: nil)
             VStack(spacing: OBSpacing.md) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Contexto de la negociación")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(OBColor.mutedForeground)
-                    Picker("Contexto de la negociación", selection: $rateContext) {
-                        ForEach(RateContext.allCases) { context in
-                            Text(context.label).tag(context)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                }
-                if rateContext == .brokerOffer {
-                    OBNumberRow(label: "Oferta del broker", prefix: "$", placeholder: "700", text: $grossRateText)
-                }
+                OBNumberRow(label: "Gross rate offered", prefix: "$", placeholder: "700", text: $grossRateText)
                 OBNumberRow(label: "Loaded miles", suffix: "mi", placeholder: "407", text: $loadedMilesText)
                 OBNumberRow(label: "Deadhead miles", suffix: "mi", text: $deadheadMilesText)
                 OBNumberRow(label: "Fuel price", prefix: "$", suffix: "/gal", placeholder: "3.85", text: $fuelPriceText)
@@ -385,13 +253,6 @@ struct LoadCalculatorView: View {
                 feeRow("Dispatch", mode: $dispatchMode, text: $dispatchValueText)
                 feeRow("Factoring", mode: $factoringMode, text: $factoringValueText)
                 OBNumberRow(label: "Other costs", prefix: "$", text: $otherCostText)
-                VStack(alignment: .leading, spacing: 4) {
-                    OBNumberRow(label: "Overhead / mi", prefix: "$", suffix: "/mi", text: $overheadPerMileText)
-                    Text(overheadNote)
-                        .font(.caption2)
-                        .foregroundStyle(defaults?.basisSufficient == false ? OBColor.warn : OBColor.mutedForeground)
-                    costProfileChecklist
-                }
             }
             .padding(OBSpacing.md)
         }
@@ -425,7 +286,7 @@ struct LoadCalculatorView: View {
     private var targetCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             PanelHeader(
-                title: rateContext == .brokerOffer ? "Current Offer vs Thresholds" : "What Rate Should I Ask?",
+                title: "Should I take it?",
                 trailing: nil
             )
             VStack(alignment: .leading, spacing: OBSpacing.md) {
@@ -433,7 +294,7 @@ struct LoadCalculatorView: View {
                     Text(mpg > 0 ? "Ingresa las millas del viaje para calcular." : "Ingresa las millas y el MPG antes de calcular.")
                         .font(.caption)
                         .foregroundStyle(OBColor.warn)
-                } else if rateContext == .brokerOffer && grossRate <= 0 {
+                } else if grossRate <= 0 {
                     Text("Ingresa la oferta actual del broker antes de evaluar la carga.")
                         .font(.caption)
                         .foregroundStyle(OBColor.warn)
@@ -481,43 +342,6 @@ struct LoadCalculatorView: View {
                     }
                     .padding(OBSpacing.md)
                     .background(offerColor(comparison.position).opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
-                } else {
-                    OBNumberRow(label: "Target operating profit / mi", prefix: "$", suffix: "/mi", placeholder: "1.50", text: $targetProfitPerMileText)
-                    thresholdRow("Direct Cost Break-even", rates.directCostBreakEven)
-                    availabilityRow(
-                        "True Operating Break-even",
-                        value: defaults?.basisSufficient == true ? rates.operatingBreakEven : nil,
-                        unavailable: "More business cost history needed"
-                    )
-                    availabilityRow(
-                        "Cash Break-even",
-                        value: defaults?.debtServiceAvailable == true ? rates.cashBreakEven : nil,
-                        unavailable: debtUnavailableReason
-                    )
-                    thresholdRow("Minimum Threshold", rates.minimum)
-                    thresholdRow("Good Threshold", rates.good)
-                    thresholdRow("Great Threshold", rates.great)
-                    if defaults?.basisSufficient == true {
-                        thresholdRow("Custom Operating Target", rates.customTarget)
-                    }
-                    HStack(alignment: .bottom) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            LabelXS("Suggested Opening Quote")
-                            Text("Adds 3% negotiation room (at least $25), then rounds up to $25.")
-                                .font(.caption2)
-                                .foregroundStyle(OBColor.mutedForeground)
-                        }
-                        Spacer()
-                        MoneyText(
-                            amount: defaults?.basisSufficient == true
-                                ? rates.openingQuote
-                                : LoadCalculatorMath.suggestedOpeningQuote(settlementTarget: rates.great),
-                            font: .title2.weight(.bold),
-                            color: OBColor.primary
-                        )
-                    }
-                    .padding(OBSpacing.md)
-                    .background(OBColor.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
                 }
             }
             .padding(OBSpacing.md)
@@ -554,32 +378,42 @@ struct LoadCalculatorView: View {
         }
     }
 
-    /// An owner who paid his truck off and said so on the web used to be told
-    /// he needed "more debt history" — a reason he could never satisfy, and
-    /// the wrong one. The route now sends `noFinancingConfirmed`, so the
-    /// refusal can name what is actually missing.
-    private var debtUnavailableReason: String {
-        guard let defaults else { return "Sin conexión al ledger" }
-        if defaults.noFinancingConfirmed { return "Necesita millas registradas suficientes" }
-        return "Registra los pagos de deuda, o confirma en la web que este camión no tiene financiamiento"
-    }
-
-    private func availabilityRow(_ label: String, value: Double?, unavailable: String) -> some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label).font(.subheadline.weight(.medium)).foregroundStyle(OBColor.foreground)
-                if value == nil {
-                    Text(unavailable).font(.caption2).foregroundStyle(OBColor.mutedForeground)
+    private var businessExpensesCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            PanelHeader(title: "Business expenses this month", trailing: defaults?.businessExpenses?.month)
+            VStack(alignment: .leading, spacing: OBSpacing.sm) {
+                Text("Recorded expenses for this truck and shared business expenses. Reference only: these are not deducted from this trip.")
+                    .font(.caption).foregroundStyle(OBColor.mutedForeground)
+                if let expenses = defaults?.businessExpenses {
+                    if expenses.entries.isEmpty {
+                        Text("No business expenses recorded for this month.")
+                            .font(.subheadline).foregroundStyle(OBColor.mutedForeground)
+                    } else {
+                        ForEach(expenses.entries) { entry in
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(entry.description).font(.subheadline)
+                                    if entry.scope == "BUSINESS" {
+                                        Text("Shared business expense").font(.caption2).foregroundStyle(OBColor.mutedForeground)
+                                    }
+                                }
+                                Spacer()
+                                MoneyText(amount: entry.amount, font: .subheadline)
+                            }
+                        }
+                    }
+                    Divider().overlay(OBColor.border)
+                    thresholdRow("Recorded total", expenses.total)
+                } else {
+                    Text("Monthly expenses unavailable. Reconnect to load your recorded expenses.")
+                        .font(.caption).foregroundStyle(OBColor.warn)
                 }
             }
-            Spacer()
-            if let value {
-                Text(value, format: .currency(code: "USD").precision(.fractionLength(2)))
-                    .font(.subheadline.weight(.semibold)).monospacedDigit()
-            } else {
-                Text("Unavailable").font(.subheadline.weight(.semibold)).foregroundStyle(OBColor.warn)
-            }
+            .padding(OBSpacing.md)
         }
+        .obPanel()
+        .padding(.horizontal, OBSpacing.md)
+        .padding(.bottom, OBSpacing.xl)
     }
 
     private func signedMoney(_ value: Double) -> String {

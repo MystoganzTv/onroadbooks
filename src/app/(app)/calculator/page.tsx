@@ -5,7 +5,6 @@ import { TruckSwitcher } from "@/components/fleet/truck-switcher";
 import { PageHeader } from "@/components/shared/page-header";
 import { PlanGate } from "@/components/shared/plan-gate";
 import { requireSession } from "@/lib/auth";
-import { div, thresholdsFromSettings } from "@/lib/calculations";
 import { getDataset } from "@/lib/db";
 import {
   activeTrucks,
@@ -14,9 +13,8 @@ import {
   primaryTruck,
   truckById,
 } from "@/lib/fleet";
-import { calculatorBusinessExpenses } from "@/lib/finance/calculator-business-expenses";
+import { calculatorDefaults } from "@/lib/finance/calculator-defaults";
 import { todayISO } from "@/lib/periods";
-import { recentFuelPrice } from "@/lib/fuel-estimate";
 import { planAllows } from "@/lib/plans";
 import { getWebDictionary } from "@/lib/i18n/dictionaries";
 import { getAppLocale } from "@/lib/i18n-server";
@@ -49,8 +47,7 @@ export default async function CalculatorPage({
   ]);
   const copy = getWebDictionary(locale).calculator;
   const dataset = await getDataset(session.businessId);
-  const { trucks, loads, fuelEntries, settings } = dataset;
-  const expenses = dataset.expenses;
+  const { trucks, loads } = dataset;
 
   if (!planAllows(dataset.subscription, "cockpit")) {
     return (
@@ -71,23 +68,11 @@ export default async function CalculatorPage({
   const selectedTruck = truckById(selectableTrucks, param(params, "truck"))
     ?? primaryTruck(selectableTrucks.length ? selectableTrucks : trucks);
   const scopedLoads = loadsForTruck(loads, selectedTruck.id);
-  const scopedFuelEntries = fuelEntries.filter((entry) => entry.truckId === selectedTruck.id);
-
-  const grossRevenue = scopedLoads.reduce((total, load) => total + load.grossRate, 0);
-  const dispatchPaid = scopedLoads.reduce((total, load) => total + load.dispatchFee, 0);
-  const factoringPaid = scopedLoads.reduce((total, load) => total + load.factoringFee, 0);
-
-  const latestFuel = [...scopedFuelEntries].sort((a, b) => b.date.localeCompare(a.date))[0];
+  const shared = calculatorDefaults(dataset, selectedTruck, today);
   const defaults: CalculatorDefaults = {
-    // The same price and MPG a load on this truck is estimated with (ADR 0030).
-    fuelPrice: recentFuelPrice(scopedFuelEntries, selectedTruck.id, today)?.pricePerGallon
-      ?? latestFuel?.pricePerGallon ?? 0,
-    mpg: selectedTruck.referenceMpg ?? 0,
-    dispatchPct: Math.round(div(dispatchPaid, grossRevenue) * 1000) / 10,
-    factoringPct: Math.round(div(factoringPaid, grossRevenue) * 1000) / 10,
-    businessExpenses: calculatorBusinessExpenses(expenses, selectedTruck.id, today),
-    deadheadWarnPct: settings.deadheadWarnPct,
-    thresholds: thresholdsFromSettings(settings),
+    ...shared,
+    fuelPrice: shared.fuelPrice ?? 0,
+    mpg: shared.mpg ?? 0,
     brokers: [...new Set(scopedLoads.map((l) => l.broker).filter(Boolean))].sort() as string[],
     trucks,
     defaultTruckId: selectedTruck.id,
