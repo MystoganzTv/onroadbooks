@@ -438,6 +438,8 @@ model Truck {
   /// Facts used to assess whether this unit is likely subject to IFTA.
   /// Null means the owner has not answered yet; historical units are never guessed.
   axleCount                           Int?
+  /// Owner-entered miles per gallon; null until set. ADR 0030.
+  referenceMpg                        Decimal? @db.Decimal(5, 2)
   registeredGrossWeightLbs            Int?
   operatesInMultipleIftaJurisdictions Boolean?
   /// Owner-confirmed filing treatment. True includes this unit in quarterly

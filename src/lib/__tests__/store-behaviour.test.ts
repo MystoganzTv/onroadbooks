@@ -1924,3 +1924,18 @@ describe("broker contacts, merge and delete", () => {
     await repo.deleteLoad(load.id);
   });
 });
+
+describe("truck reference MPG", () => {
+  it("stores the owner's MPG as a number, keeps it when omitted and clears it on null", async () => {
+    const truck = (await repo.getDataset()).trucks[0];
+    const base = { name: truck.name, startingOdometer: truck.startingOdometer, currentOdometer: truck.currentOdometer };
+    const read = async () => (await repo.getDataset()).trucks.find((row) => row.id === truck.id)!.referenceMpg ?? null;
+    assert.equal(await read(), null, "a truck starts with no MPG; none is guessed");
+    await repo.updateTruck({ ...base, referenceMpg: 8.5 }, truck.id);
+    assert.strictEqual(await read(), 8.5);
+    await repo.updateTruck(base, truck.id);
+    assert.strictEqual(await read(), 8.5, "an update that does not mention it leaves it alone");
+    await repo.updateTruck({ ...base, referenceMpg: null }, truck.id);
+    assert.equal(await read(), null);
+  });
+});

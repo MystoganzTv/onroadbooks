@@ -1318,6 +1318,7 @@ export class DrizzleRepository implements Repository {
           | Truck["operatingCostExemptions"]
           | null) ?? {},
       axleCount: row.axleCount,
+      referenceMpg: numOrNull(row.referenceMpg),
       registeredGrossWeightLbs: row.registeredGrossWeightLbs,
       operatesInMultipleIftaJurisdictions:
         row.operatesInMultipleIftaJurisdictions,
@@ -3859,6 +3860,7 @@ export class DrizzleRepository implements Repository {
             financingConfirmedNone: null,
             operatingCostExemptions: {},
             axleCount: input.axleCount ?? null,
+            referenceMpg: input.referenceMpg ?? null,
             registeredGrossWeightLbs: input.registeredGrossWeightLbs ?? null,
             operatesInMultipleIftaJurisdictions:
               input.operatesInMultipleIftaJurisdictions ?? null,
@@ -3906,6 +3908,9 @@ export class DrizzleRepository implements Repository {
             ...(input.axleCount === undefined
               ? {}
               : { axleCount: input.axleCount }),
+            ...(input.referenceMpg === undefined
+              ? {}
+              : { referenceMpg: input.referenceMpg }),
             ...(input.registeredGrossWeightLbs === undefined
               ? {}
               : { registeredGrossWeightLbs: input.registeredGrossWeightLbs }),

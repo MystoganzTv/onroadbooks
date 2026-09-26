@@ -1,0 +1,1 @@
+ALTER TABLE "Truck" ADD COLUMN "referenceMpg" numeric(5, 2);

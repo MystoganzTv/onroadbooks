@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Gauge, Pencil, ShieldCheck, TruckIcon } from "lucide-react";
+import { AlertTriangle, Gauge, Pencil, ShieldCheck, TruckIcon } from "lucide-react";
 
 import { Metric } from "@/components/shared/metric";
 import { TruckRetireButton } from "@/components/fleet/truck-retire-button";
@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TruckForm } from "@/components/truck/truck-form";
-import { formatMoney, formatNumber, formatOdometer } from "@/lib/formatters";
+import { formatMoney, formatNumber, formatOdometer, formatRateValue } from "@/lib/formatters";
+import type { FuelRate, FuelReferenceCheck } from "@/lib/fuel-estimate";
 import {
   iftaApplicability,
   iftaApplicabilityLabel,
@@ -29,6 +30,8 @@ interface TruckOverviewProps {
   canRestore: boolean;
   profileIncomplete: boolean;
   initialEditing?: boolean;
+  /** How this truck's load fuel is priced, and whether its ledger disagrees. */
+  fuel?: { rate: FuelRate | null; check: FuelReferenceCheck | null };
 }
 
 /** Read-first truck profile. Editing is an explicit, temporary mode. */
@@ -40,6 +43,7 @@ export function TruckOverview({
   canRestore,
   profileIncomplete,
   initialEditing = false,
+  fuel,
 }: TruckOverviewProps) {
   const { dictionary, locale } = useLanguage();
   const copy = dictionary.truck;
@@ -122,6 +126,31 @@ export function TruckOverview({
               value={formatNumber(odometerMiles)}
               sub={copy.sincePurchase}
             />
+            <Metric
+              label={copy.referenceMpg}
+              value={truck.referenceMpg ? String(truck.referenceMpg) : copy.mpgNotSet}
+              sub={truck.referenceMpg ? "mi/gal" : undefined}
+            />
+            <Metric
+              label={copy.fuelPerMileLabel}
+              value={fuel?.rate ? `${formatRateValue(fuel.rate.perMile)}/mi` : "--"}
+              sub={!fuel?.rate
+                ? copy.fuelUnknown
+                : fuel.rate.source === "MPG" && fuel.rate.mpg && fuel.rate.price
+                  ? interpolate(copy.fuelFromMpg, { mpg: String(fuel.rate.mpg), price: formatRateValue(fuel.rate.price.pricePerGallon) })
+                  : copy.fuelFromLedger}
+            />
+            {fuel?.check ? (
+              <p role="status" className="col-span-2 flex gap-2 rounded-md border border-warn/40 bg-warn-soft p-2.5 text-2xs leading-relaxed text-foreground">
+                <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />
+                {interpolate(copy.fuelCheck, {
+                  measured: formatRateValue(fuel.check.measuredPerMile),
+                  mpg: fuel.check.impliedMpg.toFixed(1),
+                  price: formatRateValue(fuel.rate?.price?.pricePerGallon ?? 0),
+                  reference: formatRateValue(fuel.check.referencePerMile),
+                })}
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 

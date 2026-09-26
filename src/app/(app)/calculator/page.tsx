@@ -31,6 +31,7 @@ import {
   operatingCostCoverage,
 } from "@/lib/finance/cost-coverage";
 import { todayISO } from "@/lib/periods";
+import { recentFuelPrice } from "@/lib/fuel-estimate";
 import { planAllows } from "@/lib/plans";
 import { getWebDictionary } from "@/lib/i18n/dictionaries";
 import { getAppLocale } from "@/lib/i18n-server";
@@ -143,8 +144,10 @@ export default async function CalculatorPage({
 
   const driverPayDefault = calculatorDriverPay(dataset.drivers, selectedTruck.id);
   const defaults: CalculatorDefaults = {
-    fuelPrice: latestFuel?.pricePerGallon ?? fuel.averagePricePerGallon ?? 0,
-    mpg: fuel.milesPerGallon ?? 0,
+    // The same price and MPG a load on this truck is estimated with (ADR 0030).
+    fuelPrice: recentFuelPrice(scopedFuelEntries, selectedTruck.id, today)?.pricePerGallon
+      ?? latestFuel?.pricePerGallon ?? fuel.averagePricePerGallon ?? 0,
+    mpg: selectedTruck.referenceMpg ?? fuel.milesPerGallon ?? 0,
     dispatchPct: Math.round(div(dispatchPaid, grossRevenue) * 1000) / 10,
     factoringPct: Math.round(div(factoringPaid, grossRevenue) * 1000) / 10,
     // The business view counts the driver even when the owner drives.

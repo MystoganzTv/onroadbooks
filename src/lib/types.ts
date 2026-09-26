@@ -140,6 +140,12 @@ export interface Truck {
   financingConfirmedNone?: boolean | null;
   /** Cost groups the owner explicitly confirms do not apply to this unit. */
   operatingCostExemptions?: OperatingCostExemptions;
+  /**
+   * The owner's reference fuel economy for this unit (miles per gallon). Null
+   * until they enter it; never estimated. Fuel for a load is then
+   * total miles / MPG x the price this truck last paid (ADR 0030).
+   */
+  referenceMpg?: number | null;
   /** Power-unit axles. Missing historical data remains unknown. */
   axleCount?: number | null;
   /** Registered gross vehicle or combination weight, in pounds. */

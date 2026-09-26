@@ -188,6 +188,7 @@ async function main() {
         purchasePrice: truck.purchasePrice,
         monthlyPayment: truck.monthlyPayment,
         monthlyInsurance: truck.monthlyInsurance,
+        referenceMpg: truck.referenceMpg ?? null,
         startingOdometer: truck.startingOdometer,
         currentOdometer: truck.currentOdometer,
         active: truck.active,

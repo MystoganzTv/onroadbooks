@@ -15,6 +15,8 @@ export const truck = pgTable("Truck", {
   monthlyInsurance: numeric("monthlyInsurance", { precision: 12, scale: 2 }),
   financingConfirmedNone: boolean("financingConfirmedNone"),
   operatingCostExemptions: jsonb("operatingCostExemptions").notNull().default(sql`'{}'::jsonb`),
+  /** Owner-entered miles per gallon; null until set. ADR 0030. */
+  referenceMpg: numeric("referenceMpg", { precision: 5, scale: 2 }),
   axleCount: integer("axleCount"),
   registeredGrossWeightLbs: integer("registeredGrossWeightLbs"),
   operatesInMultipleIftaJurisdictions: boolean("operatesInMultipleIftaJurisdictions"),

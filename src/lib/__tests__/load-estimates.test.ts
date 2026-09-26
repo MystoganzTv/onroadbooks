@@ -39,7 +39,7 @@ describe("trip cost estimates", () => {
     const estimate = buildLoadEstimator(dataset, "2026-09-20");
     const trip = load("t", "2026-09-15", 308);
     // $580 of fuel over 1,000 miles.
-    assert.deepEqual(estimate(trip), { fuelCost: 178.64, fuelPerMile: 0.58 });
+    assert.deepEqual(estimate(trip), { fuelCost: 178.64, fuelPerMile: 0.58, fuelSource: "LEDGER" });
     const lines = tripExpenseLines(trip, [], estimate(trip));
     assert.deepEqual(lines.find((line) => line.key === "fuel"), {
       key: "fuel", label: "Estimated fuel", amount: 178.64, estimated: true,
@@ -47,6 +47,31 @@ describe("trip cost estimates", () => {
     assert.equal(loadMetrics(trip, undefined, [], estimate(trip)).tripProfit, 821.36);
     // A fuel figure the owner entered on the load wins.
     assert.equal(estimate({ ...trip, fuelCost: 150 }).fuelCost, undefined);
+  });
+
+  it("prices fuel by the gallon once the truck has a reference MPG", () => {
+    const { dataset, load } = fixture();
+    const truckId = dataset.trucks[0].id;
+    dataset.trucks = dataset.trucks.map((truck) => (truck.id === truckId ? { ...truck, referenceMpg: 8.5 } : truck));
+    dataset.fuelEntries = [
+      { ...dataset.fuelEntries[0], id: "fe-old", truckId, date: "2026-08-01", gallons: 50, pricePerGallon: 5.9, totalCost: 295 },
+      { ...dataset.fuelEntries[0], id: "fe-new", truckId, date: "2026-09-18", gallons: 48, pricePerGallon: 6.4, totalCost: 307.2 },
+    ];
+    const trip = load("t", "2026-09-15", 308);
+    // 308 mi / 8.5 MPG x $6.40/gal -- the last fill-up, not the ledger's $0.58/mi.
+    assert.deepEqual(buildLoadEstimator(dataset, "2026-09-20")(trip), {
+      fuelCost: 231.91, fuelPerMile: 0.753, fuelSource: "MPG", fuelMpg: 8.5, fuelPricePerGallon: 6.4,
+    });
+    // Deadhead is fuel too: total miles, never loaded miles alone.
+    assert.equal(buildLoadEstimator(dataset, "2026-09-20")({ ...trip, loadedMiles: 208, deadheadMiles: 100 }).fuelCost, 231.91);
+  });
+
+  it("falls back to the ledger when the truck has an MPG but no recent price", () => {
+    const { dataset, load } = fixture();
+    const truckId = dataset.trucks[0].id;
+    dataset.trucks = dataset.trucks.map((truck) => (truck.id === truckId ? { ...truck, referenceMpg: 8.5 } : truck));
+    dataset.fuelEntries = [];
+    assert.equal(buildLoadEstimator(dataset, "2026-09-20")(load("t", "2026-09-15", 308)).fuelSource, "LEDGER");
   });
 
   it("does not guess fuel before the truck has enough miles behind it", () => {

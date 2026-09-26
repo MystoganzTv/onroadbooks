@@ -35,6 +35,8 @@ import { thresholdsFrom, upcomingMaintenance } from "@/lib/maintenance";
 import { calculateMaintenanceHealth } from "@/lib/finance/maintenance-health";
 import { calculateReserveBalances, reserveBalanceFor } from "@/lib/finance/reserves";
 import { todayISO } from "@/lib/periods";
+import { fuelReferenceCheck } from "@/lib/fuel-estimate";
+import { truckFuelBasis } from "@/lib/load-estimates";
 import { formatMoneyCompact, formatNumber, formatRate } from "@/lib/formatters";
 import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
 import { getAppLocale } from "@/lib/i18n-server";
@@ -65,6 +67,11 @@ export default async function TruckPage({
   const lifetime = truckLifetime(dataset, truck);
 
   const today = todayISO();
+  const fuelBasis = truckFuelBasis(dataset, truck.id, today);
+  const fuelView = {
+    rate: fuelBasis.rate,
+    check: fuelReferenceCheck({ rate: fuelBasis.rate, ledgerPerMile: fuelBasis.ledgerPerMile, ledgerMiles: fuelBasis.ledgerMiles }),
+  };
   const thresholds = thresholdsFrom(dataset.settings);
   const records = dataset.maintenanceRecords.filter((r) => r.truckId === truck.id);
   const upcoming = upcomingMaintenance(records, truck, today, thresholds, locale);
@@ -375,6 +382,7 @@ export default async function TruckPage({
             canRestore={allowance.canAdd}
             profileIncomplete={profileIncomplete}
             initialEditing={editRequested}
+            fuel={fuelView}
           />
         </TabsContent>
       </Tabs>

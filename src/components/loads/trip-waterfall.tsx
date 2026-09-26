@@ -60,7 +60,13 @@ export function TripWaterfall({
                   ? copy.tripFuel
                   : line.key === "driverPay" && line.estimated ? copy.driverPayExpected : line.label}
                 hint={line.key === "fuel"
-                  ? line.estimated && estimate.fuelPerMile
+                  ? line.estimated && estimate.fuelSource === "MPG" && estimate.fuelMpg && estimate.fuelPricePerGallon
+                    ? interpolate(copy.fuelEstimateMpgHint, {
+                      miles: formatMiles(metrics.totalMiles),
+                      mpg: String(estimate.fuelMpg),
+                      price: formatRateValue(estimate.fuelPricePerGallon),
+                    })
+                    : line.estimated && estimate.fuelPerMile
                     ? interpolate(copy.fuelEstimateRateHint, {
                       miles: formatMiles(metrics.totalMiles),
                       rate: formatRateValue(estimate.fuelPerMile),

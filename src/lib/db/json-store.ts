@@ -2040,6 +2040,7 @@ export class JsonRepository implements Repository {
         financingConfirmedNone: null,
         operatingCostExemptions: {},
         axleCount: input.axleCount ?? null,
+        referenceMpg: input.referenceMpg ?? null,
         registeredGrossWeightLbs: input.registeredGrossWeightLbs ?? null,
         operatesInMultipleIftaJurisdictions:
           input.operatesInMultipleIftaJurisdictions ?? null,
@@ -2072,6 +2073,7 @@ export class JsonRepository implements Repository {
         monthlyPayment: input.monthlyPayment ?? null,
         monthlyInsurance: input.monthlyInsurance ?? null,
         axleCount: input.axleCount === undefined ? target.axleCount ?? null : input.axleCount,
+        referenceMpg: input.referenceMpg === undefined ? target.referenceMpg ?? null : input.referenceMpg,
         registeredGrossWeightLbs:
           input.registeredGrossWeightLbs === undefined
             ? target.registeredGrossWeightLbs ?? null

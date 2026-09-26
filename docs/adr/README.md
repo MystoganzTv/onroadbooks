@@ -58,6 +58,7 @@ The format is in [0000-template.md](0000-template.md); the practice itself is
 | [0027](0027-read-the-rate-confirmation-never-file-it.md) | A model may read a document; it never files, decides or reaches the ledger | Accepted |
 | [0028](0028-load-profitability-perspectives.md) | Business, Driver and Owner-Operator views of a load; rating floors on the contribution scale | Accepted |
 | [0029](0029-brokers-are-companies-with-contacts.md) | A broker is a company; the people there are contacts; merge and delete profiles | Accepted |
+| [0030](0030-fuel-estimate-from-reference-mpg.md) | Estimate load fuel from the truck's reference MPG and recent price; ledger $/mi as fallback and check | Accepted |
 
 ### Craft
 

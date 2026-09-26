@@ -253,6 +253,7 @@ export interface TruckInput {
   purchasePrice?: number | null;
   monthlyPayment?: number | null;
   monthlyInsurance?: number | null;
+  referenceMpg?: number | null;
   axleCount?: number | null;
   registeredGrossWeightLbs?: number | null;
   operatesInMultipleIftaJurisdictions?: boolean | null;

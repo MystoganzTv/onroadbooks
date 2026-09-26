@@ -433,6 +433,7 @@ export const truckSchema = z.object({
   purchasePrice: money.optional().nullable(),
   monthlyPayment: money.optional().nullable(),
   monthlyInsurance: money.optional().nullable(),
+  referenceMpg: z.number({ invalid_type_error: "Enter miles per gallon" }).min(1, "Enter miles per gallon between 1 and 60").max(60, "Enter miles per gallon between 1 and 60").optional().nullable(),
   axleCount: z.number().int().min(2).max(10).optional().nullable(),
   registeredGrossWeightLbs: z.number().int().min(1_000).max(200_000).optional().nullable(),
   operatesInMultipleIftaJurisdictions: z.boolean().optional().nullable(),

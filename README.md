@@ -93,7 +93,10 @@ both rate-per-mile figures, trip expenses, trip profit, profit per mile and the
 profitability rating calculate live as you type. Every trip cost also appears
 in the operating-expense ledger on the load date, including loads saved by an
 older build; a linked detailed Fuel entry replaces the load fuel estimate so it
-is never counted twice.
+is never counted twice. Without a fuel amount on the load, fuel is estimated as
+total miles ÷ the truck's reference MPG × the price that truck last paid, shown
+as its arithmetic; a truck without an MPG uses its measured fuel $/mi from the
+ledger (ADR 0030).
 
 **Load profitability score** -- every load is rated GREAT / GOOD / MARGINAL / BAD
 on **Contribution Profit per total mile**, never on gross rate per mile. Gross

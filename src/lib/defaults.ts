@@ -95,6 +95,7 @@ export function migrateTruck(truck: Truck): Truck {
   truck.soldOn ??= null;
   truck.active ??= true;
   truck.axleCount ??= null;
+  truck.referenceMpg ??= null;
   truck.registeredGrossWeightLbs ??= null;
   truck.operatesInMultipleIftaJurisdictions ??= null;
   truck.iftaReportingEnabled ??= null;

@@ -37,6 +37,7 @@ function initialState(truck: Truck) {
     monthlyPayment: truck.monthlyPayment ? String(truck.monthlyPayment) : "",
     monthlyInsurance: truck.monthlyInsurance ? String(truck.monthlyInsurance) : "",
     axleCount: truck.axleCount ? String(truck.axleCount) : "",
+    referenceMpg: truck.referenceMpg ? String(truck.referenceMpg) : "",
     registeredGrossWeightLbs: truck.registeredGrossWeightLbs
       ? String(truck.registeredGrossWeightLbs)
       : "",
@@ -78,6 +79,7 @@ export function TruckForm({
     monthlyPayment: copy.monthlyPayment,
     monthlyInsurance: copy.monthlyInsurance,
     axleCount: copy.powerAxles,
+    referenceMpg: copy.referenceMpg,
     registeredGrossWeightLbs: copy.registeredWeight,
     startingOdometer: copy.startingOdometer,
     currentOdometer: copy.currentOdometer,
@@ -103,6 +105,7 @@ export function TruckForm({
       monthlyPayment: values.monthlyPayment ? toNumber(values.monthlyPayment) : null,
       monthlyInsurance: values.monthlyInsurance ? toNumber(values.monthlyInsurance) : null,
       axleCount: values.axleCount ? toNumber(values.axleCount) : null,
+      referenceMpg: values.referenceMpg ? toNumber(values.referenceMpg) : null,
       registeredGrossWeightLbs: values.registeredGrossWeightLbs
         ? toNumber(values.registeredGrossWeightLbs)
         : null,
@@ -337,6 +340,26 @@ export function TruckForm({
               />
             </Field>
           </div>
+
+          <Field
+            label={copy.referenceMpg}
+            htmlFor="truck-reference-mpg"
+            error={errors.referenceMpg}
+            hint={copy.referenceMpgHint}
+          >
+            <Input
+              id="truck-reference-mpg"
+              type="number"
+              inputMode="decimal"
+              min={1}
+              max={60}
+              step={0.1}
+              value={values.referenceMpg}
+              onChange={(e) => set("referenceMpg", e.target.value)}
+              placeholder="8.5"
+              className="max-w-40"
+            />
+          </Field>
 
           <div className="grid grid-cols-2 gap-3">
             <Field

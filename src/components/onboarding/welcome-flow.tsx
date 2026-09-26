@@ -67,6 +67,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName, locale
     monthlyPayment: truck.monthlyPayment ? String(truck.monthlyPayment) : "",
     monthlyInsurance: truck.monthlyInsurance ? String(truck.monthlyInsurance) : "",
     axleCount: truck.axleCount ? String(truck.axleCount) : "",
+    referenceMpg: truck.referenceMpg ? String(truck.referenceMpg) : "",
     registeredGrossWeightLbs: truck.registeredGrossWeightLbs
       ? String(truck.registeredGrossWeightLbs)
       : "",
@@ -134,6 +135,7 @@ export function WelcomeFlow({ business, truck, settings, goals, planName, locale
         monthlyPayment: toRequiredNumber(truckValues.monthlyPayment) ?? null,
         monthlyInsurance: toRequiredNumber(truckValues.monthlyInsurance) ?? null,
         axleCount: toRequiredNumber(truckValues.axleCount) ?? null,
+        referenceMpg: toRequiredNumber(truckValues.referenceMpg) ?? null,
         registeredGrossWeightLbs:
           toRequiredNumber(truckValues.registeredGrossWeightLbs) ?? null,
         operatesInMultipleIftaJurisdictions:
@@ -343,6 +345,15 @@ export function WelcomeFlow({ business, truck, settings, goals, planName, locale
                   placeholder="M2 106"
                 />
               </div>
+            </Field>
+            <Field label={truckCopy.referenceMpg} htmlFor="w-reference-mpg" hint={truckCopy.referenceMpgHint}>
+              <Input
+                id="w-reference-mpg"
+                inputMode="decimal"
+                value={truckValues.referenceMpg}
+                onChange={(e) => setTruckValue("referenceMpg", e.target.value)}
+                placeholder="8.5"
+              />
             </Field>
             <Field label={truckCopy.powerAxles} htmlFor="w-axles" hint={copy.axleHint}>
               <Input

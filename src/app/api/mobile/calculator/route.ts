@@ -28,6 +28,7 @@ import {
 } from "@/lib/finance/cost-coverage";
 import { capabilityRefusal, planAllows } from "@/lib/plans";
 import { todayISO } from "@/lib/periods";
+import { recentFuelPrice } from "@/lib/fuel-estimate";
 import { truckFromSearchParams } from "@/lib/period-params";
 import { FINANCIAL_MODEL_VERSION } from "@/lib/finance/terminology";
 
@@ -140,8 +141,11 @@ export async function GET(request: NextRequest) {
       calculationVersion: FINANCIAL_MODEL_VERSION,
       // Null rather than a number nobody proved: the app leaves the field
       // empty and refuses to estimate instead of assuming a fleet average.
-      fuelPrice: latestFuel?.pricePerGallon ?? fuel.averagePricePerGallon ?? null,
-      mpg: fuel.milesPerGallon ?? null,
+      // The same price and MPG a load on this truck is estimated with (ADR
+      // 0030); the iOS calculator seeds its MPG field from this.
+      fuelPrice: recentFuelPrice(scopedFuelEntries, selectedTruck.id, today)?.pricePerGallon
+        ?? latestFuel?.pricePerGallon ?? fuel.averagePricePerGallon ?? null,
+      mpg: selectedTruck.referenceMpg ?? fuel.milesPerGallon ?? null,
       dispatchPct: Math.round(div(dispatchPaid, grossRevenue) * 1000) / 10,
       factoringPct: Math.round(div(factoringPaid, grossRevenue) * 1000) / 10,
       // Web parity: the calculator counts the truck's driver (iOS seeds its
