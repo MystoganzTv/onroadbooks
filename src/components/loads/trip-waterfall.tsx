@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLanguage } from "@/components/shell/language-provider";
 import { tripExpenseLines } from "@/lib/calculations";
@@ -8,6 +10,7 @@ import type { TripCostEstimate } from "@/lib/load-estimates";
 import type { Expense, Load, LoadMetrics } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { RatingVerdict } from "./rating-badge";
+import { formatLocaleNumber } from "@/lib/i18n-format";
 import { interpolate } from "@/lib/i18n/dictionaries";
 
 /**
@@ -64,7 +67,7 @@ export function TripWaterfall({
                     ? interpolate(copy.fuelEstimateMpgHint, {
                       miles: formatMiles(metrics.totalMiles),
                       mpg: String(estimate.fuelMpg),
-                      price: formatRateValue(estimate.fuelPricePerGallon),
+                      price: `$${estimate.fuelPricePerGallon}`,
                     })
                     : line.estimated && estimate.fuelPerMile
                     ? interpolate(copy.fuelEstimateRateHint, {
@@ -73,6 +76,9 @@ export function TripWaterfall({
                     })
                     : copy.fuelEstimateHint
                   : undefined}
+                detail={line.key === "fuel" && line.estimated ? (
+                  <FuelCalculation load={load} estimate={estimate} amount={line.amount} />
+                ) : undefined}
                 value={-line.amount}
                 width={scale(line.amount)}
                 barClass="bg-neg"
@@ -125,9 +131,11 @@ function Row({
   barClass,
   strong,
   muted,
+  detail,
 }: {
   label: string;
   hint?: string;
+  detail?: ReactNode;
   value: number;
   width: number;
   barClass: string;
@@ -166,7 +174,57 @@ function Row({
           style={{ width: `${Math.min(width, 100)}%` }}
         />
       </div>
+      {detail}
     </div>
+  );
+}
+
+function FuelCalculation({ load, estimate, amount }: { load: Load; estimate: TripCostEstimate; amount: number }) {
+  const { dictionary, locale } = useLanguage();
+  const copy = dictionary.loads;
+  const number = (value: number, digits = 20) => formatLocaleNumber(value, locale, {
+    maximumFractionDigits: digits,
+  });
+  const miles = load.loadedMiles + load.deadheadMiles;
+  const byGallon = Boolean(estimate.fuelSource === "MPG" && estimate.fuelMpg && estimate.fuelPricePerGallon);
+  if (!byGallon && !estimate.fuelPerMile) return null;
+
+  return (
+    <details className="mt-2 rounded-md border border-border bg-surface-sunken text-sm" data-testid="fuel-calculation">
+      <summary className="cursor-pointer rounded-md px-3 py-2 text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        {copy.fuelCalculation}
+      </summary>
+      <div className="space-y-3 border-t border-border p-3">
+        <dl className="space-y-3 [&_dt]:text-xs [&_dt]:text-muted-foreground [&_dd]:mt-1 [&_dd]:break-words [&_dd]:font-medium [&_dd]:tabular-nums">
+          <div>
+            <dt>{copy.fuelCalculationMiles}</dt>
+            <dd>{number(load.loadedMiles)} + {number(load.deadheadMiles)} = {number(miles)} mi</dd>
+          </div>
+          {byGallon ? <>
+            <div>
+              <dt>{copy.fuelCalculationGallons}</dt>
+              <dd>{number(miles)} mi ÷ {number(estimate.fuelMpg!)} MPG ≈ {number(miles / estimate.fuelMpg!, 4)} gal</dd>
+            </div>
+            <div>
+              <dt>{copy.fuelCalculationPrice}</dt>
+              <dd>${number(estimate.fuelPricePerGallon!)} / gal</dd>
+            </div>
+          </> : null}
+          <div>
+            <dt>{copy.fuelCalculationTotal}</dt>
+            <dd>{byGallon
+              ? `${number(miles)} ÷ ${number(estimate.fuelMpg!)} × $${number(estimate.fuelPricePerGallon!)} = ${formatMoney(amount)}`
+              : `${number(miles)} mi × $${number(estimate.fuelPerMile!)} / mi = ${formatMoney(amount)}`}</dd>
+          </div>
+        </dl>
+        <p className="text-xs text-muted-foreground">{byGallon
+          ? estimate.fuelPriceSource === "LATEST" && estimate.fuelPriceDate
+            ? interpolate(copy.fuelCalculationLatest, { date: estimate.fuelPriceDate })
+            : estimate.fuelPriceSource === "AVERAGE" ? copy.fuelCalculationAverage : null
+          : copy.fuelCalculationLedger}</p>
+        <p className="text-xs text-muted-foreground">{copy.fuelCalculationNote}</p>
+      </div>
+    </details>
   );
 }
 

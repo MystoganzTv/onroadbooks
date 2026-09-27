@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { buildSeedDataset } from "../src/lib/seed/seed-data";
+import { todayISO } from "../src/lib/periods";
 import type { Dataset } from "../src/lib/types";
 
 const dataDir = path.join(process.cwd(), ".e2e-data");
@@ -111,6 +112,31 @@ test("truck purchases stay separate from estimated trip fuel", async ({ page }) 
   const breakdown = page.locator("div.rounded-lg").filter({ has: page.getByRole("heading", { name: "Trip cost breakdown", exact: true }) });
   await expect(breakdown).toContainText("$180.00");
   await page.screenshot({ path: "/tmp/onroad-load-expenses.png", fullPage: true });
+
+  // The fuel explanation uses the price's actual precision, not the
+  // two-decimal currency label, and never pretends a saved amount was estimated.
+  await expect(page.getByTestId("fuel-calculation")).toHaveCount(0);
+  const estimated = structuredClone(withToll);
+  estimated.loads[0] = { ...estimated.loads[0], fuelCost: 0, loadedMiles: 495, deadheadMiles: 42 };
+  estimated.trucks[0].referenceMpg = 8.5;
+  estimated.fuelEntries = [{ ...purchase, date: todayISO(), pricePerGallon: 6.522 }];
+  await fs.writeFile(dataFile, JSON.stringify(estimated));
+  await page.reload();
+  const calculation = page.getByTestId("fuel-calculation");
+  await expect(calculation).not.toHaveAttribute("open", "");
+  await calculation.locator("summary").focus();
+  await page.keyboard.press("Enter");
+  await expect(calculation).toHaveAttribute("open", "");
+  await expect(calculation).toContainText("495 + 42 = 537 mi");
+  await expect(calculation).toContainText("537 mi ÷ 8.5 MPG ≈ 63.1765 gal");
+  await expect(calculation).toContainText("537 ÷ 8.5 × $6.522 = $412.04");
+  await expect(calculation).toContainText(`Latest recorded fuel purchase for this truck: ${todayISO()}`);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await calculation.scrollIntoViewIfNeeded();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await calculation.screenshot({ path: "/tmp/onroad-fuel-calculation-detail.png" });
+  await fs.writeFile(dataFile, JSON.stringify(withToll));
+  await page.setViewportSize({ width: 1280, height: 720 });
 
   // Explicitly enabling reporting reveals its fields and navigation again.
   const enabled = JSON.parse(await fs.readFile(dataFile, "utf8")) as Dataset;

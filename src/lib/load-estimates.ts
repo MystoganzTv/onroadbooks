@@ -24,6 +24,8 @@ export interface TripCostEstimate {
   fuelSource?: FuelRate["source"];
   fuelMpg?: number;
   fuelPricePerGallon?: number;
+  fuelPriceSource?: "LATEST" | "AVERAGE";
+  fuelPriceDate?: string | null;
 }
 
 export type LoadCostEstimator = (load: Load) => TripCostEstimate;
@@ -81,11 +83,13 @@ export function buildLoadEstimator(dataset: EstimateSource, today: string): Load
       const miles = (load.loadedMiles ?? 0) + (load.deadheadMiles ?? 0);
       if (rate !== null && miles > 0) {
         estimate.fuelCost = roundMoney(miles * rate.perMile);
-        estimate.fuelPerMile = Math.round(rate.perMile * 1000) / 1000;
+        estimate.fuelPerMile = rate.perMile;
         estimate.fuelSource = rate.source;
         if (rate.source === "MPG" && rate.mpg && rate.price) {
           estimate.fuelMpg = rate.mpg;
-          estimate.fuelPricePerGallon = Math.round(rate.price.pricePerGallon * 1000) / 1000;
+          estimate.fuelPricePerGallon = rate.price.pricePerGallon;
+          estimate.fuelPriceSource = rate.price.source;
+          estimate.fuelPriceDate = rate.price.date;
         }
       }
     }

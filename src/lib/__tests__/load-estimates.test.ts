@@ -60,10 +60,23 @@ describe("trip cost estimates", () => {
     const trip = load("t", "2026-09-15", 308);
     // 308 mi / 8.5 MPG x $6.40/gal -- the last fill-up, not the ledger's $0.58/mi.
     assert.deepEqual(buildLoadEstimator(dataset, "2026-09-20")(trip), {
-      fuelCost: 231.91, fuelPerMile: 0.753, fuelSource: "MPG", fuelMpg: 8.5, fuelPricePerGallon: 6.4,
+      fuelCost: 231.91, fuelPerMile: 6.4 / 8.5, fuelSource: "MPG", fuelMpg: 8.5, fuelPricePerGallon: 6.4,
+      fuelPriceSource: "LATEST", fuelPriceDate: "2026-09-18",
     });
     // Deadhead is fuel too: total miles, never loaded miles alone.
     assert.equal(buildLoadEstimator(dataset, "2026-09-20")({ ...trip, loadedMiles: 208, deadheadMiles: 100 }).fuelCost, 231.91);
+  });
+
+  it("preserves price precision so the displayed formula can reproduce the cost", () => {
+    const { dataset, load } = fixture();
+    const truckId = dataset.trucks[0].id;
+    dataset.trucks = dataset.trucks.map(truck => ({ ...truck, referenceMpg: truck.id === truckId ? 8.5 : truck.referenceMpg }));
+    const price = 150 / 23;
+    dataset.fuelEntries = [{ ...dataset.fuelEntries[0], truckId, date: "2026-09-18", gallons: 23, totalCost: 150, pricePerGallon: price }];
+    const estimate = buildLoadEstimator(dataset, "2026-09-20")(load("t", "2026-09-20", 495, { deadheadMiles: 42 }));
+    assert.equal(estimate.fuelPricePerGallon, price);
+    assert.equal(estimate.fuelCost, 412.02);
+    assert.equal(Math.round(537 / estimate.fuelMpg! * estimate.fuelPricePerGallon! * 100) / 100, estimate.fuelCost);
   });
 
   it("falls back to the ledger when the truck has an MPG but no recent price", () => {
