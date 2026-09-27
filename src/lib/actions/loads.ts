@@ -10,6 +10,7 @@ import { fieldErrorsFrom, type ActionResult } from "./types";
 
 function revalidateAll() {
   revalidatePath("/dashboard");
+  revalidatePath("/dispatchers");
   revalidatePath("/loads");
   revalidatePath("/reports");
   revalidatePath("/truck");

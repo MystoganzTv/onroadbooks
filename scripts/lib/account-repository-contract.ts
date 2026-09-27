@@ -119,6 +119,22 @@ export async function accountRepositoryContract(
   const load = await repo.createLoad(loadInput);
   assert.equal(load.date, "2024-02-29");
   assert.equal(load.grossRate, 2500.01);
+  const dispatcher = await repo.saveDispatcher(null, { name: " Road Dispatch ", phone: "555-0199", email: null, notes: "Weekly commissions" });
+  assert.equal(dispatcher.name, "Road Dispatch");
+  await assert.rejects(foreign.saveDispatcher(dispatcher.id, { name: "Wrong owner", phone: null, email: null, notes: null }), /does not belong/);
+  await assert.rejects(repo.saveDispatcher(null, { name: "ROAD DISPATCH", phone: null, email: null, notes: null }), /already exists/);
+  await repo.updateLoad(load.id, { ...loadInput, sourceKind: "DISPATCHER", sourceName: "Road Dispatch" });
+  // Old mobile clients omit these fields: editing a load must preserve its source.
+  await repo.updateLoad(load.id, loadInput);
+  assert.equal((await repo.getDataset()).loads.find(row => row.id === load.id)?.sourceName, "Road Dispatch");
+  await repo.saveDispatcher(dispatcher.id, { name: "Road Dispatch LLC", phone: "555-0199", email: null, notes: null });
+  const sourced = (await repo.getDataset()).loads.find(row => row.id === load.id)!;
+  assert.equal(sourced.sourceName, "Road Dispatch LLC");
+  assert.equal(sourced.sourceKind, "DISPATCHER");
+  assert.equal(sourced.dispatchFee, loadInput.dispatchFee);
+  assert.equal(sourced.broker, loadInput.broker);
+  await repo.updateLoad(load.id, { ...loadInput, sourceKind: null, sourceName: null });
+  assert.equal((await repo.getDataset()).loads.find(row => row.id === load.id)?.sourceName, null);
   const contact = { name: "Example Brokerage", contactName: "Dispatch Team", phone: "555-0100", phoneExtension: "0012", email: "dispatch@example.test", mcNumber: "123456", address: "Example address", notes: "Call before arrival" };
   const broker = await repo.saveBroker(null, contact);
   assert.equal((await repo.getDataset()).brokers?.find((row) => row.id === broker.id)?.email, contact.email);

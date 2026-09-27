@@ -162,6 +162,20 @@ export interface Truck {
   createdAt: string;
 }
 
+export interface Dispatcher {
+  id: string;
+  businessId: string;
+  name: string;
+  nameKey: string;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export const LOAD_SOURCE_KINDS = ["SELF", "DISPATCHER", "BROKER_DIRECT", "OTHER"] as const;
+export type LoadSourceKind = (typeof LOAD_SOURCE_KINDS)[number];
+
 export interface Load {
   id: string;
   businessId: string;
@@ -180,6 +194,8 @@ export interface Load {
   broker: string | null;
   /** The person at the broker this load was booked with. */
   brokerContact?: string | null;
+  sourceKind?: LoadSourceKind | null;
+  sourceName?: string | null;
   loadNumber: string | null;
   equipmentType: EquipmentType | null;
   loadCapacity: LoadCapacity | null;
@@ -478,6 +494,7 @@ export interface Broker {
 
 export interface Dataset {
   brokers?: Broker[];
+  dispatchers?: Dispatcher[];
   business: Business;
   users: User[];
   settings: FinancialSettings;

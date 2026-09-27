@@ -24,3 +24,5 @@ export * from "./documents";
 export * from "./relations";
 export * from "./auth";
 export * from "./brokers";
+
+export * from "./dispatchers";

@@ -38,6 +38,9 @@ export async function GET(
         date: load.date,
         deliveryDate: load.deliveryDate,
         broker: load.broker,
+    brokerContact: load.brokerContact,
+    sourceKind: load.sourceKind ?? null,
+    sourceName: load.sourceName ?? null,
         loadNumber: load.loadNumber,
         originCity: load.originCity,
         originState: load.originState,
@@ -74,6 +77,9 @@ function loadFormShape(load: Load) {
     destinationCity: load.destinationCity,
     destinationState: load.destinationState,
     broker: load.broker,
+    brokerContact: load.brokerContact,
+    sourceKind: load.sourceKind ?? null,
+    sourceName: load.sourceName ?? null,
     loadNumber: load.loadNumber,
     equipmentType: load.equipmentType,
     loadCapacity: load.loadCapacity,
@@ -95,7 +101,7 @@ function loadFormShape(load: Load) {
   };
 }
 
-const TOUCHED = ["/dashboard", "/loads", "/reports", "/truck", "/invoices", "/ifta"];
+const TOUCHED = ["/dashboard", "/loads", "/dispatchers", "/reports", "/truck", "/invoices", "/ifta"];
 
 /**
  * Fix a load from the phone.

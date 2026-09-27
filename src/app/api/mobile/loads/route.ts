@@ -49,6 +49,8 @@ export async function GET(request: NextRequest) {
         id: load.id,
         date: load.date,
         broker: load.broker,
+        sourceKind: load.sourceKind ?? null,
+        sourceName: load.sourceName ?? null,
         originCity: load.originCity,
         originState: load.originState,
         destinationCity: load.destinationCity,
@@ -111,7 +113,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const load = await gate.repository.createLoad(parsed.data);
-    for (const path of ["/dashboard", "/loads", "/reports", "/truck"]) revalidatePath(path);
+    for (const path of ["/dashboard", "/loads", "/dispatchers", "/reports", "/truck"]) revalidatePath(path);
     return NextResponse.json({ id: load.id }, { status: 201 });
   } catch (error) {
     return NextResponse.json(

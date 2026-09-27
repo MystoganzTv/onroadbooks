@@ -1,5 +1,7 @@
 "use client";
 
+import { LOAD_SOURCE_KINDS, type LoadSourceKind } from "@/lib/types";
+
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, Trash2 } from "lucide-react";
@@ -94,6 +96,8 @@ interface FormState {
   destinationState: string;
   broker: string;
   brokerContact: string;
+  sourceKind: LoadSourceKind | "UNSPECIFIED";
+  sourceName: string;
   loadNumber: string;
   equipmentType: EquipmentType | "UNSPECIFIED";
   loadCapacity: LoadCapacity | "UNSPECIFIED";
@@ -135,6 +139,8 @@ function emptyState(defaultDate: string, truckId: string): FormState {
     destinationState: "",
     broker: "",
     brokerContact: "",
+    sourceKind: "UNSPECIFIED",
+    sourceName: "",
     loadNumber: "",
     equipmentType: "BOX_TRUCK",
     loadCapacity: "FULL",
@@ -169,6 +175,8 @@ function stateFromLoad(load: Load): FormState {
     destinationState: load.destinationState,
     broker: load.broker ?? "",
     brokerContact: load.brokerContact ?? "",
+    sourceKind: load.sourceKind ?? "UNSPECIFIED",
+    sourceName: load.sourceName ?? "",
     loadNumber: load.loadNumber ?? "",
     equipmentType: load.equipmentType ?? "UNSPECIFIED",
     loadCapacity: load.loadCapacity ?? "UNSPECIFIED",
@@ -310,6 +318,7 @@ function percentLabel(pct: number): string {
 interface LoadFormDialogProps {
   load?: Load;
   brokers?: string[];
+  dispatcherNames?: string[];
   /** Contacts already booked with, by broker name key (see broker-contacts.ts). */
   brokerContacts?: Record<string, string[]>;
   trucks?: Truck[];
@@ -339,6 +348,7 @@ interface LoadFormDialogProps {
 export function LoadFormDialog({
   load,
   brokers = [],
+  dispatcherNames = [],
   brokerContacts = {},
   trucks = [],
   drivers = [],
@@ -497,6 +507,8 @@ export function LoadFormDialog({
       destinationState: values.destinationState,
       broker: values.broker || null,
       brokerContact: values.brokerContact || null,
+      sourceKind: values.sourceKind === "UNSPECIFIED" ? null : values.sourceKind,
+      sourceName: values.sourceKind === "UNSPECIFIED" || values.sourceKind === "SELF" ? null : values.sourceName || null,
       loadNumber: values.loadNumber || null,
       equipmentType: values.equipmentType === "UNSPECIFIED" ? null : values.equipmentType,
       loadCapacity: values.loadCapacity === "UNSPECIFIED" ? null : values.loadCapacity,
@@ -790,6 +802,23 @@ export function LoadFormDialog({
                   factoringFee: convertFee(prev.factoringFee, prev.factoringMode, mode, grossRate),
                 }))}
               />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label={copy.loadSource} htmlFor="load-source" error={errors.sourceKind} hint={copy.loadSourceHint}>
+                <Select value={values.sourceKind} onValueChange={(value) => setValues(prev => ({ ...prev, sourceKind: value as FormState["sourceKind"], sourceName: "" }))}>
+                  <SelectTrigger id="load-source" aria-invalid={Boolean(errors.sourceKind)}><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="UNSPECIFIED">{copy.notSpecified}</SelectItem>
+                    {LOAD_SOURCE_KINDS.map(kind => <SelectItem key={kind} value={kind}>{copy.loadSourceKinds[kind]}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+              {values.sourceKind !== "UNSPECIFIED" && values.sourceKind !== "SELF" ? (
+                <Field label={values.sourceKind === "DISPATCHER" ? copy.loadDispatcherName : copy.loadSourceName} required={values.sourceKind === "DISPATCHER"} htmlFor="load-source-name" error={errors.sourceName}>
+                  <Input id="load-source-name" required={values.sourceKind === "DISPATCHER"} list={values.sourceKind === "DISPATCHER" ? "dispatcher-list" : undefined} maxLength={120} value={values.sourceName} onChange={e => set("sourceName", e.target.value)} aria-invalid={Boolean(errors.sourceName)} />
+                  <datalist id="dispatcher-list">{dispatcherNames.map(name => <option key={name} value={name} />)}</datalist>
+                </Field>
+              ) : null}
             </div>
             {/* Who the load was booked through: the company, and the person there. */}
             <div className="grid grid-cols-2 gap-3">

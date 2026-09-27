@@ -40,6 +40,7 @@ export interface CalculatorDefaults {
   deadheadWarnPct: number;
   thresholds: RatingThresholds;
   brokers: string[];
+  dispatcherNames?: string[];
   trucks: Truck[];
   defaultTruckId: string;
   defaultDate: string;
@@ -409,6 +410,7 @@ function EvaluateResult({
             </p>
           </div>
           <LoadFormDialog
+            dispatcherNames={defaults.dispatcherNames}
             brokers={defaults.brokers}
             trucks={defaults.trucks}
             defaultTruckId={defaults.defaultTruckId}

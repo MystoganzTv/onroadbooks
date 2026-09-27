@@ -253,6 +253,7 @@ model Business {
   reserveTransactions  ReserveTransaction[]
   settlements          Settlement[]
   brokers              Broker[]
+  dispatchers          Dispatcher[]
   drivers              Driver[]
   driverSettlements    DriverSettlement[]
 }
@@ -490,6 +491,8 @@ model Load {
   destinationState String    @db.VarChar(2)
   broker           String?
   brokerContact    String?
+  sourceKind       String?
+  sourceName       String?
   loadNumber       String?
 
   equipmentType     EquipmentType?
@@ -846,6 +849,21 @@ model Broker {
   address String?
   notes String?
   contacts Json @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([businessId, nameKey])
+}
+
+model Dispatcher {
+  id String @id @default(cuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name String
+  nameKey String
+  phone String?
+  email String?
+  notes String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

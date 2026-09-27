@@ -1,3 +1,4 @@
+import { dispatcherDirectory } from "@/lib/dispatchers";
 import { buildLoadProfitability } from "@/lib/finance/load-perspectives";
 import { LoadProfitabilityCard } from "@/components/loads/load-profitability-card";
 import { brokerContactNames } from "@/lib/broker-contacts";
@@ -132,6 +133,7 @@ export default async function LoadDetailPage({
             </Button>
           ) : null}
           <LoadFormDialog
+              dispatcherNames={dispatcherDirectory(dataset).map(row => row.name)}
             load={load}
             brokers={brokers}
             brokerContacts={brokerContactNames(dataset.loads, dataset.brokers)}
@@ -219,6 +221,7 @@ export default async function LoadDetailPage({
               </div>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-x-4 gap-y-3 p-4">
+              <Metric label={copy.loadSource} value={load.sourceKind ? copy.loadSourceKinds[load.sourceKind] : copy.notSpecified} sub={load.sourceName ?? undefined} />
               <Metric label={copy.pickup} value={formatLocaleDate(load.date, locale, "long")} />
               <Metric
                 label={copy.delivery}

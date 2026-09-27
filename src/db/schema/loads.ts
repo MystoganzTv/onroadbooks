@@ -19,6 +19,8 @@ export const load = pgTable("Load", {
   destinationState: varchar("destinationState", { length: 2 }).notNull(),
   broker: text("broker"),
   brokerContact: text("brokerContact"),
+  sourceKind: text("sourceKind"),
+  sourceName: text("sourceName"),
   loadNumber: text("loadNumber"),
   equipmentType: enums.equipmentType("equipmentType"),
   loadCapacity: enums.loadCapacity("loadCapacity"),

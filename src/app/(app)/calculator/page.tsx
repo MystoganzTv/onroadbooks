@@ -1,3 +1,4 @@
+import { dispatcherDirectory } from "@/lib/dispatchers";
 import type { Metadata } from "next";
 
 import { CalculatorPanel, type CalculatorDefaults } from "@/components/calculator/calculator-panel";
@@ -71,6 +72,7 @@ export default async function CalculatorPage({
   const shared = calculatorDefaults(dataset, selectedTruck, today);
   const defaults: CalculatorDefaults = {
     ...shared,
+    dispatcherNames: dispatcherDirectory(dataset).map(row => row.name),
     fuelPrice: shared.fuelPrice ?? 0,
     mpg: shared.mpg ?? 0,
     brokers: [...new Set(scopedLoads.map((l) => l.broker).filter(Boolean))].sort() as string[],

@@ -1,5 +1,6 @@
 import { reconcileDebtPaymentSplit } from "./finance/debt-payment";
 import { z } from "zod";
+import { LOAD_SOURCE_KINDS } from "./types";
 import { isIftaJurisdiction } from "./ifta";
 
 import { CATEGORY_IDS } from "./categories";
@@ -79,6 +80,8 @@ export const loadSchema = z
       .regex(/^[A-Za-z]{2}$/, "Use a 2-letter state"),
     broker: z.string().trim().max(120).optional().nullable(),
     brokerContact: z.string().trim().max(120).optional().nullable(),
+    sourceKind: z.enum(LOAD_SOURCE_KINDS).optional().nullable(),
+    sourceName: z.string().trim().max(120).optional().nullable(),
     loadNumber: z.string().trim().max(60).optional().nullable(),
     equipmentType: z
       .enum(["BOX_TRUCK", "DRY_VAN", "REEFER", "FLATBED", "POWER_ONLY", "SPRINTER_VAN", "OTHER"])
@@ -112,6 +115,9 @@ export const loadSchema = z
     status: z.enum(["PENDING", "INVOICED", "PAID"]),
     jurisdictionMiles: jurisdictionMilesSchema.optional(),
     notes: z.string().trim().max(2000).optional().nullable(),
+  })
+  .refine(value => value.sourceKind !== "DISPATCHER" || Boolean(value.sourceName?.trim()), {
+    message: "Enter the dispatcher's name.", path: ["sourceName"],
   })
   .refine((value) => !value.deliveryDate || value.deliveryDate >= value.date, {
     message: "Delivery cannot be before pickup",

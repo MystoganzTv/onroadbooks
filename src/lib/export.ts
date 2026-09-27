@@ -119,7 +119,7 @@ export function buildReport(
           "Gross Rate", "Rate/Loaded Mile", "Rate/Total Mile",
           "Estimated Fuel", "Tolls", "Dispatch", "Factoring", "Other", "Driver Pay",
           "Direct Trip Costs", "Contribution Profit", "Contribution/Total Mile",
-          "Contribution Margin %", "Rating", "Notes",
+          "Contribution Margin %", "Rating", "Notes", "Load source", "Source name",
         ],
         rows: periodLoads.map((load) => [
           truckName(load.truckId),
@@ -154,6 +154,8 @@ export function buildReport(
           Number(load.metrics.profitMargin.toFixed(1)),
           load.metrics.rating,
           load.notes ?? "",
+          load.sourceKind ?? "",
+          load.sourceName ?? "",
         ]),
       };
 

@@ -10,6 +10,7 @@
 import type {
   Business,
   Broker,
+  Dispatcher,
   BrokerContact,
   User,
   Dataset,
@@ -65,6 +66,8 @@ export class BusinessNotFoundError extends Error {
   }
 }
 
+export type DispatcherInput = Pick<Dispatcher, "name" | "phone" | "email" | "notes">;
+
 export interface LoadInput {
   /** Which unit ran it. Optional only while the workspace has one active truck. */
   truckId?: string | null;
@@ -80,6 +83,8 @@ export interface LoadInput {
   destinationState: string;
   broker?: string | null;
   brokerContact?: string | null;
+  sourceKind?: Load["sourceKind"];
+  sourceName?: string | null;
   loadNumber?: string | null;
   equipmentType?: EquipmentType | null;
   loadCapacity?: LoadCapacity | null;
@@ -359,6 +364,8 @@ export interface Repository {
   moveBrokerName(name: string, targetId: string): Promise<Broker>;
   /** Everything the app needs for a request, in one read. */
   getDataset(): Promise<Dataset>;
+
+  saveDispatcher(id: string | null, input: DispatcherInput): Promise<Dispatcher>;
 
   createLoad(input: LoadInput): Promise<Load>;
   updateLoad(id: string, input: LoadInput): Promise<Load>;

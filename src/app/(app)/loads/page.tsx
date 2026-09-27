@@ -1,3 +1,4 @@
+import { dispatcherDirectory } from "@/lib/dispatchers";
 import { brokerContactNames } from "@/lib/broker-contacts";
 import { buildLoadEstimator } from "@/lib/load-estimates";
 import { brokerNames as savedBrokerNames } from "@/lib/brokers";
@@ -103,6 +104,7 @@ export default async function LoadsPage({
               />
             )}
             <LoadFormDialog
+              dispatcherNames={dispatcherDirectory(dataset).map(row => row.name)}
               brokers={brokers}
               brokerContacts={brokerContacts}
               trucks={trucks}

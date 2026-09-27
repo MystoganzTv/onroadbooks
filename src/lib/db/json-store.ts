@@ -1,3 +1,5 @@
+import type { Dispatcher } from "../types";
+import type { DispatcherInput } from "./repository";
 import { brokerContactsOf, brokerNameKey, clearedLegacyContact, planBrokerMerge, planNameIntoBroker } from "../brokers";
 import { recurringSeriesExpenseIds } from "../recurring-expenses";
 import "server-only";
@@ -286,6 +288,7 @@ function migrate(dataset: Dataset): Dataset {
   // catalogue decides what it becomes -- Individual, the old single-truck
   // plan, keeps the cockpit it was sold and becomes OnRoad Pro.
   dataset.brokers ??= [];
+  dataset.dispatchers ??= [];
   // Same move as SQL migration 0012: the legacy person becomes a contact.
   for (const broker of dataset.brokers) {
     broker.contacts = brokerContactsOf(broker);
@@ -437,6 +440,8 @@ function loadFromInput(
     destinationState: input.destinationState.trim().toUpperCase(),
     broker: input.broker?.trim() || null,
     brokerContact: input.brokerContact?.trim() || null,
+    sourceKind: input.sourceKind === undefined ? existing?.sourceKind ?? null : input.sourceKind,
+    sourceName: input.sourceName === undefined ? existing?.sourceName ?? null : input.sourceName?.trim() || null,
     loadNumber: input.loadNumber?.trim() || null,
     equipmentType: input.equipmentType ?? null,
     loadCapacity: input.loadCapacity ?? null,
@@ -968,6 +973,7 @@ export class JsonAuthStore implements AuthStore {
       dataset.settlements = [];
       dataset.drivers = [];
       dataset.brokers = [];
+      dataset.dispatchers = [];
       dataset.driverSettlements = [];
       dataset.trucks = [
         {
@@ -1162,6 +1168,24 @@ export class JsonRepository implements Repository {
       dataset.documents = dataset.documents.filter(
         (document) => !document.expenseId || !generatedIds.includes(document.expenseId),
       );
+    }, this.businessId);
+  }
+
+  async saveDispatcher(id: string | null, input: DispatcherInput): Promise<Dispatcher> {
+    return mutate(dataset => {
+      const rows = dataset.dispatchers ??= [];
+      const existing = id ? rows.find(row => row.id === id) : undefined;
+      if (id && !existing) throw new Error("That dispatcher does not belong to this workspace.");
+      const nameKey = brokerNameKey(input.name);
+      if (rows.some(row => row.nameKey === nameKey && row.id !== id)) throw new Error("A dispatcher with that name already exists.");
+      const row: Dispatcher = { ...input, name: input.name.trim(), nameKey, id: existing?.id ?? newId("dispatcher"), businessId: dataset.business.id, createdAt: existing?.createdAt ?? new Date().toISOString() };
+      if (existing) {
+        for (const load of dataset.loads) {
+          if (load.sourceKind === "DISPATCHER" && brokerNameKey(load.sourceName ?? "") === existing.nameKey) load.sourceName = row.name;
+        }
+        Object.assign(existing, row);
+      } else rows.push(row);
+      return row;
     }, this.businessId);
   }
 

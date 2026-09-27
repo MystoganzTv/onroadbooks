@@ -1,3 +1,5 @@
+import type { Dispatcher } from "../types";
+import type { DispatcherInput } from "./repository";
 import { brokerContactsOf, brokerNameKey, clearedLegacyContact, planBrokerMerge, planNameIntoBroker } from "../brokers";
 import { recurringSeriesExpenseIds } from "../recurring-expenses";
 import "server-only";
@@ -847,6 +849,7 @@ export class DrizzleAuthStore implements AuthStore {
         columns: { storageKey: true },
       });
 
+      await tx.delete(s.dispatcher).where(eq(s.dispatcher.businessId, businessId));
       await tx.delete(s.broker).where(eq(s.broker.businessId, businessId));
       await affectedRows(
         tx
@@ -1093,6 +1096,7 @@ export class DrizzleRepository implements Repository {
     const business = await this.business(client);
 
     const [
+      dispatcherRows,
       brokerRows,
       loadRows,
       expenseRows,
@@ -1109,6 +1113,7 @@ export class DrizzleRepository implements Repository {
       obligationRows,
       paymentEventRows,
     ] = await Promise.all([
+      client.query.dispatcher.findMany({ where: eq(s.dispatcher.businessId, business.id), orderBy: [asc(s.dispatcher.name)] }),
       client.query.broker.findMany({ where: eq(s.broker.businessId, business.id), orderBy: [asc(s.broker.name)] }),
       // Tie-break on id so same-day rows have a defined order, matching the
       // JSON store rather than whatever Postgres happens to return.
@@ -1332,6 +1337,7 @@ export class DrizzleRepository implements Repository {
     }));
 
     const dataset: Dataset = {
+      dispatchers: dispatcherRows.map(row => ({ ...row, createdAt: row.createdAt.toISOString() })),
       brokers: brokerRows.map((row) => ({ ...row, contacts: brokerContactsOf(row), createdAt: row.createdAt.toISOString() })),
       users: [],
       business: {
@@ -1468,6 +1474,8 @@ export class DrizzleRepository implements Repository {
           destinationState: row.destinationState,
           broker: row.broker,
           brokerContact: row.brokerContact,
+          sourceKind: row.sourceKind as Load["sourceKind"],
+          sourceName: row.sourceName,
           loadNumber: row.loadNumber,
           equipmentType: row.equipmentType as EquipmentType | null,
           loadCapacity: row.loadCapacity as LoadCapacity | null,
@@ -1598,6 +1606,8 @@ export class DrizzleRepository implements Repository {
       destinationState: input.destinationState.trim().toUpperCase(),
       broker: input.broker?.trim() || null,
       brokerContact: input.brokerContact?.trim() || null,
+      sourceKind: input.sourceKind,
+      sourceName: input.sourceName === undefined ? undefined : input.sourceName?.trim() || null,
       loadNumber: input.loadNumber?.trim() || null,
       equipmentType: input.equipmentType ?? null,
       loadCapacity: input.loadCapacity ?? null,
@@ -1910,6 +1920,25 @@ export class DrizzleRepository implements Repository {
       );
       await oneRow(tx.delete(s.load).where(eq(s.load.id, id)).returning());
     });
+  }
+
+  async saveDispatcher(id: string | null, input: DispatcherInput): Promise<Dispatcher> {
+    const client = await this.clientProvider();
+    const business = await this.business(client);
+    const row = await client.transaction(async tx => {
+      const existing = id ? await tx.query.dispatcher.findFirst({ where: and(eq(s.dispatcher.id, id), eq(s.dispatcher.businessId, business.id)) }) : null;
+      if (id && !existing) throw new Error("That dispatcher does not belong to this workspace.");
+      const nameKey = brokerNameKey(input.name);
+      const duplicate = await tx.query.dispatcher.findFirst({ where: and(eq(s.dispatcher.businessId, business.id), eq(s.dispatcher.nameKey, nameKey)) });
+      if (duplicate && duplicate.id !== id) throw new Error("A dispatcher with that name already exists.");
+      const data = { ...input, name: input.name.trim(), nameKey };
+      if (!existing) return oneRow(tx.insert(s.dispatcher).values(insertValues(s.dispatcher, { ...data, businessId: business.id })).returning());
+      const loads = await tx.query.load.findMany({ where: and(eq(s.load.businessId, business.id), eq(s.load.sourceKind, "DISPATCHER")), columns: { id: true, sourceName: true } });
+      const linked = loads.filter(load => brokerNameKey(load.sourceName ?? "") === existing.nameKey).map(load => load.id);
+      if (linked.length) await tx.update(s.load).set(updateValues(s.load, { sourceName: data.name })).where(and(eq(s.load.businessId, business.id), inArray(s.load.id, linked)));
+      return oneRow(tx.update(s.dispatcher).set(updateValues(s.dispatcher, data)).where(and(eq(s.dispatcher.id, existing.id), eq(s.dispatcher.businessId, business.id))).returning());
+    });
+    return { ...row, createdAt: row.createdAt.toISOString() };
   }
 
   async saveBroker(id: string | null, input: BrokerInput): Promise<Broker> {
