@@ -33,7 +33,7 @@ const PUBLIC_PATHS = [
  * The marketing landing page. It is matched exactly and never by prefix --
  * `"/".startsWith` would let the whole application through.
  */
-const PUBLIC_EXACT_PATHS = ["/", "/privacy", "/terms"];
+const PUBLIC_EXACT_PATHS = ["/", "/privacy", "/terms", "/support"];
 
 /**
  * Static files served straight off disk: everything in public/ plus the
