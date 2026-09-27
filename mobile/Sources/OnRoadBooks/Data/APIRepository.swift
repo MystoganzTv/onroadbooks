@@ -147,6 +147,78 @@ final class APIRepository: LedgerRepository {
         _ = try APIClient.outcome(data, http)
     }
 
+    func scanRateCon(data: Data, contentType: String) async throws -> [String: String] {
+        let boundary = "scan-\(UUID().uuidString)"
+        var body = Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"rate-con\"\r\nContent-Type: \(contentType)\r\n\r\n".utf8)
+        body.append(data)
+        body.append(Data("\r\n--\(boundary)--\r\n".utf8))
+        var request = client.request("api/mobile/rate-con/scan", method: "POST")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        request.timeoutInterval = 90
+        let (responseData, response) = try await client.send(request)
+        guard response.statusCode == 200 else {
+            if response.statusCode == 401 { throw APIError.unauthorized }
+            let error = try? JSONDecoder().decode(RefusalResponse.self, from: responseData)
+            throw APIError.refused(error?.error ?? "No se pudo leer el documento.")
+        }
+        struct Reading: Decodable { let values: [String: String] }
+        return try JSONDecoder().decode(Reading.self, from: responseData).values
+    }
+
+    func fetchCostPerMile() async throws -> CostPerMileSnapshot {
+        try await get("api/mobile/cost-per-mile", as: CostPerMileSnapshot.self)
+    }
+
+    func changeAccountData(intent: String, confirmation: String) async throws {
+        _ = try await directWrite("api/mobile/account", method: "POST", body: ["intent": intent, "confirmation": confirmation])
+    }
+
+    func fetchAccount() async throws -> AccountSummary {
+        try await get("api/mobile/account", as: AccountSummary.self)
+    }
+    func fetchDocuments() async throws -> DocumentLibrary {
+        try await get("api/mobile/documents", as: DocumentLibrary.self)
+    }
+    func downloadDocument(_ id: String) async throws -> URL {
+        try await download(client.request("api/mobile/documents/\(id)", method: "GET"), fallbackName: "documento")
+    }
+    func deleteStoredDocument(_ id: String) async throws {
+        try await directDelete("api/mobile/documents/\(id)")
+    }
+    func uploadDocument(owner: String, entityId: String, type: String, name: String, contentType: String, data: Data) async throws {
+        let boundary = "onroad-\(UUID().uuidString)"
+        var body = Data()
+        for (key, value) in [("owner", owner), ("entityId", entityId), ("type", type)] {
+            body.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(key)\"\r\n\r\n\(value)\r\n".utf8))
+        }
+        let safeName = name.replacingOccurrences(of: "\"", with: "_").replacingOccurrences(of: "\r", with: "_").replacingOccurrences(of: "\n", with: "_")
+        body.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"file\"; filename=\"\(safeName)\"\r\nContent-Type: \(contentType)\r\n\r\n".utf8))
+        body.append(data)
+        body.append(Data("\r\n--\(boundary)--\r\n".utf8))
+        var request = client.request("api/mobile/documents", method: "POST")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        let (responseData, response) = try await client.send(request)
+        _ = try APIClient.outcome(responseData, response)
+    }
+
+    func downloadInvoice(loadId: String) async throws -> URL {
+        try await download(client.request("api/mobile/invoices/\(loadId)/pdf", method: "GET"), fallbackName: "factura.pdf")
+    }
+
+    func fetchManagement(_ resource: String, quarter: String?) async throws -> ManagementCollection {
+        try await get("api/mobile/manage/\(resource)", query: quarter.map { [URLQueryItem(name: "quarter", value: $0)] } ?? [], as: ManagementCollection.self)
+    }
+
+    func saveManagement(_ resource: String, id: String?, values: [String: String]) async throws {
+        _ = try await directWrite("api/mobile/manage/\(resource)", method: "POST", body: ManagementWrite(id: id, values: values))
+    }
+
+    func deleteManagement(_ resource: String, id: String) async throws {
+        _ = try await directWrite("api/mobile/manage/\(resource)", method: "DELETE", body: ["id": id])
+    }
+
     func fetchDashboard() async throws -> DashboardSnapshot {
         try await get("api/mobile/dashboard", as: DashboardDTO.self).toDomain()
     }
@@ -335,6 +407,13 @@ final class APIRepository: LedgerRepository {
             throw APIError.refused(refusal.error)
         }
         guard http.statusCode == 200 else { throw APIError.requestFailed }
+        // Private object storage supplies a short-lived URL. Start a fresh
+        // request so the app's bearer token never travels to the storage host.
+        if http.value(forHTTPHeaderField: "Content-Type")?.contains("application/json") == true {
+            let signed = try JSONDecoder().decode([String: String].self, from: data)
+            guard let raw = signed["url"], let url = URL(string: raw), url.scheme == "https" else { throw APIError.decodingFailed }
+            return try await download(URLRequest(url: url), fallbackName: fallbackName)
+        }
 
         let name = http.value(forHTTPHeaderField: "Content-Disposition")
             .flatMap { header -> String? in
@@ -344,8 +423,10 @@ final class APIRepository: LedgerRepository {
                 return String(rest[..<end])
             } ?? fallbackName
 
-        let destination = FileManager.default.temporaryDirectory.appendingPathComponent(name)
-        try? FileManager.default.removeItem(at: destination)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let safeName = URL(fileURLWithPath: name).lastPathComponent
+        let destination = directory.appendingPathComponent(safeName.isEmpty ? fallbackName : safeName)
         try data.write(to: destination, options: .atomic)
         return destination
     }

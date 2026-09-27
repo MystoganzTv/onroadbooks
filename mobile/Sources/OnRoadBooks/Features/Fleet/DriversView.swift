@@ -73,6 +73,13 @@ struct DriversView: View {
         .navigationTitle("Choferes")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                NavigationLink {
+                    ManagementView(repository: repository, resource: "drivers", title: "Datos y pagos")
+                } label: { Label("Datos y pagos", systemImage: "square.and.pencil") }
+            }
+        }
+        .toolbar {
             if refusal == nil {
                 ToolbarItem(placement: .primaryAction) {
                     Button { isAdding = true } label: { Image(systemName: "plus") }

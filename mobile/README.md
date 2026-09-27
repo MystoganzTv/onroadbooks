@@ -7,24 +7,24 @@ de iOS — y ahora conectada de verdad al mismo backend que usa la web.
 
 ## Qué incluye
 
-- **Login** real contra `/api/mobile/login` (o "Ver con datos de muestra"
-  para revisar diseño sin cuenta / sin backend desplegado todavía).
-- **Dashboard** (el cockpit): booked revenue, cash collected, accounts
-  receivable, operating profit, cash after debt service, cost per mile,
-  safe to pay, money flow por categoría, últimos loads y reservas.
-- **Loads**: lista con rating (GREAT/GOOD/MARGINAL/BAD, igual que
-  `ProfitabilityRating` en el backend) y profit por milla.
-- **Expenses**: lista agrupada por categoría, con la categoría real del
-  backend (`getCategory().label`), no una lista fija en la app.
-- **Load Calculator**: un solo flujo "Should I take it?", con ganancia del
-  viaje, umbrales y contraoferta. Seguro y otros gastos del mes aparecen abajo
-  como referencia; no se asignan por milla ni se descuentan de la carga.
-  Web e iOS reciben los mismos valores de `calculator-defaults.ts`.
-- **More**: pantallas funcionales para Fuel, Invoices, Reserves, IFTA,
-  Analytics, Reports, Fleet, Truck, Drivers y Driver Pay. Las funciones de
-  Fleet respetan el plan y los permisos del negocio; Plans & Billing explica
-  que esa gestión continúa en `onroadbooks.com`.
-- **Settings**: cierre de sesión real (borra el token del Keychain).
+- Login con contraseña y Google; registro y recuperación con formularios nativos.
+- Dashboard, cargas, gastos, combustible, calculadora y reportes sobre el mismo
+  libro y los mismos cálculos que la web, con período y camión seleccionados.
+- Gestión nativa de brokers/contactos, dispatchers, financiamiento y clasificación
+  de pagos, camiones/mantenimiento, choferes, reservas, IFTA, metas y negocio.
+- Edición completa de cargas, lectura de rate confirmations con revisión antes de
+  guardar, facturas opcionales y PDF para compartir.
+- Documentos: adjuntar PDF/imágenes, consultar, descargar y eliminar.
+- Analytics de rutas/brokers y costo por milla; cuenta y catálogo real de planes.
+- Apariencia clara, oscura o del sistema, tamaño de texto accesible y bloqueo
+  biométrico opcional; restablecimiento de datos y eliminación de cuenta.
+
+Los formularios de `Features/Management` usan un catálogo de campos cerrado del
+servidor, renderizado mediante `Form`, `TextField`, `Picker`, `Toggle` y
+`DatePicker` de SwiftUI. No ejecutan HTML ni abren la web para gestionar datos.
+
+La paridad **todavía no es completa**. Consulta [PARITY.md](PARITY.md) para el
+alcance verificado y los pendientes, especialmente las suscripciones de Apple.
 
 ## Datos: reales, no solo demo
 
@@ -36,17 +36,16 @@ cifras reales de agosto ($9,795.00 / $6,143.90 / $3,651.10 / $1.84 CPM /
 $2,235.23 safe-to-pay) para que la app se vea con números creíbles incluso
 sin cuenta.
 
-Las rutas móviles ya están desplegadas en producción, por lo que el login y
-los datos reales funcionan desde el iPhone. "Ver con datos de muestra" sigue
-disponible como modo demo deliberado y no como sustituto temporal del backend.
+Las rutas existentes usan producción por defecto. Las nuevas rutas de gestión
+requieren desplegar este cambio de backend y distribuir una nueva build de iOS;
+una compilación local no actualiza los clientes ya instalados. El modo de muestra
+sigue siendo deliberado y no simula escrituras en las secciones nuevas.
 
 ## Por qué no hay un `.xcodeproj` ya generado
 
-Este proyecto se armó desde una sesión en la nube sin Xcode disponible para
-compilar o generar el `.xcodeproj` de forma binaria. En su lugar se usa
-[XcodeGen](https://github.com/yonaskolb/XcodeGen), que genera el proyecto a
-partir de `project.yml` — así el proyecto entero vive como texto plano y es
-fácil de versionar en git junto al resto de OnRoad Books.
+El proyecto de Xcode se genera con [XcodeGen](https://github.com/yonaskolb/XcodeGen)
+a partir de `project.yml`. Los fuentes, recursos, configuración y pruebas viven
+como texto en este repositorio; el proyecto generado queda fuera de Git.
 
 ## Cómo abrirlo (una sola vez)
 
@@ -100,30 +99,15 @@ Resources/
 
 ## El backend: `/api/mobile/*` en la propia app Next.js
 
-Revisé el `.env` real de la web app y la memoria del proyecto
-(`onroadbooks_supabase.md`) antes de conectar nada, y encontré algo
-importante: OnRoad Books **no** habla con Supabase vía su cliente con RLS.
-Se conecta directo a Postgres desde el servidor con Prisma
-(`DATABASE_URL` — una cadena de conexión completa a la base de datos), y
-el login es scrypt + cookie firmada propio, no Supabase Auth.
+Las credenciales de base de datos y almacenamiento permanecen en el servidor.
+`getMobileSession()` valida el token Bearer y su pertenencia al negocio; las rutas
+obtienen el repositorio limitado a ese negocio. Las escrituras aplican permisos,
+plan y los mismos esquemas y métodos de repositorio que utiliza la web.
 
-Un `DATABASE_URL` es una credencial completa de base de datos — **jamás
-debe vivir dentro del binario de una app móvil**: cualquiera podría
-extraerlo del IPA y leer o escribir todo el ledger directo, saltándose
-cada regla de negocio (costsPosted, snapshots de settlement, matemática de
-reservas) que hoy solo existe en el código de la web app.
-
-Por eso, en `OnroadBooks` (el repo de la web, no este) se agregaron:
-
-- `src/lib/auth/mobile.ts` — `getMobileSession()`: el MISMO token firmado
-  que usa la cookie web (`encodeSession`/`decodeSession`), leído de un
-  header `Authorization: Bearer` en vez de una cookie.
-- `POST /api/mobile/login` — espejo de `/api/auth/login`, devuelve el
-  token en el JSON en vez de ponerlo en una cookie.
-- Las rutas `/api/mobile/*` cubren dashboard, cargas, gastos, combustible,
-  facturas, reservas, reportes, IFTA y Fleet. Las lecturas reutilizan
-  las mismas funciones de `lib/calculations` y `lib/finance` que usa la web;
-  las escrituras pasan por sus mismas validaciones y reglas de negocio.
+`/api/mobile/manage/[resource]` expone únicamente los 19 recursos definidos en
+`src/lib/mobile/management.ts`. No acepta nombres de tablas o métodos arbitrarios.
+Las descargas de almacenamiento firmado usan una petición independiente para no
+reenviar el token de sesión al proveedor de archivos.
 
 La app se compila en CI tanto para el simulador como para `iphoneos/arm64`, y
 el backend se valida junto con TypeScript, lint, pruebas unitarias y E2E.

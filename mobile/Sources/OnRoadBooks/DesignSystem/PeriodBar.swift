@@ -196,5 +196,8 @@ private struct ReloadsOnScope: ViewModifier {
 
     func body(content: Content) -> some View {
         content.task(id: Key(scope: scopeStore.scope, token: token)) { await reload() }
+            .onReceive(NotificationCenter.default.publisher(for: .obLedgerChanged)) { _ in
+                Task { await reload() }
+            }
     }
 }

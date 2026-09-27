@@ -13,7 +13,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const gate = await requireMobileWrite(request, "manage_drivers", "fleet");
+  const gate = await requireMobileWrite(request, "manage_drivers");
   if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
   const { id } = await params;

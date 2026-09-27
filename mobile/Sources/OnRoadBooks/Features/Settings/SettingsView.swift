@@ -3,17 +3,17 @@ import SwiftUI
 struct SettingsView: View {
     let repository: LedgerRepository
     let accountLabel: String
+    var queue: WriteQueue? = nil
     @ObservedObject var appLock: AppLock
     var onSignOut: (() -> Void)?
 
+    @AppStorage("onroadbooks.appearance") private var appearance = "dark"
+    @AppStorage("onroadbooks.textSize") private var textSize = "system"
     @State private var lockSetupFailed = false
 
     var body: some View {
         List {
             Section {
-                // Real email when signed in, "Datos de muestra" in demo mode
-                // — never a hardcoded business name. Plan/business name isn't
-                // returned by any /api/mobile/* route yet.
                 Text(accountLabel)
                     .font(.headline)
                     .foregroundStyle(OBColor.foreground)
@@ -30,10 +30,28 @@ struct SettingsView: View {
                 Text("Account").foregroundStyle(OBColor.mutedForeground)
             }
 
+            Section("Negocio") {
+                NavigationLink("Negocio y finanzas") {
+                    ManagementView(repository: repository, resource: "settings", title: "Negocio y finanzas")
+                }
+                NavigationLink("Metas") {
+                    ManagementView(repository: repository, resource: "goals", title: "Metas")
+                }
+            }
+
             Section {
-                LabeledRow(title: "Appearance", value: "Dark")
-                LabeledRow(title: "Currency", value: "USD")
-                LabeledRow(title: "Text size", value: "Default")
+                Picker("Apariencia", selection: $appearance) {
+                    Text("Sistema").tag("system")
+                    Text("Claro").tag("light")
+                    Text("Oscuro").tag("dark")
+                }
+                .accessibilityIdentifier("appearance-picker")
+                Picker("Tamaño del texto", selection: $textSize) {
+                    Text("Del dispositivo").tag("system")
+                    Text("Grande").tag("large")
+                    Text("Muy grande").tag("extraLarge")
+                }
+                LabeledRow(title: "Moneda del libro", value: "USD")
             } header: {
                 Text("Preferences").foregroundStyle(OBColor.mutedForeground)
             }
@@ -68,8 +86,14 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Datos y cuenta") {
+                NavigationLink("Restablecer o eliminar cuenta") {
+                    AccountDataView(repository: repository, queue: queue, onSignOut: onSignOut)
+                }
+            }
+
             Section {
-                LabeledRow(title: "Version", value: "1.0 (1)")
+                LabeledRow(title: "Version", value: "\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"))")
                 if let onSignOut {
                     Button(role: .destructive) {
                         onSignOut()

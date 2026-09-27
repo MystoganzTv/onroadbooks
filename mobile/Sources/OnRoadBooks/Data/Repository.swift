@@ -5,6 +5,20 @@ import Foundation
 /// (`src/lib/db/repository.ts`): views never know or care whether they're
 /// reading `MockRepository` or a real `APIRepository`.
 protocol LedgerRepository {
+    func changeAccountData(intent: String, confirmation: String) async throws
+    func fetchCostPerMile() async throws -> CostPerMileSnapshot
+    func scanRateCon(data: Data, contentType: String) async throws -> [String: String]
+    func fetchAccount() async throws -> AccountSummary
+    func fetchDocuments() async throws -> DocumentLibrary
+    func downloadDocument(_ id: String) async throws -> URL
+    func deleteStoredDocument(_ id: String) async throws
+    func uploadDocument(owner: String, entityId: String, type: String, name: String, contentType: String, data: Data) async throws
+
+    func downloadInvoice(loadId: String) async throws -> URL
+    func fetchManagement(_ resource: String, quarter: String?) async throws -> ManagementCollection
+    func saveManagement(_ resource: String, id: String?, values: [String: String]) async throws
+    func deleteManagement(_ resource: String, id: String) async throws
+
     func fetchDashboard() async throws -> DashboardSnapshot
     func fetchLoads() async throws -> [Load]
     func fetchExpenses() async throws -> ExpenseLedger
@@ -109,4 +123,29 @@ protocol LedgerRepository {
     /// it silently offline would leave the IFTA report looking wrong for no
     /// reason the owner could see.
     @discardableResult func updateTruckIftaFilingScope(truckId: String, iftaReportingEnabled: Bool?) async throws -> String
+}
+
+// Demo mode never sends management changes to a real account.
+extension LedgerRepository {
+    func changeAccountData(intent: String, confirmation: String) async throws { throw APIError.refused("Inicia sesión para administrar la cuenta.") }
+    func fetchCostPerMile() async throws -> CostPerMileSnapshot { throw APIError.refused("Inicia sesión para consultar el costo por milla.") }
+    func scanRateCon(data: Data, contentType: String) async throws -> [String: String] { throw APIError.refused("Inicia sesión para leer una confirmación de tarifa.") }
+    func fetchAccount() async throws -> AccountSummary { throw APIError.refused("Inicia sesión para consultar tu cuenta.") }
+    func fetchDocuments() async throws -> DocumentLibrary { throw APIError.refused("Inicia sesión para consultar tus documentos.") }
+    func downloadDocument(_ id: String) async throws -> URL { throw APIError.refused("Inicia sesión para consultar tus documentos.") }
+    func deleteStoredDocument(_ id: String) async throws { throw APIError.refused("Inicia sesión para administrar tus documentos.") }
+    func uploadDocument(owner: String, entityId: String, type: String, name: String, contentType: String, data: Data) async throws { throw APIError.refused("Inicia sesión para adjuntar documentos.") }
+
+    func downloadInvoice(loadId: String) async throws -> URL {
+        throw APIError.refused("Inicia sesión para descargar facturas.")
+    }
+    func fetchManagement(_ resource: String, quarter: String?) async throws -> ManagementCollection {
+        throw APIError.refused("Esta sección necesita una cuenta real. Inicia sesión para consultar y administrar tus registros.")
+    }
+    func saveManagement(_ resource: String, id: String?, values: [String: String]) async throws {
+        throw APIError.refused("Inicia sesión para guardar cambios.")
+    }
+    func deleteManagement(_ resource: String, id: String) async throws {
+        throw APIError.refused("Inicia sesión para eliminar registros.")
+    }
 }

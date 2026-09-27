@@ -43,6 +43,13 @@ struct ReservesView: View {
         .navigationTitle("Reserves")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                NavigationLink {
+                    ManagementView(repository: repository, resource: "reserve-buckets", title: "Cubetas")
+                } label: { Label("Cubetas", systemImage: "slider.horizontal.3") }
+            }
+        }
+        .toolbar {
             if let ledger, !ledger.accounts.isEmpty, !locked {
                 ToolbarItem(placement: .primaryAction) {
                     Button { isMoving = true } label: { Image(systemName: "plus.forwardslash.minus") }

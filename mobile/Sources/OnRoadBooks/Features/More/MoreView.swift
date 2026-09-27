@@ -23,16 +23,20 @@ private struct MoreGroup: Identifiable {
 private let moreGroups: [MoreGroup] = [
     MoreGroup(title: "Operate", items: [
         MoreItem(title: "Load Calculator", icon: "sum", fleetOnly: false), // "calculator" isn't a real SF Symbol -- caught live on Enrique's simulator
+        MoreItem(title: "Brokers", icon: "building.2.fill", fleetOnly: false),
+        MoreItem(title: "Dispatchers", icon: "person.2.fill", fleetOnly: false),
         MoreItem(title: "Fuel", icon: "fuelpump.fill", fleetOnly: false),
         MoreItem(title: "Drivers", icon: "person.crop.circle", fleetOnly: false),
     ]),
     MoreGroup(title: "Money", items: [
+        MoreItem(title: "Financing", icon: "dollarsign.circle.fill", fleetOnly: false),
         MoreItem(title: "Invoices", icon: "doc.text.fill", fleetOnly: false),
         MoreItem(title: "Reserves", icon: "building.columns.fill", fleetOnly: false),
     ]),
     MoreGroup(title: "Intelligence", items: [
         MoreItem(title: "IFTA", icon: "mappin.and.ellipse", fleetOnly: false),
         MoreItem(title: "Analytics", icon: "chart.bar.fill", fleetOnly: false),
+        MoreItem(title: "Documents", icon: "folder.fill", fleetOnly: false),
         MoreItem(title: "Reports", icon: "chart.bar.doc.horizontal.fill", fleetOnly: false),
         MoreItem(title: "Truck", icon: "steeringwheel", fleetOnly: false),
     ]),
@@ -41,12 +45,19 @@ private let moreGroups: [MoreGroup] = [
 struct MoreView: View {
     let repository: LedgerRepository
     let accountLabel: String
+    var queue: WriteQueue? = nil
     let appLock: AppLock
     var onSignOut: (() -> Void)?
 
     @ViewBuilder
     private func destination(for item: MoreItem) -> some View {
         switch item.title {
+        case "Brokers":
+            ManagementView(repository: repository, resource: "brokers", title: "Brokers")
+        case "Dispatchers":
+            ManagementView(repository: repository, resource: "dispatchers", title: "Dispatchers")
+        case "Financing":
+            FinancingManagementView(repository: repository)
         case "Load Calculator":
             LoadCalculatorView(repository: repository)
         case "Fuel":
@@ -57,10 +68,18 @@ struct MoreView: View {
             ReservesView(repository: repository)
         case "Truck":
             TruckView(repository: repository)
+        case "Documents":
+            DocumentsView(repository: repository)
         case "Reports":
             ReportsView(repository: repository)
         case "Analytics":
-            AnalyticsView(repository: repository)
+            List {
+                NavigationLink("Costo por milla") { CostPerMileView(repository: repository) }
+                NavigationLink("Rutas y brokers") { AnalyticsView(repository: repository) }
+            }
+            .navigationTitle("Analytics")
+            .scrollContentBackground(.hidden)
+            .background(OBColor.background)
         case "IFTA":
             IftaView(repository: repository)
         case "Drivers":
@@ -112,11 +131,7 @@ struct MoreView: View {
 
                     Section {
                         NavigationLink {
-                            OBUnavailableView(
-                                title: "Plan y facturación",
-                                message: "Tu plan y tu método de pago se administran en onroadbooks.com desde el navegador.",
-                                systemImage: "creditcard.fill"
-                            )
+                            AccountView(repository: repository)
                         } label: {
                             Label("Plans & Billing", systemImage: "creditcard.fill")
                                 .foregroundStyle(OBColor.foreground)
@@ -125,7 +140,7 @@ struct MoreView: View {
                         .listRowSeparatorTint(OBColor.border)
 
                         NavigationLink {
-                            SettingsView(repository: repository, accountLabel: accountLabel, appLock: appLock, onSignOut: onSignOut)
+                            SettingsView(repository: repository, accountLabel: accountLabel, queue: queue, appLock: appLock, onSignOut: onSignOut)
                         } label: {
                             Label("Settings", systemImage: "gearshape.fill")
                                 .foregroundStyle(OBColor.foreground)

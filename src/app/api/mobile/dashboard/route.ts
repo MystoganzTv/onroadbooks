@@ -1,3 +1,4 @@
+import { mobileScopedDataset } from "@/lib/mobile/scope";
 import { buildLoadEstimator } from "@/lib/load-estimates";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -50,9 +51,9 @@ export async function GET(request: NextRequest) {
 
   const period = periodFromSearchParams(Object.fromEntries(request.nextUrl.searchParams));
   const prior = previousPeriod(period);
-  const today = todayISO();
+  const today = period.key === "today" ? period.start : todayISO();
 
-  const dataset = await getRepository(session.businessId).getDataset();
+  const dataset = mobileScopedDataset(await getRepository(session.businessId).getDataset(), request.nextUrl.searchParams);
   const { loads, expenses: ledgerExpenses, settings, goals, reserveAccounts, reserveTransactions, paymentEvents, financialObligations } = dataset;
 
   // Operating results start at the first load, exactly as on the web dashboard.

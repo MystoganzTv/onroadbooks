@@ -1,3 +1,4 @@
+import { mobileScopedDataset } from "@/lib/mobile/scope";
 import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const period = periodFromSearchParams(Object.fromEntries(request.nextUrl.searchParams));
-  const dataset = await getRepository(session.businessId).getDataset();
+  const dataset = mobileScopedDataset(await getRepository(session.businessId).getDataset(), request.nextUrl.searchParams);
   const { loads, expenses, settings, fuelEntries, paymentEvents } = dataset;
 
   const entries = fuelInPeriod(fuelEntries, period);

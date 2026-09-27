@@ -1,14 +1,15 @@
 import Foundation
 
 enum APIConfig {
-    /// Production API base. `/api/mobile/*` was added to the SAME Next.js
-    /// app OnRoad Books already runs at this domain (see project memory
-    /// `onroadbooks_mobile.md`) — there is no separate mobile backend.
-    ///
-    /// To point at a local `npm run dev` instead while developing: change
-    /// this to `http://localhost:3000` AND add an ATS exception for
-    /// localhost in Info.plist (`NSAppTransportSecurity` /
-    /// `NSExceptionDomains`), since iOS blocks plain HTTP by default. Don't
-    /// ship a build with either change.
-    static let baseURL = URL(string: "https://onroadbooks.com")!
+    static var baseURL: URL {
+        // Simulator-only local verification. Release and physical-device builds
+        // always use production; no bearer token or credential lives in config.
+        #if DEBUG && targetEnvironment(simulator)
+        if let raw = ProcessInfo.processInfo.environment["ONROAD_API_BASE_URL"],
+           let url = URL(string: raw),
+           ["localhost", "127.0.0.1"].contains(url.host ?? ""),
+           ["http", "https"].contains(url.scheme ?? "") { return url }
+        #endif
+        return URL(string: "https://onroadbooks.com")!
+    }
 }

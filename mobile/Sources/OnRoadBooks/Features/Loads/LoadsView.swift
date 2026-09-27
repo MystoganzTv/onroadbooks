@@ -17,6 +17,11 @@ struct LoadsView: View {
                     action: { isAdding = true }
                 )
                 OBPeriodBar()
+                NavigationLink("Todos los campos y asignaciones") {
+                    ManagementView(repository: repository, resource: "loads", title: "Cargas")
+                }
+                .font(.subheadline)
+                .padding(.vertical, 8)
 
                 if isLoading {
                     ProgressView().tint(OBColor.primary)

@@ -17,6 +17,8 @@ struct AppRootView: View {
     @StateObject private var queue = WriteQueue(
         client: APIClient(baseURL: APIConfig.baseURL, tokenProvider: { AuthSession.storedToken() })
     )
+    @AppStorage("onroadbooks.appearance") private var appearance = "dark"
+    @AppStorage("onroadbooks.textSize") private var textSize = "system"
     @State private var useDemo = false
     @Environment(\.scenePhase) private var scenePhase
 
@@ -64,7 +66,14 @@ struct AppRootView: View {
                 .transition(.opacity)
             }
         }
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(appearance == "system" ? nil : appearance == "light" ? .light : .dark)
+        .transformEnvironment(\.dynamicTypeSize) { size in
+            switch textSize {
+            case "large": size = max(size, .xLarge)
+            case "extraLarge": size = max(size, .xxxLarge)
+            default: break
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .obNetworkPathChanged)) { note in
             guard let online = note.object as? Bool else { return }
             monitor.apply(online: online)

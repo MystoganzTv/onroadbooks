@@ -12,6 +12,11 @@ struct IftaView: View {
     @State private var report: IftaReport?
     @State private var isLoading = true
     @State private var failure: String?
+    @State private var quarter = "\(Calendar.current.component(.year, from: Date()))-Q\((Calendar.current.component(.month, from: Date()) - 1) / 3 + 1)"
+    private var quarters: [String] {
+        let year = Calendar.current.component(.year, from: Date())
+        return (year-5...year+1).reversed().flatMap { y in (1...4).reversed().map { "\(y)-Q\($0)" } }
+    }
 
     var body: some View {
         Group {
@@ -30,7 +35,25 @@ struct IftaView: View {
         .background(OBColor.background)
         .navigationTitle("IFTA")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await reload() }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    NavigationLink("Registrar millas por jurisdicción") {
+                        ManagementView(repository: repository, resource: "ifta-mileage", title: "Millas IFTA")
+                    }
+                    NavigationLink("Tarifas trimestrales") {
+                        ManagementView(repository: repository, resource: "ifta-rates", title: "Tarifas IFTA")
+                    }
+                } label: { Label("Administrar", systemImage: "square.and.pencil") }
+            }
+        }
+        .safeAreaInset(edge: .top) {
+            Picker("Trimestre", selection: $quarter) {
+                ForEach(quarters, id: \.self) { Text($0).tag($0) }
+            }.padding(.horizontal).frame(maxWidth: .infinity).background(OBColor.background)
+        }
+        .task(id: quarter) { await reload() }
+        .onReceive(NotificationCenter.default.publisher(for: .obLedgerChanged)) { _ in Task { await reload() } }
         .refreshable { await reload() }
     }
 
@@ -179,7 +202,7 @@ struct IftaView: View {
 
     private func reload() async {
         do {
-            report = try await repository.fetchIfta(quarter: nil)
+            report = try await repository.fetchIfta(quarter: quarter)
             failure = nil
         } catch {
             failure = (error as? LocalizedError)?.errorDescription

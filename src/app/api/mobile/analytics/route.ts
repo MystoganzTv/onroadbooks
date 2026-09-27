@@ -1,3 +1,4 @@
+import { mobileScopedDataset } from "@/lib/mobile/scope";
 import { todayISO } from "@/lib/periods";
 import { buildLoadEstimator } from "@/lib/load-estimates";
 import { NextResponse, type NextRequest } from "next/server";
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const period = periodFromSearchParams(Object.fromEntries(request.nextUrl.searchParams));
-  const dataset = await getRepository(session.businessId).getDataset();
+  const dataset = mobileScopedDataset(await getRepository(session.businessId).getDataset(), request.nextUrl.searchParams);
 
   if (!planAllows(dataset.subscription, "cockpit")) {
     return NextResponse.json({ error: capabilityRefusal("cockpit") }, { status: 403 });

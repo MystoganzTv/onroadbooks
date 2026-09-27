@@ -156,6 +156,7 @@ export async function PATCH(request: NextRequest) {
     purchasePrice: truck.purchasePrice,
     monthlyPayment: truck.monthlyPayment,
     monthlyInsurance: truck.monthlyInsurance,
+    referenceMpg: truck.referenceMpg,
     axleCount: truck.axleCount ?? null,
     registeredGrossWeightLbs: truck.registeredGrossWeightLbs ?? null,
     operatesInMultipleIftaJurisdictions: truck.operatesInMultipleIftaJurisdictions ?? null,

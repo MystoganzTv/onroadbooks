@@ -40,7 +40,6 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        UIUserInterfaceStyle: Dark
         # Solo HTTPS estandar del sistema: exenta. Sin esto, App Store
         # Connect pregunta por cumplimiento de exportacion en cada build.
         ITSAppUsesNonExemptEncryption: false
@@ -56,6 +55,17 @@ targets:
         PRODUCT_NAME: OnRoad Books
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
+  OnRoadBooksUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - Tests
+    dependencies:
+      - target: OnRoadBooks
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.mystodev.onroadbooks.uitests
 schemes:
   OnRoadBooks:
     build:
@@ -63,5 +73,9 @@ schemes:
         OnRoadBooks: all
     run:
       config: Debug
+    test:
+      config: Debug
+      targets:
+        - OnRoadBooksUITests
     archive:
       config: Release

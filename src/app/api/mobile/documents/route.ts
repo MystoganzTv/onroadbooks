@@ -110,3 +110,27 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({ id: document.id }, { status: 201 });
 }
+
+/** Metadata and allowed attachment targets; private storage keys never leave the server. */
+export async function GET(request: NextRequest) {
+  const session = await getMobileSession(request);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const dataset = await getRepository(session.businessId).getDataset();
+  const { DOCUMENT_TYPES, DOCUMENT_TYPES_FOR } = await import("@/lib/documents");
+  const { roleCan } = await import("@/lib/roles");
+  const { canWrite } = await import("@/lib/plans");
+  const writable = canWrite(dataset.subscription);
+  const role = session.role ?? "VIEWER";
+  const permissionFor = (owner: string) => owner === "LOAD" ? "manage_loads" : owner === "EXPENSE" ? "manage_expenses" : owner === "MAINTENANCE" ? "manage_maintenance" : "manage_fleet";
+  const targets = [
+    ...dataset.loads.map(row => ({ id: row.id, owner: "LOAD", label: `${row.date} · ${row.originCity} → ${row.destinationCity}` })),
+    ...dataset.expenses.map(row => ({ id: row.id, owner: "EXPENSE", label: `${row.date} · ${row.description}` })),
+    ...dataset.trucks.map(row => ({ id: row.id, owner: "TRUCK", label: row.name })),
+    ...dataset.maintenanceRecords.map(row => ({ id: row.id, owner: "MAINTENANCE", label: `${row.serviceDate} · ${row.type}` })),
+  ].filter(target => writable && roleCan(role, permissionFor(target.owner)));
+  const documents = dataset.documents.map(row => {
+    const owner = row.loadId ? "LOAD" : row.expenseId ? "EXPENSE" : row.maintenanceId ? "MAINTENANCE" : "TRUCK";
+    return { id: row.id, fileName: row.fileName, type: documentTypeLabel(row.type, "es"), canDelete: writable && roleCan(role, permissionFor(owner)) };
+  });
+  return NextResponse.json({ documents, targets, types: DOCUMENT_TYPES.map(t => ({ id: t.id, label: t.labelEs })), typesFor: DOCUMENT_TYPES_FOR, maxBytes: MAX_FUNCTION_UPLOAD_BYTES }, { headers: { "Cache-Control": "private, no-store" } });
+}

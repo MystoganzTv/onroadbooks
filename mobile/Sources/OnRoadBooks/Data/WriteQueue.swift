@@ -99,6 +99,21 @@ final class WriteQueue: ObservableObject {
         _ = await send(write)
     }
 
+    func holdForAccountChange() -> Bool {
+        guard !isSending else { return false }
+        for index in items.indices {
+            items[index].state = .attention
+            items[index].note = "Se solicitó restablecer o eliminar la cuenta. Revisa los libros antes de reenviar."
+        }
+        save()
+        return true
+    }
+
+    func discardAllAfterAccountChange() {
+        items.removeAll()
+        save()
+    }
+
     func discard(_ write: QueuedWrite) {
         items.removeAll { $0.id == write.id }
         save()

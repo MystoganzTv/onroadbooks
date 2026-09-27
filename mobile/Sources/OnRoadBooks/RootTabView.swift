@@ -24,6 +24,7 @@ struct RootTabView: View {
     /// happen — AppRootView always passes one).
     var onSignOut: (() -> Void)?
 
+    @EnvironmentObject private var scopeStore: ScopeStore
     @State private var showingPending = false
     @Environment(\.scenePhase) private var scenePhase
 
@@ -70,11 +71,16 @@ struct RootTabView: View {
             ExpensesView(repository: repository)
                 .tabItem { Label("Expenses", systemImage: "creditcard.fill") }
 
-            MoreView(repository: repository, accountLabel: accountLabel, appLock: appLock, onSignOut: onSignOut)
+            MoreView(repository: repository, accountLabel: accountLabel, queue: queue, appLock: appLock, onSignOut: onSignOut)
                 .tabItem { Label("More", systemImage: "ellipsis.circle.fill") }
         }
+        .task {
+            await refreshTrucks()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .obLedgerChanged)) { _ in
+            Task { await refreshTrucks() }
+        }
         .tint(OBColor.primary)
-        .preferredColorScheme(.dark)
         .safeAreaInset(edge: .top, spacing: 0) {
             if let queue, let monitor {
                 PendingBanner(queue: queue, monitor: monitor) { showingPending = true }
@@ -90,7 +96,6 @@ struct RootTabView: View {
                             }
                         }
                 }
-                .preferredColorScheme(.dark)
             }
         }
         .onChange(of: scenePhase) { phase in
@@ -98,6 +103,12 @@ struct RootTabView: View {
             // have returned without the path monitor having fired while the app
             // was suspended.
             if phase == .active, let queue { Task { await queue.flush() } }
+        }
+    }
+
+    @MainActor private func refreshTrucks() async {
+        if let account = try? await repository.fetchAccount() {
+            scopeStore.setTrucks(account.trucks.map { ScopeStore.TruckChoice(id: $0.id, name: $0.name) })
         }
     }
 }

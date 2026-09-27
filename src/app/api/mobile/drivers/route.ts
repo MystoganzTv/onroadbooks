@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const gate = await requireMobileWrite(request, "manage_drivers", "fleet");
+  const gate = await requireMobileWrite(request, "manage_drivers");
   if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
   let body: unknown;

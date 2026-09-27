@@ -6,6 +6,7 @@ struct LoginView: View {
 
     @State private var email = ""
     @State private var password = ""
+    @State private var accessFlow: AccountAccessView.Flow?
     @FocusState private var focusedField: Field?
     private enum Field { case email, password }
 
@@ -110,6 +111,17 @@ struct LoginView: View {
                 }
                 .padding(.horizontal, OBSpacing.md)
 
+                HStack(spacing: 24) {
+                    Button("Crear cuenta") { accessFlow = .register }
+                    Button("Olvidé mi contraseña") { accessFlow = .recover }
+                }
+                .font(.footnote)
+                .disabled(authSession.isAuthenticating)
+
+                Button("Tengo una invitación") { accessFlow = .invitation }
+                    .font(.footnote)
+                    .disabled(authSession.isAuthenticating)
+
                 Button("Ver con datos de muestra", action: onUseDemo)
                     .font(.footnote.weight(.medium))
                     .foregroundStyle(OBColor.mutedForeground)
@@ -119,5 +131,8 @@ struct LoginView: View {
         }
         .background(OBColor.background)
         .scrollDismissesKeyboard(.interactively)
+        .sheet(item: $accessFlow) { flow in
+            AccountAccessView(flow: flow, authSession: authSession)
+        }
     }
 }

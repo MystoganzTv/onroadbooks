@@ -41,6 +41,18 @@ struct TruckView: View {
         .background(OBColor.background)
         .navigationTitle("Truck")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    NavigationLink("Administrar camiones") {
+                        ManagementView(repository: repository, resource: "trucks", title: "Camiones")
+                    }
+                    NavigationLink("Mantenimiento") {
+                        ManagementView(repository: repository, resource: "maintenance", title: "Mantenimiento")
+                    }
+                } label: { Label("Administrar", systemImage: "ellipsis.circle") }
+            }
+        }
         .obScopeBar()
         .obReloadsOnScope { await reload() }
         .refreshable { await reload() }
