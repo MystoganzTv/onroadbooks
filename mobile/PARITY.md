@@ -34,10 +34,12 @@ anterior. Las modificaciones nuevas notifican a los resúmenes para recargarse.
 
 ## Diferencias que siguen abiertas
 
-- **Suscripciones nativas:** se consulta el plan real, pero aún no se compra,
-  restaura o cambia una suscripción mediante StoreKit. Faltan los productos de
-  App Store Connect y la integración/verificación de derechos en el backend.
-  Mostrar precios del catálogo web no representa una oferta de compra de Apple.
+- **Suscripciones nativas:** la build 4 incorpora StoreKit 2 para Starter/Pro,
+  restauración, precios localizados y gestión de suscripciones. El servidor
+  valida firmas de Apple y consulta el estado actual antes de conceder acceso.
+  La activación pública requiere configurar la clave IAP y las notificaciones
+  V2, comprobar una compra sandbox y seleccionar la nueva build en Apple.
+  Fleet permanece excluido de la oferta móvil.
 - **Idioma y presentación:** sigue existiendo mezcla de inglés/español en
   pantallas heredadas y etiquetas. No se ha completado un selector de idioma ni
   reproducido cada visualización o modo simple/detallado de la web.

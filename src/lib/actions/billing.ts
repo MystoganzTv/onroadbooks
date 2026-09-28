@@ -31,6 +31,7 @@ export async function createCheckoutAction(plan: PlanId): Promise<void> {
 
   const repository = getRepository(session.businessId);
   const { business, subscription } = await repository.getDataset();
+  if (subscription.providerSubscriptionId?.startsWith("apple:")) redirect("/plans?billing=apple");
   if (
     subscription.providerSubscriptionId &&
     subscription.status !== "CANCELED"
@@ -91,6 +92,7 @@ export async function openBillingPortalAction(): Promise<void> {
   const session = await requirePermission("manage_billing");
 
   const { subscription } = await getRepository(session.businessId).getDataset();
+  if (subscription.providerSubscriptionId?.startsWith("apple:")) redirect("https://apps.apple.com/account/subscriptions");
   if (!subscription.providerCustomerId) redirect("/plans");
 
   const portal = await getStripe().billingPortal.sessions.create({

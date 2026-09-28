@@ -8,6 +8,7 @@ import SwiftUI
 /// queue — there is nothing to send.
 struct AppRootView: View {
     @StateObject private var authSession = AuthSession()
+    @StateObject private var purchases = ApplePurchaseStore()
     @StateObject private var monitor = NetworkMonitor()
     @StateObject private var appLock = AppLock()
     /// The period and truck every screen reads from — the phone's equivalent
@@ -52,6 +53,7 @@ struct AppRootView: View {
                 }
             }
             .environmentObject(scopeStore)
+            .environmentObject(purchases)
 
             // Covers a real session or demo mode -- never the login screen,
             // which has nothing yet worth locking behind a second gate.
@@ -67,6 +69,10 @@ struct AppRootView: View {
             }
         }
         .preferredColorScheme(appearance == "system" ? nil : appearance == "light" ? .light : .dark)
+        .task(id: authSession.token) {
+            guard let token = authSession.token else { return }
+            await purchases.listen(repository: APIRepository(tokenProvider: { token }))
+        }
         .transformEnvironment(\.dynamicTypeSize) { size in
             switch textSize {
             case "large": size = max(size, .xLarge)
@@ -77,13 +83,19 @@ struct AppRootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .obNetworkPathChanged)) { note in
             guard let online = note.object as? Bool else { return }
             monitor.apply(online: online)
-            if online { Task { await queue.flush() } }
+            if online { Task {
+                await queue.flush()
+                if let token = authSession.token { await purchases.reconcile(repository: APIRepository(tokenProvider: { token })) }
+            } }
         }
         .onChange(of: scenePhase) { phase in
             // Lock on the way OUT of the foreground, not on the way back in --
             // that way there is never a frame where a backgrounded app shows
             // real numbers in the app switcher.
             if phase == .background { appLock.lockOnBackground() }
+            if phase == .active, let token = authSession.token {
+                Task { await purchases.reconcile(repository: APIRepository(tokenProvider: { token })) }
+            }
         }
     }
 }

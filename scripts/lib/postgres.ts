@@ -12,6 +12,8 @@ export const APPLICATION_TABLES = [
   "Business",
   "FinancialGoal",
   "Subscription",
+  "AppleBillingAccount",
+  "ApplePurchase",
   "ReserveAccount",
   "ReserveTransaction",
   "Settlement",

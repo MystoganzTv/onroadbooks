@@ -7,6 +7,7 @@ import Foundation
 struct APIClient {
     let baseURL: URL
     let tokenProvider: () -> String?
+    var session: URLSession = .shared
 
     func request(_ path: String, method: String) -> URLRequest {
         var request = URLRequest(url: baseURL.appendingPathComponent(path))
@@ -27,7 +28,7 @@ struct APIClient {
     /// Throws `APIError` for anything that is not a usable HTTP response.
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse else { throw APIError.requestFailed }
             return (data, http)
         } catch let error as URLError {

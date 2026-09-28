@@ -507,7 +507,7 @@ export interface AdminAccountSummary {
   currentPeriodEnd: string | null;
   hasProviderSubscription: boolean;
   /** Inferred server-side; no provider identifiers are exposed to the client. */
-  accessSource: "stripe" | "complimentary" | "trial" | "inactive";
+  accessSource: "stripe" | "apple" | "complimentary" | "trial" | "inactive";
   /** Most recent record creation across product modules, never a financial value. */
   lastActivityAt: string | null;
   counts: {

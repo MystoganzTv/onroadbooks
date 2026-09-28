@@ -1,0 +1,68 @@
+{
+  "identifier": "CA087C1C-3C73-40B9-89D6-14CF6269F657",
+  "nonRenewingSubscriptions": [],
+  "products": [],
+  "settings": {
+    "_applicationInternalID": "6806707411",
+    "_developerTeamID": "V6F97AK8AD",
+    "_failTransactionsEnabled": false,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": []
+  },
+  "subscriptionGroups": [
+    {
+      "id": "22418234",
+      "localizations": [],
+      "name": "OnRoad Books Plans",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "19",
+          "familyShareable": false,
+          "groupNumber": 2,
+          "internalID": "6816684620",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "Track one truck: loads, income, expenses and reports",
+              "displayName": "Solo Starter",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "com.mystodev.onroadbooks.starter.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Solo Starter Monthly",
+          "subscriptionGroupID": "22418234",
+          "type": "RecurringSubscription"
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "39",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "6816684042",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "Bookkeeping, load planning, reserves and goals",
+              "displayName": "OnRoad Pro",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "com.mystodev.onroadbooks.pro.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "OnRoad Pro Monthly",
+          "subscriptionGroupID": "22418234",
+          "type": "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version": {
+    "major": 3,
+    "minor": 0
+  }
+}

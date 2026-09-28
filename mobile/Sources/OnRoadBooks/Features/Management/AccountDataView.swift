@@ -1,4 +1,5 @@
 import SwiftUI
+import StoreKit
 
 struct AccountDataView: View {
     let repository: LedgerRepository
@@ -11,6 +12,7 @@ struct AccountDataView: View {
     @State private var busy = false
     @State private var failure: String?
     @State private var success = false
+    @State private var showManageSubscription = false
 
     private var expected: String { intent == "reset" ? "RESET" : account?.email ?? "" }
     var body: some View {
@@ -26,6 +28,10 @@ struct AccountDataView: View {
                          : "Elimina tu cuenta y, si eres el último propietario, los registros y documentos del negocio. No se puede deshacer.")
                         .foregroundStyle(OBColor.neg)
                     Text("Los cambios pendientes del teléfono se descartarán al completar la operación.").font(.caption).foregroundStyle(.secondary)
+                    if intent == "delete", account?.billingProvider == "apple" {
+                        Text("Eliminar la cuenta no cancela los cobros de Apple. Cancela la renovación en Apple antes de eliminarla.").foregroundStyle(OBColor.warn)
+                        Button("Gestionar suscripción de Apple") { showManageSubscription = true }
+                    }
                 }
                 Section("Escribe \(expected) para confirmar") {
                     TextField(expected, text: $confirmation)
@@ -45,6 +51,7 @@ struct AccountDataView: View {
         .navigationBarTitleDisplayMode(.inline)
         .scrollContentBackground(.hidden)
         .background(OBColor.background)
+        .manageSubscriptionsSheet(isPresented: $showManageSubscription)
         .task {
             do { account = try await repository.fetchAccount() } catch { failure = error.localizedDescription }
         }

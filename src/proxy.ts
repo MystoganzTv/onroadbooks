@@ -27,6 +27,7 @@ const PUBLIC_PATHS = [
   // own bearer-token check against CRON_SECRET before touching any ledger.
   "/api/cron/monthly-expenses",
   "/api/stripe/webhook",
+  "/api/apple/notifications",
 ];
 
 /**

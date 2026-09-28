@@ -448,7 +448,7 @@ export class PrismaAuthStore implements AuthStore {
             : null,
         hasProviderSubscription,
         accessSource: hasProviderSubscription
-          ? "stripe"
+          ? subscription?.providerSubscriptionId?.startsWith("apple:") ? "apple" : "stripe"
           : subscriptionStatus === "TRIALING"
             ? "trial"
             : isComplimentaryAccess({
@@ -880,7 +880,9 @@ export class PrismaRepository implements Repository {
           plan: getPlan(subscriptionRow.plan).id,
           status: subscriptionRow.status,
           currentPeriodEnd: subscriptionRow.currentPeriodEnd
-            ? isoDate(subscriptionRow.currentPeriodEnd)
+            ? subscriptionRow.providerSubscriptionId?.startsWith("apple:")
+              ? subscriptionRow.currentPeriodEnd.toISOString()
+              : isoDate(subscriptionRow.currentPeriodEnd)
             : subscriptionRow.status === "TRIALING"
               ? trialEndsOn(subscriptionRow.startedAt.toISOString())
               : null,

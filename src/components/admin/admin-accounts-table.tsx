@@ -71,7 +71,7 @@ function statusVariant(status: AdminAccountSummary["subscriptionStatus"]) {
 
 function accessVariant(source: AdminAccountSummary["accessSource"]) {
   if (source === "complimentary") return "positive" as const;
-  if (source === "stripe") return "default" as const;
+  if (source === "stripe" || source === "apple") return "default" as const;
   if (source === "trial") return "info" as const;
   return "outline" as const;
 }
@@ -157,6 +157,7 @@ export function AdminAccountsTable({
   const accessLabels = React.useMemo<Record<AdminAccountSummary["accessSource"], string>>(
     () => ({
       stripe: "Stripe",
+      apple: "App Store",
       complimentary: copy.complimentary,
       trial: copy.trial,
       inactive: copy.inactive,

@@ -5,6 +5,7 @@ import Foundation
 /// (`src/lib/db/repository.ts`): views never know or care whether they're
 /// reading `MockRepository` or a real `APIRepository`.
 protocol LedgerRepository {
+    func syncApplePurchase(_ signedTransaction: String) async throws -> ApplePurchaseResult
     func changeAccountData(intent: String, confirmation: String) async throws
     func fetchCostPerMile() async throws -> CostPerMileSnapshot
     func scanRateCon(data: Data, contentType: String) async throws -> [String: String]
@@ -127,6 +128,7 @@ protocol LedgerRepository {
 
 // Demo mode never sends management changes to a real account.
 extension LedgerRepository {
+    func syncApplePurchase(_ signedTransaction: String) async throws -> ApplePurchaseResult { throw APIError.refused("Inicia sesión para restaurar tus compras.") }
     func changeAccountData(intent: String, confirmation: String) async throws { throw APIError.refused("Inicia sesión para administrar la cuenta.") }
     func fetchCostPerMile() async throws -> CostPerMileSnapshot { throw APIError.refused("Inicia sesión para consultar el costo por milla.") }
     func scanRateCon(data: Data, contentType: String) async throws -> [String: String] { throw APIError.refused("Inicia sesión para leer una confirmación de tarifa.") }

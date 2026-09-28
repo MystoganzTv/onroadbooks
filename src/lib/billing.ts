@@ -64,11 +64,13 @@ export async function syncStripeSubscription(
   const businessId = eventSubscription.metadata.onRoadBusinessId?.trim();
   if (!businessId) throw new Error("Stripe subscription is missing its OnRoad business id.");
 
-  await withSecurityLock(`stripe:${businessId}`, async (client) => {
+  await withSecurityLock(`billing:${businessId}`, async (client) => {
     const repository = client
       ? new DrizzleRepository(businessId, async () => drizzle(client, { schema }))
       : getRepository(businessId);
     const current = (await repository.getDataset()).subscription;
+    // Never route an Apple identifier to Stripe or let an old Stripe event replace Apple access.
+    if (current.providerSubscriptionId?.startsWith("apple:")) return;
     // Event payloads are historical snapshots. Re-read Stripe while holding the
     // workspace lock, including for deletions and repeated events.
     const stripeSubscription = await retrieve(eventSubscription.id);

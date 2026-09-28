@@ -32,6 +32,12 @@ enum APIError: LocalizedError {
 /// long haul. The rule those two share: a write is only ever sent again by
 /// itself when we know the server never saw it.
 final class APIRepository: LedgerRepository {
+    func syncApplePurchase(_ signedTransaction: String) async throws -> ApplePurchaseResult {
+        let body = try JSONSerialization.data(withJSONObject: ["signedTransaction": signedTransaction])
+        let (data, response) = try await client.send(client.post("api/mobile/apple-purchases", body: body))
+        _ = try APIClient.outcome(data, response)
+        return try JSONDecoder().decode(ApplePurchaseResult.self, from: data)
+    }
     private let client: APIClient
     private let queue: WriteQueue?
     private let isOnline: () -> Bool
@@ -42,11 +48,12 @@ final class APIRepository: LedgerRepository {
     init(
         baseURL: URL = APIConfig.baseURL,
         tokenProvider: @escaping () -> String?,
+        session: URLSession = .shared,
         queue: WriteQueue? = nil,
         isOnline: @escaping () -> Bool = { true },
         scope: @escaping () -> Scope = { .current() }
     ) {
-        client = APIClient(baseURL: baseURL, tokenProvider: tokenProvider)
+        client = APIClient(baseURL: baseURL, tokenProvider: tokenProvider, session: session)
         self.queue = queue
         self.isOnline = isOnline
         self.scope = scope

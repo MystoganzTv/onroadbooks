@@ -259,6 +259,9 @@ export function canWrite(
 ): boolean {
   if (!subscription) return true;
   if (!WRITABLE.includes(subscription.status)) return false;
+  if (subscription.providerSubscriptionId?.startsWith("apple:")) {
+    return subscription.currentPeriodEnd !== null && Date.parse(subscription.currentPeriodEnd) > Date.now();
+  }
   if (subscription.status === "TRIALING") {
     return !trialState(subscription, today)?.expired;
   }

@@ -255,6 +255,15 @@ export function PlanCard({
   const trial = current.id === "OWNER" ? trialState(subscription, today) : null;
   const fleet = PLANS.FLEET;
   const fleetActive = hasFleetAccess(subscription);
+  if (subscription.providerSubscriptionId?.startsWith("apple:")) {
+    return <Card id="plan">
+      <CardHeader><CardTitle>{current.name}</CardTitle><Badge variant={status.tone}>{status.label}</Badge></CardHeader>
+      <CardContent className="space-y-3 p-4">
+        <p>{copy.planBilling}: App Store</p>
+        <a className="text-primary underline" href="https://apps.apple.com/account/subscriptions">{copy.manageBilling} — Apple</a>
+      </CardContent>
+    </Card>;
+  }
   const managedBilling = Boolean(
     subscription.providerCustomerId &&
       subscription.providerSubscriptionId &&

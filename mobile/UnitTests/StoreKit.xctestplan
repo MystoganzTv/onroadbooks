@@ -1,0 +1,12 @@
+{
+  "configurations": [{ "id": "D91E3058-17BA-491A-A126-FC002DDBE30A", "name": "Local StoreKit", "options": {} }],
+  "defaultOptions": {
+    "storeKitConfigurationFileReference": { "identifier": "OnRoadBooks.storekit" },
+    "testExecutionOrdering": "alphabetical",
+    "testTimeoutsEnabled": true,
+    "defaultTestExecutionTimeAllowance": 60,
+    "maximumTestExecutionTimeAllowance": 90
+  },
+  "testTargets": [{ "target": { "containerPath": "container:OnRoadBooksMobile.xcodeproj", "identifier": "3FFEE15440BA11CA968D6655", "name": "OnRoadBooksStoreKitTests" } }],
+  "version": 1
+}

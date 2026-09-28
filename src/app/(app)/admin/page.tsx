@@ -36,7 +36,7 @@ export default async function AdminPage() {
   ).length;
   const joinedThisWeek = customers.filter((account) => Date.parse(account.createdAt) >= sevenDaysAgo).length;
   const trials = customers.filter((account) => account.subscriptionStatus === "TRIALING").length;
-  const paid = customers.filter((account) => account.accessSource === "stripe").length;
+  const paid = customers.filter((account) => account.accessSource === "stripe" || account.accessSource === "apple").length;
   const complimentary = customers.filter((account) => account.accessSource === "complimentary").length;
 
   const metrics = [

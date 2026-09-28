@@ -249,6 +249,8 @@ model Business {
   settings             FinancialSettings?
   goals                FinancialGoal?
   subscription         Subscription?
+  appleBillingAccount  AppleBillingAccount?
+  applePurchases       ApplePurchase[]
   reserveAccounts      ReserveAccount[]
   reserveTransactions  ReserveTransaction[]
   settlements          Settlement[]
@@ -260,6 +262,21 @@ model Business {
 
 /// What the owner is aiming at. One row per business; targets are monthly and
 /// every shorter window is derived, never stored.
+model AppleBillingAccount {
+  businessId String @id
+  appAccountToken String @unique(map: "AppleBillingAccount_token_key") @db.Uuid
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
+model ApplePurchase {
+  id String @id
+  businessId String
+  transactionId String
+  productId String
+  checkedAt DateTime @db.Timestamp(3)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+}
+
 model FinancialGoal {
   id         String   @id @default(cuid())
   businessId String   @unique

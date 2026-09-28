@@ -18,6 +18,7 @@ blob-report
 .env
 .env*.local
 *.pem
+*.p8
 
 # Local ledger, uploaded receipts and the generated session key.
 # The demo dataset rebuilds itself on first run, so nothing here belongs in
