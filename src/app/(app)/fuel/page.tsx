@@ -66,6 +66,11 @@ export default async function FuelPage({
   const periodExpenses = expensesInPeriod(expenses, period);
   const periodFuel = fuelInPeriod(fuelEntries, period);
   const fuel = summarizeFuel(periodFuel, summary.totalMiles);
+  // Every truck's dated readings, all time -- a receipt from last month is
+  // checked against last month's neighbours, not this period's.
+  const odometerReadings = allFuel
+    .filter((entry) => typeof entry.odometer === "number")
+    .map((entry) => ({ id: entry.id, truckId: entry.truckId, date: entry.date, odometer: entry.odometer ?? null }));
   const lastOdometer =
     fuelEntries
       .filter((entry) => typeof entry.odometer === "number")
@@ -89,6 +94,7 @@ export default async function FuelPage({
             defaultTruckId={truckId}
             defaultDate={defaultEntryDate(period)}
             lastOdometer={lastOdometer}
+            odometerReadings={odometerReadings}
           />
         }
       />
@@ -131,6 +137,7 @@ export default async function FuelPage({
         defaultTruckId={truckId}
         defaultDate={defaultEntryDate(period)}
         lastOdometer={lastOdometer}
+        odometerReadings={odometerReadings}
       />
     </div>
   );

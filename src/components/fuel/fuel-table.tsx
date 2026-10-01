@@ -31,7 +31,7 @@ import {
 } from "@/lib/formatters";
 import type { FuelEntry, Truck } from "@/lib/types";
 import { formatLocaleDate } from "@/lib/i18n-format";
-import { FuelFormDialog } from "./fuel-form-dialog";
+import { FuelFormDialog, type FuelOdometerReading } from "./fuel-form-dialog";
 
 interface FuelTableProps {
   entries: FuelEntry[];
@@ -39,6 +39,7 @@ interface FuelTableProps {
   defaultTruckId?: string | null;
   defaultDate: string;
   lastOdometer: number | null;
+  odometerReadings?: FuelOdometerReading[];
 }
 
 export function FuelTable({
@@ -47,6 +48,7 @@ export function FuelTable({
   defaultTruckId,
   defaultDate,
   lastOdometer,
+  odometerReadings,
 }: FuelTableProps) {
   const router = useRouter();
   const { mode } = useViewMode();
@@ -95,6 +97,7 @@ export function FuelTable({
               defaultTruckId={defaultTruckId}
               defaultDate={defaultDate}
               lastOdometer={lastOdometer}
+              odometerReadings={odometerReadings}
             />
           }
         />
@@ -156,6 +159,7 @@ export function FuelTable({
                         trucks={trucks}
                         entry={entry}
                         lastOdometer={lastOdometer}
+                        odometerReadings={odometerReadings}
                         trigger={
                           <Button variant="ghost" size="icon-sm" aria-label={copy.editEntry}>
                             <Pencil />

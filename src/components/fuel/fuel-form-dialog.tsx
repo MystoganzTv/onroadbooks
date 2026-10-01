@@ -34,10 +34,10 @@ import { fieldErrors, focusFirstError, validationMessage } from "@/lib/form";
 import { createFuelEntryAction, updateFuelEntryAction } from "@/lib/actions/fuel";
 import { fuelAmounts } from "@/lib/calculations";
 import { formatMoney } from "@/lib/formatters";
-import { localeTag } from "@/lib/i18n-format";
+import { formatLocaleDate, localeTag } from "@/lib/i18n-format";
 import { todayISO } from "@/lib/periods";
 import { fuelSchema } from "@/lib/schemas";
-import { decimalSeparatorFor, odometerConcern, parseOdometerInput } from "@/lib/odometer";
+import { decimalSeparatorFor, odometerConcern, odometerConcernOnDate, parseOdometerInput } from "@/lib/odometer";
 import { orderedTrucks } from "@/lib/fleet";
 import { IFTA_JURISDICTIONS, inferFuelJurisdiction } from "@/lib/ifta";
 import type { Expense, FuelEntry, Truck } from "@/lib/types";
@@ -58,8 +58,9 @@ interface FormState {
 /** The pop-up shown before saving a reading that is probably a typo. */
 type OdometerReview =
   | { kind: "format"; entered: string; suggestion: number }
-  | { kind: "below"; value: number; reference: number }
-  | { kind: "jump"; value: number; reference: number; miles: number };
+  | { kind: "below"; value: number; reference: number; referenceDate?: string }
+  | { kind: "above"; value: number; reference: number; referenceDate: string }
+  | { kind: "jump"; value: number; reference: number; miles: number; referenceDate?: string };
 
 interface FuelFormDialogProps {
   entry?: FuelEntry;
@@ -75,7 +76,17 @@ interface FuelFormDialogProps {
   defaultTruckId?: string | null;
   defaultDate?: string;
   lastOdometer?: number | null;
+  /** Every dated reading on file, so a receipt is checked against the days
+   *  around it rather than against whatever was entered last. */
+  odometerReadings?: FuelOdometerReading[];
   trigger?: React.ReactNode;
+}
+
+export interface FuelOdometerReading {
+  id: string;
+  truckId: string;
+  date: string;
+  odometer: number | null;
 }
 
 /**
@@ -95,6 +106,7 @@ export function FuelFormDialog({
   defaultTruckId,
   defaultDate,
   lastOdometer,
+  odometerReadings,
   trigger,
 }: FuelFormDialogProps) {
   const router = useRouter();
@@ -211,9 +223,19 @@ export function FuelFormDialog({
     }
 
     const odometer = reading.kind === "ok" ? reading.value : null;
-    // Edits of older entries legitimately sit below the truck's current reading.
-    if (!confirmed && !isEdit && odometer != null) {
-      const concern = odometerConcern(odometer, referenceOdometer);
+    if (!confirmed && odometer != null) {
+      // With the dated readings: judged by the days around this receipt, so
+      // entering yesterday's receipt after today's is fine, edits included.
+      // Without them (embedded elsewhere): the old latest-reading check, new
+      // entries only.
+      const concern = odometerReadings
+        ? odometerConcernOnDate(
+          odometer,
+          values.date,
+          odometerReadings.filter((reading) => reading.truckId === truckId),
+          { excludeId: entry?.id },
+        )
+        : !isEdit ? odometerConcern(odometer, referenceOdometer) : null;
       if (concern) {
         setReview({ ...concern, value: odometer });
         return;
@@ -498,6 +520,10 @@ export function FuelFormDialog({
               <DialogDescription className="text-sm text-foreground">
                 {review?.kind === "format"
                   ? interpolate(copy.odometerFormatBody, { entered: review.entered, suggestion: miles(review.suggestion) })
+                  : review?.kind === "below" && review.referenceDate
+                    ? interpolate(copy.odometerBelowDatedBody, { value: miles(review.value), reference: miles(review.reference), date: formatLocaleDate(review.referenceDate, locale, "long") })
+                  : review?.kind === "above"
+                    ? interpolate(copy.odometerAboveDatedBody, { value: miles(review.value), reference: miles(review.reference), date: formatLocaleDate(review.referenceDate, locale, "long") })
                   : review?.kind === "below"
                     ? interpolate(copy.odometerBelowBody, { value: miles(review.value), reference: miles(review.reference) })
                     : review?.kind === "jump"

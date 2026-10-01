@@ -68,3 +68,51 @@ export function decimalSeparatorFor(localeTag: string): DecimalSeparator {
   const part = new Intl.NumberFormat(localeTag).formatToParts(1.5).find((p) => p.type === "decimal");
   return part?.value === "," ? "," : ".";
 }
+
+export interface OdometerReading {
+  id?: string;
+  date: string;
+  odometer: number | null | undefined;
+}
+
+export type DatedOdometerConcern =
+  | { kind: "below"; reference: number; referenceDate: string }
+  | { kind: "above"; reference: number; referenceDate: string }
+  | { kind: "jump"; reference: number; referenceDate: string; miles: number };
+
+/**
+ * Receipts arrive in any order -- Tuesday's can be entered after Wednesday's
+ * -- so a reading is judged against the DATES around it, never against
+ * whatever was typed last. A Monday receipt with fewer miles than Tuesday's is
+ * normal. What cannot happen is an earlier day reading MORE than a later day,
+ * or a later day reading LESS than an earlier one. Readings on the same day
+ * are not compared: the order of two fill-ups on one date is unknown.
+ *
+ * The jump check only applies when nothing later is on file; a reading that
+ * fits between an earlier and a later one is consistent by definition.
+ */
+export function odometerConcernOnDate(
+  value: number,
+  date: string,
+  readings: OdometerReading[],
+  { excludeId, maxJump = ODOMETER_JUMP_WARNING }: { excludeId?: string; maxJump?: number } = {},
+): DatedOdometerConcern | null {
+  let before: { odometer: number; date: string } | null = null;
+  let after: { odometer: number; date: string } | null = null;
+  for (const reading of readings) {
+    if (excludeId && reading.id === excludeId) continue;
+    const odometer = reading.odometer;
+    if (typeof odometer !== "number" || !(odometer > 0)) continue;
+    if (reading.date < date) {
+      if (!before || odometer > before.odometer) before = { odometer, date: reading.date };
+    } else if (reading.date > date) {
+      if (!after || odometer < after.odometer) after = { odometer, date: reading.date };
+    }
+  }
+  if (before && value < before.odometer) return { kind: "below", reference: before.odometer, referenceDate: before.date };
+  if (after && value > after.odometer) return { kind: "above", reference: after.odometer, referenceDate: after.date };
+  if (before && !after && value - before.odometer > maxJump) {
+    return { kind: "jump", reference: before.odometer, referenceDate: before.date, miles: value - before.odometer };
+  }
+  return null;
+}
