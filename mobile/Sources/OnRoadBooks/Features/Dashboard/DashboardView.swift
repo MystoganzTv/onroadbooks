@@ -37,6 +37,11 @@ struct DashboardView: View {
 
                 ScrollView {
                     if let snapshot = viewModel.snapshot {
+                        if let failure = viewModel.refreshFailure {
+                            OBRefreshFailureBanner(message: failure)
+                                .padding(.horizontal, OBSpacing.md)
+                                .padding(.top, OBSpacing.sm)
+                        }
                         content(for: snapshot)
                     } else if viewModel.isLoading {
                         ProgressView().tint(OBColor.primary)
@@ -50,7 +55,7 @@ struct DashboardView: View {
                             .frame(maxWidth: .infinity, minHeight: 300)
                     }
                 }
-                .refreshable { await viewModel.load() }
+                .obRefreshable { await viewModel.load() }
             }
             .background(OBColor.background)
             .toolbar(.hidden, for: .navigationBar)
@@ -323,9 +328,20 @@ struct LoadRow: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 3) {
-                Text(load.lane)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(OBColor.foreground)
+                // The PO leads: the lane repeats, the PO never does.
+                if let po = load.poLabel {
+                    Text(po)
+                        .font(.subheadline.weight(.bold))
+                        .monospacedDigit()
+                        .foregroundStyle(OBColor.foreground)
+                    Text(load.lane)
+                        .font(.caption)
+                        .foregroundStyle(OBColor.foreground)
+                } else {
+                    Text(load.lane)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(OBColor.foreground)
+                }
                 Text(load.broker)
                     .font(.caption)
                     .foregroundStyle(OBColor.mutedForeground)

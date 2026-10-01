@@ -16,6 +16,7 @@ struct AddLoadView: View {
 
     @Environment(\.dismiss) private var dismiss
 
+    @State private var loadNumber = ""
     @State private var date = Date()
     @State private var broker = ""
     @State private var originCity = ""
@@ -55,6 +56,19 @@ struct AddLoadView: View {
     var body: some View {
         NavigationStack {
             Form {
+                // The PO is the load's identifier -- the lane repeats, the PO
+                // never does -- so it is the first thing asked for.
+                Section {
+                    HStack {
+                        Text("PO#").foregroundStyle(OBColor.mutedForeground)
+                        TextField("Número de PO (opcional)", text: $loadNumber)
+                            .textInputAutocapitalization(.characters)
+                            .autocorrectionDisabled()
+                            .monospacedDigit()
+                    }
+                }
+                .listRowBackground(OBColor.card)
+
                 Section {
                     OBNumberRow(label: "Tarifa", prefix: "$", placeholder: "0.00", text: $rateText)
                     OBNumberRow(label: "Millas cargadas", text: $loadedText)
@@ -158,7 +172,8 @@ struct AddLoadView: View {
                         deadheadMiles: OBNumber.parse(deadheadText) ?? 0,
                         fuelCost: OBNumber.parse(fuelText) ?? 0,
                         tolls: OBNumber.parse(tollsText) ?? 0,
-                        otherExpenses: OBNumber.parse(otherText) ?? 0
+                        otherExpenses: OBNumber.parse(otherText) ?? 0,
+                        loadNumber: loadNumber.trimmingCharacters(in: .whitespacesAndNewlines)
                     )
                 )
                 onSaved()

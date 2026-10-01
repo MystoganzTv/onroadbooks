@@ -23,6 +23,7 @@ struct LoadDetailView: View {
     @State private var isLoading = true
     @State private var loadFailure: String?
 
+    @State private var loadNumber = ""
     @State private var date = Date()
     @State private var broker = ""
     @State private var originCity = ""
@@ -82,7 +83,8 @@ struct LoadDetailView: View {
             }
         }
         .background(OBColor.background)
-        .navigationTitle("Load")
+        // The PO names the load; the lane does not (it repeats).
+        .navigationTitle(LoadReference.label(detail?.loadNumber) ?? "Load")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
     }
@@ -90,6 +92,7 @@ struct LoadDetailView: View {
     private var form: some View {
         Form {
             Section {
+                poField(text: $loadNumber)
                 DatePicker("Fecha", selection: $date, displayedComponents: .date)
                 TextField("Broker", text: $broker)
             }
@@ -197,6 +200,17 @@ struct LoadDetailView: View {
         }
     }
 
+    private func poField(text: Binding<String>) -> some View {
+        HStack {
+            Text("PO#").foregroundStyle(OBColor.mutedForeground)
+            TextField("Número de PO", text: text)
+                .textInputAutocapitalization(.characters)
+                .autocorrectionDisabled()
+                .font(.body.weight(.semibold))
+                .monospacedDigit()
+        }
+    }
+
     private func stateField(text: Binding<String>) -> some View {
         TextField("Estado (2 letras)", text: text)
             .textInputAutocapitalization(.characters)
@@ -222,6 +236,7 @@ struct LoadDetailView: View {
         do {
             let record = try await repository.fetchLoadDetail(id: loadId)
             detail = record
+            loadNumber = record.loadNumber ?? ""
             date = record.date
             broker = record.broker
             originCity = record.originCity
@@ -266,7 +281,8 @@ struct LoadDetailView: View {
                         deadheadMiles: OBNumber.parse(deadheadText) ?? 0,
                         fuelCost: OBNumber.parse(fuelText) ?? 0,
                         tolls: OBNumber.parse(tollsText) ?? 0,
-                        otherExpenses: OBNumber.parse(otherText) ?? 0
+                        otherExpenses: OBNumber.parse(otherText) ?? 0,
+                        loadNumber: loadNumber.trimmingCharacters(in: .whitespacesAndNewlines)
                     )
                 )
                 onChanged()

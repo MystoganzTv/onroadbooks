@@ -388,6 +388,31 @@ struct OBUnavailableView: View {
     }
 }
 
+/// A refresh that failed while the screen still holds the last good data.
+/// The data stays; this line says it may be stale and why.
+struct OBRefreshFailureBanner: View {
+    let message: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: OBSpacing.sm) {
+            Image(systemName: "wifi.exclamationmark")
+                .foregroundStyle(OBColor.warn)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("No se pudo actualizar — mostrando lo último que cargó.")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(OBColor.foreground)
+                Text(message)
+                    .font(.caption2)
+                    .foregroundStyle(OBColor.mutedForeground)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(OBSpacing.sm)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .obPanel()
+    }
+}
+
 struct ComingSoonView: View {
     let title: String
     let systemImage: String

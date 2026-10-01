@@ -18,6 +18,7 @@
  */
 
 import { z } from "zod";
+import { bareLoadReference } from "@/lib/load-reference";
 
 import { EQUIPMENT_TYPES } from "../load-details";
 import type { EquipmentType } from "../types";
@@ -49,7 +50,7 @@ export const RATE_CON_TOOL_SCHEMA = {
     },
     loadNumber: {
       type: ["string", "null"],
-      description: "The broker's load, order or pro number for this shipment.",
+      description: "The broker's PO number for this shipment (also printed as load, order or reference number). The identifier only, without its label: \"PO# 38525680\" -> \"38525680\".",
     },
     pickupDate: {
       type: ["string", "null"],
@@ -330,7 +331,7 @@ export function normalizeExtraction(raw: RateConExtraction): RateConFields {
   const fields: RateConFields = {
     broker: cleanText(raw.broker, 120),
     brokerContact: cleanText(raw.brokerContact, 120),
-    loadNumber: cleanText(raw.loadNumber, 60),
+    loadNumber: bareLoadReference(cleanText(raw.loadNumber, 60)),
     date: cleanDate(raw.pickupDate),
     deliveryDate: cleanDate(raw.deliveryDate),
     originCity: cleanText(raw.originCity, 80),

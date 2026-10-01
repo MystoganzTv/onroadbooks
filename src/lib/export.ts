@@ -30,6 +30,7 @@ import {
   FINANCIAL_MODEL_VERSION,
   financialTreatmentOf,
 } from "./finance/terminology";
+import { bareLoadReference } from "@/lib/load-reference";
 
 export type ReportId =
   | "loads"
@@ -113,7 +114,7 @@ export function buildReport(
         title: `Loads - ${scopeLabel} - ${period.label}`,
         calculationVersion: FINANCIAL_MODEL_VERSION,
         columns: [
-          "Truck", "Pickup Date", "Delivery Date", "Ending Odometer", "Load Number", "Broker", "Origin", "Destination",
+          "Truck", "Pickup Date", "Delivery Date", "Ending Odometer", "PO Number", "Broker", "Origin", "Destination",
           "Equipment", "Load Type", "Length (ft)", "Weight (lb)", "Commodity",
           "Loaded Miles", "Deadhead Miles", "Total Miles", "Deadhead %",
           "Gross Rate", "Rate/Loaded Mile", "Rate/Total Mile",
@@ -126,7 +127,7 @@ export function buildReport(
           load.date,
           load.deliveryDate ?? "",
           load.endingOdometer ?? "",
-          load.loadNumber ?? "",
+          bareLoadReference(load.loadNumber) ?? "",
           load.broker ?? "",
           `${load.originCity}, ${load.originState}`,
           `${load.destinationCity}, ${load.destinationState}`,
@@ -311,12 +312,12 @@ export function buildReport(
       return {
         title: `Mileage - ${scopeLabel} - ${period.label}`,
         calculationVersion: FINANCIAL_MODEL_VERSION,
-        columns: ["Truck", "Pickup Date", "Load Number", "Origin", "Destination", "Loaded Miles", "Deadhead Miles", "Total Miles", "Deadhead %"],
+        columns: ["Truck", "Pickup Date", "PO Number", "Origin", "Destination", "Loaded Miles", "Deadhead Miles", "Total Miles", "Deadhead %"],
         rows: [
           ...periodLoads.map((load) => [
             truckName(load.truckId),
             load.date,
-            load.loadNumber ?? "",
+            bareLoadReference(load.loadNumber) ?? "",
             `${load.originCity}, ${load.originState}`,
             `${load.destinationCity}, ${load.destinationState}`,
             load.loadedMiles,

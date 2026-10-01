@@ -1,3 +1,4 @@
+import { formatLoadReference } from "@/lib/load-reference";
 import { roundMoney } from "./calculations";
 import type { Dataset, ExpenseCategoryId, Load } from "./types";
 
@@ -92,9 +93,7 @@ export function loadExpenseDescription(
   load: Pick<Load, "loadNumber" | "originState" | "destinationState">,
   label: string,
 ): string {
-  const reference = load.loadNumber
-    ? `Load #${load.loadNumber}`
-    : `${load.originState}-${load.destinationState}`;
+  const reference = formatLoadReference(load.loadNumber) ?? `${load.originState}-${load.destinationState}`;
   return `${reference} · ${label}`;
 }
 

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { formatLoadReference } from "@/lib/load-reference";
 import { notFound } from "next/navigation";
 
 import { MiniStat } from "@/components/dashboard/mini-stat";
@@ -65,7 +66,7 @@ export default async function DriverProfilePage({
         <TableHeader><TableRow><TableHead>{copy.pickup}</TableHead><TableHead>{copy.load}</TableHead><TableHead>{copy.route}</TableHead><TableHead className="text-right">{copy.gross}</TableHead><TableHead className="text-right">{copy.payFromLoads}</TableHead><TableHead className="text-right">{copy.recordedPaid}</TableHead></TableRow></TableHeader>
         <TableBody>{earnings.length === 0 ? <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">{dictionary.loads.noLoadsPeriod}</TableCell></TableRow> : earnings.map(({ load, amount, paidAmount, paidOn }) => <TableRow key={load.id}>
           <TableCell>{formatLocaleDate(load.date, locale, { month: "short", day: "numeric" })}</TableCell>
-          <TableCell><Link href={`/loads/${load.id}`} className="font-medium text-primary hover:underline">{load.loadNumber ?? load.id}</Link></TableCell>
+          <TableCell><Link href={`/loads/${load.id}`} className="font-medium text-primary hover:underline">{formatLoadReference(load.loadNumber) ?? load.id}</Link></TableCell>
           <TableCell>{load.originCity}, {load.originState} → {load.destinationCity}, {load.destinationState}</TableCell>
           <TableCell className="text-right tnum">{formatMoney(load.grossRate)}</TableCell><TableCell className="text-right tnum font-semibold">{formatMoney(amount)}</TableCell>
           <TableCell className="text-right tnum">{paidAmount === null ? "—" : <>{formatMoney(paidAmount)}{paidOn ? <p className="text-2xs text-muted-foreground">{formatLocaleDate(paidOn, locale)}</p> : null}</>}</TableCell>

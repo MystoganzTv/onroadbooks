@@ -66,7 +66,7 @@ struct DriverPayView: View {
         .navigationTitle("Pago a choferes")
         .navigationBarTitleDisplayMode(.inline)
         .task { await reload() }
-        .refreshable { await reload() }
+        .obRefreshable { await reload() }
     }
 
     private func reload() async {

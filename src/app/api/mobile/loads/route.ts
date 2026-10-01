@@ -1,6 +1,7 @@
 import { mobileScopedDataset } from "@/lib/mobile/scope";
 import { buildLoadEstimator } from "@/lib/load-estimates";
 import { revalidatePath } from "next/cache";
+import { bareLoadReference } from "@/lib/load-reference";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { fieldErrorsFrom } from "@/lib/actions/types";
@@ -49,6 +50,8 @@ export async function GET(request: NextRequest) {
       return {
         id: load.id,
         date: load.date,
+        // The PO is the load's identifier on the phone too; a lane repeats.
+        loadNumber: bareLoadReference(load.loadNumber),
         broker: load.broker,
         sourceKind: load.sourceKind ?? null,
         sourceName: load.sourceName ?? null,

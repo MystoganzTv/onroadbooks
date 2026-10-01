@@ -4,6 +4,7 @@ import { LoadProfitabilityCard } from "@/components/loads/load-profitability-car
 import { brokerContactNames } from "@/lib/broker-contacts";
 import { buildLoadEstimator } from "@/lib/load-estimates";
 import Link from "next/link";
+import { formatLoadReference } from "@/lib/load-reference";
 import { brokerNameKey, brokerNames as savedBrokerNames } from "@/lib/brokers";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -99,21 +100,32 @@ export default async function LoadDetailPage({
   const linkedExpenses = dataset.expenses.filter((expense) => expense.loadId === load.id);
   const documents = dataset.documents.filter((doc) => doc.loadId === load.id);
   const route = `${load.originCity}, ${load.originState} ${copy.to} ${load.destinationCity}, ${load.destinationState}`;
+  const poReference = formatLoadReference(load.loadNumber);
 
   return (
     <div className="space-y-4 p-4 lg:p-6">
       <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <HistoryBackButton fallbackHref="/loads" label={copy.back} className="-ml-2 mb-1" />
-          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-            <MapPin className="size-4 shrink-0 text-muted-foreground" />
-            <span className="truncate">{route}</span>
-          </h1>
+          {/* The PO leads: a lane repeats week after week, the PO never does. */}
+          {poReference ? (
+            <>
+              <h1 className="text-2xl font-semibold tracking-tight tnum select-all">{poReference}</h1>
+              <p className="mt-0.5 flex items-center gap-2 text-base font-medium">
+                <MapPin className="size-4 shrink-0 text-muted-foreground" />
+                <span className="truncate">{route}</span>
+              </p>
+            </>
+          ) : (
+            <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
+              <MapPin className="size-4 shrink-0 text-muted-foreground" />
+              <span className="truncate">{route}</span>
+            </h1>
+          )}
           <p className="mt-0.5 text-sm text-muted-foreground">
             {copy.pickup} {formatLocaleDate(load.date, locale, "long")}
             {load.deliveryDate ? ` - ${copy.delivery} ${formatLocaleDate(load.deliveryDate, locale, "long")}` : ""}
             {load.broker ? <> - {brokerProfile ? <Link className="text-primary hover:underline" href={`/brokers/${brokerProfile.id}`}>{load.broker}</Link> : load.broker}{load.brokerContact ? ` (${load.brokerContact})` : ""}</> : null}
-            {load.loadNumber ? ` - ${interpolate(copy.loadNumber, { number: load.loadNumber })}` : ""}
             {dataset.trucks.length > 1
               ? ` - ${dataset.trucks.find((t) => t.id === load.truckId)?.name ?? copy.unknownTruck}`
               : ""}

@@ -41,7 +41,7 @@ struct DriverStatementDetailView: View {
         .navigationTitle("Liquidación")
         .navigationBarTitleDisplayMode(.inline)
         .task { await reload() }
-        .refreshable { await reload() }
+        .obRefreshable { await reload() }
     }
 
     private func summary(_ detail: DriverStatementDetail) -> some View {

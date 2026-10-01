@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { bareLoadReference, formatLoadReference } from "@/lib/load-reference";
 import { Download, ExternalLink } from "lucide-react";
 
 import { InvoiceActions } from "@/components/invoices/invoice-actions";
@@ -54,8 +55,8 @@ export default async function InvoicesPage() {
                 <TableBody>{loads.map((load) => {
                   return <TableRow key={load.id}>
                     <TableCell>
-                      <Link href={`/loads/${load.id}`} className="font-medium hover:underline">{load.invoiceNumber ?? load.loadNumber ?? copy.unnumberedLoad}</Link>
-                      {load.invoiceNumber && load.loadNumber ? <span className="block text-2xs text-muted-foreground">{interpolate(copy.loadNumber, { number: load.loadNumber })}</span> : null}
+                      <Link href={`/loads/${load.id}`} className="font-medium hover:underline">{load.invoiceNumber ?? formatLoadReference(load.loadNumber) ?? copy.unnumberedLoad}</Link>
+                      {load.invoiceNumber && load.loadNumber ? <span className="block text-2xs text-muted-foreground">{interpolate(copy.loadNumber, { number: bareLoadReference(load.loadNumber) ?? "" })}</span> : null}
                     </TableCell>
                     <TableCell>{load.billToName ?? load.broker ?? "—"}</TableCell>
                     <TableCell className="whitespace-nowrap text-xs">{load.originCity}, {load.originState} → {load.destinationCity}, {load.destinationState}</TableCell>

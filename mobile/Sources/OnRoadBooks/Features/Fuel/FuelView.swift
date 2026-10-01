@@ -79,7 +79,7 @@ struct FuelView: View {
         }
         .obScopeBar()
         .obReloadsOnScope { await reload() }
-        .refreshable { await reload() }
+        .obRefreshable { await reload() }
         .sheet(isPresented: $isAdding) {
             AddFuelView(repository: repository, onSaved: { Task { await reload() } })
         }
@@ -168,7 +168,9 @@ struct FuelView: View {
     }
 
     private func reload() async {
-        ledger = try? await repository.fetchFuel()
+        // A failed or cancelled refresh keeps the last good ledger on screen;
+        // only a first load that never succeeded shows the unavailable state.
+        if let fresh = try? await repository.fetchFuel() { ledger = fresh }
         isLoading = false
     }
 }

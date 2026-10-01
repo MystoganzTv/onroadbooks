@@ -25,6 +25,19 @@ enum APIError: LocalizedError {
     }
 }
 
+extension Error {
+    /// The app abandoned the request itself — SwiftUI cancelled the task, most
+    /// often a pull-to-refresh whose screen re-rendered mid-flight. Nothing
+    /// went wrong with the network or the ledger, so a screen must never treat
+    /// it as "no data" and empty itself.
+    var isCancellation: Bool {
+        if self is CancellationError { return true }
+        if let url = self as? URLError, url.code == .cancelled { return true }
+        if let api = self as? APIError, case .transport(let failure) = api, failure.code == .cancelled { return true }
+        return false
+    }
+}
+
 /// Talks to the `/api/mobile/*` routes in the OnRoad Books web app — a plain
 /// HTTP client, no database driver (see project memory `onroadbooks_mobile.md`).
 ///
@@ -581,6 +594,9 @@ private struct LoadDTO: Decodable {
     let debtCashBurden: Double
     let allocationBasisLabel: String
     let rating: String
+    /// Optional: an older server does not send it, and a missing key must
+    /// not fail the whole list (one decoder serves loads AND the dashboard).
+    let loadNumber: String?
 
     func toDomain() -> Load {
         Load(
@@ -599,7 +615,8 @@ private struct LoadDTO: Decodable {
             allocatedOperatingCosts: allocatedOperatingCosts,
             estimatedFullyLoadedOperatingProfit: estimatedFullyLoadedOperatingProfit,
             debtCashBurden: debtCashBurden,
-            allocationBasisLabel: allocationBasisLabel
+            allocationBasisLabel: allocationBasisLabel,
+            loadNumber: loadNumber
         )
     }
 }
@@ -1229,8 +1246,11 @@ private struct NewLoadDTO: Encodable {
     let factoringFee: Double
     let otherExpenses: Double
     let status: String
+    let loadNumber: String?
 
     init(_ load: NewLoad) {
+        let po = load.loadNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        loadNumber = po.isEmpty ? nil : po
         date = ISODate.day(load.date)
         broker = load.broker.isEmpty ? nil : load.broker
         originCity = load.originCity
@@ -1417,6 +1437,7 @@ private struct LoadDetailDTO: Decodable {
     let otherExpenses: Double
     let status: String
     let invoiceNumber: String?
+    let loadNumber: String?
 
     func toDomain() -> LoadDetail {
         LoadDetail(
@@ -1435,7 +1456,8 @@ private struct LoadDetailDTO: Decodable {
             tolls: tolls,
             otherExpenses: otherExpenses,
             status: status,
-            invoiceNumber: invoiceNumber
+            invoiceNumber: invoiceNumber,
+            loadNumber: loadNumber
         )
     }
 }
@@ -1457,8 +1479,11 @@ private struct LoadEditDTO: Encodable {
     let fuelCost: Double
     let tolls: Double
     let otherExpenses: Double
+    /// nil = omit (keep), "" = explicit null (clear), text = set.
+    let loadNumber: String?
 
     init(_ change: LoadEdit) {
+        loadNumber = change.loadNumber?.trimmingCharacters(in: .whitespacesAndNewlines)
         driverId = change.driverId
         date = ISODate.day(change.date)
         broker = change.broker.isEmpty ? nil : change.broker
@@ -1477,7 +1502,7 @@ private struct LoadEditDTO: Encodable {
     enum CodingKeys: String, CodingKey {
         case driverId, date, broker, originCity, originState, destinationCity
         case destinationState, grossRate, loadedMiles, deadheadMiles
-        case fuelCost, tolls, otherExpenses
+        case fuelCost, tolls, otherExpenses, loadNumber
     }
 
     /// `encodeNil` rather than the synthesized encoder: a nil optional would
@@ -1485,6 +1510,13 @@ private struct LoadEditDTO: Encodable {
     /// merge — so unassigning a driver would silently do nothing.
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
+        if let loadNumber {
+            if loadNumber.isEmpty {
+                try container.encodeNil(forKey: .loadNumber)
+            } else {
+                try container.encode(loadNumber, forKey: .loadNumber)
+            }
+        }
         if let driverId {
             try container.encode(driverId, forKey: .driverId)
         } else {

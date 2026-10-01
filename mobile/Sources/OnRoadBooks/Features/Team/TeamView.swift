@@ -60,7 +60,7 @@ struct TeamView: View {
             }
         }
         .task { await reload() }
-        .refreshable { await reload() }
+        .obRefreshable { await reload() }
         .sheet(isPresented: $showInvite) {
             InviteTeamMemberView(repository: repository) {
                 Task { await reload() }

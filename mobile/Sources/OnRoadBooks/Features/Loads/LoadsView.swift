@@ -5,6 +5,9 @@ struct LoadsView: View {
     @State private var loads: [Load] = []
     @State private var isLoading = true
     @State private var isAdding = false
+    /// Why the last refresh failed. The list on screen stays: a dropped
+    /// request is not an empty ledger.
+    @State private var refreshFailure: String?
 
     var body: some View {
         NavigationStack {
@@ -26,8 +29,23 @@ struct LoadsView: View {
                 if isLoading {
                     ProgressView().tint(OBColor.primary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if loads.isEmpty, refreshFailure != nil {
+                    // Still a List so pull-to-retry works on this screen too.
+                    List {
+                        OBUnavailableView(title: "Loads")
+                            .frame(minHeight: 300)
+                            .listRowBackground(OBColor.background)
+                            .listRowSeparator(.hidden)
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                 } else {
                     List {
+                        if let refreshFailure {
+                            OBRefreshFailureBanner(message: refreshFailure)
+                                .listRowBackground(OBColor.background)
+                                .listRowSeparator(.hidden)
+                        }
                         ForEach(loads) { load in
                             NavigationLink {
                                 LoadDetailView(
@@ -49,7 +67,7 @@ struct LoadsView: View {
             .background(OBColor.background)
             .toolbar(.hidden, for: .navigationBar)
             .obReloadsOnScope { await reload() }
-            .refreshable { await reload() }
+            .obRefreshable { await reload() }
             .sheet(isPresented: $isAdding) {
                 AddLoadView(repository: repository, onSaved: { Task { await reload() } })
             }
@@ -57,7 +75,15 @@ struct LoadsView: View {
     }
 
     private func reload() async {
-        loads = (try? await repository.fetchLoads()) ?? []
+        do {
+            loads = try await repository.fetchLoads()
+            refreshFailure = nil
+        } catch let error where error.isCancellation {
+            // Abandoned by the app, not refused by anyone. Keep everything.
+        } catch {
+            refreshFailure = (error as? LocalizedError)?.errorDescription
+                ?? "No se pudo actualizar. Revisa la señal y desliza para reintentar."
+        }
         isLoading = false
     }
 }
@@ -66,10 +92,23 @@ private struct LoadDetailRow: View {
     let load: Load
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(load.lane)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(OBColor.foreground)
+            HStack(alignment: .top) {
+                // The PO leads: the lane repeats, the PO never does.
+                VStack(alignment: .leading, spacing: 2) {
+                    if let po = load.poLabel {
+                        Text(po)
+                            .font(.subheadline.weight(.bold))
+                            .monospacedDigit()
+                            .foregroundStyle(OBColor.foreground)
+                        Text(load.lane)
+                            .font(.caption)
+                            .foregroundStyle(OBColor.foreground)
+                    } else {
+                        Text(load.lane)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(OBColor.foreground)
+                    }
+                }
                 Spacer()
                 RatingChip(rating: load.rating)
             }

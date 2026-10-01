@@ -176,6 +176,17 @@ extension View {
         modifier(ReloadsOnScope(token: token, reload: reload))
     }
 
+    /// Pull to refresh that survives its own gesture.
+    ///
+    /// SwiftUI cancels the `.refreshable` task the moment the view it hangs on
+    /// re-renders — and a refresh re-renders the screen by design. The request
+    /// died as `URLError.cancelled`, the screen read that as "no data", and the
+    /// owner watched his loads vanish on every pull. Running the reload in its
+    /// own unstructured `Task` lets it finish whatever the spinner does.
+    func obRefreshable(_ action: @escaping () async -> Void) -> some View {
+        refreshable { await Task { await action() }.value }
+    }
+
     /// The bar pinned under the navigation bar, for pushed screens. Tab roots
     /// place it themselves, directly below their own header — the same order
     /// the web uses: page header, then the period controls.

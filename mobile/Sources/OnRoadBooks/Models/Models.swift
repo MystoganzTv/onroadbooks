@@ -64,6 +64,9 @@ struct Load: Identifiable, Hashable {
     let estimatedFullyLoadedOperatingProfit: Double
     let debtCashBurden: Double
     let allocationBasisLabel: String
+    /// The broker's PO, bare ("38525680"). The load's identifier: a lane
+    /// repeats week after week, the PO never does.
+    let loadNumber: String?
 
     init(
         id: String, date: Date, broker: String, origin: String, destination: String,
@@ -71,9 +74,11 @@ struct Load: Identifiable, Hashable {
         profitPerMile: Double, directTripCosts: Double? = nil,
         contributionProfit: Double? = nil, allocatedOperatingCosts: Double? = nil,
         estimatedFullyLoadedOperatingProfit: Double? = nil, debtCashBurden: Double? = nil,
-        allocationBasisLabel: String = "trailing operating basis"
+        allocationBasisLabel: String = "trailing operating basis",
+        loadNumber: String? = nil
     ) {
         self.id = id
+        self.loadNumber = loadNumber
         self.date = date
         self.broker = broker
         self.origin = origin
@@ -96,6 +101,18 @@ struct Load: Identifiable, Hashable {
     }
 
     var lane: String { "\(origin) → \(destination)" }
+
+    /// "PO# 38525680", or nil when the load has no PO.
+    var poLabel: String? { LoadReference.label(loadNumber) }
+}
+
+/// One PO# prefix, never "Load #PO# …". Mirrors `src/lib/load-reference.ts`:
+/// the server already stores and sends the PO bare, this only formats it.
+enum LoadReference {
+    static func label(_ number: String?) -> String? {
+        guard let number = number?.trimmingCharacters(in: .whitespacesAndNewlines), !number.isEmpty else { return nil }
+        return "PO# \(number)"
+    }
 }
 
 /// The category id and label come straight from the backend's
@@ -196,6 +213,8 @@ struct NewLoad {
     var fuelCost: Double
     var tolls: Double
     var otherExpenses: Double
+    /// The broker's PO. Empty means none.
+    var loadNumber: String = ""
 }
 
 /// The raw record behind a load row, for correcting it.
@@ -220,6 +239,7 @@ struct LoadDetail: Identifiable, Equatable {
     var otherExpenses: Double
     var status: String
     var invoiceNumber: String?
+    var loadNumber: String? = nil
 
     /// Dispatch and factoring are not on this screen; the server keeps them.
     var lane: String { "\(originCity), \(originState) → \(destinationCity), \(destinationState)" }
@@ -245,6 +265,9 @@ struct LoadEdit: Equatable {
     var fuelCost: Double
     var tolls: Double
     var otherExpenses: Double
+    /// nil = leave the PO as it is (the key is omitted and the server's merge
+    /// keeps it); "" = clear it (sent as an explicit null); text = set it.
+    var loadNumber: String? = nil
 }
 
 // MARK: - Load calculator

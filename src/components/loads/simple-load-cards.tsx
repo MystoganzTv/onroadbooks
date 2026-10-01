@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { formatLoadReference } from "@/lib/load-reference";
 import { useLanguage } from "@/components/shell/language-provider";
 import { formatMoney } from "@/lib/formatters";
 import { formatLocaleDate } from "@/lib/i18n-format";
@@ -22,8 +23,9 @@ export function SimpleLoadCards({ loads, trucks = [], totals }: {
             <Link href={`/loads/${load.id}`} className="block space-y-3 p-4 transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
               <div>
                 <p className="text-xs text-muted-foreground">{formatLocaleDate(load.date, locale, "short")}</p>
-                <p className="mt-1 break-words font-medium">{load.originCity}, {load.originState} → {load.destinationCity}, {load.destinationState}</p>
-                <p className="mt-1 break-words text-xs text-muted-foreground">{[load.broker, load.loadNumber, trucks.length > 1 ? trucks.find((truck) => truck.id === load.truckId)?.name : null].filter(Boolean).join(" · ")}</p>
+                {formatLoadReference(load.loadNumber) ? <p className="mt-1 break-words font-semibold tnum">{formatLoadReference(load.loadNumber)}</p> : null}
+                <p className={cn("mt-1 break-words", formatLoadReference(load.loadNumber) ? "text-sm" : "font-medium")}>{load.originCity}, {load.originState} → {load.destinationCity}, {load.destinationState}</p>
+                <p className="mt-1 break-words text-xs text-muted-foreground">{[load.broker, trucks.length > 1 ? trucks.find((truck) => truck.id === load.truckId)?.name : null].filter(Boolean).join(" · ")}</p>
               </div>
               <dl className="grid grid-cols-2 gap-3">
                 <div><dt className="text-xs text-muted-foreground">{dictionary.loads.rate}</dt><dd className="mt-1 font-semibold tnum">{formatMoney(load.grossRate)}</dd></div>

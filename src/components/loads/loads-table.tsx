@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { formatLoadReference } from "@/lib/load-reference";
 import { useRouter } from "next/navigation";
 import {
   ArrowUpDown,
@@ -357,9 +358,10 @@ export function LoadsTable({
                   <TableCell className="text-muted-foreground">{formatLocaleDate(load.date, locale, "short")}</TableCell>
                   <TableCell className="whitespace-normal min-w-40">
                     <Link href={`/loads/${load.id}`} onClick={(event) => event.stopPropagation()} className="rounded-sm font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                      {load.originCity}, {load.originState} → {load.destinationCity}, {load.destinationState}
+                      {formatLoadReference(load.loadNumber) ? <span className="block font-semibold tnum">{formatLoadReference(load.loadNumber)}</span> : null}
+                      <span className={formatLoadReference(load.loadNumber) ? "block text-sm font-normal" : undefined}>{load.originCity}, {load.originState} → {load.destinationCity}, {load.destinationState}</span>
                     </Link>
-                    <span className="mt-1 block text-xs text-muted-foreground">{[load.broker, load.loadNumber, showTruck ? truckName(load.truckId) : null].filter(Boolean).join(" · ")}</span>
+                    <span className="mt-1 block text-xs text-muted-foreground">{[load.broker, showTruck ? truckName(load.truckId) : null].filter(Boolean).join(" · ")}</span>
                   </TableCell>
                   <TableCell className="text-right font-medium tnum">{formatMoney(load.grossRate)}</TableCell>
                   <TableCell className={cn("text-right font-medium tnum", load.metrics.tripProfit >= 0 ? "text-pos" : "text-neg")}>{formatMoney(load.metrics.tripProfit)}</TableCell>

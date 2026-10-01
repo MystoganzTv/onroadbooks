@@ -58,7 +58,7 @@ struct DocumentsView: View {
         .disabled(busy)
         .quickLookPreview($preview)
         .task { await reload() }
-        .refreshable { await reload() }
+        .obRefreshable { await reload() }
         .sheet(isPresented: $adding) {
             if let library {
                 AddDocumentView(repository: repository, library: library) { Task { await reload() } }

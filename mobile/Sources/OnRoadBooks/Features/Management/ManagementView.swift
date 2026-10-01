@@ -72,7 +72,7 @@ struct ManagementView: View {
             }
         }
         .task(id: quarter) { await reload() }
-        .refreshable { await reload() }
+        .obRefreshable { await reload() }
         .sheet(isPresented: $adding) {
             if let collection {
                 NavigationStack {

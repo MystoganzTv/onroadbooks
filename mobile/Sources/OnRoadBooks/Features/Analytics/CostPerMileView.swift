@@ -75,7 +75,7 @@ struct CostPerMileView: View {
         .background(OBColor.background)
         .obScopeBar()
         .obReloadsOnScope { await reload() }
-        .refreshable { await reload() }
+        .obRefreshable { await reload() }
     }
     private func metric(_ label: String, _ amount: Double, available: Bool) -> some View {
         HStack {

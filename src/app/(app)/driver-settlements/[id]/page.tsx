@@ -1,6 +1,7 @@
 import { FLEET_VISIBLE } from "@/lib/product";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { formatLoadReference } from "@/lib/load-reference";
 import { notFound, redirect } from "next/navigation";
 
 import { DriverSettlementActions } from "@/components/driver-settlements/driver-settlement-actions";
@@ -78,7 +79,7 @@ export default async function DriverSettlementDetailPage({ params }: { params: P
           const method = DRIVER_PAY_TYPES.find((type) => type.id === line.payType)!;
           return <TableRow key={line.id}>
             <TableCell>{load ? formatLocaleDate(load.date, locale, { month: "short", day: "numeric" }) : "—"}</TableCell>
-            <TableCell>{load ? <Link href={`/loads/${load.id}`} className="font-medium text-primary hover:underline">{load.originCity}, {load.originState} → {load.destinationCity}, {load.destinationState}</Link> : copy.loadUnavailable}<p className="text-2xs text-muted-foreground">{load?.loadNumber ? `#${load.loadNumber}` : line.loadId}</p></TableCell>
+            <TableCell>{load ? <Link href={`/loads/${load.id}`} className="font-medium text-primary hover:underline">{load.originCity}, {load.originState} → {load.destinationCity}, {load.destinationState}</Link> : copy.loadUnavailable}<p className="text-2xs text-muted-foreground">{formatLoadReference(load?.loadNumber) ?? line.loadId}</p></TableCell>
             <TableCell>{truck?.name ?? copy.unknownUnit}</TableCell>
             <TableCell>{line.payType === "PERCENT_GROSS" ? interpolate(copy.percentGross, { rate: line.payRate }) : line.payType === "FLAT_PER_LOAD" ? interpolate(copy.perLoad, { rate: formatMoney(line.payRate) }) : `${formatMoney(line.payRate)} ${locale === "es" ? method.suffixEs : method.suffix}`}</TableCell>
             <TableCell className="text-right tnum">{formatMoney(line.grossRevenue)}</TableCell><TableCell className="text-right tnum">{formatMiles(line.totalMiles)}</TableCell><TableCell className="text-right tnum font-semibold">{formatMoney(line.payAmount)}</TableCell>

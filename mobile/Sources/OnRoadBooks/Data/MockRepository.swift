@@ -25,19 +25,23 @@ final class MockRepository: LedgerRepository {
             Load(id: "1", date: mockDate(2026, 8, 28), broker: "Werner Logistics",
                  origin: "Chicago, IL", destination: "Columbus, OH",
                  rate: 2850, miles: 356, deadheadMiles: 12,
-                 rating: .great, profitPerMile: 1.98),
+                 rating: .great, profitPerMile: 1.98,
+                 loadNumber: "48120375"),
             Load(id: "2", date: mockDate(2026, 8, 25), broker: "TQL",
                  origin: "Dallas, TX", destination: "Memphis, TN",
                  rate: 1640, miles: 452, deadheadMiles: 38,
-                 rating: .good, profitPerMile: 1.42),
+                 rating: .good, profitPerMile: 1.42,
+                 loadNumber: "38525680"),
             Load(id: "3", date: mockDate(2026, 8, 22), broker: "Coyote",
                  origin: "Atlanta, GA", destination: "Charlotte, NC",
                  rate: 980, miles: 244, deadheadMiles: 20,
-                 rating: .good, profitPerMile: 1.35),
+                 rating: .good, profitPerMile: 1.35,
+                 loadNumber: "C-771204"),
             Load(id: "4", date: mockDate(2026, 8, 19), broker: "Landstar",
                  origin: "Louisville, KY", destination: "Indianapolis, IN",
                  rate: 640, miles: 114, deadheadMiles: 45,
-                 rating: .marginal, profitPerMile: 0.98),
+                 rating: .marginal, profitPerMile: 0.98,
+                 loadNumber: "2214976"),
             Load(id: "5", date: mockDate(2026, 8, 14), broker: "Direct Shipper",
                  origin: "Phoenix, AZ", destination: "Albuquerque, NM",
                  rate: 980, miles: 465, deadheadMiles: 210,
@@ -328,7 +332,8 @@ final class MockRepository: LedgerRepository {
             tolls: 0,
             otherExpenses: 0,
             status: "PENDING",
-            invoiceNumber: nil
+            invoiceNumber: nil,
+            loadNumber: load.loadNumber
         )
     }
 
@@ -355,7 +360,8 @@ final class MockRepository: LedgerRepository {
             allocatedOperatingCosts: existing.allocatedOperatingCosts,
             estimatedFullyLoadedOperatingProfit: profit - existing.allocatedOperatingCosts,
             debtCashBurden: existing.debtCashBurden,
-            allocationBasisLabel: existing.allocationBasisLabel
+            allocationBasisLabel: existing.allocationBasisLabel,
+            loadNumber: change.loadNumber.map { $0.isEmpty ? nil : $0 } ?? existing.loadNumber
         )
         return id
     }
@@ -665,7 +671,8 @@ final class MockRepository: LedgerRepository {
                  origin: "\(load.originCity), \(load.originState.uppercased())",
                  destination: "\(load.destinationCity), \(load.destinationState.uppercased())",
                  rate: load.grossRate, miles: load.loadedMiles, deadheadMiles: load.deadheadMiles,
-                 rating: demoRating(profitPerMile: perMile), profitPerMile: perMile),
+                 rating: demoRating(profitPerMile: perMile), profitPerMile: perMile,
+                 loadNumber: load.loadNumber.isEmpty ? nil : load.loadNumber),
             at: 0
         )
         return id

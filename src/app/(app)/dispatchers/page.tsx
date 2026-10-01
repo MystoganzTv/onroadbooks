@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatLoadReference } from "@/lib/load-reference";
 import { DispatcherFormDialog } from "@/components/dispatchers/dispatcher-form-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,7 +43,7 @@ export default async function DispatchersPage({ searchParams }: { searchParams: 
       <CardContent className="overflow-x-auto p-0"><Table>
         <TableHeader><TableRow><TableHead>{copy.date}</TableHead><TableHead>{copy.load}</TableHead><TableHead>{copy.broker}</TableHead><TableHead className="text-right">{copy.fee}</TableHead></TableRow></TableHeader>
         <TableBody>{[...selected.loads].sort((a, b) => b.date.localeCompare(a.date)).map(load => <TableRow key={load.id}>
-          <TableCell className="whitespace-nowrap">{load.date}</TableCell><TableCell><Link className="text-primary hover:underline" href={`/loads/${load.id}`}>{load.loadNumber || `${load.originCity} → ${load.destinationCity}`}</Link></TableCell><TableCell>{load.broker ?? "—"}</TableCell>
+          <TableCell className="whitespace-nowrap">{load.date}</TableCell><TableCell><Link className="text-primary hover:underline" href={`/loads/${load.id}`}>{formatLoadReference(load.loadNumber) ?? `${load.originCity} → ${load.destinationCity}`}</Link></TableCell><TableCell>{load.broker ?? "—"}</TableCell>
           <TableCell className="text-right tabular-nums">{formatMoney(tripExpenseLines(load, dataset.expenses).find(line => line.key === "dispatch")?.amount ?? 0)}</TableCell>
         </TableRow>)}</TableBody>
       </Table><p className="border-t border-border p-4 text-right font-semibold">{copy.total}: {formatMoney(selected.fees)}</p></CardContent>

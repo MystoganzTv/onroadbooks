@@ -1,4 +1,5 @@
 import { revalidatePath } from "next/cache";
+import { bareLoadReference } from "@/lib/load-reference";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { fieldErrorsFrom } from "@/lib/actions/types";
@@ -41,7 +42,7 @@ export async function GET(
     brokerContact: load.brokerContact,
     sourceKind: load.sourceKind ?? null,
     sourceName: load.sourceName ?? null,
-        loadNumber: load.loadNumber,
+        loadNumber: bareLoadReference(load.loadNumber),
         originCity: load.originCity,
         originState: load.originState,
         destinationCity: load.destinationCity,
@@ -80,7 +81,7 @@ function loadFormShape(load: Load) {
     brokerContact: load.brokerContact,
     sourceKind: load.sourceKind ?? null,
     sourceName: load.sourceName ?? null,
-    loadNumber: load.loadNumber,
+    loadNumber: bareLoadReference(load.loadNumber),
     equipmentType: load.equipmentType,
     loadCapacity: load.loadCapacity,
     equipmentLengthFt: load.equipmentLengthFt,

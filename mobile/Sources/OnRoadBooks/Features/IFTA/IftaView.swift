@@ -54,7 +54,7 @@ struct IftaView: View {
         }
         .task(id: quarter) { await reload() }
         .onReceive(NotificationCenter.default.publisher(for: .obLedgerChanged)) { _ in Task { await reload() } }
-        .refreshable { await reload() }
+        .obRefreshable { await reload() }
     }
 
     @ViewBuilder

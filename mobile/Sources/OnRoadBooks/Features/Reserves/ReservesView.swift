@@ -65,7 +65,7 @@ struct ReservesView: View {
         }
         .obScopeBar()
         .obReloadsOnScope { await reload() }
-        .refreshable { await reload() }
+        .obRefreshable { await reload() }
     }
 
     @ViewBuilder

@@ -44,7 +44,7 @@ struct AnalyticsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .obScopeBar()
         .obReloadsOnScope(alsoOn: grouping) { await reload() }
-        .refreshable { await reload() }
+        .obRefreshable { await reload() }
     }
 
     @ViewBuilder

@@ -1,4 +1,5 @@
 import { reconcileDebtPaymentSplit } from "./finance/debt-payment";
+import { bareLoadReference } from "@/lib/load-reference";
 import { z } from "zod";
 import { LOAD_SOURCE_KINDS } from "./types";
 import { isIftaJurisdiction } from "./ifta";
@@ -82,7 +83,8 @@ export const loadSchema = z
     brokerContact: z.string().trim().max(120).optional().nullable(),
     sourceKind: z.enum(LOAD_SOURCE_KINDS).optional().nullable(),
     sourceName: z.string().trim().max(120).optional().nullable(),
-    loadNumber: z.string().trim().max(60).optional().nullable(),
+    // Stored bare: "PO# 38525680" -> "38525680". Screens add the one PO# prefix.
+    loadNumber: z.string().trim().max(60).optional().nullable().transform((value) => (value == null ? value : bareLoadReference(value))),
     equipmentType: z
       .enum(["BOX_TRUCK", "DRY_VAN", "REEFER", "FLATBED", "POWER_ONLY", "SPRINTER_VAN", "OTHER"])
       .optional()

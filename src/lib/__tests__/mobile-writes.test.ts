@@ -45,6 +45,7 @@ const loadFromPhone = {
   factoringFee: 0,
   otherExpenses: 0,
   status: "PENDING",
+  loadNumber: "PO# 38525680",
 };
 
 const expenseFromPhone = {
@@ -289,6 +290,14 @@ describe("what the iOS app now posts to edit, collect and close", () => {
     // A partial body is refused: sending only the corrected rate would blank
     // the route, the miles and the trip costs.
     assert.equal(loadSchema.safeParse({ grossRate: 1900 }).success, false);
+  });
+
+  it("stores the PO bare, so no screen prints \"Load #PO# …\"", () => {
+    const parsed = loadSchema.safeParse(loadFromPhone);
+    assert.equal(parsed.success && parsed.data.loadNumber, "38525680");
+    // LoadEditDTO sends an explicit null to clear the PO.
+    const cleared = loadSchema.safeParse({ ...loadFromPhone, loadNumber: null });
+    assert.equal(cleared.success && cleared.data.loadNumber, null);
   });
 
   it("edits an expense and a fill-up with their own full schemas", () => {

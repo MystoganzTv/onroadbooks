@@ -87,7 +87,7 @@ struct DriversView: View {
             }
         }
         .task { await reload() }
-        .refreshable { await reload() }
+        .obRefreshable { await reload() }
         .sheet(isPresented: $isAdding) {
             AddDriverView(repository: repository, onSaved: { Task { await reload() } })
         }

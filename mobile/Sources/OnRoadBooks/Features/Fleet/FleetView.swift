@@ -47,7 +47,7 @@ struct FleetView: View {
         .navigationBarTitleDisplayMode(.inline)
         .obScopeBar()
         .obReloadsOnScope { await reload() }
-        .refreshable { await reload() }
+        .obRefreshable { await reload() }
     }
 
     private func totals(_ overview: FleetOverview) -> some View {

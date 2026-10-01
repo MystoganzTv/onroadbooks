@@ -99,7 +99,7 @@ struct ExpensesView: View {
             .background(OBColor.background)
             .toolbar(.hidden, for: .navigationBar)
             .obReloadsOnScope { await reload() }
-            .refreshable { await reload() }
+            .obRefreshable { await reload() }
             .sheet(item: $editing) { expense in
                 EditExpenseView(
                     repository: repository,
@@ -166,7 +166,9 @@ struct ExpensesView: View {
 
     private func reload() async {
         let ledger = try? await repository.fetchExpenses()
-        expenses = (ledger?.entries ?? []).sorted(by: { $0.date > $1.date })
+        // A failed or cancelled refresh keeps what is on screen -- emptying the
+        // list made a dropped connection look like a ledger with no expenses.
+        if let ledger { expenses = ledger.entries.sorted(by: { $0.date > $1.date }) }
         // Keep the last known picker list rather than emptying it on a failed
         // refresh -- a dropped connection should not make the add form unusable.
         if let categories = ledger?.categories, !categories.isEmpty { self.categories = categories }

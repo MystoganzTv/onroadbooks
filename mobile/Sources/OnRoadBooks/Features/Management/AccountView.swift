@@ -100,7 +100,7 @@ struct AccountView: View {
         .task { await reload(); await purchases.loadProducts() }
         .onChange(of: purchases.revision) { _ in Task { await reload() } }
         .manageSubscriptionsSheet(isPresented: $showManage)
-        .refreshable { await reload() }
+        .obRefreshable { await reload() }
     }
     @MainActor private func reload() async {
         do { account = try await repository.fetchAccount(); failure = nil }
