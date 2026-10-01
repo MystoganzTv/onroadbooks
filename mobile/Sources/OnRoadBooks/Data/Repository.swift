@@ -65,6 +65,9 @@ protocol LedgerRepository {
     /// a row someone may have changed since is the wrong default — the same
     /// reasoning that keeps team and settings writes out of the queue.
     func fetchLoadDetail(id: String) async throws -> LoadDetail
+    /// Brokers, contacts and fee rates for the load form. Optional: a screen
+    /// that cannot get them still works, it just asks for more typing.
+    func fetchLoadFormOptions() async throws -> LoadFormOptions
     @discardableResult func updateLoad(id: String, _ change: LoadEdit) async throws -> String
     func deleteLoad(id: String) async throws
     /// Deleting a load never deletes the money: its expenses and fuel are
@@ -128,6 +131,7 @@ protocol LedgerRepository {
 
 // Demo mode never sends management changes to a real account.
 extension LedgerRepository {
+    func fetchLoadFormOptions() async throws -> LoadFormOptions { .empty }
     func syncApplePurchase(_ signedTransaction: String) async throws -> ApplePurchaseResult { throw APIError.refused("Inicia sesión para restaurar tus compras.") }
     func changeAccountData(intent: String, confirmation: String) async throws { throw APIError.refused("Inicia sesión para administrar la cuenta.") }
     func fetchCostPerMile() async throws -> CostPerMileSnapshot { throw APIError.refused("Inicia sesión para consultar el costo por milla.") }

@@ -29,6 +29,8 @@ export default async function BrokerPage({ params }: { params: Promise<{ id: str
   const copy = dictionary.brokers;
   const loads = dataset.loads.filter((load) => brokerNameKey(load.broker ?? "") === broker.nameKey).sort((a, b) => b.date.localeCompare(a.date));
   const contacts = brokerContactsOf(broker);
+  // What this broker has taken off rates after delivery -- the short-pay history.
+  const deducted = loads.reduce((sum, load) => sum + (load.claimDeduction ?? 0), 0);
   const canManage = roleCan(session.role ?? "VIEWER", "manage_loads");
   return <div className="space-y-4 p-4 lg:p-6">
     <HistoryBackButton fallbackHref="/brokers" label={copy.back} />
@@ -44,7 +46,7 @@ export default async function BrokerPage({ params }: { params: Promise<{ id: str
       {!broker.phone && !broker.email && !broker.mcNumber && !broker.address && !broker.notes ? <p className="text-sm text-muted-foreground">{copy.noContact}</p> : null}
     </CardContent></Card>
     <BrokerContactsCard brokerId={broker.id} brokerName={broker.name} contacts={contacts} canManage={canManage} />
-    <Card><CardHeader><CardTitle>{copy.history}</CardTitle><span className="text-sm tnum">{loads.length} {copy.loads.toLowerCase()} · {formatMoney(loads.reduce((sum, load) => sum + load.grossRate, 0))}</span></CardHeader>
+    <Card><CardHeader><CardTitle>{copy.history}</CardTitle><span className="text-sm tnum">{loads.length} {copy.loads.toLowerCase()} · {formatMoney(loads.reduce((sum, load) => sum + load.grossRate, 0))}{deducted > 0 ? <span className="text-neg"> · −{formatMoney(deducted)} {dictionary.loads.brokerDeduction.toLowerCase()}</span> : null}</span></CardHeader>
       <CardContent className="p-0">{!loads.length ? <p className="p-4 text-sm text-muted-foreground">{copy.noLoads}</p> : <div className="overflow-x-auto"><Table>
         <TableHeader><TableRow><TableHead>{dictionary.loads.pickup}</TableHead><TableHead>{dictionary.drivers.load}</TableHead><TableHead>{dictionary.drivers.route}</TableHead><TableHead>{copy.bookedWith}</TableHead><TableHead className="text-right">{copy.revenue}</TableHead></TableRow></TableHeader>
         <TableBody>{loads.map((load) => <TableRow key={load.id}><TableCell>{formatLocaleDate(load.date, locale)}</TableCell><TableCell><Link className="text-primary hover:underline" href={`/loads/${load.id}`}>{formatLoadReference(load.loadNumber) ?? load.id}</Link></TableCell><TableCell>{load.originCity}, {load.originState} → {load.destinationCity}, {load.destinationState}</TableCell><TableCell>{load.brokerContact?.trim() || <span className="text-muted-foreground">—</span>}</TableCell><TableCell className="text-right tnum">{formatMoney(load.grossRate)}</TableCell></TableRow>)}</TableBody>

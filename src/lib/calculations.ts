@@ -182,6 +182,9 @@ export function tripExpenseLines(
     { key: "dispatch", label: "Dispatch", amount: load.dispatchFee },
     { key: "factoring", label: "Factoring", amount: load.factoringFee },
     { key: "other", label: "Other", amount: load.otherExpenses },
+    // What the broker deducted after delivery. Same footing as dispatch and
+    // factoring: it is money the load did not bring in.
+    { key: "claims", label: "Broker deduction", amount: load.claimDeduction ?? 0 },
   ].map((line) => ({ ...line, amount: num(line.amount) }));
   const categoryKeys: Record<string, string> = {
     TOLLS: "tolls", DISPATCH: "dispatch", FACTORING: "factoring",

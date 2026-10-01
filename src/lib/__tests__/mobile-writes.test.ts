@@ -292,6 +292,24 @@ describe("what the iOS app now posts to edit, collect and close", () => {
     assert.equal(loadSchema.safeParse({ grossRate: 1900 }).success, false);
   });
 
+  it("accepts the phone's full load edit: details, fees and the broker deduction", () => {
+    // From `LoadEditDTO` with includesDetails, merged over the stored load.
+    const edit = {
+      ...loadFromPhone,
+      brokerContact: "Christopher Sanchez",
+      deliveryDate: "2026-09-03",
+      weightLbs: 7000,
+      commodity: "Boxboard",
+      dispatchFee: 111,
+      factoringFee: 64.75,
+      claimDeduction: 28.75,
+      claimReason: "Rotura",
+    };
+    assert.equal(loadSchema.safeParse(edit).success, true);
+    // Cleared on the phone = explicit nulls.
+    assert.equal(loadSchema.safeParse({ ...edit, brokerContact: null, deliveryDate: null, weightLbs: null, commodity: null, claimReason: null }).success, true);
+  });
+
   it("stores the PO bare, so no screen prints \"Load #PO# …\"", () => {
     const parsed = loadSchema.safeParse(loadFromPhone);
     assert.equal(parsed.success && parsed.data.loadNumber, "38525680");

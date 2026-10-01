@@ -113,10 +113,16 @@ export const loadSchema = z
     dispatchFee: money,
     factoringFee: money,
     otherExpenses: money,
+    claimDeduction: money.optional(),
+    claimReason: z.string().trim().max(200).optional().nullable(),
     costsPosted: z.boolean().optional(),
     status: z.enum(["PENDING", "INVOICED", "PAID"]),
     jurisdictionMiles: jurisdictionMilesSchema.optional(),
     notes: z.string().trim().max(2000).optional().nullable(),
+  })
+  .refine((value) => (value.claimDeduction ?? 0) <= value.grossRate, {
+    message: "A deduction cannot be more than the rate",
+    path: ["claimDeduction"],
   })
   .refine(value => value.sourceKind !== "DISPATCHER" || Boolean(value.sourceName?.trim()), {
     message: "Enter the dispatcher's name.", path: ["sourceName"],
@@ -131,7 +137,8 @@ export const loadSchema = z
         value.tolls +
         value.dispatchFee +
         value.factoringFee +
-        value.otherExpenses <=
+        value.otherExpenses +
+        (value.claimDeduction ?? 0) <=
       value.grossRate * 3,
     {
       message: "Direct Trip Costs look far higher than the Gross Rate -- check the numbers",

@@ -243,6 +243,21 @@ final class APIRepository: LedgerRepository {
         try await get("api/mobile/dashboard", as: DashboardDTO.self).toDomain()
     }
 
+    func fetchLoadFormOptions() async throws -> LoadFormOptions {
+        struct Response: Decodable {
+            struct Fees: Decodable { let dispatchPct: Double?; let factoringPct: Double? }
+            struct Broker: Decodable { let name: String; let contacts: [String] }
+            let feeDefaults: Fees
+            let brokers: [Broker]
+        }
+        let response = try await get("api/mobile/loads/form", as: Response.self)
+        return LoadFormOptions(
+            dispatchPct: response.feeDefaults.dispatchPct,
+            factoringPct: response.feeDefaults.factoringPct,
+            brokers: response.brokers.map { LoadFormOptions.Broker(name: $0.name, contacts: $0.contacts) }
+        )
+    }
+
     func fetchLoads() async throws -> [Load] {
         try await get("api/mobile/loads", as: LoadsResponseDTO.self).loads.map { $0.toDomain() }
     }
@@ -1247,10 +1262,20 @@ private struct NewLoadDTO: Encodable {
     let otherExpenses: Double
     let status: String
     let loadNumber: String?
+    let brokerContact: String?
+    let deliveryDate: String?
+    let weightLbs: Int?
+    let commodity: String?
 
     init(_ load: NewLoad) {
         let po = load.loadNumber.trimmingCharacters(in: .whitespacesAndNewlines)
         loadNumber = po.isEmpty ? nil : po
+        let contact = load.brokerContact.trimmingCharacters(in: .whitespacesAndNewlines)
+        brokerContact = contact.isEmpty ? nil : contact
+        deliveryDate = load.deliveryDate.map { ISODate.day($0) }
+        weightLbs = load.weightLbs.map { Int($0.rounded()) }
+        let goods = load.commodity.trimmingCharacters(in: .whitespacesAndNewlines)
+        commodity = goods.isEmpty ? nil : goods
         date = ISODate.day(load.date)
         broker = load.broker.isEmpty ? nil : load.broker
         originCity = load.originCity
@@ -1262,8 +1287,8 @@ private struct NewLoadDTO: Encodable {
         deadheadMiles = load.deadheadMiles
         fuelCost = load.fuelCost
         tolls = load.tolls
-        dispatchFee = 0
-        factoringFee = 0
+        dispatchFee = load.dispatchFee
+        factoringFee = load.factoringFee
         otherExpenses = load.otherExpenses
         status = "PENDING"
     }
@@ -1438,6 +1463,15 @@ private struct LoadDetailDTO: Decodable {
     let status: String
     let invoiceNumber: String?
     let loadNumber: String?
+    // Optional so an older server's reply still decodes.
+    let brokerContact: String?
+    let deliveryDate: String?
+    let weightLbs: Double?
+    let commodity: String?
+    let dispatchFee: Double?
+    let factoringFee: Double?
+    let claimDeduction: Double?
+    let claimReason: String?
 
     func toDomain() -> LoadDetail {
         LoadDetail(
@@ -1457,7 +1491,15 @@ private struct LoadDetailDTO: Decodable {
             otherExpenses: otherExpenses,
             status: status,
             invoiceNumber: invoiceNumber,
-            loadNumber: loadNumber
+            loadNumber: loadNumber,
+            brokerContact: brokerContact,
+            deliveryDate: deliveryDate.map { ISODate.parse($0) },
+            weightLbs: weightLbs,
+            commodity: commodity,
+            dispatchFee: dispatchFee ?? 0,
+            factoringFee: factoringFee ?? 0,
+            claimDeduction: claimDeduction ?? 0,
+            claimReason: claimReason
         )
     }
 }
@@ -1481,8 +1523,10 @@ private struct LoadEditDTO: Encodable {
     let otherExpenses: Double
     /// nil = omit (keep), "" = explicit null (clear), text = set.
     let loadNumber: String?
+    let change: LoadEdit
 
     init(_ change: LoadEdit) {
+        self.change = change
         loadNumber = change.loadNumber?.trimmingCharacters(in: .whitespacesAndNewlines)
         driverId = change.driverId
         date = ISODate.day(change.date)
@@ -1503,6 +1547,8 @@ private struct LoadEditDTO: Encodable {
         case driverId, date, broker, originCity, originState, destinationCity
         case destinationState, grossRate, loadedMiles, deadheadMiles
         case fuelCost, tolls, otherExpenses, loadNumber
+        case brokerContact, deliveryDate, weightLbs, commodity
+        case dispatchFee, factoringFee, claimDeduction, claimReason
     }
 
     /// `encodeNil` rather than the synthesized encoder: a nil optional would
@@ -1534,6 +1580,30 @@ private struct LoadEditDTO: Encodable {
         try container.encode(fuelCost, forKey: .fuelCost)
         try container.encode(tolls, forKey: .tolls)
         try container.encode(otherExpenses, forKey: .otherExpenses)
+        // The whole detail block, empties as explicit nulls, so clearing a
+        // field on the phone really clears it in the server's merge.
+        if change.includesDetails {
+            func text(_ value: String, _ key: CodingKeys) throws {
+                let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.isEmpty { try container.encodeNil(forKey: key) } else { try container.encode(trimmed, forKey: key) }
+            }
+            try text(change.brokerContact, .brokerContact)
+            try text(change.commodity, .commodity)
+            try text(change.claimReason, .claimReason)
+            if let date = change.deliveryDate {
+                try container.encode(ISODate.day(date), forKey: .deliveryDate)
+            } else {
+                try container.encodeNil(forKey: .deliveryDate)
+            }
+            if let weight = change.weightLbs, weight >= 1 {
+                try container.encode(Int(weight.rounded()), forKey: .weightLbs)
+            } else {
+                try container.encodeNil(forKey: .weightLbs)
+            }
+            try container.encode(change.dispatchFee, forKey: .dispatchFee)
+            try container.encode(change.factoringFee, forKey: .factoringFee)
+            try container.encode(change.claimDeduction, forKey: .claimDeduction)
+        }
     }
 }
 

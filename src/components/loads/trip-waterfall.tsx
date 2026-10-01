@@ -61,6 +61,8 @@ export function TripWaterfall({
                 key={line.key}
                 label={line.key === "fuel"
                   ? copy.tripFuel
+                  : line.key === "claims"
+                  ? copy.brokerDeduction
                   : line.label}
                 hint={line.key === "fuel"
                   ? line.estimated && estimate.fuelSource === "MPG" && estimate.fuelMpg && estimate.fuelPricePerGallon
@@ -75,6 +77,8 @@ export function TripWaterfall({
                       rate: formatRateValue(estimate.fuelPerMile),
                     })
                     : copy.fuelEstimateHint
+                  : line.key === "claims" && line.amount > 0
+                  ? [load.claimReason, interpolate(copy.paidAfterDeduction, { amount: formatMoney(load.grossRate - line.amount) })].filter(Boolean).join(" · ")
                   : undefined}
                 detail={line.key === "fuel" && line.estimated ? (
                   <FuelCalculation load={load} estimate={estimate} amount={line.amount} />

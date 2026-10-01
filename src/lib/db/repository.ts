@@ -99,6 +99,9 @@ export interface LoadInput {
   dispatchFee: number;
   factoringFee: number;
   otherExpenses: number;
+  /** Omitted = keep the stored deduction. */
+  claimDeduction?: number;
+  claimReason?: string | null;
   costsPosted?: boolean;
   status: PaymentStatus;
   jurisdictionMiles?: Load["jurisdictionMiles"];

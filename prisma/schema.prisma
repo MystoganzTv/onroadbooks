@@ -528,6 +528,9 @@ model Load {
   dispatchFee   Decimal @default(0) @db.Decimal(12, 2)
   factoringFee  Decimal @default(0) @db.Decimal(12, 2)
   otherExpenses Decimal @default(0) @db.Decimal(12, 2)
+  /// What the broker took off the rate after delivery (damage, shortage).
+  claimDeduction Decimal @default(0) @db.Decimal(12, 2)
+  claimReason    String?
   /// Frozen when a driver settlement is paid. The matching ledger expense is
   /// linked through DriverSettlementLine, so load profitability and the P&L
   /// show the same dollars without double-counting them.

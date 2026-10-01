@@ -79,6 +79,8 @@ const FIELD_LABELS: Record<string, string> = {
   dispatchFee: "Dispatch",
   factoringFee: "Factoring",
   otherExpenses: "Other",
+  claimDeduction: "Broker deduction",
+  claimReason: "Deduction reason",
   date: "Pickup date",
   equipmentLengthFt: "Equipment length",
   weightLbs: "Weight",
@@ -116,6 +118,8 @@ interface FormState {
   factoringFee: string;
   factoringMode: FeeMode;
   otherExpenses: string;
+  claimDeduction: string;
+  claimReason: string;
   jurisdictionMiles: JurisdictionRow[];
   notes: string;
 }
@@ -158,6 +162,8 @@ function emptyState(defaultDate: string, truckId: string): FormState {
     factoringFee: "",
     factoringMode: "pct",
     otherExpenses: "",
+    claimDeduction: "",
+    claimReason: "",
     jurisdictionMiles: [],
     notes: "",
   };
@@ -192,6 +198,8 @@ function stateFromLoad(load: Load): FormState {
     ...feeState("dispatch", load.dispatchFee, load.grossRate),
     ...feeState("factoring", load.factoringFee, load.grossRate),
     otherExpenses: load.otherExpenses ? String(load.otherExpenses) : "",
+    claimDeduction: load.claimDeduction ? String(load.claimDeduction) : "",
+    claimReason: load.claimReason ?? "",
     jurisdictionMiles: load.jurisdictionMiles.map((row, index) => ({
       id: `${row.jurisdiction}-${index}`,
       jurisdiction: row.jurisdiction,
@@ -528,6 +536,8 @@ export function LoadFormDialog({
       dispatchFee: dispatchAmount,
       factoringFee: factoringAmount,
       otherExpenses: toNumber(values.otherExpenses),
+      claimDeduction: toNumber(values.claimDeduction),
+      claimReason: values.claimReason.trim() || null,
       costsPosted: load?.costsPosted ?? true,
       // Preserve legacy metadata. Reporting a load already records its income.
       status: load?.status ?? "PENDING",
@@ -569,6 +579,7 @@ export function LoadFormDialog({
         loadedMiles: copy.loadedMiles, deadheadMiles: copy.deadheadMiles,
         grossRate: copy.grossRate, fuelCost: copy.tripFuel, tolls: copy.tolls,
         dispatchFee: copy.dispatch, factoringFee: copy.factoring, otherExpenses: copy.other,
+        claimDeduction: copy.brokerDeduction, claimReason: copy.deductionReason,
         date: copy.pickupDate, equipmentLengthFt: copy.lengthFeet, weightLbs: copy.weight, commodity: copy.commodity,
       } : FIELD_LABELS;
       toast.error(validationMessage(next, fieldLabels));
@@ -681,6 +692,19 @@ export function LoadFormDialog({
               </Field>
             ) : null}
 
+            {/* The PO is the load's identifier (a lane repeats, the PO never
+                does), so it sits up top in Simple mode too. */}
+            <div className="grid grid-cols-2 gap-3">
+              <Field label={copy.loadNumberLabel} htmlFor="load-number" error={errors.loadNumber}>
+                <Input
+                  id="load-number"
+                  maxLength={60}
+                  aria-invalid={Boolean(errors.loadNumber)}
+                  value={values.loadNumber}
+                  onChange={(e) => set("loadNumber", e.target.value)}
+                  placeholder="38525680"
+                />
+              </Field>
               <Field label={copy.pickupDate} htmlFor="load-date" required error={errors.date}>
                 <Input
                   id="load-date"
@@ -691,6 +715,7 @@ export function LoadFormDialog({
                   required
                 />
               </Field>
+            </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
               <LocationFields
                 id="load-origin"
@@ -803,6 +828,40 @@ export function LoadFormDialog({
                 }))}
               />
             </div>
+            {/* After delivery: what the broker took off the rate (damage, shortage).
+                The rate above stays what the rate con says. */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field
+                label={copy.brokerDeduction}
+                htmlFor="load-claim"
+                error={errors.claimDeduction}
+                hint={toNumber(values.claimDeduction) > 0 && grossRate > 0
+                  ? interpolate(copy.paidAfterDeduction, { amount: formatMoney(grossRate - toNumber(values.claimDeduction)) })
+                  : copy.brokerDeductionHint}
+              >
+                <Input
+                  id="load-claim"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.01"
+                  value={values.claimDeduction}
+                  onChange={(e) => set("claimDeduction", e.target.value)}
+                  aria-invalid={Boolean(errors.claimDeduction)}
+                  placeholder="0.00"
+                />
+              </Field>
+              <Field label={copy.deductionReason} htmlFor="load-claim-reason" error={errors.claimReason}>
+                <Input
+                  id="load-claim-reason"
+                  maxLength={200}
+                  value={values.claimReason}
+                  onChange={(e) => set("claimReason", e.target.value)}
+                  aria-invalid={Boolean(errors.claimReason)}
+                  placeholder={copy.deductionReasonPlaceholder}
+                />
+              </Field>
+            </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label={copy.loadSource} htmlFor="load-source" error={errors.sourceKind} hint={copy.loadSourceHint}>
                 <Select value={values.sourceKind} onValueChange={(value) => setValues(prev => ({ ...prev, sourceKind: value as FormState["sourceKind"], sourceName: "" }))}>
@@ -885,16 +944,6 @@ export function LoadFormDialog({
                   value={values.deliveryDate}
                   onChange={(e) => set("deliveryDate", e.target.value)}
                   aria-invalid={Boolean(errors.deliveryDate)}
-                />
-              </Field>
-              <Field label={copy.loadNumberLabel} htmlFor="load-number" error={errors.loadNumber}>
-                <Input
-                  id="load-number"
-                  maxLength={60}
-                  aria-invalid={Boolean(errors.loadNumber)}
-                  value={values.loadNumber}
-                  onChange={(e) => set("loadNumber", e.target.value)}
-                  placeholder={copy.optional}
                 />
               </Field>
               <Field

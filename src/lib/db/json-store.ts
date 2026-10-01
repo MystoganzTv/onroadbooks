@@ -336,6 +336,8 @@ function migrate(dataset: Dataset): Dataset {
     load.fuelCost ??= 0;
     load.tolls ??= 0;
     load.otherExpenses ??= 0;
+    load.claimDeduction ??= 0;
+    load.claimReason ??= null;
     load.driverId ??= null;
     load.driverPay ??= 0;
     load.jurisdictionMiles = normalizeJurisdictionMiles(load.jurisdictionMiles);
@@ -456,6 +458,8 @@ function loadFromInput(
     dispatchFee: roundMoney(input.dispatchFee),
     factoringFee: roundMoney(input.factoringFee),
     otherExpenses: roundMoney(input.otherExpenses),
+    claimDeduction: input.claimDeduction === undefined ? existing?.claimDeduction ?? 0 : roundMoney(input.claimDeduction),
+    claimReason: input.claimReason === undefined ? existing?.claimReason ?? null : input.claimReason?.trim() || null,
     driverPay: 0,
     costsPosted: input.costsPosted ?? true,
     status: input.status,

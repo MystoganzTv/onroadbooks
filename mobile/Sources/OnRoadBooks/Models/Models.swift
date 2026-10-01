@@ -215,6 +215,59 @@ struct NewLoad {
     var otherExpenses: Double
     /// The broker's PO. Empty means none.
     var loadNumber: String = ""
+    var brokerContact: String = ""
+    var deliveryDate: Date? = nil
+    var weightLbs: Double? = nil
+    var commodity: String = ""
+    /// Dollars, already converted from the % the owner typed.
+    var dispatchFee: Double = 0
+    var factoringFee: Double = 0
+}
+
+/// What the load form offers to pick from instead of typing: the owner's
+/// brokers with the people he books with, and his current dispatch and
+/// factoring rates (from his latest load, the same rule as the web form).
+struct LoadFormOptions {
+    struct Broker: Identifiable, Hashable {
+        var id: String { name }
+        let name: String
+        let contacts: [String]
+    }
+    var dispatchPct: Double?
+    var factoringPct: Double?
+    var brokers: [Broker]
+
+    static let empty = LoadFormOptions(dispatchPct: nil, factoringPct: nil, brokers: [])
+}
+
+/// Dispatch and factoring are typed as % of the rate or as dollars; only
+/// dollars are stored. Mirrors `src/lib/load-fees.ts` so neither side drifts
+/// a cent.
+enum LoadFees {
+    static func round(_ value: Double) -> Double { (value * 100).rounded() / 100 }
+
+    static func dollars(_ text: String, isPercent: Bool, rate: Double?) -> Double {
+        let value = OBNumber.parse(text) ?? 0
+        guard isPercent else { return round(value) }
+        guard let rate, rate > 0 else { return 0 }
+        return round(rate * value / 100)
+    }
+
+    /// The percent a stored fee was typed at, when the rounded percent
+    /// reproduces the stored dollars exactly; otherwise nil (it was dollars).
+    static func exactPercent(fee: Double, rate: Double) -> Double? {
+        guard fee > 0, rate > 0 else { return nil }
+        let pct = (fee / rate * 10_000).rounded() / 100
+        return round(rate * pct / 100) == round(fee) ? pct : nil
+    }
+
+    static func text(_ value: Double) -> String {
+        guard value != 0 else { return "" }
+        if value == value.rounded() { return String(Int(value)) }
+        var text = String(format: "%.2f", value)
+        while text.contains(".") && (text.hasSuffix("0") || text.hasSuffix(".")) { text.removeLast() }
+        return text
+    }
 }
 
 /// The raw record behind a load row, for correcting it.
@@ -240,8 +293,17 @@ struct LoadDetail: Identifiable, Equatable {
     var status: String
     var invoiceNumber: String?
     var loadNumber: String? = nil
+    var brokerContact: String? = nil
+    var deliveryDate: Date? = nil
+    var weightLbs: Double? = nil
+    var commodity: String? = nil
+    var dispatchFee: Double = 0
+    var factoringFee: Double = 0
+    /// What the broker took off the rate after delivery (damage, shortage).
+    var claimDeduction: Double = 0
+    var claimReason: String? = nil
 
-    /// Dispatch and factoring are not on this screen; the server keeps them.
+    /// Equipment and IFTA miles are not on this screen; the server keeps them.
     var lane: String { "\(originCity), \(originState) → \(destinationCity), \(destinationState)" }
 }
 
@@ -268,6 +330,18 @@ struct LoadEdit: Equatable {
     /// nil = leave the PO as it is (the key is omitted and the server's merge
     /// keeps it); "" = clear it (sent as an explicit null); text = set it.
     var loadNumber: String? = nil
+    /// When true the fields below are sent in full -- empty ones as explicit
+    /// nulls, so clearing a delivery date really clears it. When false they
+    /// are omitted and the server keeps what it has.
+    var includesDetails = false
+    var brokerContact: String = ""
+    var deliveryDate: Date? = nil
+    var weightLbs: Double? = nil
+    var commodity: String = ""
+    var dispatchFee: Double = 0
+    var factoringFee: Double = 0
+    var claimDeduction: Double = 0
+    var claimReason: String = ""
 }
 
 // MARK: - Load calculator

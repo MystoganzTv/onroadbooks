@@ -208,6 +208,8 @@ interface LoadLedgerSource {
   dispatchFee: DecimalLike;
   factoringFee: DecimalLike;
   otherExpenses: DecimalLike;
+  claimDeduction: DecimalLike;
+  claimReason: string | null;
   costsPosted: boolean;
 }
 
@@ -223,6 +225,8 @@ async function syncPrismaLoadExpenses(
     dispatchFee: num(load.dispatchFee),
     factoringFee: num(load.factoringFee),
     otherExpenses: num(load.otherExpenses),
+    claimDeduction: num(load.claimDeduction),
+    claimReason: load.claimReason,
   });
 
   for (const spec of specs) {
@@ -1118,6 +1122,8 @@ export class PrismaRepository implements Repository {
           dispatchFee: num(row.dispatchFee),
           factoringFee: num(row.factoringFee),
           otherExpenses: num(row.otherExpenses),
+          claimDeduction: num(row.claimDeduction),
+          claimReason: row.claimReason,
           driverPay: num(row.driverPay),
           costsPosted: row.costsPosted,
           status: row.status as PaymentStatus,
@@ -1243,6 +1249,8 @@ export class PrismaRepository implements Repository {
       dispatchFee: roundMoney(input.dispatchFee),
       factoringFee: roundMoney(input.factoringFee),
       otherExpenses: roundMoney(input.otherExpenses),
+      claimDeduction: input.claimDeduction === undefined ? undefined : roundMoney(input.claimDeduction),
+      claimReason: input.claimReason === undefined ? undefined : input.claimReason?.trim() || null,
       costsPosted: input.costsPosted ?? true,
       status: input.status,
       ...(input.jurisdictionMiles === undefined

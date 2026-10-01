@@ -213,6 +213,14 @@ export interface Load {
   /** Factoring fee on this load's invoice. */
   factoringFee: number;
   otherExpenses: number;
+  /**
+   * What the broker took off the rate after delivery -- damage, shortage, a
+   * late fee. The rate stays what the rate con says; this is the difference
+   * between that and what was actually paid. Optional for older records.
+   */
+  claimDeduction?: number;
+  /** Why the broker deducted it, in the owner's words ("rotura", "faltante"). */
+  claimReason?: string | null;
   /** Driver pay frozen and posted when the linked statement is paid. */
   driverPay: number;
   /** Whether trip costs are mirrored into the operating-expense ledger. */

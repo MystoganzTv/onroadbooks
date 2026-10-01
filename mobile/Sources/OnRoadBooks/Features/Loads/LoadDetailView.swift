@@ -6,8 +6,10 @@ import SwiftUI
 /// rate is not a cosmetic problem: it moves the load's own rating, the true
 /// cost per mile, and through that the Safe to Pay figure on the dashboard.
 ///
-/// What this screen does NOT show — dispatch and factoring fees, the
-/// equipment, the commodity, the IFTA jurisdiction miles — is merged in by
+/// It now carries what the web form does for one load: PO, broker and contact,
+/// delivery date, dispatch and factoring (% or $), weight, commodity, and the
+/// broker's deduction when they paid less than the rate. What it still does
+/// NOT show -- the equipment, the IFTA jurisdiction miles -- is merged in by
 /// the server and comes back untouched. A phone is a smaller window onto the
 /// record, not a smaller record.
 struct LoadDetailView: View {
@@ -23,8 +25,20 @@ struct LoadDetailView: View {
     @State private var isLoading = true
     @State private var loadFailure: String?
 
+    @State private var options = LoadFormOptions.empty
     @State private var loadNumber = ""
     @State private var date = Date()
+    @State private var hasDelivery = false
+    @State private var deliveryDate = Date()
+    @State private var brokerContact = ""
+    @State private var dispatchText = ""
+    @State private var dispatchIsPercent = true
+    @State private var factoringText = ""
+    @State private var factoringIsPercent = true
+    @State private var weightText = ""
+    @State private var commodity = ""
+    @State private var claimText = ""
+    @State private var claimReason = ""
     @State private var broker = ""
     @State private var originCity = ""
     @State private var originState = ""
@@ -92,17 +106,22 @@ struct LoadDetailView: View {
     private var form: some View {
         Form {
             Section {
-                poField(text: $loadNumber)
-                DatePicker("Fecha", selection: $date, displayedComponents: .date)
-                TextField("Broker", text: $broker)
+                OBPONumberField(text: $loadNumber)
+                DatePicker("Recogida", selection: $date, displayedComponents: .date)
+                OBOptionalDateRow(label: "Entrega", isOn: $hasDelivery, date: $deliveryDate, minimum: date)
+            }
+            .listRowBackground(OBColor.card)
+
+            Section("Broker") {
+                OBBrokerFields(broker: $broker, contact: $brokerContact, brokers: options.brokers)
             }
             .listRowBackground(OBColor.card)
 
             Section("Ruta") {
                 TextField("Ciudad de origen", text: $originCity)
-                stateField(text: $originState)
+                OBStateField(text: $originState)
                 TextField("Ciudad de destino", text: $destinationCity)
-                stateField(text: $destinationState)
+                OBStateField(text: $destinationState)
             }
             .listRowBackground(OBColor.card)
 
@@ -115,6 +134,36 @@ struct LoadDetailView: View {
                     Text("\(ratePerMile, format: .currency(code: "USD").precision(.fractionLength(2))) por milla, vacías incluidas.")
                         .foregroundStyle(OBColor.mutedForeground)
                 }
+            }
+            .listRowBackground(OBColor.card)
+
+            Section("Dispatch y factoring") {
+                OBFeeRow(label: "Dispatch", text: $dispatchText, isPercent: $dispatchIsPercent, rate: rate)
+                OBFeeRow(label: "Factoring", text: $factoringText, isPercent: $factoringIsPercent, rate: rate)
+            }
+            .listRowBackground(OBColor.card)
+
+            // After delivery: what the broker took off the rate. The rate stays
+            // what the rate con says; this is the difference.
+            Section {
+                OBNumberRow(label: "Descuento del broker", prefix: "$", placeholder: "0.00", text: $claimText)
+                TextField("Motivo (rotura, faltante, retraso…)", text: $claimReason)
+            } header: {
+                Text("Descuento del broker")
+            } footer: {
+                if let rate, let claim = OBNumber.parse(claimText), claim > 0 {
+                    Text("El broker pagó \(max(0, rate - claim), format: .currency(code: "USD")). Baja la ganancia de esta carga y queda en Gastos.")
+                        .foregroundStyle(claim > rate ? OBColor.neg : OBColor.mutedForeground)
+                } else {
+                    Text("Solo si te pagaron menos que la tarifa: rotura, faltante, retraso.")
+                        .foregroundStyle(OBColor.mutedForeground)
+                }
+            }
+            .listRowBackground(OBColor.card)
+
+            Section("Detalles de la carga") {
+                OBNumberRow(label: "Peso", suffix: "lb", placeholder: "0", text: $weightText)
+                TextField("Mercancía", text: $commodity)
             }
             .listRowBackground(OBColor.card)
 
@@ -200,26 +249,12 @@ struct LoadDetailView: View {
         }
     }
 
-    private func poField(text: Binding<String>) -> some View {
-        HStack {
-            Text("PO#").foregroundStyle(OBColor.mutedForeground)
-            TextField("Número de PO", text: text)
-                .textInputAutocapitalization(.characters)
-                .autocorrectionDisabled()
-                .font(.body.weight(.semibold))
-                .monospacedDigit()
-        }
-    }
-
-    private func stateField(text: Binding<String>) -> some View {
-        TextField("Estado (2 letras)", text: text)
-            .textInputAutocapitalization(.characters)
-            .autocorrectionDisabled()
-            .onChange(of: text.wrappedValue) { value in
-                let letters = value.uppercased().filter { $0.isLetter }
-                let clipped = String(letters.prefix(2))
-                if clipped != value { text.wrappedValue = clipped }
-            }
+    /// A stored fee shown the way it was typed: as % when the rounded
+    /// percent reproduces the dollars exactly, otherwise as dollars.
+    private static func feeInput(_ fee: Double, rate: Double) -> (String, Bool) {
+        guard fee > 0 else { return ("", true) }
+        if let pct = LoadFees.exactPercent(fee: fee, rate: rate) { return (LoadFees.text(pct), true) }
+        return (LoadFees.text(fee), false)
     }
 
     private static func text(_ value: Double) -> String {
@@ -238,6 +273,15 @@ struct LoadDetailView: View {
             detail = record
             loadNumber = record.loadNumber ?? ""
             date = record.date
+            hasDelivery = record.deliveryDate != nil
+            deliveryDate = record.deliveryDate ?? record.date
+            brokerContact = record.brokerContact ?? ""
+            (dispatchText, dispatchIsPercent) = Self.feeInput(record.dispatchFee, rate: record.grossRate)
+            (factoringText, factoringIsPercent) = Self.feeInput(record.factoringFee, rate: record.grossRate)
+            weightText = record.weightLbs.map { Self.text($0) } ?? ""
+            commodity = record.commodity ?? ""
+            claimText = Self.text(record.claimDeduction)
+            claimReason = record.claimReason ?? ""
             broker = record.broker
             originCity = record.originCity
             originState = record.originState
@@ -253,6 +297,7 @@ struct LoadDetailView: View {
             // A Solo or Pro account refuses this, and that is fine: no drivers
             // means no picker, and the screen says nothing about it.
             drivers = ((try? await repository.fetchDrivers()) ?? []).filter { $0.active }
+            if let fetched = try? await repository.fetchLoadFormOptions() { options = fetched }
             loadFailure = nil
         } catch {
             loadFailure = (error as? LocalizedError)?.errorDescription ?? "No se pudo abrir este load."
@@ -282,7 +327,16 @@ struct LoadDetailView: View {
                         fuelCost: OBNumber.parse(fuelText) ?? 0,
                         tolls: OBNumber.parse(tollsText) ?? 0,
                         otherExpenses: OBNumber.parse(otherText) ?? 0,
-                        loadNumber: loadNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+                        loadNumber: loadNumber.trimmingCharacters(in: .whitespacesAndNewlines),
+                        includesDetails: true,
+                        brokerContact: brokerContact,
+                        deliveryDate: hasDelivery ? max(deliveryDate, date) : nil,
+                        weightLbs: OBNumber.parse(weightText),
+                        commodity: commodity,
+                        dispatchFee: LoadFees.dollars(dispatchText, isPercent: dispatchIsPercent, rate: rate),
+                        factoringFee: LoadFees.dollars(factoringText, isPercent: factoringIsPercent, rate: rate),
+                        claimDeduction: OBNumber.parse(claimText) ?? 0,
+                        claimReason: claimReason
                     )
                 )
                 onChanged()

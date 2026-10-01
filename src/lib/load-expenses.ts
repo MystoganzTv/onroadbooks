@@ -2,14 +2,15 @@ import { formatLoadReference } from "@/lib/load-reference";
 import { roundMoney } from "./calculations";
 import type { Dataset, ExpenseCategoryId, Load } from "./types";
 
-export type LoadExpenseKey = "fuel" | "tolls" | "dispatch" | "factoring" | "other";
+export type LoadExpenseKey = "fuel" | "tolls" | "dispatch" | "factoring" | "other" | "claims";
 
 export type LoadExpenseField =
   | "fuelCost"
   | "tolls"
   | "dispatchFee"
   | "factoringFee"
-  | "otherExpenses";
+  | "otherExpenses"
+  | "claimDeduction";
 
 export const LOAD_EXPENSE_KEYS: LoadExpenseKey[] = [
   "fuel",
@@ -17,6 +18,7 @@ export const LOAD_EXPENSE_KEYS: LoadExpenseKey[] = [
   "dispatch",
   "factoring",
   "other",
+  "claims",
 ];
 
 export interface LoadExpenseSpec {
@@ -28,7 +30,7 @@ export interface LoadExpenseSpec {
 
 type LoadCostSource = Pick<
   Load,
-  "fuelCost" | "tolls" | "dispatchFee" | "factoringFee" | "otherExpenses"
+  "fuelCost" | "tolls" | "dispatchFee" | "factoringFee" | "otherExpenses" | "claimDeduction" | "claimReason"
 >;
 
 export function loadExpenseId(loadId: string, key: LoadExpenseKey): string {
@@ -52,6 +54,8 @@ export function loadExpenseField(key: LoadExpenseKey): LoadExpenseField {
       return "factoringFee";
     case "other":
       return "otherExpenses";
+    case "claims":
+      return "claimDeduction";
   }
 }
 
@@ -85,6 +89,14 @@ export function loadExpenseSpecs(load: LoadCostSource): LoadExpenseSpec[] {
       category: "OTHER",
       label: "Other trip cost",
       amount: roundMoney(load.otherExpenses),
+    },
+    {
+      // No enum category of its own (the column is a Postgres enum); the
+      // description carries what it is and why.
+      key: "claims",
+      category: "OTHER",
+      label: load.claimReason?.trim() ? `Broker deduction - ${load.claimReason.trim()}` : "Broker deduction",
+      amount: roundMoney(load.claimDeduction ?? 0),
     },
   ];
 }
