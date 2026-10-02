@@ -41,7 +41,7 @@ import {
   categoryTotals,
   expensesInPeriod,
   loadsInPeriod,
-  pctChange,
+  pctChangeOrNull,
   thresholdsFromSettings,
   withMetricsAll,
 } from "@/lib/calculations";
@@ -91,7 +91,7 @@ import {
   truckFromSearchParams,
   type SearchParams,
 } from "@/lib/period-params";
-import { defaultEntryDate, previousPeriod, todayISO } from "@/lib/periods";
+import { comparisonPeriod, defaultEntryDate, todayISO } from "@/lib/periods";
 import { roleCan } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { getWebDictionary } from "@/lib/i18n/dictionaries";
@@ -136,7 +136,6 @@ export default async function DashboardPage({
   const dataset = await getDataset(session.businessId);
   const period = periodFromSearchParams(params);
   const periodDisplayLabel = formatLocalePeriod(period, locale);
-  const prior = previousPeriod(period);
 
   const {
     loads: allLoads,
@@ -155,6 +154,9 @@ export default async function DashboardPage({
   // PeriodControls sends the browser's calendar date for "Today", so that
   // period is authoritative; otherwise fall back to the server's date.
   const today = period.key === "today" ? period.start : todayISO();
+  // Like for like: a quarter or year still in progress is compared with the
+  // same number of days of the previous one, not the whole of it.
+  const prior = comparisonPeriod(period, today);
 
   // Scope. Null means the whole fleet; a truck id narrows every figure below
   // to that unit's own loads and its own direct costs.
@@ -361,9 +363,9 @@ export default async function DashboardPage({
             presentation={moneyPresentation}
             previousLabel={prior.shortLabel}
             deltas={{
-              revenue: pctChange(summary.bookedRevenue, priorSummary.bookedRevenue),
-              profit: pctChange(summary.operatingProfit, priorSummary.operatingProfit),
-              profitPerMile: pctChange(summary.profitPerMile, priorSummary.profitPerMile),
+              revenue: pctChangeOrNull(summary.bookedRevenue, priorSummary.bookedRevenue),
+              profit: pctChangeOrNull(summary.operatingProfit, priorSummary.operatingProfit),
+              profitPerMile: pctChangeOrNull(summary.profitPerMile, priorSummary.profitPerMile),
             }}
             showOwnerPlanning={ownerPlanning}
           />

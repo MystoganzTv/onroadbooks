@@ -82,7 +82,7 @@ export async function invoicePdf(business: Business, load: Load): Promise<Uint8A
   }
   const meta: [string, string | null][] = [["Invoice date", load.invoiceDate]];
   if (load.invoiceDueDate) meta.push(["Due date", load.invoiceDueDate]);
-  meta.push(["PO number", bareLoadReference(load.loadNumber) ?? "-"]);
+  meta.push(["PO / load number", bareLoadReference(load.loadNumber) ?? "-"]);
   meta.forEach(([label, value], index) => { const y = 665 - index * 24; page.drawText(label, { x: 390, y, size: 8, font, color: muted }); page.drawText(printable(value), { x: 475, y, size: 9, font: bold, color: navy }); });
   page.drawRectangle({ x: 42, y: 532, width: 528, height: 26, color: blue });
   page.drawText("DESCRIPTION", { x: 50, y: 542, size: 8, font: bold, color: rgb(1, 1, 1) });

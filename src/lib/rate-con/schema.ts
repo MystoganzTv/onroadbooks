@@ -50,7 +50,7 @@ export const RATE_CON_TOOL_SCHEMA = {
     },
     loadNumber: {
       type: ["string", "null"],
-      description: "The broker's PO number for this shipment (also printed as load, order or reference number). The identifier only, without its label: \"PO# 38525680\" -> \"38525680\".",
+      description: "The broker's PO or load number for this shipment (whatever the broker calls it: PO, load, order or reference number). The identifier only, without its label: \"PO# 38525680\" -> \"38525680\".",
     },
     pickupDate: {
       type: ["string", "null"],

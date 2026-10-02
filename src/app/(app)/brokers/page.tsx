@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Building2 } from "lucide-react";
 import { BrokerFormDialog } from "@/components/brokers/broker-form-dialog";
 import { MoveBrokerNameDialog } from "@/components/brokers/move-broker-name-dialog";
+import { LinkRow } from "@/components/shared/link-row";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
@@ -34,11 +35,12 @@ export default async function BrokersPage() {
     <PageHeader title={copy.title} description={copy.description} actions={canManage ? <BrokerFormDialog /> : undefined} />
     <Card><CardContent className="p-0">
       {profiles.length === 0 ? <EmptyState icon={Building2} title={copy.noBrokers} description={copy.noBrokersDescription} /> : <div className="overflow-x-auto"><Table>
-        <TableHeader><TableRow><TableHead>{copy.name}</TableHead><TableHead>{copy.contacts}</TableHead><TableHead>{copy.phone}</TableHead><TableHead className="text-right">{copy.loads}</TableHead><TableHead className="text-right">{copy.revenue}</TableHead><TableHead /></TableRow></TableHeader>
+        <TableHeader><TableRow><TableHead>{copy.name}</TableHead><TableHead>{copy.contacts}</TableHead><TableHead>{copy.phone}</TableHead><TableHead className="text-right">{copy.loads}</TableHead><TableHead className="text-right">{copy.revenue}</TableHead></TableRow></TableHeader>
         <TableBody>{profiles.map((profile) => {
           const loads = loadsFor(profile.name);
           const people = brokerContactsOf(profile);
-          return <TableRow key={profile.id} className="align-top">
+          // The whole row opens the profile; phone links inside still dial.
+          return <LinkRow key={profile.id} href={`/brokers/${profile.id}`} className="align-top">
             <TableCell><Link className="font-medium text-primary hover:underline" href={`/brokers/${profile.id}`}>{profile.name}</Link>{profile.mcNumber ? <p className="text-2xs text-muted-foreground">{profile.mcNumber}</p> : null}</TableCell>
             <TableCell>{people.length ? <ul className="space-y-1">
               {people.slice(0, 4).map((person) => <li key={person.id} className="leading-tight">
@@ -49,8 +51,7 @@ export default async function BrokersPage() {
             </ul> : <span className="text-muted-foreground">—</span>}</TableCell>
             <TableCell>{profile.phone ? <a className="whitespace-nowrap text-primary hover:underline" href={`tel:${profile.phone}`}>{profile.phone}</a> : "—"}</TableCell>
             <TableCell className="text-right tnum">{loads.length}</TableCell><TableCell className="text-right tnum">{formatMoney(loads.reduce((sum, load) => sum + load.grossRate, 0))}</TableCell>
-            <TableCell className="text-right"><Button asChild variant="ghost" size="sm"><Link href={`/brokers/${profile.id}`}>{copy.profile}</Link></Button></TableCell>
-          </TableRow>;
+          </LinkRow>;
         })}</TableBody>
       </Table></div>}
     </CardContent></Card>

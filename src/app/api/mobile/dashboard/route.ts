@@ -28,7 +28,7 @@ import {
 } from "@/lib/finance";
 import { FINANCIAL_MODEL_VERSION, isOperatingExpense } from "@/lib/finance/terminology";
 import { periodFromSearchParams } from "@/lib/period-params";
-import { previousPeriod, todayISO } from "@/lib/periods";
+import { comparisonPeriod, todayISO } from "@/lib/periods";
 import { planAllows } from "@/lib/plans";
 import { roleCan } from "@/lib/roles";
 
@@ -51,8 +51,9 @@ export async function GET(request: NextRequest) {
   const ownerPlanning = roleCan(session.role ?? "VIEWER", "manage_owner_finances");
 
   const period = periodFromSearchParams(Object.fromEntries(request.nextUrl.searchParams));
-  const prior = previousPeriod(period);
   const today = period.key === "today" ? period.start : todayISO();
+  // Same like-for-like rule as the web dashboard.
+  const prior = comparisonPeriod(period, today);
 
   const dataset = mobileScopedDataset(await getRepository(session.businessId).getDataset(), request.nextUrl.searchParams);
   const { loads, expenses: ledgerExpenses, settings, goals, reserveAccounts, reserveTransactions, paymentEvents, financialObligations } = dataset;

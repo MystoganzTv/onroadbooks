@@ -1,5 +1,5 @@
 /**
- * The PO is how an owner-operator names a load. A lane repeats every week --
+ * The PO / load number is how an owner-operator names a load. A lane repeats every week --
  * National Harbor to Cincinnati twice in a month is two different loads -- but
  * the broker's PO / load number never does, so it is the identifier every
  * screen leads with.
@@ -35,8 +35,13 @@ export function bareLoadReference(raw: string | null | undefined): string | null
   return value || null;
 }
 
-/** "38525680" or "PO# 38525680" -> "PO# 38525680". Null when there is no PO. */
+/**
+ * "38525680" or "PO# 38525680" -> "#38525680". Null when there is none.
+ *
+ * Neutral on purpose: TQL calls it a PO, Curri a load number, others an
+ * order. "#" names it without claiming which.
+ */
 export function formatLoadReference(raw: string | null | undefined): string | null {
   const bare = bareLoadReference(raw);
-  return bare ? `PO# ${bare}` : null;
+  return bare ? `#${bare}` : null;
 }

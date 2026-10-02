@@ -411,3 +411,28 @@ export function monthsInRange(range: DateRange): Period[] {
   }
   return out;
 }
+
+/**
+ * What the dashboard compares against. Same as `previousPeriod`, except while
+ * the period is still running: on October 2 the quarter has two days in it,
+ * and setting those against all of Q3 printed "-81.9%" for a quarter that
+ * had barely started. So a running period is compared with the same number
+ * of days at the start of the previous one -- Q4 to Oct 2 against Jul 1-2,
+ * 2026 to Oct 2 against 2025 to Oct 2.
+ */
+export function comparisonPeriod(period: Period, today: string): Period {
+  const prior = previousPeriod(period);
+  const running = period.start <= today && today < period.end;
+  if (!running || !["first", "second", "full", "quarter", "ytd"].includes(period.key)) return prior;
+  const elapsed = dayCount({ start: period.start, end: today });
+  const end = addDays(prior.start, elapsed - 1);
+  const clipped = end < prior.end ? end : prior.end;
+  const span = `${dayLabel(prior.start)}-${dayLabel(clipped)}`;
+  return {
+    ...prior,
+    end: clipped,
+    days: dayCount({ start: prior.start, end: clipped }),
+    label: `${prior.label} (${span})`,
+    shortLabel: `${prior.shortLabel} · ${span}`,
+  };
+}

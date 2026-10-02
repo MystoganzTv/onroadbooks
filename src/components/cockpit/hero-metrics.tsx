@@ -22,7 +22,8 @@ interface HeroMetricsProps {
   summary: FinancialSummary;
   presentation: OwnerMoneyPresentation;
   previousLabel: string;
-  deltas: { revenue: number; profit: number; profitPerMile: number };
+  /** null = nothing recorded in the comparison period. */
+  deltas: { revenue: number | null; profit: number | null; profitPerMile: number | null };
   showOwnerPlanning?: boolean;
 }
 
@@ -85,7 +86,11 @@ export function HeroMetrics({
             {formatMoneyCompact(summary.operatingProfit)}
           </p>
           <div className="mt-3">
-            <DeltaBadge value={deltas.profit} label={`vs ${previousLabel}`} />
+            {deltas.profit === null ? (
+              <span className="text-2xs text-muted-foreground">{interpolate(copy.noComparisonData, { period: previousLabel })}</span>
+            ) : (
+              <DeltaBadge value={deltas.profit} label={`vs ${previousLabel}`} />
+            )}
           </div>
         </div>
 

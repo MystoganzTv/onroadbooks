@@ -63,6 +63,16 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
     setTo(period.end);
   }, [period.start, period.end]);
 
+  // Changing the month keeps the view you are in. It used to force "Month",
+  // so stepping YTD from October to September silently showed September
+  // alone -- the numbers looked wrong because they were a different period.
+  // Qtr steps a whole quarter; YTD, halves and Month step one month.
+  const anchoredKey: PeriodKey =
+    period.key === "quarter" || period.key === "ytd" || period.key === "first" || period.key === "second"
+      ? period.key
+      : "full";
+  const monthStep = period.key === "quarter" ? 3 : 1;
+
   const push = useCallback(
     (next: { month?: string; period?: PeriodKey; from?: string; to?: string }) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -119,7 +129,7 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
           variant="ghost"
           size="icon-sm"
           className="h-9 w-9 rounded-r-none"
-          onClick={() => push({ month: shiftMonth(period.month, -1), period: "full" })}
+          onClick={() => push({ month: shiftMonth(period.month, -monthStep), period: anchoredKey })}
           aria-label={copy.previousMonth}
           title={copy.previousMonth}
         >
@@ -127,13 +137,15 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
         </Button>
         <Select
           value={period.month}
-          onValueChange={(value) => push({ month: value, period: "full" })}
+          onValueChange={(value) => push({ month: value, period: anchoredKey })}
         >
           <SelectTrigger
             className="h-9 w-[8.75rem] rounded-none border-x border-y-0 border-border/70 bg-transparent text-xs shadow-none focus:ring-0 focus:ring-offset-0"
             aria-label={copy.selectMonth}
           >
-            <SelectValue />
+            {/* Explicit text: Radix fills an empty SelectValue only after
+                hydration, so the server-rendered bar showed a blank month. */}
+            <SelectValue>{locale === "es" ? localizedMonth(period.month) : monthOptions(period.month).find((option) => option.value === period.month)?.label}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             {monthOptions(period.month).map((option) => (
@@ -147,7 +159,7 @@ export function PeriodControls({ period, className }: PeriodControlsProps) {
           variant="ghost"
           size="icon-sm"
           className="h-9 w-9 rounded-l-none"
-          onClick={() => push({ month: shiftMonth(period.month, 1), period: "full" })}
+          onClick={() => push({ month: shiftMonth(period.month, monthStep), period: anchoredKey })}
           aria-label={copy.nextMonth}
           title={copy.nextMonth}
         >

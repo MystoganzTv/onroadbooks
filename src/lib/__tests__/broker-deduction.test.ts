@@ -54,7 +54,7 @@ describe("broker deduction (short pay after delivery)", () => {
     reconcileLoadExpenseLedger(dataset);
     const posted = dataset.expenses.find((row) => row.id === "expload_l1_claims");
     assert.equal(posted?.amount, 28.75);
-    assert.equal(posted?.description, "PO# 38525680 · Broker deduction - Rotura");
+    assert.equal(posted?.description, "#38525680 · Broker deduction - Rotura");
 
     dataset.loads[0].claimDeduction = 0;
     reconcileLoadExpenseLedger(dataset);

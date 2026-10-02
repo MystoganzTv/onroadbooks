@@ -58,7 +58,7 @@ import {
   truckFromSearchParams,
   type SearchParams,
 } from "@/lib/period-params";
-import { previousPeriod, todayISO, trailingHalfMonths, trailingMonths } from "@/lib/periods";
+import { comparisonPeriod, todayISO, trailingHalfMonths, trailingMonths } from "@/lib/periods";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getAppLocale();
@@ -95,7 +95,7 @@ export default async function ReportsPage({
   const dataset = await getDataset(session.businessId);
   const { business, trucks, loads, expenses, settings, paymentEvents, reserveAccounts, subscription } = dataset;
   const period = periodFromSearchParams(params);
-  const prior = previousPeriod(period);
+  const prior = comparisonPeriod(period, period.key === "today" ? period.start : todayISO());
   const truckId = truckFromSearchParams(params, trucks);
   const scopedLoads = loadsForTruck(loads, truckId);
   const scopedExpenses = expensesForTruck(expenses, truckId);

@@ -102,16 +102,16 @@ struct Load: Identifiable, Hashable {
 
     var lane: String { "\(origin) → \(destination)" }
 
-    /// "PO# 38525680", or nil when the load has no PO.
+    /// "#38525680", or nil when the load has no PO / load number.
     var poLabel: String? { LoadReference.label(loadNumber) }
 }
 
-/// One PO# prefix, never "Load #PO# …". Mirrors `src/lib/load-reference.ts`:
+/// One neutral "#", never "Load #PO# …" (a PO for TQL, a load number for Curri). Mirrors `src/lib/load-reference.ts`:
 /// the server already stores and sends the PO bare, this only formats it.
 enum LoadReference {
     static func label(_ number: String?) -> String? {
         guard let number = number?.trimmingCharacters(in: .whitespacesAndNewlines), !number.isEmpty else { return nil }
-        return "PO# \(number)"
+        return "#\(number)"
     }
 }
 

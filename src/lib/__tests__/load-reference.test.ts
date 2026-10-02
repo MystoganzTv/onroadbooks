@@ -24,9 +24,10 @@ describe("load reference (PO)", () => {
     assert.equal(bareLoadReference("PO#"), null);
   });
 
-  it("prints exactly one PO# prefix", () => {
-    assert.equal(formatLoadReference("PO# 38525680"), "PO# 38525680");
-    assert.equal(formatLoadReference("38525680"), "PO# 38525680");
+  it("prints one neutral # -- a PO for TQL, a load number for Curri", () => {
+    assert.equal(formatLoadReference("PO# 38525680"), "#38525680");
+    assert.equal(formatLoadReference("Load #C-1182"), "#C-1182");
+    assert.equal(formatLoadReference("38525680"), "#38525680");
     assert.equal(formatLoadReference(null), null);
   });
 });

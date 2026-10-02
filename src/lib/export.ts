@@ -114,7 +114,7 @@ export function buildReport(
         title: `Loads - ${scopeLabel} - ${period.label}`,
         calculationVersion: FINANCIAL_MODEL_VERSION,
         columns: [
-          "Truck", "Pickup Date", "Delivery Date", "Ending Odometer", "PO Number", "Broker", "Origin", "Destination",
+          "Truck", "Pickup Date", "Delivery Date", "Ending Odometer", "PO / Load Number", "Broker", "Origin", "Destination",
           "Equipment", "Load Type", "Length (ft)", "Weight (lb)", "Commodity",
           "Loaded Miles", "Deadhead Miles", "Total Miles", "Deadhead %",
           "Gross Rate", "Rate/Loaded Mile", "Rate/Total Mile",
@@ -314,7 +314,7 @@ export function buildReport(
       return {
         title: `Mileage - ${scopeLabel} - ${period.label}`,
         calculationVersion: FINANCIAL_MODEL_VERSION,
-        columns: ["Truck", "Pickup Date", "PO Number", "Origin", "Destination", "Loaded Miles", "Deadhead Miles", "Total Miles", "Deadhead %"],
+        columns: ["Truck", "Pickup Date", "PO / Load Number", "Origin", "Destination", "Loaded Miles", "Deadhead Miles", "Total Miles", "Deadhead %"],
         rows: [
           ...periodLoads.map((load) => [
             truckName(load.truckId),

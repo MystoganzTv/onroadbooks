@@ -250,14 +250,14 @@ struct AddLoadView: View {
 
 // MARK: - Load form pieces, shared by AddLoadView and LoadDetailView
 
-/// "PO#" then the number, in the weight the identifier deserves.
+/// "#" then the PO or load number (TQL says PO, Curri says load number).
 struct OBPONumberField: View {
     @Binding var text: String
 
     var body: some View {
         HStack {
-            Text("PO#").foregroundStyle(OBColor.mutedForeground)
-            TextField("Número de PO", text: $text)
+            Text("#").foregroundStyle(OBColor.mutedForeground)
+            TextField("PO / número de carga", text: $text)
                 .textInputAutocapitalization(.characters)
                 .autocorrectionDisabled()
                 .font(.body.weight(.semibold))

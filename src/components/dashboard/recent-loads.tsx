@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { formatLoadReference } from "@/lib/load-reference";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Package } from "lucide-react";
 
@@ -77,6 +78,7 @@ export function RecentLoads({ loads, simple = false }: { loads: LoadWithMetrics[
                         onClick={(event) => event.stopPropagation()}
                         className="rounded-sm outline-none group-hover:underline focus-visible:ring-2 focus-visible:ring-ring"
                       >
+                        {formatLoadReference(load.loadNumber) ? <span className="mr-2 font-semibold tnum">{formatLoadReference(load.loadNumber)}</span> : null}
                         {load.originCity}, {load.originState}
                         <span className="mx-1 text-muted-foreground">{dictionary.loads.to}</span>
                         {load.destinationCity}, {load.destinationState}

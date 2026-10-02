@@ -91,6 +91,15 @@ export function pctChange(current: number, previous: number): number {
   return div(current - previous, Math.abs(previous)) * 100;
 }
 
+/**
+ * Same, but null when there is nothing to compare with. "0.0% vs 2025 YTD"
+ * for a business that did not exist in 2025 reads as "flat", which is false.
+ */
+export function pctChangeOrNull(current: number, previous: number): number | null {
+  if (!previous) return null;
+  return pctChange(current, previous);
+}
+
 /* ---- Load level ----------------------------------------------------- */
 
 /** Default rating thresholds, used when no settings are supplied. */

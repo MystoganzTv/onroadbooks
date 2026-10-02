@@ -183,14 +183,26 @@ final class ScopeStore: ObservableObject {
         }
     }
 
-    func selectMonth(_ month: String) {
-        // Matching the web: choosing a month from the picker, or stepping with
-        // the arrows, also puts you back on the full month.
-        scope = Scope(month: month, key: .full, from: nil, to: nil, truckId: scope.truckId)
+    /// Changing the month keeps the view you are in -- Trim, YTD or a half
+    /// month -- matching the web. It used to force the full month, so moving
+    /// YTD from October to September silently showed September alone.
+    /// Today, week and custom ranges are not month-anchored and fall back to
+    /// the full month.
+    private var anchoredKey: PeriodKey {
+        switch scope.key {
+        case .quarter, .ytd, .first, .second: return scope.key
+        default: return .full
+        }
     }
 
+    func selectMonth(_ month: String) {
+        scope = Scope(month: month, key: anchoredKey, from: nil, to: nil, truckId: scope.truckId)
+    }
+
+    /// The arrows step one month, or a whole quarter when on Trim.
     func stepMonth(_ delta: Int) {
-        selectMonth(OBDate.shiftMonth(scope.month, by: delta))
+        let step = scope.key == .quarter ? delta * 3 : delta
+        selectMonth(OBDate.shiftMonth(scope.month, by: step))
     }
 
     func selectCustom(from: String, to: String) {

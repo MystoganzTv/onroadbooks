@@ -63,7 +63,7 @@ import { LocationFields } from "./location-fields";
 const FIELD_LABELS: Record<string, string> = {
   broker: "Broker",
   brokerContact: "Broker contact",
-  loadNumber: "PO number",
+  loadNumber: "PO / load number",
   notes: "Notes",
   deliveryDate: "Delivery date",
   endingOdometer: "Ending odometer",
