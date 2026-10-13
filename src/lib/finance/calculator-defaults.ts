@@ -3,6 +3,7 @@ import { loadsForTruck } from "../fleet";
 import { recentFuelPrice } from "../fuel-estimate";
 import type { Dataset, Truck } from "../types";
 import { calculatorBusinessExpenses } from "./calculator-business-expenses";
+import { DEFAULT_MAINTENANCE_PER_MILE, DEFAULT_MIN_RATE_PER_TOTAL_MILE } from "./load-calculator";
 
 /** Shared web/iOS inputs: direct trip costs, plus monthly context with no allocation. */
 export function calculatorDefaults(dataset: Dataset, truck: Truck, today: string) {
@@ -18,5 +19,9 @@ export function calculatorDefaults(dataset: Dataset, truck: Truck, today: string
     businessExpenses: calculatorBusinessExpenses(dataset.expenses, truck.id, today),
     deadheadWarnPct: dataset.settings.deadheadWarnPct,
     thresholds: thresholdsFromSettings(dataset.settings),
+    /** Gross per TOTAL mile the owner will not run below. Prefilled; editable per quote. */
+    minRatePerTotalMile: DEFAULT_MIN_RATE_PER_TOTAL_MILE,
+    /** Maintenance allocation per TOTAL mile, shown as its own layer. */
+    maintenancePerMile: DEFAULT_MAINTENANCE_PER_MILE,
   };
 }

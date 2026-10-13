@@ -15,6 +15,7 @@ import {
   calculateLoadEstimate,
   calculateTargetRate,
   compareOfferToThresholds,
+  realRpmForDisplay,
   type FeeMode,
 } from "@/lib/finance/load-calculator";
 import {
@@ -39,6 +40,10 @@ export interface CalculatorDefaults {
   businessExpenses: CalculatorBusinessExpenses;
   deadheadWarnPct: number;
   thresholds: RatingThresholds;
+  /** Owner's operational floor, gross per TOTAL mile. */
+  minRatePerTotalMile: number;
+  /** Maintenance allocation per TOTAL mile. */
+  maintenancePerMile: number;
   brokers: string[];
   dispatcherNames?: string[];
   trucks: Truck[];
@@ -50,6 +55,7 @@ interface Values {
   grossRate: string;
   loadedMiles: string;
   deadheadMiles: string;
+  deadheadAfterMiles: string;
   fuelPrice: string;
   mpg: string;
   tolls: string;
@@ -58,6 +64,8 @@ interface Values {
   factoringMode: FeeMode;
   factoringValue: string;
   otherCost: string;
+  minRatePerTotalMile: string;
+  maintenancePerMile: string;
 }
 
 function initialValues(defaults: CalculatorDefaults): Values {
@@ -65,6 +73,7 @@ function initialValues(defaults: CalculatorDefaults): Values {
     grossRate: "",
     loadedMiles: "",
     deadheadMiles: "0",
+    deadheadAfterMiles: "0",
     fuelPrice: defaults.fuelPrice ? defaults.fuelPrice.toFixed(2) : "3.85",
     mpg: defaults.mpg ? defaults.mpg.toFixed(1) : "",
     tolls: "",
@@ -73,6 +82,8 @@ function initialValues(defaults: CalculatorDefaults): Values {
     factoringMode: "PCT",
     factoringValue: defaults.factoringPct ? String(defaults.factoringPct) : "0",
     otherCost: "",
+    minRatePerTotalMile: defaults.minRatePerTotalMile.toFixed(2),
+    maintenancePerMile: defaults.maintenancePerMile.toFixed(2),
   };
 }
 
@@ -85,6 +96,9 @@ function initialValues(defaults: CalculatorDefaults): Values {
  *
  * All arithmetic comes from lib/finance/load-calculator. This component only
  * turns strings into numbers and numbers into layout.
+ *
+ * Placeholders are "0" on purpose: an example value such as "38" in grey
+ * reads as an entered toll while the box is empty and calculates as $0.
  */
 export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) {
   const { dictionary } = useLanguage();
@@ -100,6 +114,7 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
   const shared = {
     loadedMiles: toNumber(values.loadedMiles),
     deadheadMiles: toNumber(values.deadheadMiles),
+    deadheadAfterMiles: toNumber(values.deadheadAfterMiles),
     fuelPrice: toNumber(values.fuelPrice),
     mpg: toNumber(values.mpg),
     tolls: toNumber(values.tolls),
@@ -110,10 +125,15 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
     otherCost: toNumber(values.otherCost),
     overheadPerMile: 0,
     debtServicePerMile: 0,
+    minRatePerTotalMile: toNumber(values.minRatePerTotalMile),
   };
 
   const estimate = calculateLoadEstimate(
-    { ...shared, grossRate: toNumber(values.grossRate) },
+    {
+      ...shared,
+      grossRate: toNumber(values.grossRate),
+      maintenancePerMile: toNumber(values.maintenancePerMile),
+    },
     defaults.thresholds,
     defaults.deadheadWarnPct,
   );
@@ -145,18 +165,18 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
               <Input
                 id="calc-gross"
                 inputMode="decimal"
-                placeholder="700"
+                placeholder="0"
                 value={values.grossRate}
                 onChange={(e) => set("grossRate", e.target.value)}
               />
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label={copy.loadedMiles} htmlFor="calc-loaded">
+              <Field label={copy.loadedMiles} htmlFor="calc-loaded" className="col-span-2">
                 <Input
                   id="calc-loaded"
                   inputMode="numeric"
-                  placeholder="407"
+                  placeholder="0"
                   value={values.loadedMiles}
                   onChange={(e) => set("loadedMiles", e.target.value)}
                 />
@@ -169,9 +189,22 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
                 <Input
                   id="calc-deadhead"
                   inputMode="numeric"
-                  placeholder="84"
+                  placeholder="0"
                   value={values.deadheadMiles}
                   onChange={(e) => set("deadheadMiles", e.target.value)}
+                />
+              </Field>
+              <Field
+                label={copy.deadheadAfterDelivery}
+                htmlFor="calc-deadhead-after"
+                hint={copy.alwaysCounted}
+              >
+                <Input
+                  id="calc-deadhead-after"
+                  inputMode="numeric"
+                  placeholder="0"
+                  value={values.deadheadAfterMiles}
+                  onChange={(e) => set("deadheadAfterMiles", e.target.value)}
                 />
               </Field>
               <Field label={copy.fuelPrice} htmlFor="calc-fuel">
@@ -194,7 +227,7 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
                 <Input
                   id="calc-tolls"
                   inputMode="decimal"
-                  placeholder="38"
+                  placeholder="0"
                   value={values.tolls}
                   onChange={(e) => set("tolls", e.target.value)}
                 />
@@ -203,6 +236,7 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
                 <Input
                   id="calc-other"
                   inputMode="decimal"
+                  placeholder="0"
                   value={values.otherCost}
                   onChange={(e) => set("otherCost", e.target.value)}
                 />
@@ -226,13 +260,41 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
               onValue={(value) => set("factoringValue", value)}
             />
 
+            <div className="border-t border-border pt-3">
+              <p className="mb-2 text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                {copy.yourRules}
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label={copy.minAllInRpm} htmlFor="calc-min-rpm" hint={copy.minAllInRpmHint}>
+                  <Input
+                    id="calc-min-rpm"
+                    inputMode="decimal"
+                    placeholder="0"
+                    value={values.minRatePerTotalMile}
+                    onChange={(e) => set("minRatePerTotalMile", e.target.value)}
+                  />
+                </Field>
+                <Field
+                  label={copy.maintenancePerMile}
+                  htmlFor="calc-maintenance"
+                  hint={copy.maintenancePerMileHint}
+                >
+                  <Input
+                    id="calc-maintenance"
+                    inputMode="decimal"
+                    placeholder="0"
+                    value={values.maintenancePerMile}
+                    onChange={(e) => set("maintenancePerMile", e.target.value)}
+                  />
+                </Field>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
         {/* ---- Results ------------------------------------------------ */}
         <div className="min-w-0 space-y-3 xl:col-span-3">
-          <EvaluateResult estimate={estimate} defaults={defaults} values={values} />
-          <OfferComparison target={target} values={values} />
+          <EvaluateResult estimate={estimate} target={target} defaults={defaults} values={values} />
         </div>
       </div>
     </div>
@@ -241,12 +303,18 @@ export function CalculatorPanel({ defaults }: { defaults: CalculatorDefaults }) 
 
 /* ---- Evaluate --------------------------------------------------------- */
 
+type Estimate = ReturnType<typeof calculateLoadEstimate>;
+type Target = ReturnType<typeof calculateTargetRate>;
+type CalculatorCopy = ReturnType<typeof useLanguage>["dictionary"]["calculator"];
+
 function EvaluateResult({
   estimate,
+  target,
   defaults,
   values,
 }: {
-  estimate: ReturnType<typeof calculateLoadEstimate>;
+  estimate: Estimate;
+  target: Target;
   defaults: CalculatorDefaults;
   values: Values;
 }) {
@@ -279,11 +347,11 @@ function EvaluateResult({
         : copy.enterMpg
       : line.key === "dispatch"
         ? values.dispatchMode === "PCT"
-          ? interpolate(copy.percentGross, { percent: values.dispatchValue })
+          ? interpolate(copy.percentGross, { percent: values.dispatchValue || "0" })
           : copy.flatFee
         : line.key === "factoring"
           ? values.factoringMode === "PCT"
-            ? interpolate(copy.percentGross, { percent: values.factoringValue })
+            ? interpolate(copy.percentGross, { percent: values.factoringValue || "0" })
             : copy.flatFee
           : undefined;
     return { label, hint };
@@ -318,6 +386,16 @@ function EvaluateResult({
     );
   }
 
+  const gross = toNumber(values.grossRate);
+  const floor = estimate.operationalMinimum;
+  const realRpm = realRpmForDisplay(estimate.grossPerTotalMile, floor);
+  const hasMaintenance = estimate.maintenancePerMile > 0;
+  const perMileAndMargin = (perMile: number, margin: number) =>
+    interpolate(copy.perMileMargin, {
+      rate: formatRateValue(perMile),
+      percent: formatPercent(margin),
+    });
+
   return (
     <>
       <Card>
@@ -331,8 +409,61 @@ function EvaluateResult({
           </span>
         </CardHeader>
         <CardContent className="p-0">
+          {/* ---- Decision strip: offer, both RPMs, miles ----------------- */}
+          <div className="space-y-3 border-b border-border p-4" data-testid="calculator-decision">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  {copy.currentBrokerOffer}
+                </p>
+                <p className="mt-1 tnum text-3xl font-semibold leading-none tracking-tight">
+                  {formatMoney(gross)}
+                </p>
+              </div>
+              <FloorPill floor={floor} copy={copy} />
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <Metric
+                label={copy.loadedRpm}
+                value={interpolate(copy.perLoadedMile, {
+                  rate: formatRateValue(estimate.grossPerLoadedMile),
+                })}
+                hint={copy.loadedRpmHint}
+                testId="loaded-rpm"
+              />
+              <Metric
+                label={copy.realRpm}
+                value={interpolate(copy.perTotalMile, { rate: formatRateValue(realRpm) })}
+                hint={copy.realRpmHint}
+                tone={floor.meets === false ? "warn" : undefined}
+                emphasis
+                testId="real-rpm"
+              />
+              <Metric
+                label={copy.totalMilesLabel}
+                value={formatMiles(estimate.totalMiles)}
+                hint={interpolate(copy.totalMilesBreakdown, {
+                  loaded: formatMiles(estimate.loadedMiles),
+                  deadhead: formatMiles(estimate.deadheadMiles),
+                })}
+                testId="total-miles"
+                className="col-span-2 sm:col-span-1"
+              />
+            </div>
+            {floor.meets === false ? (
+              <p className="text-2xs text-warn tnum" data-testid="floor-gap">
+                {interpolate(copy.needsForMinimum, {
+                  rate: formatMoney(floor.rate),
+                  rpm: formatRateValue(floor.ratePerTotalMile),
+                  gap: formatMoney(floor.shortfall),
+                })}
+              </p>
+            ) : null}
+          </div>
+
+          {/* ---- Gross -> direct costs -> contribution -> maintenance ---- */}
           <dl className="divide-y divide-border/70">
-            <Line label={copy.grossRate} value={formatMoney(toNumber(values.grossRate))} strong />
+            <Line label={copy.grossRate} value={formatMoney(gross)} strong />
             {estimate.lines.map((line) => (
               <Line
                 key={line.key}
@@ -343,55 +474,72 @@ function EvaluateResult({
               />
             ))}
             <Line
+              label={copy.directTripCosts}
+              value={`-${formatMoney(estimate.directTripCosts)}`}
+              tone="neg"
+              testId="direct-trip-costs"
+            />
+            <Line
               label={copy.tripMoneyLeft}
-              hint={copy.tripMoneyLeftHint}
+              hint={perMileAndMargin(estimate.contributionProfitPerMile, estimate.contributionMargin)}
               value={formatMoney(estimate.contributionProfit)}
               tone={estimate.contributionProfit >= 0 ? undefined : "neg"}
               strong
+              testId="contribution-profit"
             />
+            {hasMaintenance ? (
+              <>
+                <Line
+                  label={copy.maintenanceAllocation}
+                  hint={interpolate(copy.maintenanceAllocationHint, {
+                    rate: formatRateValue(estimate.maintenancePerMile),
+                    miles: formatMiles(estimate.totalMiles),
+                  })}
+                  value={`-${formatMoney(estimate.maintenanceAllocation)}`}
+                  tone="neg"
+                  testId="maintenance-allocation"
+                />
+                <Line
+                  label={copy.afterMaintenance}
+                  hint={perMileAndMargin(
+                    estimate.contributionAfterMaintenancePerMile,
+                    estimate.contributionAfterMaintenanceMargin,
+                  )}
+                  value={formatMoney(estimate.contributionAfterMaintenance)}
+                  tone={estimate.contributionAfterMaintenance >= 0 ? undefined : "neg"}
+                  strong
+                  testId="after-maintenance"
+                />
+              </>
+            ) : null}
           </dl>
 
           <div
             className={cn(
-              "flex items-end justify-between gap-4 border-t-2 px-4 py-4",
+              "grid gap-4 border-t-2 px-4 py-4",
+              hasMaintenance ? "grid-cols-2" : "grid-cols-1",
               estimate.contributionProfit >= 0
                 ? "border-pos/40 bg-pos-soft/40"
                 : "border-neg/40 bg-neg-soft/40",
             )}
           >
-            <div>
-              <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                {copy.tripMoneyLeft}
-              </p>
-              <p className="mt-1 text-2xs text-muted-foreground tnum">
-                {interpolate(copy.marginDirect, {
-                  percent: formatPercent(estimate.contributionMargin),
-                })}
-              </p>
-            </div>
-            <div className="text-right">
-              <p
-                className={cn(
-                  "tnum text-3xl font-semibold leading-none tracking-tight",
-                  estimate.contributionProfit >= 0 ? "text-pos" : "text-neg",
-                )}
-              >
-                {formatMoneyCompact(estimate.contributionProfit)}
-              </p>
-              <p
-                className={cn(
-                  "mt-1 tnum text-sm font-medium",
-                  estimate.contributionProfitPerMile >= 0 ? "text-pos" : "text-neg",
-                )}
-              >
-                {formatRateValue(estimate.contributionProfitPerMile)}/mi
-              </p>
-            </div>
+            <Headline
+              label={copy.tripMoneyLeft}
+              note={copy.tripMoneyLeftHint}
+              amount={estimate.contributionProfit}
+              perMile={estimate.contributionProfitPerMile}
+            />
+            {hasMaintenance ? (
+              <Headline
+                label={copy.afterMaintenance}
+                note={copy.afterMaintenanceHint}
+                amount={estimate.contributionAfterMaintenance}
+                perMile={estimate.contributionAfterMaintenancePerMile}
+              />
+            ) : null}
           </div>
         </CardContent>
       </Card>
-
-      <BusinessExpensesCard expenses={defaults.businessExpenses} />
 
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {interpolate(copy.loadClassificationAnnouncement, {
@@ -400,6 +548,10 @@ function EvaluateResult({
         })}
       </p>
       <LoadScoreBreakdown score={estimate.score} showBasis="loaded" />
+
+      <OfferComparison target={target} estimate={estimate} values={values} />
+
+      <BusinessExpensesCard expenses={defaults.businessExpenses} />
 
       <Card>
         <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
@@ -418,8 +570,10 @@ function EvaluateResult({
             ratingThresholds={defaults.thresholds}
             prefill={{
               loadedMiles: toNumber(values.loadedMiles),
-              deadheadMiles: toNumber(values.deadheadMiles),
-              grossRate: toNumber(values.grossRate),
+              // A load stores one deadhead figure; both legs were priced here,
+              // so both are carried, keeping the saved load's RPM the same.
+              deadheadMiles: estimate.deadheadMiles,
+              grossRate: gross,
               fuelCost: estimate.fuelCost,
               // Tolls and other costs stay planning numbers: posted from a quote
               // they would land in Expenses on top of the real toll bill.
@@ -443,10 +597,107 @@ function EvaluateResult({
   );
 }
 
+function FloorPill({
+  floor,
+  copy,
+}: {
+  floor: Estimate["operationalMinimum"];
+  copy: CalculatorCopy;
+}) {
+  const rpm = formatRateValue(floor.ratePerTotalMile);
+  const [text, tone] = floor.meets === null
+    ? [copy.noMinimumRpm, "border-border text-muted-foreground"]
+    : floor.meets
+      ? [interpolate(copy.meetsMinimumRpm, { rate: rpm }), "border-pos/40 bg-pos-soft text-pos"]
+      : [interpolate(copy.belowMinimumRpm, { rate: rpm }), "border-warn/40 bg-warn-soft text-warn"];
+  return (
+    <span
+      className={cn("rounded-full border px-2.5 py-1 text-2xs font-semibold tnum", tone)}
+      data-testid="floor-status"
+    >
+      {text}
+    </span>
+  );
+}
+
+function Metric({
+  label,
+  value,
+  hint,
+  tone,
+  emphasis,
+  testId,
+  className,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  tone?: "warn";
+  emphasis?: boolean;
+  testId?: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "min-w-0 rounded-md border px-3 py-2.5",
+        emphasis ? "border-primary/40 bg-primary/5" : "border-border",
+        className,
+      )}
+    >
+      <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p
+        className={cn(
+          "mt-1 tnum font-semibold leading-tight",
+          emphasis ? "text-lg" : "text-md",
+          tone === "warn" ? "text-warn" : "text-foreground",
+        )}
+        data-testid={testId}
+      >
+        {value}
+      </p>
+      {hint ? <p className="mt-0.5 text-2xs leading-snug text-muted-foreground">{hint}</p> : null}
+    </div>
+  );
+}
+
+function Headline({
+  label,
+  note,
+  amount,
+  perMile,
+}: {
+  label: string;
+  note: string;
+  amount: number;
+  perMile: number;
+}) {
+  return (
+    <div className="min-w-0">
+      <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </p>
+      <p
+        className={cn(
+          "mt-1 tnum text-2xl font-semibold leading-none tracking-tight sm:text-3xl",
+          amount >= 0 ? "text-pos" : "text-neg",
+        )}
+      >
+        {formatMoneyCompact(amount)}
+      </p>
+      <p className={cn("mt-1 tnum text-sm font-medium", perMile >= 0 ? "text-pos" : "text-neg")}>
+        {formatRateValue(perMile)}/mi
+      </p>
+      <p className="mt-1 text-2xs text-muted-foreground">{note}</p>
+    </div>
+  );
+}
+
 /* ---- Business context and offer comparison ---------------------------- */
 
 const TIER_TONE: Record<string, string> = {
-  minimum: "border-warn/40 bg-warn-soft",
+  operationalMinimum: "border-warn/40 bg-warn-soft",
+  minimum: "border-border bg-card",
   good: "border-info/40 bg-info-soft",
   great: "border-pos/40 bg-pos-soft",
 };
@@ -494,16 +745,19 @@ function BusinessExpensesCard({ expenses }: { expenses: CalculatorBusinessExpens
   );
 }
 
-function OfferComparison({ target, values }: {
-  target: ReturnType<typeof calculateTargetRate>;
+function OfferComparison({ target, estimate, values }: {
+  target: Target;
+  estimate: Estimate;
   values: Values;
 }) {
   const { dictionary } = useLanguage();
   const copy = dictionary.calculator;
   if (!target.valid || target.impossible || toNumber(values.grossRate) <= 0) return null;
 
-  const tier = (key: "minimum" | "good" | "great") =>
+  const tier = (key: "operationalMinimum" | "minimum" | "good" | "great") =>
     target.tiers.find((item) => item.key === key)!;
+  const operational = tier("operationalMinimum");
+  const hasFloor = operational.rate > 0;
   const minimum = tier("minimum");
   const good = tier("good");
   const great = tier("great");
@@ -512,9 +766,20 @@ function OfferComparison({ target, values }: {
     minimum: minimum.rate,
     good: good.rate,
     great: great.rate,
+    operationalMinimum: hasFloor ? operational.rate : 0,
   });
-  const offerAction = comparison
-    ? comparison.position === "GREAT"
+  const belowFloor = comparison.meetsOperationalMinimum === false;
+  const floorRpm = formatRateValue(operational.profitPerMile);
+
+  const offerAction = belowFloor
+    ? interpolate(copy.offerBelowOperationalAction, {
+        gap: formatMoney(Math.max(0, operational.rate - currentOffer)),
+        rpm: floorRpm,
+        minimum: formatMoney(operational.rate),
+        target: formatMoneyCompact(comparison.settlementTarget ?? operational.rate),
+        walkAway: formatMoney(comparison.walkAway),
+      })
+    : comparison.position === "GREAT"
       ? copy.offerGreatAction
       : comparison.position === "GOOD"
         ? interpolate(copy.offerGoodAction, {
@@ -527,25 +792,29 @@ function OfferComparison({ target, values }: {
           : interpolate(copy.offerBelowAction, {
               minimum: formatMoneyCompact(minimum.rate),
               target: formatMoneyCompact(comparison.settlementTarget ?? good.rate),
-            })
-    : "";
-  const offerRating = comparison
-    ? comparison.position === "BELOW_MINIMUM"
-      ? copy.badLoad
-      : comparison.position === "MARGINAL"
-        ? copy.marginalLoad
-        : comparison.position === "GOOD"
-          ? copy.goodLoad
-          : copy.greatLoad
-    : "";
-  const offerAnnouncement = comparison
-    ? comparison.suggestedCounteroffer === null
+            });
+  const offerRating = comparison.position === "BELOW_MINIMUM"
+    ? copy.badLoad
+    : comparison.position === "MARGINAL"
+      ? copy.marginalLoad
+      : comparison.position === "GOOD"
+        ? copy.goodLoad
+        : copy.greatLoad;
+  const floorVerdict = hasFloor
+    ? interpolate(belowFloor ? copy.belowMinimumRpm : copy.meetsMinimumRpm, { rate: floorRpm })
+    : copy.noMinimumRpm;
+  const offerAnnouncement = [
+    comparison.suggestedCounteroffer === null
       ? interpolate(copy.offerAnnouncementNoCounter, { rating: offerRating })
       : interpolate(copy.offerAnnouncementWithCounter, {
           rating: offerRating,
           counter: formatMoneyCompact(comparison.suggestedCounteroffer),
-        })
-    : "";
+        }),
+    hasFloor ? `${floorVerdict}.` : "",
+  ].filter(Boolean).join(" ");
+  const descriptionFor = (template: string, perMile: number) =>
+    interpolate(template, { rate: formatRateValue(perMile) });
+  const realRpm = realRpmForDisplay(estimate.grossPerTotalMile, estimate.operationalMinimum);
 
   return (
     <Card>
@@ -565,17 +834,32 @@ function OfferComparison({ target, values }: {
         >
           {offerAnnouncement}
         </p>
-        <div className="rounded-md border border-primary/40 bg-primary/10 p-4">
-          <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {copy.currentBrokerOffer}
-          </p>
-          <p className="mt-1 tnum text-3xl font-semibold tracking-tight">
-            {formatMoneyCompact(currentOffer)}
+        <div className="flex items-end justify-between gap-4 rounded-md border border-primary/40 bg-primary/10 p-4">
+          <div>
+            <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {copy.currentBrokerOffer}
+            </p>
+            <p className="mt-1 tnum text-3xl font-semibold tracking-tight">
+              {formatMoneyCompact(currentOffer)}
+            </p>
+          </div>
+          <p className={cn("tnum text-sm font-semibold", belowFloor ? "text-warn" : "text-foreground")}>
+            {interpolate(copy.perTotalMile, { rate: formatRateValue(realRpm) })}
           </p>
         </div>
-        <RateRow label={copy.minimumThreshold} description={copy.minimumDescription} rate={minimum.rate} ratePerLoadedMile={minimum.ratePerLoadedMile} tone="minimum" copy={copy} />
-        <RateRow label={copy.goodThreshold} description={copy.goodDescription} rate={good.rate} ratePerLoadedMile={good.ratePerLoadedMile} tone="good" copy={copy} />
-        <RateRow label={copy.greatThreshold} description={copy.greatDescription} rate={great.rate} ratePerLoadedMile={great.ratePerLoadedMile} tone="great" copy={copy} />
+        {hasFloor ? (
+          <RateRow
+            label={copy.operationalMinimumThreshold}
+            description={interpolate(copy.operationalMinimumDescription, { rpm: floorRpm })}
+            tier={operational}
+            tone="operationalMinimum"
+            copy={copy}
+            testId="threshold-operational"
+          />
+        ) : null}
+        <RateRow label={copy.minimumThreshold} description={descriptionFor(copy.minimumDescription, minimum.profitPerMile)} tier={minimum} tone="minimum" copy={copy} testId="threshold-profitability" />
+        <RateRow label={copy.goodThreshold} description={descriptionFor(copy.goodDescription, good.profitPerMile)} tier={good} tone="good" copy={copy} testId="threshold-good" />
+        <RateRow label={copy.greatThreshold} description={descriptionFor(copy.greatDescription, great.profitPerMile)} tier={great} tone="great" copy={copy} testId="threshold-great" />
 
         <div className="flex items-center justify-between gap-4 rounded-md border border-border px-3.5 py-3">
           <p className="text-xs font-semibold uppercase tracking-wide">{copy.differenceVsGreat}</p>
@@ -590,25 +874,59 @@ function OfferComparison({ target, values }: {
 
         <div className={cn(
           "rounded-md border p-4",
-          comparison.position === "GREAT"
-            ? "border-pos/40 bg-pos-soft"
-            : comparison.position === "GOOD"
-              ? "border-info/40 bg-info-soft"
-              : "border-warn/40 bg-warn-soft",
+          belowFloor
+            ? "border-warn/40 bg-warn-soft"
+            : comparison.position === "GREAT"
+              ? "border-pos/40 bg-pos-soft"
+              : comparison.position === "GOOD"
+                ? "border-info/40 bg-info-soft"
+                : "border-warn/40 bg-warn-soft",
         )}>
-          <p className="text-sm font-semibold uppercase tracking-wide">{offerRating}</p>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{offerAction}</p>
-          {comparison.suggestedCounteroffer !== null ? (
-            <div className="mt-3 flex items-end justify-between gap-4 border-t border-current/10 pt-3">
-              <div>
-                <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {copy.suggestedCounteroffer}
-                </p>
-                <p className="mt-1 text-2xs text-muted-foreground">{copy.counterStrategy}</p>
-              </div>
-              <p className="tnum text-2xl font-semibold tracking-tight text-primary">
-                {formatMoneyCompact(comparison.suggestedCounteroffer)}
+          {/* Both verdicts, side by side: neither may hide the other. */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {copy.contributionBasis}
               </p>
+              <p className="mt-0.5 text-sm font-semibold uppercase tracking-wide" data-testid="verdict-contribution">
+                {offerRating}
+              </p>
+            </div>
+            <div>
+              <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {copy.allInRpmRule}
+              </p>
+              <p
+                className={cn(
+                  "mt-0.5 text-sm font-semibold uppercase tracking-wide",
+                  belowFloor ? "text-warn" : hasFloor ? "text-pos" : "text-muted-foreground",
+                )}
+                data-testid="verdict-floor"
+              >
+                {floorVerdict}
+              </p>
+            </div>
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{offerAction}</p>
+          {comparison.suggestedCounteroffer !== null ? (
+            <div className="mt-3 space-y-2 border-t border-current/10 pt-3">
+              <div className="flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {copy.suggestedCounteroffer}
+                  </p>
+                  <p className="mt-1 text-2xs text-muted-foreground">{copy.counterStrategy}</p>
+                </div>
+                <p className="tnum text-2xl font-semibold tracking-tight text-primary" data-testid="suggested-counteroffer">
+                  {formatMoneyCompact(comparison.suggestedCounteroffer)}
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-4 text-xs">
+                <span className="text-muted-foreground">{copy.walkAway}</span>
+                <span className="tnum font-semibold" data-testid="walk-away">
+                  {formatMoney(comparison.walkAway)}
+                </span>
+              </div>
             </div>
           ) : null}
         </div>
@@ -620,36 +938,40 @@ function OfferComparison({ target, values }: {
 function RateRow({
   label,
   description,
-  rate,
-  ratePerLoadedMile,
+  tier,
   tone,
   copy,
+  testId,
 }: {
   label: string;
   description: string;
-  rate: number | null;
-  ratePerLoadedMile: number | null;
+  tier: Target["tiers"][number];
   tone: string;
-  copy: ReturnType<typeof useLanguage>["dictionary"]["calculator"];
+  copy: CalculatorCopy;
+  testId?: string;
 }) {
   return (
-    <div className={cn(
-      "flex items-center justify-between gap-4 rounded-md border px-3.5 py-3",
-      TIER_TONE[tone],
-    )}>
+    <div
+      className={cn(
+        "flex items-center justify-between gap-4 rounded-md border px-3.5 py-3",
+        TIER_TONE[tone],
+      )}
+      data-testid={testId}
+    >
       <div className="min-w-0">
         <p className="text-xs font-semibold uppercase tracking-wide">{label}</p>
         <p className="mt-0.5 text-2xs opacity-80">{description}</p>
       </div>
       <div className="shrink-0 text-right">
         <p className="tnum text-xl font-semibold leading-none tracking-tight">
-          {rate === null ? copy.unavailable : formatMoneyCompact(rate)}
+          {formatMoney(tier.rate)}
         </p>
-        {ratePerLoadedMile !== null ? (
-          <p className="mt-1 text-2xs opacity-70 tnum">
-            {interpolate(copy.perLoadedMile, { rate: formatRateValue(ratePerLoadedMile) })}
-          </p>
-        ) : null}
+        <p className="mt-1 text-2xs font-medium tnum">
+          {interpolate(copy.perTotalMile, { rate: formatRateValue(tier.ratePerTotalMile) })}
+        </p>
+        <p className="text-2xs opacity-70 tnum">
+          {interpolate(copy.perLoadedMile, { rate: formatRateValue(tier.ratePerLoadedMile) })}
+        </p>
       </div>
     </div>
   );
@@ -716,12 +1038,14 @@ function Line({
   value,
   tone,
   strong,
+  testId,
 }: {
   label: string;
   hint?: string;
   value: string;
   tone?: "neg";
   strong?: boolean;
+  testId?: string;
 }) {
   return (
     <div className="flex items-baseline justify-between gap-3 px-4 py-2.5">
@@ -744,6 +1068,7 @@ function Line({
           strong ? "text-md font-semibold" : "text-sm",
           tone === "neg" ? "text-neg" : "text-foreground",
         )}
+        data-testid={testId}
       >
         {value}
       </dd>

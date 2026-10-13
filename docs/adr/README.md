@@ -60,6 +60,7 @@ The format is in [0000-template.md](0000-template.md); the practice itself is
 | [0029](0029-brokers-are-companies-with-contacts.md) | A broker is a company; the people there are contacts; merge and delete profiles | Accepted |
 | [0030](0030-fuel-estimate-from-reference-mpg.md) | Estimate load fuel from the truck's reference MPG and recent price; ledger $/mi as fallback and check | Accepted |
 | [0031](0031-owner-operator-product.md) | Owner-operator product: driver pay out of loads, Fleet hidden, no startup period, floors $1.25 / $0.90 / $0.60 | Accepted |
+| [0032](0032-real-rpm-floor-and-maintenance-layer.md) | Judge a quote on real RPM; operational minimum as a gate beside the rating; maintenance as its own layer | Accepted |
 
 ### Craft
 

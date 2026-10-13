@@ -829,7 +829,7 @@ test.describe.serial("critical browser flows", () => {
       await expect(page.getByText("Suggested counteroffer", { exact: true })).toHaveCount(0);
       const tripResult = page.getByRole("heading", { name: "Should I take it?" }).locator("../..");
       await expect(tripResult).toContainText("$811.88");
-      await expect(tripResult).toContainText("Before business expenses and your own pay.");
+      await expect(tripResult).toContainText("Before maintenance, business expenses and your own pay.");
       await expect(tripResult).not.toContainText("Allocated");
       // Monthly ledger changes never turn into a proposed-trip deduction.
       dataset.expenses[0].amount = 2400;
@@ -868,6 +868,8 @@ test.describe.serial("critical browser flows", () => {
     await page.locator("#calc-mpg").fill("8.5");
     await page.locator("#calc-tolls").fill("50");
     await page.locator("#calc-factoring").fill("3");
+    // Contribution bands in isolation: the operational RPM floor has its own test.
+    await page.locator("#calc-min-rpm").fill("0");
     await gross.fill("1100");
 
     const assertBand = async (
@@ -876,7 +878,7 @@ test.describe.serial("critical browser flows", () => {
       counter: string | null,
     ) => {
       await gross.fill(offer);
-      const currentOfferBlock = page.getByText("Current broker offer").locator("..");
+      const currentOfferBlock = page.getByText("Current broker offer").first().locator("..");
       await expect(currentOfferBlock).toContainText(`$${offer}`);
       await expect(page.getByText(rating, { exact: true }).first()).toBeVisible();
       const announcement = page.getByTestId("offer-announcement");
@@ -903,8 +905,58 @@ test.describe.serial("critical browser flows", () => {
     await assertBand("557.13", "Good load", "$700");
     await assertBand("500.50", "Marginal load", "$600");
     await assertBand("459.09", "Marginal load", "$600");
-    await assertBand("459.08", "Below minimum", "$600");
-    await assertBand("400.25", "Below minimum", "$600");
+    await assertBand("459.08", "Below profitability floor", "$600");
+    await assertBand("400.25", "Below profitability floor", "$600");
+  });
+
+  test("load calculator separates loaded and real RPM, maintenance and the operational minimum", async ({ page }) => {
+    await login(page);
+    await page.goto("/calculator");
+
+    // The owner's own test case: $3,300, 1,747 loaded + 140 deadhead, $38 tolls.
+    await page.locator("#calc-gross").fill("3300");
+    await page.locator("#calc-loaded").fill("1747");
+    await page.locator("#calc-deadhead").fill("140");
+    await page.locator("#calc-deadhead-after").fill("0");
+    await page.locator("#calc-fuel").fill("6.82");
+    await page.locator("#calc-mpg").fill("8.5");
+    await page.locator("#calc-tolls").fill("38");
+    await page.locator("#calc-other").fill("");
+    await page.locator("#calc-dispatch").fill("5");
+    await page.locator("#calc-factoring").fill("3.2");
+    await expect(page.locator("#calc-min-rpm")).toHaveValue("1.80");
+    await expect(page.locator("#calc-maintenance")).toHaveValue("0.20");
+
+    await expect(page.getByTestId("loaded-rpm")).toHaveText("$1.89/loaded mi");
+    await expect(page.getByTestId("real-rpm")).toHaveText("$1.75/total mi");
+    await expect(page.getByTestId("total-miles")).toHaveText("1,887 mi");
+    await expect(page.getByTestId("floor-status")).toHaveText("Below your $1.80 minimum");
+    await expect(page.getByTestId("direct-trip-costs")).toHaveText("-$1,822.64");
+    await expect(page.getByTestId("contribution-profit")).toHaveText("$1,477.36");
+    await expect(page.getByTestId("maintenance-allocation")).toHaveText("-$377.40");
+    await expect(page.getByTestId("after-maintenance")).toHaveText("$1,099.96");
+    await expect(page.getByTestId("threshold-operational")).toContainText("$3,396.60");
+    await expect(page.getByTestId("threshold-operational")).toContainText("$1.80/total mi");
+    await expect(page.getByTestId("verdict-contribution")).toHaveText("Marginal load");
+    await expect(page.getByTestId("verdict-floor")).toHaveText("Below your $1.80 minimum");
+    await expect(page.getByTestId("suggested-counteroffer")).toHaveText("$3,650");
+    await expect(page.getByTestId("walk-away")).toHaveText("$3,396.60");
+
+    // An empty Tolls box is visibly $0, never a grey example value.
+    await page.locator("#calc-tolls").fill("");
+    await expect(page.locator("#calc-tolls")).toHaveAttribute("placeholder", "0");
+    await expect(page.getByTestId("contribution-profit")).toHaveText("$1,515.36");
+
+    // Deadhead after delivery is real miles too.
+    await page.locator("#calc-tolls").fill("38");
+    await page.locator("#calc-deadhead-after").fill("113");
+    await expect(page.getByTestId("total-miles")).toHaveText("2,000 mi");
+    await expect(page.getByTestId("threshold-operational")).toContainText("$3,600.00");
+
+    // Meeting the floor flips only the floor verdict.
+    await page.locator("#calc-deadhead-after").fill("0");
+    await page.locator("#calc-gross").fill("3396.60");
+    await expect(page.getByTestId("floor-status")).toHaveText("Meets your $1.80 minimum");
   });
 
   test("load calculator is keyboard operable and announces changing decisions", async ({ page }) => {
@@ -917,6 +969,7 @@ test.describe.serial("critical browser flows", () => {
       page.locator("#calc-gross"),
       page.locator("#calc-loaded"),
       page.locator("#calc-deadhead"),
+      page.locator("#calc-deadhead-after"),
       page.locator("#calc-fuel"),
       page.locator("#calc-mpg"),
       page.locator("#calc-tolls"),
@@ -927,6 +980,8 @@ test.describe.serial("critical browser flows", () => {
       page.locator("#calc-factoring"),
       page.getByRole("group", { name: "Factoring fee unit" }).getByRole("button", { name: "%" }),
       page.getByRole("group", { name: "Factoring fee unit" }).getByRole("button", { name: "$" }),
+      page.locator("#calc-min-rpm"),
+      page.locator("#calc-maintenance"),
     ];
     for (const control of keyboardOrder) {
       await page.keyboard.press("Tab");
@@ -940,11 +995,11 @@ test.describe.serial("critical browser flows", () => {
     await page.locator("#calc-tolls").fill("50");
     await page.locator("#calc-factoring").fill("3");
     await expect(page.getByTestId("offer-announcement")).toHaveText(
-      "Good load. Suggested counteroffer $700.",
+      "Good load. Suggested counteroffer $700. Meets your $1.80 minimum.",
     );
     await page.locator("#calc-gross").fill("1100");
     await expect(page.getByTestId("offer-announcement")).toHaveText(
-      "Great load. No counteroffer recommended.",
+      "Great load. No counteroffer recommended. Meets your $1.80 minimum.",
     );
   });
 
@@ -970,14 +1025,14 @@ test.describe.serial("critical browser flows", () => {
       await page.locator("#calc-mpg").fill("8.5");
       await page.locator("#calc-tolls").fill("50");
       await page.locator("#calc-factoring").fill("3");
-      await expect(page.getByText("Por debajo del mínimo", { exact: true }).first()).toBeVisible();
-      await expect(page.getByText(/Está por debajo de tu umbral mínimo.*Contraoferta hacia/)).toBeVisible();
-      await expect(page.getByText(/Agrega 3% de margen para negociar/)).toBeVisible();
+      await expect(page.getByText("Por debajo del piso de rentabilidad", { exact: true }).first()).toBeVisible();
+      await expect(page.getByText(/A esta oferta le faltan .* para tu mínimo de .*Contraoferta hacia/)).toBeVisible();
+      await expect(page.getByText(/Apunta al siguiente umbral/)).toBeVisible();
       expect(await page.evaluate(() => (
         document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1
       ))).toBe(true);
 
-      for (const label of ["Umbral mínimo", "Umbral bueno", "Umbral excelente"]) {
+      for (const label of ["Mínimo operativo", "Piso de rentabilidad", "Umbral bueno", "Umbral excelente"]) {
         const box = await page.getByText(label, { exact: true }).locator("../..").boundingBox();
         expect(box, `${label} should render at ${viewport.name}`).not.toBeNull();
         expect(box!.x).toBeGreaterThanOrEqual(0);
