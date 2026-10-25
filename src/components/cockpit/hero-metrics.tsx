@@ -116,6 +116,27 @@ export function HeroMetrics({
           <CashFact label={copy.debtPayments} value={answers.debtPayments.value} tone="negative" negative unknown={copy.notEnoughData} />
         </dl>
 
+        {showOwnerPlanning && summary.reserves.length > 0 ? (
+          <div className="border-t border-border bg-surface-sunken/45 px-5 py-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                {copy.whenCashAvailable}
+              </p>
+              <p className="text-xs font-semibold text-warn tnum">
+                {copy.suggestedSetAside}: {formatMoneyCompact(summary.reserveTotal)}
+              </p>
+            </div>
+            <dl className="mt-2 space-y-1.5">
+              {summary.reserves.map((reserve) => (
+                <div key={reserve.accountId} className="flex items-baseline justify-between gap-3 text-2xs">
+                  <dt className="text-muted-foreground">{reserveLabel(reserve.kind, reserve.name, copy)}</dt>
+                  <dd className="font-medium text-foreground tnum">{formatMoneyCompact(reserve.amount)}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ) : null}
+
         {showOwnerPlanning ? (
           <div className="border-t-2 border-info/35 bg-info-soft/25 px-5 py-4">
             <div className="flex items-end justify-between gap-4">
@@ -136,27 +157,6 @@ export function HeroMetrics({
                 {copy.cashStillNeeded}: {formatMoneyCompact(fundingGap)}
               </p>
             ) : null}
-          </div>
-        ) : null}
-
-        {showOwnerPlanning && summary.reserves.length > 0 ? (
-          <div className="border-t border-border bg-surface-sunken/45 px-5 py-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                {copy.whenCashAvailable}
-              </p>
-              <p className="text-xs font-semibold text-warn tnum">
-                {copy.suggestedSetAside}: {formatMoneyCompact(summary.reserveTotal)}
-              </p>
-            </div>
-            <dl className="mt-2 space-y-1.5">
-              {summary.reserves.map((reserve) => (
-                <div key={reserve.accountId} className="flex items-baseline justify-between gap-3 text-2xs">
-                  <dt className="text-muted-foreground">{reserveLabel(reserve.kind, reserve.name, copy)}</dt>
-                  <dd className="font-medium text-foreground tnum">{formatMoneyCompact(reserve.amount)}</dd>
-                </div>
-              ))}
-            </dl>
           </div>
         ) : null}
       </section>

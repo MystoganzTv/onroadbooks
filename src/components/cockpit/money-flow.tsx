@@ -138,6 +138,22 @@ export function MoneyFlow({
           <FlowRow label={copy.businessExpenses} question={copy.howMuchSpend} value={-ownerPay.operatingExpenses} tone="negative" width={width(ownerPay.operatingExpenses)} />
           <FlowRow label={copy.debtPayments} question={copy.howMuchDebt} value={-ownerPay.debtService} tone="negative" width={width(ownerPay.debtService)} />
 
+          {showOwnerPlanning && ownerPay.reserves.length > 0 ? (
+            <div className="border-t border-border bg-surface-sunken/45 px-4 py-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  {copy.whenCashAvailable}
+                </p>
+                <p className="text-xs font-semibold text-warn tnum">
+                  {copy.suggestedSetAside}: {formatMoneyCompact(ownerPay.reserveTotal)}
+                </p>
+              </div>
+              <p className="mt-1 text-2xs text-muted-foreground">
+                {copy.reservesNotShortfall}
+              </p>
+            </div>
+          ) : null}
+
           {showOwnerPlanning ? (
             <div className={cn("border-t-2 px-4 py-4", (available ?? 0) > 0 ? "border-pos/40 bg-pos-soft/40" : "border-info/35 bg-info-soft/30")}>
               <div className="flex items-end justify-between gap-3">
@@ -157,21 +173,6 @@ export function MoneyFlow({
             </div>
           ) : null}
 
-          {showOwnerPlanning && ownerPay.reserves.length > 0 ? (
-            <div className="border-t border-border bg-surface-sunken/45 px-4 py-3">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="text-2xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                  {copy.whenCashAvailable}
-                </p>
-                <p className="text-xs font-semibold text-warn tnum">
-                  {copy.suggestedSetAside}: {formatMoneyCompact(ownerPay.reserveTotal)}
-                </p>
-              </div>
-              <p className="mt-1 text-2xs text-muted-foreground">
-                {copy.reservesNotShortfall}
-              </p>
-            </div>
-          ) : null}
         </div>
       </div>
 
