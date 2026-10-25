@@ -473,6 +473,23 @@ export function ExpenseFormDialog({
               </div>
             ) : null}
 
+            <div className="space-y-1.5 rounded-md border border-border p-3">
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="expense-recurring" className="normal-case tracking-normal text-foreground">
+                  {copy.repeatMonthly}
+                </Label>
+                <Switch
+                  id="expense-recurring"
+                  checked={values.recurring}
+                  onCheckedChange={(checked) => set("recurring", checked)}
+                  aria-describedby="expense-recurring-hint"
+                />
+              </div>
+              <p id="expense-recurring-hint" className="text-xs text-muted-foreground">
+                {values.recurring ? copy.repeatMonthlyOn : copy.repeatMonthlyOff}
+              </p>
+            </div>
+
             <Field
               label={copy.description}
               htmlFor="expense-description"

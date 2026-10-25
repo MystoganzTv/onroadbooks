@@ -22,6 +22,7 @@ import { ReservesPanel } from "@/components/cockpit/reserves-panel";
 import { Section } from "@/components/cockpit/section";
 import { PlanningCard } from "@/components/cockpit/planning-card";
 import { TruckHealthPanel } from "@/components/cockpit/truck-health-panel";
+import { WorkedDaysCard } from "@/components/cockpit/worked-days-card";
 import { MiniStat } from "@/components/dashboard/mini-stat";
 import { PeriodControls } from "@/components/dashboard/period-controls";
 import { RecentLoads } from "@/components/dashboard/recent-loads";
@@ -97,6 +98,7 @@ import { cn } from "@/lib/utils";
 import { getWebDictionary } from "@/lib/i18n/dictionaries";
 import { formatLocalePeriod } from "@/lib/i18n-format";
 import { getAppLocale } from "@/lib/i18n-server";
+import { workedDays } from "@/lib/worked-days";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getAppLocale();
@@ -257,6 +259,7 @@ export default async function DashboardPage({
   });
 
   const buckets = periodBuckets(loads, expenses, period);
+  const daysWorked = workedDays(loads, period, today);
   const query = scopeQuery(period, truckId);
   const brokerNames = savedBrokerNames(loads, dataset.brokers);
   const hasLedgerHistory = allLoads.length > 0 || allExpenses.length > 0;
@@ -440,6 +443,11 @@ export default async function DashboardPage({
             {cockpit ? <DeadheadMonitor report={deadhead} className="min-w-0" /> : null}
             {cockpit ? <PlanningCard planning={planning} /> : null}
           </div>
+        </Section>
+
+        {/* ---- Days worked ------------------------------------------------- */}
+        <Section title={copy.daysWorkedTitle} description={periodDisplayLabel}>
+          <WorkedDaysCard report={daysWorked} revenue={summary.bookedRevenue} />
         </Section>
 
         {/* ---- Revenue and expenses ---------------------------------------- */}
