@@ -78,6 +78,7 @@ ok
 5 3.5
 Chicago IL Miami FL 1400 millas $2800
 120
+dh 50
 el broker ofrece $3100
 1
 guardar
@@ -86,6 +87,13 @@ mpg 9
 buscar cargas cerca de Chicago
 borrar mis datos
 ```
+
+Text shorthand, calculations, negotiation and broker-message drafts work without
+an AI key. For the current load, `dh 50`, `50 dh`, `dh 50 millas` and
+`dead head 50` update the empty miles to pickup and recalculate the same load;
+`dh after 50` changes only the explicitly stated empty miles after delivery.
+Free-form interpretation, images and PDFs require `ANTHROPIC_API_KEY`; voice
+transcription also requires `OPENAI_API_KEY`.
 
 Tests: `npm test` (everything, no network) and `npm run test:database` (adds
 the Drizzle store contract against a disposable PostgreSQL).

@@ -40,13 +40,14 @@ export type QuickIntent =
   | { kind: "ALERTS_STOP_ALL" }
   | { kind: "ALERT_CREATE"; text: string }
   | { kind: "OFFER"; grossRate: number }
+  | { kind: "LOAD_UPDATE"; facts: Partial<LoadFacts> }
   | { kind: "LOAD"; facts: Partial<LoadFacts> };
 
 const STATES = new Set(
   "AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY AB BC MB NB NL NS ON PE QC SK".split(" "),
 );
 
-const COMMANDS: { kind: Exclude<QuickIntent["kind"], "SEARCH" | "OFFER" | "LOAD" | "COMPARE" | "ALERT_STOP" | "ALERT_CREATE">; pattern: RegExp }[] = [
+const COMMANDS: { kind: Exclude<QuickIntent["kind"], "SEARCH" | "OFFER" | "LOAD" | "LOAD_UPDATE" | "COMPARE" | "ALERT_STOP" | "ALERT_CREATE">; pattern: RegExp }[] = [
   { kind: "PLAN", pattern: /^(plan|my plan|mi plan|billing|subscription|my subscription|suscripcion|mi suscripcion|facturacion)$/ },
   { kind: "UPGRADE", pattern: /^(upgrade|go pro|pro|subscribe|suscribirme|suscribir|mejorar|mejorar plan|plan pro|quiero pro)$/ },
   { kind: "MANAGE_PLAN", pattern: /^(manage subscription|manage billing|cancel subscription|update card|cancelar suscripcion|administrar suscripcion|cambiar tarjeta)$/ },
@@ -90,8 +91,24 @@ function grossRateOf(clean: string): number | null {
   return usd ? parseNumber(usd[1]) : null;
 }
 
-const DH_AFTER = String.raw`(?:dh after|deadhead after|dh back|dh home|return(?:ing)?(?: home)?|back home|empty back|de regreso|regreso|vacio despues|vacias despues)`;
-const DH = String.raw`(?:dh-?o|dh|deadhead|empty|vacio|vacias|vacios|en vacio)`;
+const DH_AFTER = String.raw`(?:dh after|dead[ -]?head after|dh back|dh home|return(?:ing)?(?: home)?|back home|empty back|de regreso|regreso|vacio despues|vacias despues)`;
+const DH = String.raw`(?:dh-?o|dh|dead[ -]?head|empty|vacio|vacias|vacios|en vacio)`;
+
+/** Explicit mileage corrections, not an entire new load or an unlabelled answer. */
+export function parseDeadheadUpdate(text: string): Partial<LoadFacts> | null {
+  const clean = normalize(text);
+  const unit = String.raw`(?:mi(?:les?)?|millas?|mls)`;
+  const read = (label: string): number | null => {
+    const match = clean.match(new RegExp(String.raw`^${label}\s*[:=]?\s*${NUM}(?:\s*${unit})?\.?$`)) ??
+      clean.match(new RegExp(String.raw`^${NUM}\s*(?:${unit}\s*)?${label}\.?$`));
+    const value = match ? parseNumber(match[1]) : null;
+    return value !== null && value <= 10_000 ? value : null;
+  };
+  const after = read(DH_AFTER);
+  if (after !== null) return { deadheadAfterMiles: after };
+  const pickup = read(DH);
+  return pickup !== null ? { deadheadPickupMiles: pickup } : null;
+}
 
 function milesOf(clean: string) {
   let rest = clean;
@@ -242,6 +259,8 @@ export function quickIntent(text: string): QuickIntent | null {
   if (/^(find|search|look for|show me|any|busca|buscar|buscame|encuentra|encuentrame|hay)\b.*\b(loads?|cargas?|freight)\b/.test(clean)) {
     return { kind: "SEARCH", text };
   }
+  const update = parseDeadheadUpdate(text);
+  if (update) return { kind: "LOAD_UPDATE", facts: update };
   const facts = parseLoadShorthand(text);
   if (facts) return { kind: "LOAD", facts };
   const offer = parseOffer(text);

@@ -212,6 +212,45 @@ describe("load analysis over WhatsApp", () => {
     const [load] = await store.listLoads(user.id, { limit: 5 });
     assert.deepEqual(load.offers, [2_800, 3_100]);
   });
+  it("recalculates the current saved load for the deadhead corrections from the WhatsApp trial without AI", async () => {
+    await say("15551000000", "Elmsford NY Monroeville PA 375 millas $800 0 DH");
+    await say("15551000000", "save");
+    const before = (await store.findUserByWaId("15551000000"))!;
+    for (const [input, dh] of [["dh 40 millas", 40], ["40 dh", 40], ["dh 50", 50], ["dead head 50", 50], ["dh 0", 0]] as const) {
+      assert.match(await say("15551000000", input), new RegExp(`TOTAL: ${375 + dh} mi`), input);
+      const user = (await store.findUserByWaId("15551000000"))!;
+      assert.equal(user.conversation.currentLoadId, before.conversation.currentLoadId);
+      const loads = await store.listLoads(user.id, { limit: 10 });
+      assert.equal(loads.length, 1);
+      assert.equal(loads[0].status, "SAVED");
+      assert.equal(loads[0].facts.deadheadPickupMiles, dh);
+      assert.equal(loads[0].facts.loadedMiles, 375);
+      assert.equal(loads[0].facts.origin?.city, "Elmsford");
+      assert.equal(loads[0].facts.destination?.city, "Monroeville");
+      assert.deepEqual(loads[0].offers, [800]);
+    }
+    assert.equal((await store.getUsage(before.id, "2026-10-27")).aiCalls, 0);
+  });
+  it("accepts a labelled deadhead answer when asking for missing pickup miles", async () => {
+    await say("15551000000", "Elmsford NY Monroeville PA 375 millas $800");
+    assert.match(await say("15551000000", "dh 50"), /TOTAL: 425 mi/);
+    const user = (await store.findUserByWaId("15551000000"))!;
+    assert.equal(user.conversation.awaiting, null);
+    assert.equal((await store.listLoads(user.id, { limit: 10 })).length, 1);
+  });
+  it("keeps labelled deadhead separate from a pending rate and an explicit return leg", async () => {
+    await say("15551000000", "Elmsford NY Monroeville PA 375 millas 0 DH");
+    await say("15551000000", "50 dh");
+    let user = (await store.findUserByWaId("15551000000"))!;
+    assert.equal(user.conversation.awaiting, "grossRate");
+    assert.equal(user.conversation.draft?.grossRate, null);
+    assert.equal(user.conversation.draft?.deadheadPickupMiles, 50);
+    await say("15551000000", "$800");
+    assert.match(await say("15551000000", "dh after 25"), /TOTAL: 450 mi/);
+    user = (await store.findUserByWaId("15551000000"))!;
+    assert.equal(user.conversation.draft?.deadheadPickupMiles, 50);
+    assert.equal(user.conversation.draft?.deadheadAfterMiles, 25);
+  });
   it("what to ask, broker message, save and history", async () => {
     await say("15551000000", "Chicago IL Miami FL 1400 miles $2500 120 DH");
     assert.match(await say("15551000000", "what should I ask?"), /ASK: \$[\d,]+[\s\S]*WALK AWAY/);
@@ -253,6 +292,42 @@ describe("AI paths with substitutes for the providers", () => {
 
   beforeEach(async () => {
     await onboard("15552000000", ["26 ft box truck", "8.5", "6.70", "1.80", "5 3.5"]);
+  });
+
+  it("keeps the current load when a text correction repeats its lane but omits unchanged miles", async () => {
+    await say("15552000000", "Elmsford NY Monroeville PA 375 miles $800 50 DH");
+    await say("15552000000", "save");
+    const before = (await store.findUserByWaId("15552000000"))!;
+    deps = makeDeps({ interpreter: interpreter(() => ({
+      ok: true, usage,
+      interpretation: { intent: "LOAD", language: "en", search: null, loads: [{
+        ...emptyLoad(), origin: { city: "Elmsford", state: "NY" },
+        destination: { city: "Monroeville", state: "PA" },
+        deadheadPickupMiles: 60, grossRate: 850,
+      }] },
+    })) });
+    assert.match(await say("15552000000", "Now sixty empty miles to pickup and eight hundred fifty dollars total"), /TOTAL: 435 mi/);
+    const after = (await store.findUserByWaId("15552000000"))!;
+    assert.equal(after.conversation.currentLoadId, before.conversation.currentLoadId);
+    const loads = await store.listLoads(after.id, { limit: 10 });
+    assert.equal(loads.length, 1);
+    assert.equal(loads[0].status, "SAVED");
+    assert.equal(loads[0].facts.loadedMiles, 375);
+    assert.deepEqual(loads[0].offers, [800, 850]);
+  });
+
+  it("does not inherit mileage when a text message names a different lane", async () => {
+    await say("15552000000", "Elmsford NY Monroeville PA 375 miles $800 50 DH");
+    deps = makeDeps({ interpreter: interpreter(() => ({
+      ok: true, usage,
+      interpretation: { intent: "LOAD", language: "en", search: null, loads: [{
+        ...emptyLoad(), origin: { city: "Dallas", state: "TX" }, deadheadPickupMiles: 60, grossRate: 850,
+      }] },
+    })) });
+    assert.match(await say("15552000000", "Another pickup in Dallas"), /How many LOADED miles/);
+    const user = (await store.findUserByWaId("15552000000"))!;
+    assert.equal(user.conversation.draft?.loadedMiles, null);
+    assert.equal(user.conversation.draft?.destination, null);
   });
 
   it("prices a screenshot read and marks it as read from the image", async () => {

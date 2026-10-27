@@ -107,7 +107,6 @@ export async function extractRateCon(
       body: JSON.stringify({
         model: process.env.RATE_CON_MODEL || DEFAULT_MODEL,
         max_tokens: MAX_TOKENS,
-        temperature: 0,
         tools: [
           {
             name: RATE_CON_TOOL_NAME,

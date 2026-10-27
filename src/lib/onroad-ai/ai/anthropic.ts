@@ -2,7 +2,7 @@
  * Anthropic Messages API interpreter.
  *
  * Same discipline as `rate-con/extract.ts`: one request, one forced tool
- * call, temperature 0, no retries (a retry doubles the bill for the same
+ * call, no retries (a retry doubles the bill for the same
  * wrong answer), and nothing in the reply is trusted until
  * `normalizeInterpretation` has cleaned it.
  *
@@ -120,7 +120,6 @@ export class AnthropicInterpreter implements MessageInterpreter {
         body: JSON.stringify({
           model: this.config.model,
           max_tokens: MAX_TOKENS,
-          temperature: 0,
           system: SYSTEM,
           tools: [
             {

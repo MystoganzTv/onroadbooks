@@ -5,7 +5,7 @@ import { extractToolInput } from "../onroad-ai/ai/anthropic";
 import { normalizeInterpretation } from "../onroad-ai/ai/schema";
 import { BOT_COPY } from "../onroad-ai/copy";
 import { driverProfileSchema } from "../onroad-ai/profile";
-import { parseBareNumber, parseLoadShorthand, quickIntent } from "../onroad-ai/quick-parse";
+import { parseBareNumber, parseDeadheadUpdate, parseLoadShorthand, quickIntent } from "../onroad-ai/quick-parse";
 import { parseFees, parseSettingsCommand, parseTruck } from "../onroad-ai/settings";
 
 const profile = driverProfileSchema.parse({ mpg: 8.5, fuelPrice: 6.7, dispatchValue: 5, factoringValue: 3.5, minRatePerTotalMile: 1.8 });
@@ -51,6 +51,19 @@ describe("shorthand loads", () => {
 });
 
 describe("intents", () => {
+  it("recognizes labelled deadhead corrections in either order without loaded miles", () => {
+    for (const input of ["dh 50", "50 DH", "dh 50 millas", "50 miles dh", "dead head 50", "deadhead: 50 mi", "50 en vacío", "DH-O=50"]) {
+      assert.deepEqual(quickIntent(input), { kind: "LOAD_UPDATE", facts: { deadheadPickupMiles: 50 } }, input);
+    }
+    assert.deepEqual(parseDeadheadUpdate("dh 0"), { deadheadPickupMiles: 0 });
+    assert.deepEqual(parseDeadheadUpdate("dh after 50"), { deadheadAfterMiles: 50 });
+    assert.deepEqual(parseDeadheadUpdate("50 millas de regreso"), { deadheadAfterMiles: 50 });
+  });
+  it("does not treat unlabelled, ambiguous, negative or out-of-range values as deadhead corrections", () => {
+    for (const input of ["50", "$50", "dh -50", "dh 10001", "dh 50 80", "maybe dh 50", "dh 50 km", "Chicago IL Miami FL 1400 miles $2800 120 DH"]) {
+      assert.equal(parseDeadheadUpdate(input), null, input);
+    }
+  });
   it("offers and questions", () => {
     assert.deepEqual(quickIntent("Broker offered $1700, should I take it?"), { kind: "OFFER", grossRate: 1_700 });
     assert.deepEqual(quickIntent("el broker ofrece 1700"), { kind: "OFFER", grossRate: 1_700 });

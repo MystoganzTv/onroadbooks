@@ -499,7 +499,18 @@ async function manage(ctx: Ctx): Promise<Reply[]> {
 function isContinuation(ctx: Ctx, facts: LoadFacts): boolean {
   if (!ctx.state.draft) return false;
   const hasLane = facts.origin !== null || facts.destination !== null;
-  return !hasLane && facts.loadedMiles === null;
+  if (!hasLane) return facts.loadedMiles === null;
+  // A text correction may repeat the current lane but omit its unchanged
+  // mileage. Keep that lane's facts; a different lane or a complete load
+  // still starts a new analysis. Media remains a separate load read.
+  if (facts.source !== "TEXT" || facts.loadedMiles !== null) return false;
+  return (["origin", "destination"] as const).every((key) => {
+    const next = facts[key];
+    const current = ctx.state.draft![key];
+    return !next || (["city", "state"] as const).every((part) =>
+      next[part] === null || (current?.[part] != null && normalize(next[part]) === normalize(current[part])),
+    );
+  });
 }
 
 async function actOnInterpretation(ctx: Ctx, interpretation: Interpretation, source: LoadFacts["source"]): Promise<Reply[]> {
@@ -630,6 +641,9 @@ async function runQuickIntent(ctx: Ctx, intent: QuickIntent, text: string, sourc
     case "ALERT_STOP": return stopAlert(ctx, intent.index);
     case "ALERTS_STOP_ALL": return stopAllAlerts(ctx);
     case "OFFER": return applyOffer(ctx, intent.grossRate);
+    case "LOAD_UPDATE":
+      ctx.state.draft = mergeFacts(ctx.state.draft ?? emptyFacts(source), intent.facts);
+      return evaluate(ctx, ctx.state.currentLoadId ? "update" : "new");
     case "LOAD":
       startNewLoad(ctx, intent.facts, source);
       return evaluate(ctx, "new");
