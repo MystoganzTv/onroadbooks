@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Activity, CreditCard, ShieldCheck, Users } from "lucide-react";
+import Link from "next/link";
+import { Activity, Bot, ChevronRight, CreditCard, ShieldCheck, Users } from "lucide-react";
 
 import { AdminAccountsTable } from "@/components/admin/admin-accounts-table";
 import { AdminOperationsCheck } from "@/components/admin/admin-operations-check";
@@ -19,6 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function AdminPage() {
   const [, locale] = await Promise.all([requireAdminPageSession(), getAppLocale()]);
   const copy = getWebDictionary(locale).admin;
+  const aiCopy = getWebDictionary(locale).onroadAi;
   const accounts = (await getAuthStore().listAccounts()).map((account) => ({
     ...account,
     isPlatformAdmin: isPlatformAdminEmail(account.email),
@@ -69,6 +71,19 @@ export default async function AdminPage() {
       </div>
 
       <AdminOperationsCheck />
+
+      <Link href="/admin/onroad-ai" className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <Card className="transition-colors hover:bg-surface-sunken/60">
+          <CardContent className="flex items-center gap-3 p-4">
+            <Bot className="size-5 shrink-0 text-info" />
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-semibold">{aiCopy.openConsole}</h2>
+              <p className="mt-1 text-xs text-muted-foreground">{aiCopy.openConsoleNote}</p>
+            </div>
+            <ChevronRight className="size-4 text-muted-foreground" />
+          </CardContent>
+        </Card>
+      </Link>
 
       <AdminAccountsTable accounts={accounts} now={new Date(now).toISOString()} />
     </div>

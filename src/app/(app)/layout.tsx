@@ -10,6 +10,8 @@ import { hasFleetAccess } from "@/lib/plans";
 import { FLEET_VISIBLE } from "@/lib/product";
 import { fleetIftaApplicability } from "@/lib/ifta-eligibility";
 import { getAppLocale } from "@/lib/i18n-server";
+import { OnroadAiChatWidget } from "@/components/onroad-ai/chat-widget";
+import { webChatEnabledFor } from "@/lib/onroad-ai/webchat";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [session, locale, viewMode] = await Promise.all([requireSession(), getAppLocale(), getViewMode()]);
@@ -62,6 +64,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         >
           {children}
         </AppShell>
+        {webChatEnabledFor(session.email) ? <OnroadAiChatWidget /> : null}
       </ViewModeProvider>
     </LanguageProvider>
   );

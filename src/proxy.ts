@@ -28,6 +28,10 @@ const PUBLIC_PATHS = [
   "/api/cron/monthly-expenses",
   "/api/stripe/webhook",
   "/api/apple/notifications",
+  // OnRoad AI (WhatsApp). Meta has no session cookie: the webhook verifies
+  // X-Hub-Signature-256, the maintenance route checks CRON_SECRET and the
+  // operations route checks ONROAD_AI_ADMIN_TOKEN, each before doing anything.
+  "/api/whatsapp",
 ];
 
 /**

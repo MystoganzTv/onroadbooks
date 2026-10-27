@@ -127,6 +127,7 @@ async function main() {
               "src/lib/__tests__/store-behaviour.test.ts",
               "src/lib/__tests__/auth-security.test.ts",
               "src/lib/__tests__/apple-billing-db.test.ts",
+              "src/lib/__tests__/onroad-ai-store.test.ts",
             ],
         {
           stdio: "inherit",

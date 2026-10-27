@@ -49,6 +49,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true });
   }
 
+  // OnRoad AI (the WhatsApp assistant) shares this Stripe account but has its
+  // own endpoint, /api/whatsapp/stripe. Its objects carry no workspace id, so
+  // handling them here would fail and make Stripe retry for days.
+  if ((event.data.object as { metadata?: Record<string, string> | null }).metadata?.product === "onroad-ai") {
+    return NextResponse.json({ received: true });
+  }
+
   try {
     switch (event.type) {
       case "checkout.session.completed": {

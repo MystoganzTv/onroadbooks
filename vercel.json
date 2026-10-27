@@ -5,6 +5,10 @@
     {
       "path": "/api/cron/monthly-expenses",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/whatsapp/maintenance",
+      "schedule": "30 9 * * *"
     }
   ]
 }

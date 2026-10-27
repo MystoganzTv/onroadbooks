@@ -51,7 +51,9 @@
     "certify:r2": "node --conditions=react-server --import tsx scripts/certify-r2-storage.ts",
     "migrate:storage-audit": "node --import tsx scripts/audit-storage-migration.ts",
     "db:drizzle:verify": "node --import tsx scripts/verify-drizzle-deployment.ts",
-    "migrate:services-audit": "node --import tsx scripts/audit-supabase-services.ts"
+    "migrate:services-audit": "node --import tsx scripts/audit-supabase-services.ts",
+    "onroad-ai:simulate": "node --import tsx scripts/onroad-ai-simulate.ts",
+    "onroad-ai:seed-local": "node --import tsx scripts/onroad-ai-seed-local.ts"
   },
   "overrides": {
     "@esbuild-kit/core-utils": {
