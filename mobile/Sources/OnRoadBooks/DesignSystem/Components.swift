@@ -1,5 +1,26 @@
 import SwiftUI
 
+/// The load number is the identifier everywhere a load appears. A missing
+/// number is explicit; the route stays secondary even on older records.
+struct LoadHeading: View {
+    let load: Load
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(load.poLabel ?? "Sin número de carga")
+                .font(.headline.weight(.bold))
+                .monospacedDigit()
+                .foregroundStyle(OBColor.foreground)
+                .accessibilityIdentifier("load-number-\(load.id)")
+            Text(load.lane)
+                .font(.caption)
+                .foregroundStyle(OBColor.mutedForeground)
+                .accessibilityIdentifier("load-route-\(load.id)")
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
 // MARK: - Panel (mirrors the web app's `.panel` / `.panel-head` / `.panel-title`)
 
 struct PanelModifier: ViewModifier {

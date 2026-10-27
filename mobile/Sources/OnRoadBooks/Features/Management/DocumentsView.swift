@@ -23,27 +23,31 @@ struct DocumentsView: View {
     @State private var search = ""
     var body: some View {
         List {
-            if let library {
-                ForEach(library.documents.filter { search.isEmpty || $0.fileName.localizedCaseInsensitiveContains(search) || $0.type.localizedCaseInsensitiveContains(search) }) { document in
-                    Button { Task { await open(document) } } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(document.fileName)
-                            Text(document.type).font(.caption).foregroundStyle(.secondary)
+            Group {
+                if let library {
+                    ForEach(library.documents.filter { search.isEmpty || $0.fileName.localizedCaseInsensitiveContains(search) || $0.type.localizedCaseInsensitiveContains(search) }) { document in
+                        Button { Task { await open(document) } } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(document.fileName)
+                                Text(document.type).font(.caption).foregroundStyle(OBColor.mutedForeground)
+                            }
+                        }
+                        .swipeActions {
+                            if document.canDelete {
+                                Button("Eliminar", role: .destructive) { removing = document }
+                            }
                         }
                     }
-                    .swipeActions {
-                        if document.canDelete {
-                            Button("Eliminar", role: .destructive) { removing = document }
-                        }
-                    }
+                    if library.documents.isEmpty { Text("Todavía no hay documentos.").foregroundStyle(OBColor.mutedForeground) }
+                } else if failure == nil { ProgressView("Cargando documentos…") }
+                if busy { ProgressView() }
+                if let failure {
+                    Text(failure).foregroundStyle(OBColor.neg)
+                    Button("Reintentar") { Task { await reload() } }
                 }
-                if library.documents.isEmpty { Text("Todavía no hay documentos.").foregroundStyle(.secondary) }
-            } else if failure == nil { ProgressView("Cargando documentos…") }
-            if busy { ProgressView() }
-            if let failure {
-                Text(failure).foregroundStyle(OBColor.neg)
-                Button("Reintentar") { Task { await reload() } }
             }
+            .listRowBackground(OBColor.card)
+            .listRowSeparatorTint(OBColor.border)
         }
         .navigationTitle("Documentos")
         .navigationBarTitleDisplayMode(.inline)
@@ -103,27 +107,34 @@ private struct AddDocumentView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Picker("Pertenece a", selection: $owner) {
-                    Text("Carga").tag("LOAD"); Text("Gasto").tag("EXPENSE")
-                    Text("Camión").tag("TRUCK"); Text("Mantenimiento").tag("MAINTENANCE")
+                Group {
+                    Picker("Pertenece a", selection: $owner) {
+                        Text("Carga").tag("LOAD"); Text("Gasto").tag("EXPENSE")
+                        Text("Camión").tag("TRUCK"); Text("Mantenimiento").tag("MAINTENANCE")
+                    }
+                    .onChange(of: owner) { _ in targetId = ""; kind = "" }
+                    Picker("Registro", selection: $targetId) {
+                        Text("Seleccionar").tag("")
+                        ForEach(library.targets.filter { $0.owner == owner }) { target in Text(target.label).tag(target.id) }
+                    }
+                    Picker("Tipo de documento", selection: $kind) {
+                        Text("Seleccionar").tag("")
+                        ForEach(library.types.filter { library.typesFor[owner, default: []].contains($0.id) }) { type in Text(type.label).tag(type.id) }
+                    }
+                    Button(selectedURL?.lastPathComponent ?? "Elegir PDF o imagen") { choosing = true }
+                    Text("Máximo \(library.maxBytes / 1024 / 1024) MB por archivo.").font(.caption).foregroundStyle(OBColor.mutedForeground)
+                    if let failure { Text(failure).foregroundStyle(OBColor.neg) }
+                    Button { Task { await save() } } label: {
+                        if saving { ProgressView() } else { Text("Adjuntar documento") }
+                    }
+                    .disabled(saving || targetId.isEmpty || kind.isEmpty || selectedURL == nil)
                 }
-                .onChange(of: owner) { _ in targetId = ""; kind = "" }
-                Picker("Registro", selection: $targetId) {
-                    Text("Seleccionar").tag("")
-                    ForEach(library.targets.filter { $0.owner == owner }) { target in Text(target.label).tag(target.id) }
-                }
-                Picker("Tipo de documento", selection: $kind) {
-                    Text("Seleccionar").tag("")
-                    ForEach(library.types.filter { library.typesFor[owner, default: []].contains($0.id) }) { type in Text(type.label).tag(type.id) }
-                }
-                Button(selectedURL?.lastPathComponent ?? "Elegir PDF o imagen") { choosing = true }
-                Text("Máximo \(library.maxBytes / 1024 / 1024) MB por archivo.").font(.caption).foregroundStyle(.secondary)
-                if let failure { Text(failure).foregroundStyle(OBColor.neg) }
-                Button { Task { await save() } } label: {
-                    if saving { ProgressView() } else { Text("Adjuntar documento") }
-                }
-                .disabled(saving || targetId.isEmpty || kind.isEmpty || selectedURL == nil)
+                .listRowBackground(OBColor.card)
+                .listRowSeparatorTint(OBColor.border)
             }
+            .scrollContentBackground(.hidden)
+            .background(OBColor.background)
+            .tint(OBColor.primary)
             .disabled(saving)
             .navigationTitle("Adjuntar documento")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() }.disabled(saving) } }

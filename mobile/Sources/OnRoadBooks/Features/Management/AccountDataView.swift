@@ -17,34 +17,38 @@ struct AccountDataView: View {
     private var expected: String { intent == "reset" ? "RESET" : account?.email ?? "" }
     var body: some View {
         Form {
-            if account?.role == "Owner" {
-                Section("Operación") {
-                    Picker("Acción", selection: $intent) {
-                        Text("Restablecer los libros").tag("reset")
-                        Text("Eliminar mi cuenta").tag("delete")
-                    }.onChange(of: intent) { _ in confirmation = ""; success = false }
-                    Text(intent == "reset"
-                         ? "Elimina los registros y documentos del negocio. Conserva la cuenta y la suscripción. No se puede deshacer."
-                         : "Elimina tu cuenta y, si eres el último propietario, los registros y documentos del negocio. No se puede deshacer.")
-                        .foregroundStyle(OBColor.neg)
-                    Text("Los cambios pendientes del teléfono se descartarán al completar la operación.").font(.caption).foregroundStyle(.secondary)
-                    if intent == "delete", account?.billingProvider == "apple" {
-                        Text("Eliminar la cuenta no cancela los cobros de Apple. Cancela la renovación en Apple antes de eliminarla.").foregroundStyle(OBColor.warn)
-                        Button("Gestionar suscripción de Apple") { showManageSubscription = true }
+            Group {
+                if account?.role == "Owner" {
+                    Section("Operación") {
+                        Picker("Acción", selection: $intent) {
+                            Text("Restablecer los libros").tag("reset")
+                            Text("Eliminar mi cuenta").tag("delete")
+                        }.onChange(of: intent) { _ in confirmation = ""; success = false }
+                        Text(intent == "reset"
+                             ? "Elimina los registros y documentos del negocio. Conserva la cuenta y la suscripción. No se puede deshacer."
+                             : "Elimina tu cuenta y, si eres el último propietario, los registros y documentos del negocio. No se puede deshacer.")
+                            .foregroundStyle(OBColor.neg)
+                        Text("Los cambios pendientes del teléfono se descartarán al completar la operación.").font(.caption).foregroundStyle(OBColor.mutedForeground)
+                        if intent == "delete", account?.billingProvider == "apple" {
+                            Text("Eliminar la cuenta no cancela los cobros de Apple. Cancela la renovación en Apple antes de eliminarla.").foregroundStyle(OBColor.warn)
+                            Button("Gestionar suscripción de Apple") { showManageSubscription = true }
+                        }
                     }
-                }
-                Section("Escribe \(expected) para confirmar") {
-                    TextField(expected, text: $confirmation)
-                        .textInputAutocapitalization(.never).autocorrectionDisabled()
-                    Button(intent == "reset" ? "Restablecer los libros" : "Eliminar mi cuenta", role: .destructive) { confirming = true }
-                        .disabled(expected.isEmpty || confirmation != expected || busy)
-                }
-            } else if account != nil {
-                Text("Solo el propietario puede restablecer o eliminar la cuenta.")
-            } else if failure == nil { ProgressView("Cargando cuenta…") }
-            if busy { ProgressView("Procesando…") }
-            if success { Text("Los libros se restablecieron.").foregroundStyle(OBColor.pos) }
-            if let failure { Text(failure).foregroundStyle(OBColor.neg) }
+                    Section("Escribe \(expected) para confirmar") {
+                        TextField(expected, text: $confirmation)
+                            .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        Button(intent == "reset" ? "Restablecer los libros" : "Eliminar mi cuenta", role: .destructive) { confirming = true }
+                            .disabled(expected.isEmpty || confirmation != expected || busy)
+                    }
+                } else if account != nil {
+                    Text("Solo el propietario puede restablecer o eliminar la cuenta.")
+                } else if failure == nil { ProgressView("Cargando cuenta…") }
+                if busy { ProgressView("Procesando…") }
+                if success { Text("Los libros se restablecieron.").foregroundStyle(OBColor.pos) }
+                if let failure { Text(failure).foregroundStyle(OBColor.neg) }
+            }
+            .listRowBackground(OBColor.card)
+            .listRowSeparatorTint(OBColor.border)
         }
         .disabled(busy)
         .navigationTitle("Datos y cuenta")

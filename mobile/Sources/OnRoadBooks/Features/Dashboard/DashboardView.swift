@@ -47,14 +47,15 @@ struct DashboardView: View {
                         ProgressView().tint(OBColor.primary)
                             .frame(maxWidth: .infinity, minHeight: 300)
                     } else {
-                        // Same failure the other tabs already know how to
-                        // say: the request came back empty-handed, not that
-                        // it is still running. Pull to retry, per the
-                        // default OBUnavailableView message.
-                        OBUnavailableView(title: "Dashboard")
+                        OBUnavailableView(
+                            title: "Dashboard",
+                            message: viewModel.refreshFailure ?? "No se pudo cargar. Desliza para reintentar.",
+                            systemImage: "exclamationmark.circle"
+                        )
                             .frame(maxWidth: .infinity, minHeight: 300)
                     }
                 }
+                .accessibilityIdentifier("dashboard-scroll")
                 .obRefreshable { await viewModel.load() }
             }
             .background(OBColor.background)
@@ -328,20 +329,7 @@ struct LoadRow: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 3) {
-                // The PO leads: the lane repeats, the PO never does.
-                if let po = load.poLabel {
-                    Text(po)
-                        .font(.subheadline.weight(.bold))
-                        .monospacedDigit()
-                        .foregroundStyle(OBColor.foreground)
-                    Text(load.lane)
-                        .font(.caption)
-                        .foregroundStyle(OBColor.foreground)
-                } else {
-                    Text(load.lane)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(OBColor.foreground)
-                }
+                LoadHeading(load: load)
                 Text(load.broker)
                     .font(.caption)
                     .foregroundStyle(OBColor.mutedForeground)

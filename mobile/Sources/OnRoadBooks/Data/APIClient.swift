@@ -5,6 +5,7 @@ import Foundation
 /// requests and `WriteQueue` uses it to replay the ones that had to wait, so a
 /// queued write is sent by exactly the same code path as an immediate one.
 struct APIClient {
+    static let sessionRejected = Notification.Name("onroadbooks.sessionRejected")
     let baseURL: URL
     let tokenProvider: () -> String?
     var session: URLSession = .shared
@@ -30,6 +31,21 @@ struct APIClient {
         do {
             let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse else { throw APIError.requestFailed }
+            // Only our authenticated API can reject the app's session. A signed
+            // document download may return 401 for an entirely different reason.
+            if http.statusCode == 401,
+               request.url?.scheme == baseURL.scheme,
+               request.url?.host == baseURL.host,
+               request.url?.port == baseURL.port,
+               request.url?.path.hasPrefix("/api/mobile/") == true,
+               let authorization = request.value(forHTTPHeaderField: "Authorization"),
+               authorization.hasPrefix("Bearer "),
+               authorization.count > 7 {
+                let rejectedToken = String(authorization.dropFirst(7))
+                await MainActor.run {
+                    NotificationCenter.default.post(name: Self.sessionRejected, object: rejectedToken)
+                }
+            }
             return (data, http)
         } catch let error as URLError {
             throw APIError.transport(TransportFailure(error))

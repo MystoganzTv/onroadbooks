@@ -561,12 +561,23 @@ struct ReserveBucket: Identifiable, Hashable {
     let targetProgress: Double?
     let rulePct: Double?
     let ruleBasis: String?
+    var suggestedContribution: Double? = nil
+    var maintenanceByTruck: [TruckMaintenanceReserve] = []
 
     var ruleLabel: String? {
         guard let rulePct, rulePct > 0 else { return nil }
         let basis = ruleBasis == "GROSS_REVENUE" ? "de los ingresos" : "de la ganancia"
         return "\(Int(rulePct.rounded()))% \(basis)"
     }
+}
+
+struct TruckMaintenanceReserve: Decodable, Identifiable, Hashable {
+    var id: String { truckId }
+    let truckId: String
+    let truckName: String
+    let active: Bool
+    let bookedRevenue: Double
+    let suggestedReserve: Double
 }
 
 struct ReserveMovement: Identifiable, Hashable {
@@ -587,6 +598,7 @@ struct ReserveLedger {
     let safeToPay: Double
     let accounts: [ReserveBucket]
     let movements: [ReserveMovement]
+    var suggestedTotal: Double? = nil
 }
 
 // MARK: - Invoices

@@ -56,7 +56,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.mystodev.onroadbooks
         PRODUCT_NAME: OnRoad Books
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "4"
+        CURRENT_PROJECT_VERSION: "6"
   OnRoadBooksUITests:
     type: bundle.ui-testing
     platform: iOS

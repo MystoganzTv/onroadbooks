@@ -243,15 +243,15 @@ final class MockRepository: LedgerRepository {
                 ReserveBucket(id: "tax", name: "Tax", balance: 2412.66,
                               periodContributions: 730.22, periodWithdrawals: 0,
                               targetBalance: 6000, targetProgress: 40.2,
-                              rulePct: 20, ruleBasis: "OPERATING_PROFIT"),
+                              rulePct: 20, ruleBasis: "OPERATING_PROFIT", suggestedContribution: 730.22),
                 ReserveBucket(id: "maint", name: "Maintenance", balance: 1469.25,
                               periodContributions: 489.75, periodWithdrawals: 0,
                               targetBalance: 3000, targetProgress: 48.9,
-                              rulePct: 5, ruleBasis: "GROSS_REVENUE"),
+                              rulePct: 5, ruleBasis: "GROSS_REVENUE", suggestedContribution: 489.75),
                 ReserveBucket(id: "emerg", name: "Emergency", balance: 587.70,
                               periodContributions: 195.90, periodWithdrawals: 0,
                               targetBalance: nil, targetProgress: nil,
-                              rulePct: 2, ruleBasis: "GROSS_REVENUE"),
+                              rulePct: 2, ruleBasis: "GROSS_REVENUE", suggestedContribution: 195.90),
             ],
             movements: [
                 ReserveMovement(id: "m1", accountName: "Tax", date: mockDate(2026, 8, 16),
@@ -262,7 +262,8 @@ final class MockRepository: LedgerRepository {
                                 amount: 97.95, detail: "Cierre Ago 1 – 15", automatic: true),
                 ReserveMovement(id: "m4", accountName: "Maintenance", date: mockDate(2026, 8, 12),
                                 amount: -340.00, detail: "Cambio de aceite + inspección DOT", automatic: false),
-            ]
+            ],
+            suggestedTotal: 1415.87
         )
     }
 

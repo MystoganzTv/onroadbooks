@@ -156,3 +156,30 @@ Los clientes ya instalados necesitan una nueva build para cambiar su interfaz.
 El backend conserva los campos antiguos de la calculadora con asignaciones en
 cero y disponibilidad falsa para no romper la decodificación de esas versiones.
 La build nueva solo utiliza costos del viaje y el contexto mensual separado.
+
+## Regresión de recarga y apariencia (build 5)
+
+Las pruebas `DashboardRefreshTests` y `MobileSessionTests` cubren conservación
+del último dashboard, cancelaciones, respuestas fuera de orden y sesiones
+rechazadas. `RefreshUITests` verifica el gesto real de arrastrar hacia abajo,
+la recuperación tras un fallo temporal, el número de carga como título y
+capturas de Dispatchers con los colores de la app.
+
+Para la prueba de interfaz, inicia `node --import tsx mobile/Scripts/refresh-ui-fixtures.mjs`
+desde la raíz del repositorio y ejecuta `OnRoadBooksUITests/RefreshUITests`
+en un simulador aislado. Usa únicamente datos ficticios en `127.0.0.1:4187`;
+no necesita cuentas ni acceso a producción. El cambio de URL está limitado
+a builds Debug del simulador. La build 5 del iPhone sigue usando producción.
+
+## Reservas (build 6)
+
+La API y la app muestran el total calculado para apartar, su desglose por cubeta
+y el mantenimiento por camión con las mismas funciones que la web. Los saldos
+registrados y el progreso de las metas siguen basados únicamente en movimientos.
+Leer o recargar esta pantalla no crea aportaciones. Los campos nuevos son
+opcionales en el cliente para admitir servidores anteriores sin inventar ceros.
+
+`src/lib/__tests__/mobile-reserves.test.ts` verifica importes, movimientos,
+períodos y cubetas inactivas. `RefreshUITests` comprueba también la respuesta
+real del serializador de reservas con datos ficticios, pasando por el decodificador
+de iOS y la pantalla nativa.

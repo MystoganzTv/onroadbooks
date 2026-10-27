@@ -8,6 +8,7 @@ struct LoadsView: View {
     /// Why the last refresh failed. The list on screen stays: a dropped
     /// request is not an empty ledger.
     @State private var refreshFailure: String?
+    @State private var latestRequest = UUID()
 
     var body: some View {
         NavigationStack {
@@ -26,21 +27,20 @@ struct LoadsView: View {
                 .font(.subheadline)
                 .padding(.vertical, 8)
 
-                if isLoading {
-                    ProgressView().tint(OBColor.primary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if loads.isEmpty, refreshFailure != nil {
-                    // Still a List so pull-to-retry works on this screen too.
-                    List {
-                        OBUnavailableView(title: "Loads")
+                // Keep the same scroll container throughout a refresh, including
+                // empty and error states, so the pull gesture remains attached.
+                List {
+                    if isLoading {
+                        ProgressView().tint(OBColor.primary)
+                            .frame(maxWidth: .infinity, minHeight: 300)
+                            .listRowBackground(OBColor.background)
+                            .listRowSeparator(.hidden)
+                    } else if loads.isEmpty, let refreshFailure {
+                        OBUnavailableView(title: "Loads", message: refreshFailure, systemImage: "exclamationmark.circle")
                             .frame(minHeight: 300)
                             .listRowBackground(OBColor.background)
                             .listRowSeparator(.hidden)
-                    }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
-                } else {
-                    List {
+                    } else {
                         if let refreshFailure {
                             OBRefreshFailureBanner(message: refreshFailure)
                                 .listRowBackground(OBColor.background)
@@ -60,14 +60,14 @@ struct LoadsView: View {
                             .listRowSeparatorTint(OBColor.border)
                         }
                     }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .obRefreshable { await reload() }
             }
             .background(OBColor.background)
             .toolbar(.hidden, for: .navigationBar)
             .obReloadsOnScope { await reload() }
-            .obRefreshable { await reload() }
             .sheet(isPresented: $isAdding) {
                 AddLoadView(repository: repository, onSaved: { Task { await reload() } })
             }
@@ -75,16 +75,21 @@ struct LoadsView: View {
     }
 
     private func reload() async {
+        let request = UUID()
+        latestRequest = request
+        defer { if latestRequest == request { isLoading = false } }
         do {
-            loads = try await repository.fetchLoads()
+            let updated = try await repository.fetchLoads()
+            guard latestRequest == request else { return }
+            loads = updated
             refreshFailure = nil
         } catch let error where error.isCancellation {
             // Abandoned by the app, not refused by anyone. Keep everything.
         } catch {
+            guard latestRequest == request else { return }
             refreshFailure = (error as? LocalizedError)?.errorDescription
                 ?? "No se pudo actualizar. Revisa la señal y desliza para reintentar."
         }
-        isLoading = false
     }
 }
 
@@ -93,22 +98,7 @@ private struct LoadDetailRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top) {
-                // The PO leads: the lane repeats, the PO never does.
-                VStack(alignment: .leading, spacing: 2) {
-                    if let po = load.poLabel {
-                        Text(po)
-                            .font(.subheadline.weight(.bold))
-                            .monospacedDigit()
-                            .foregroundStyle(OBColor.foreground)
-                        Text(load.lane)
-                            .font(.caption)
-                            .foregroundStyle(OBColor.foreground)
-                    } else {
-                        Text(load.lane)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(OBColor.foreground)
-                    }
-                }
+                LoadHeading(load: load)
                 Spacer()
                 RatingChip(rating: load.rating)
             }

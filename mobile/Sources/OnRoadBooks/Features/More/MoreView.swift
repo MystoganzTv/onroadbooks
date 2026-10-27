@@ -75,7 +75,9 @@ struct MoreView: View {
         case "Analytics":
             List {
                 NavigationLink("Costo por milla") { CostPerMileView(repository: repository) }
+                    .listRowBackground(OBColor.card)
                 NavigationLink("Rutas y brokers") { AnalyticsView(repository: repository) }
+                    .listRowBackground(OBColor.card)
             }
             .navigationTitle("Analytics")
             .scrollContentBackground(.hidden)

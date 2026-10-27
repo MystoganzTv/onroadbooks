@@ -69,6 +69,10 @@ struct AppRootView: View {
             }
         }
         .preferredColorScheme(appearance == "system" ? nil : appearance == "light" ? .light : .dark)
+        .onReceive(NotificationCenter.default.publisher(for: APIClient.sessionRejected)) { note in
+            guard let rejectedToken = note.object as? String else { return }
+            authSession.invalidate(rejectedToken: rejectedToken)
+        }
         .task(id: authSession.token) {
             guard let token = authSession.token else { return }
             await purchases.listen(repository: APIRepository(tokenProvider: { token }))

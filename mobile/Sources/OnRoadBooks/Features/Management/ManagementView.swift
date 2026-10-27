@@ -20,45 +20,53 @@ struct ManagementView: View {
     }
     var body: some View {
         List {
-            if resource == "ifta-rates" {
-                Picker("Trimestre", selection: $quarter) {
-                    ForEach(quarters, id: \.self) { Text($0).tag($0) }
-                }
-            }
-            if let collection {
-                relatedSections
-                Section {
-                    Text(collection.description).font(.subheadline).foregroundStyle(.secondary)
-                    if let refusal = collection.refusal {
-                        Label(refusal, systemImage: "lock").font(.footnote)
+            Group {
+                if resource == "ifta-rates" {
+                    Picker("Trimestre", selection: $quarter) {
+                        ForEach(quarters, id: \.self) { Text($0).tag($0) }
                     }
                 }
-                if records.isEmpty {
-                    Text(search.isEmpty ? "Todavía no hay registros." : "No hay resultados para esta búsqueda.")
-                        .foregroundStyle(.secondary)
+                if let collection {
+                    relatedSections
+                    Section {
+                        Text(collection.description).font(.subheadline).foregroundStyle(OBColor.mutedForeground)
+                        if let refusal = collection.refusal {
+                            Label(refusal, systemImage: "lock").font(.footnote)
+                        }
+                    }
+                    if records.isEmpty {
+                        Text(search.isEmpty ? "Todavía no hay registros." : "No hay resultados para esta búsqueda.")
+                            .foregroundStyle(OBColor.mutedForeground)
+                    }
+                    ForEach(records) { record in
+                        NavigationLink {
+                            ManagementEditor(repository: repository, resource: resource, collection: collection, record: record) {
+                                Task { await reload() }
+                            }
+                        } label: {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(record.title).font(.headline)
+                                if !record.subtitle.isEmpty { Text(record.subtitle).font(.caption).foregroundStyle(OBColor.mutedForeground) }
+                            }
+                            .padding(.vertical, 5)
+                        }
+                    }
                 }
-                ForEach(records) { record in
-                    NavigationLink {
-                        ManagementEditor(repository: repository, resource: resource, collection: collection, record: record) {
-                            Task { await reload() }
-                        }
-                    } label: {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(record.title).font(.headline)
-                            if !record.subtitle.isEmpty { Text(record.subtitle).font(.caption).foregroundStyle(.secondary) }
-                        }
-                        .padding(.vertical, 5)
+                if loading && collection == nil { ProgressView("Cargando…") }
+                if let failure {
+                    Section {
+                        Text(failure).foregroundStyle(OBColor.neg)
+                        Button("Reintentar") { Task { await reload() } }
+                            .foregroundStyle(OBColor.primary)
                     }
                 }
             }
-            if loading && collection == nil { ProgressView("Cargando…") }
-            if let failure {
-                Section {
-                    Text(failure).foregroundStyle(OBColor.neg)
-                    Button("Reintentar") { Task { await reload() } }
-                }
-            }
+            .listRowBackground(OBColor.card)
+            .listRowSeparatorTint(OBColor.border)
         }
+        .listStyle(.insetGrouped)
+        .foregroundStyle(OBColor.foreground)
+        .tint(OBColor.primary)
         .scrollContentBackground(.hidden)
         .background(OBColor.background)
         .navigationTitle(title)
@@ -108,6 +116,8 @@ struct ManagementView: View {
         do {
             collection = try await repository.fetchManagement(resource, quarter: resource == "ifta-rates" ? quarter : nil)
             failure = nil
+        } catch let error where error.isCancellation {
+            // A replaced refresh must not become a visible error.
         } catch { failure = error.localizedDescription }
     }
 }
@@ -148,54 +158,62 @@ struct ManagementEditor: View {
     }
     var body: some View {
         Form {
-            if record == nil && collection.scanAvailable {
-                RateConImport(repository: repository) { fields in
-                    values.merge(fields) { _, imported in imported }
+            Group {
+                if record == nil && collection.scanAvailable {
+                    RateConImport(repository: repository) { fields in
+                        values.merge(fields) { _, imported in imported }
+                    }
                 }
-            }
-            if let record, !record.details.isEmpty {
-                Section("Resumen") {
-                    ForEach(Array(record.details.enumerated()), id: \.offset) { _, detail in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(detail.label).font(.caption).foregroundStyle(.secondary)
-                            Text(detail.value).monospacedDigit()
+                if let record, !record.details.isEmpty {
+                    Section("Resumen") {
+                        ForEach(Array(record.details.enumerated()), id: \.offset) { _, detail in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(detail.label).font(.caption).foregroundStyle(OBColor.mutedForeground)
+                                Text(detail.value).monospacedDigit()
+                            }
                         }
                     }
                 }
-            }
-            if let refusal = collection.refusal { Text(refusal).foregroundStyle(.secondary) }
-            ForEach(sections, id: \.self) { section in
-                Section(section) {
-                    if resource == "ifta-mileage" {
-                        DisclosureGroup(section, isExpanded: sectionBinding(section)) { fields(in: section) }
-                    } else { fields(in: section) }
-                }
-                .disabled(!editable || saving)
-            }
-            if let failure { Section { Text(failure).foregroundStyle(OBColor.neg) } }
-            if resource == "invoices", let record {
-                Section("PDF") {
-                    if let invoiceFile { ShareLink("Compartir PDF", item: invoiceFile) }
-                    else { Button("Preparar PDF") { Task {
-                        do { invoiceFile = try await repository.downloadInvoice(loadId: record.id) }
-                        catch { failure = error.localizedDescription }
-                    } } }
-                    Text("Guarda primero la factura para generar su PDF.").font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            if editable {
-                Section {
-                    Button { if resource == "broker-merge" { confirmMerge = true } else { Task { await save() } } } label: {
-                        if saving { ProgressView() } else { Text("Guardar cambios") }
+                if let refusal = collection.refusal { Text(refusal).foregroundStyle(OBColor.mutedForeground) }
+                ForEach(sections, id: \.self) { section in
+                    Section(section) {
+                        if resource == "ifta-mileage" {
+                            DisclosureGroup(section, isExpanded: sectionBinding(section)) { fields(in: section) }
+                        } else { fields(in: section) }
                     }
+                    .disabled(!editable || saving)
+                }
+                if let failure { Section { Text(failure).foregroundStyle(OBColor.neg) } }
+                if resource == "invoices", let record {
+                    Section("PDF") {
+                        if let invoiceFile { ShareLink("Compartir PDF", item: invoiceFile) }
+                        else { Button("Preparar PDF") { Task {
+                            do { invoiceFile = try await repository.downloadInvoice(loadId: record.id) }
+                            catch { failure = error.localizedDescription }
+                        } } }
+                        Text("Guarda primero la factura para generar su PDF.").font(.caption).foregroundStyle(OBColor.mutedForeground)
+                    }
+                }
+                if editable {
+                    Section {
+                        Button { if resource == "broker-merge" { confirmMerge = true } else { Task { await save() } } } label: {
+                            if saving { ProgressView() } else { Text("Guardar cambios") }
+                        }
                     .disabled(saving || !valid)
+                    .foregroundStyle(OBColor.primary)
 
+                    }
+                }
+                if record != nil && collection.canDelete {
+                    Section { Button("Eliminar registro", role: .destructive) { confirmDelete = true }.disabled(saving).foregroundStyle(OBColor.neg) }
                 }
             }
-            if record != nil && collection.canDelete {
-                Section { Button("Eliminar registro", role: .destructive) { confirmDelete = true }.disabled(saving) }
-            }
+            .listRowBackground(OBColor.card)
+            .listRowSeparatorTint(OBColor.border)
         }
+        .listStyle(.insetGrouped)
+        .foregroundStyle(OBColor.foreground)
+        .tint(OBColor.primary)
         .scrollContentBackground(.hidden)
         .background(OBColor.background)
         .navigationTitle(record?.title ?? "Agregar")
@@ -249,7 +267,7 @@ struct ManagementEditor: View {
             }
         default:
             VStack(alignment: .leading, spacing: 5) {
-                Text(field.label + (field.required ? " *" : "")).font(.caption).foregroundStyle(.secondary)
+                Text(field.label + (field.required ? " *" : "")).font(.caption).foregroundStyle(OBColor.mutedForeground)
                 TextField(field.required ? "Requerido" : "Opcional", text: text(field.key), axis: field.kind == "multiline" ? .vertical : .horizontal)
                     .accessibilityLabel(field.label)
                     .keyboardType(field.kind == "number" ? .decimalPad : field.key == "email" ? .emailAddress : .default)
@@ -290,13 +308,20 @@ struct FinancingManagementView: View {
     let repository: LedgerRepository
     var body: some View {
         List {
-            NavigationLink("Préstamos y arrendamientos") {
-                ManagementView(repository: repository, resource: "financing", title: "Financiamiento")
+            Group {
+                NavigationLink("Préstamos y arrendamientos") {
+                    ManagementView(repository: repository, resource: "financing", title: "Financiamiento")
+                }
+                NavigationLink("Clasificar pagos pendientes") {
+                    ManagementView(repository: repository, resource: "debt-payments", title: "Clasificar pagos")
+                }
             }
-            NavigationLink("Clasificar pagos pendientes") {
-                ManagementView(repository: repository, resource: "debt-payments", title: "Clasificar pagos")
-            }
+            .listRowBackground(OBColor.card)
+            .listRowSeparatorTint(OBColor.border)
         }
+        .listStyle(.insetGrouped)
+        .foregroundStyle(OBColor.foreground)
+        .tint(OBColor.primary)
         .navigationTitle("Financiamiento")
         .scrollContentBackground(.hidden)
         .background(OBColor.background)

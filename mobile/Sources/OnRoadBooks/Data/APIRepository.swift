@@ -1103,6 +1103,8 @@ private struct ReservesResponseDTO: Decodable {
         let targetProgress: Double?
         let rulePct: Double?
         let ruleBasis: String?
+        let suggestedContribution: Double?
+        let maintenanceByTruck: [TruckMaintenanceReserve]?
     }
 
     struct Movement: Decodable {
@@ -1121,6 +1123,7 @@ private struct ReservesResponseDTO: Decodable {
     let safeToPay: Double
     let accounts: [Account]
     let movements: [Movement]
+    let suggestedTotal: Double?
 
     func toDomain() -> ReserveLedger {
         ReserveLedger(
@@ -1135,7 +1138,9 @@ private struct ReservesResponseDTO: Decodable {
                     periodContributions: $0.periodContributions,
                     periodWithdrawals: $0.periodWithdrawals,
                     targetBalance: $0.targetBalance, targetProgress: $0.targetProgress,
-                    rulePct: $0.rulePct, ruleBasis: $0.ruleBasis
+                    rulePct: $0.rulePct, ruleBasis: $0.ruleBasis,
+                    suggestedContribution: $0.suggestedContribution,
+                    maintenanceByTruck: $0.maintenanceByTruck ?? []
                 )
             },
             movements: movements.map {
@@ -1143,7 +1148,8 @@ private struct ReservesResponseDTO: Decodable {
                     id: $0.id, accountName: $0.accountName, date: ISODate.parse($0.date),
                     amount: $0.amount, detail: $0.description, automatic: $0.automatic
                 )
-            }
+            },
+            suggestedTotal: suggestedTotal
         )
     }
 }

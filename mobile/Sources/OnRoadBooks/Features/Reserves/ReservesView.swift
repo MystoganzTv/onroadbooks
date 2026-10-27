@@ -15,10 +15,13 @@ struct ReservesView: View {
     /// which reads very differently from a dropped connection.
     @State private var locked = false
     @State private var isMoving = false
+    @State private var latestRequest = UUID()
 
     var body: some View {
         Group {
-            if isLoading {
+            if let ledger, !locked {
+                content(ledger)
+            } else if isLoading {
                 ProgressView().tint(OBColor.primary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let failure {
@@ -31,10 +34,9 @@ struct ReservesView: View {
                         .multilineTextAlignment(.center)
                         .foregroundStyle(OBColor.mutedForeground)
                         .padding(.horizontal, OBSpacing.lg)
+                    Button("Reintentar") { Task { await reload() } }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let ledger {
-                content(ledger)
             } else {
                 OBUnavailableView(title: "Reservas")
             }
@@ -65,17 +67,42 @@ struct ReservesView: View {
         }
         .obScopeBar()
         .obReloadsOnScope { await reload() }
-        .obRefreshable { await reload() }
     }
 
     @ViewBuilder
     private func content(_ ledger: ReserveLedger) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OBSpacing.lg) {
+                if let failure {
+                    OBRefreshFailureBanner(message: failure)
+                        .padding(.horizontal, OBSpacing.md)
+                }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    LabelXS("Guardado en total")
-                    MoneyText(amount: ledger.total, font: .largeTitle.weight(.semibold))
+                    LabelXS("A apartar este período")
+                    if let suggested = ledger.suggestedTotal {
+                        MoneyText(amount: suggested, font: .largeTitle.weight(.semibold))
+                            .accessibilityIdentifier("reserve-suggested-total")
+                    } else {
+                        Text("Cálculo no disponible. Vuelve a cargar.")
+                            .foregroundStyle(OBColor.mutedForeground)
+                    }
+                    Text("\(ledger.periodLabel) · Todo el negocio")
+                        .font(.caption)
+                        .foregroundStyle(OBColor.mutedForeground)
+                    Text("Calculado según tus porcentajes. El saldo registrado cambia al agregar movimientos.")
+                        .font(.caption)
+                        .foregroundStyle(OBColor.mutedForeground)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(OBSpacing.md)
+                .obPanel()
+                .padding(.horizontal, OBSpacing.md)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    LabelXS("Saldo registrado en reservas")
+                    MoneyText(amount: ledger.total, font: .title2.weight(.semibold))
+                        .accessibilityIdentifier("reserve-recorded-total")
                     Text(movementLine(ledger))
                         .font(.caption)
                         .foregroundStyle(OBColor.mutedForeground)
@@ -92,7 +119,7 @@ struct ReservesView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     LabelXS("Disponible para ti")
                     MoneyText(amount: ledger.safeToPay, font: .title2.weight(.semibold), color: OBColor.primary)
-                    Text("Después de apartar lo que va a las cubetas.")
+                    Text("Estimado después de descontar las reservas calculadas.")
                         .font(.caption)
                         .foregroundStyle(OBColor.mutedForeground)
                 }
@@ -131,6 +158,8 @@ struct ReservesView: View {
             }
             .padding(.top, OBSpacing.sm)
         }
+        .accessibilityIdentifier("reserves-scroll")
+        .obRefreshable { await reload() }
     }
 
     private func movementLine(_ ledger: ReserveLedger) -> String {
@@ -145,11 +174,19 @@ struct ReservesView: View {
     }
 
     private func reload() async {
+        let request = UUID()
+        latestRequest = request
+        defer { if latestRequest == request { isLoading = false } }
         do {
-            ledger = try await repository.fetchReserves()
+            let updated = try await repository.fetchReserves()
+            guard latestRequest == request else { return }
+            ledger = updated
             failure = nil
             locked = false
+        } catch let error where error.isCancellation {
+            // Keep the last ledger when SwiftUI replaces a task.
         } catch {
+            guard latestRequest == request else { return }
             if case APIError.refused(let message) = error {
                 failure = message
                 locked = true
@@ -159,7 +196,6 @@ struct ReservesView: View {
                 locked = false
             }
         }
-        isLoading = false
     }
 }
 
@@ -180,11 +216,23 @@ private struct BucketCard: View {
                     }
                 }
                 Spacer(minLength: OBSpacing.sm)
-                Text(bucket.balance, format: .currency(code: "USD").precision(.fractionLength(2)))
-                    .font(.title3.weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(OBColor.foreground)
+                VStack(alignment: .trailing, spacing: 4) {
+                    LabelXS("A apartar")
+                    if let suggested = bucket.suggestedContribution {
+                        Text(suggested, format: .currency(code: "USD").precision(.fractionLength(2)))
+                            .font(.title3.weight(.semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(OBColor.foreground)
+                            .accessibilityIdentifier("reserve-suggested-\(bucket.id)")
+                    } else {
+                        Text("—").foregroundStyle(OBColor.mutedForeground)
+                    }
+                }
             }
+
+            Text("Saldo registrado: \(bucket.balance, format: .currency(code: "USD").precision(.fractionLength(2)))")
+                .font(.caption)
+                .foregroundStyle(OBColor.mutedForeground)
 
             if let target = bucket.targetBalance, let progress = bucket.targetProgress {
                 VStack(alignment: .leading, spacing: 5) {
@@ -193,7 +241,7 @@ private struct BucketCard: View {
                             Capsule().fill(OBColor.surfaceRaised)
                             Capsule()
                                 .fill(OBColor.primary)
-                                .frame(width: max(4, geo.size.width * min(progress / 100, 1)))
+                                .frame(width: geo.size.width * max(0, min(progress / 100, 1)))
                         }
                     }
                     .frame(height: 6)
@@ -211,6 +259,26 @@ private struct BucketCard: View {
                 Text(periodLine)
                     .font(.caption2)
                     .foregroundStyle(OBColor.mutedForeground)
+            }
+
+            if !bucket.maintenanceByTruck.isEmpty {
+                Divider().overlay(OBColor.border)
+                LabelXS("Mantenimiento por camión")
+                ForEach(bucket.maintenanceByTruck) { truck in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(truck.truckName).font(.caption.weight(.semibold))
+                            Text("\(truck.bookedRevenue, format: .currency(code: "USD")) de ingresos")
+                                .font(.caption2)
+                                .foregroundStyle(OBColor.mutedForeground)
+                        }
+                        Spacer()
+                        Text(truck.suggestedReserve, format: .currency(code: "USD"))
+                            .font(.caption.weight(.semibold))
+                            .monospacedDigit()
+                    }
+                    .foregroundStyle(OBColor.foreground)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

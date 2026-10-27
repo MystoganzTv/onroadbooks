@@ -32,42 +32,46 @@ struct CostPerMileView: View {
     @State private var failure: String?
     var body: some View {
         List {
-            if let snapshot {
-                Section(snapshot.periodLabel) {
-                    metric("Costo operativo / mi", snapshot.actual.actualCostPerMile, available: snapshot.actual.sufficient)
-                    metric("Deuda / mi", snapshot.actual.debtServicePerMile, available: snapshot.actual.sufficient)
-                    metric("Costo de caja / mi", snapshot.actual.cashCostPerMile, available: snapshot.actual.sufficient)
-                    LabeledContent("Millas", value: snapshot.actual.totalMiles.formatted())
-                    Text("Los gastos se cuentan en su fecha real, sin prorratear. Las millas incluyen las vacías.").font(.caption).foregroundStyle(.secondary)
-                }
-                if let trailing = snapshot.trailing {
-                    Section("Referencia para planificar") {
-                        metric("Costo operativo / mi", trailing.actualCostPerMile, available: trailing.sufficient)
-                        Text(trailing.basisLabel).font(.caption).foregroundStyle(.secondary)
+            Group {
+                if let snapshot {
+                    Section(snapshot.periodLabel) {
+                        metric("Costo operativo / mi", snapshot.actual.actualCostPerMile, available: snapshot.actual.sufficient)
+                        metric("Deuda / mi", snapshot.actual.debtServicePerMile, available: snapshot.actual.sufficient)
+                        metric("Costo de caja / mi", snapshot.actual.cashCostPerMile, available: snapshot.actual.sufficient)
+                        LabeledContent("Millas", value: snapshot.actual.totalMiles.formatted())
+                        Text("Los gastos se cuentan en su fecha real, sin prorratear. Las millas incluyen las vacías.").font(.caption).foregroundStyle(OBColor.mutedForeground)
                     }
-                }
-                Section("Categorías") {
-                    ForEach(snapshot.actual.lines) { line in
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text(line.label)
-                                Spacer()
-                                Text(line.amount, format: .currency(code: "USD")).monospacedDigit()
-                            }
-                            HStack {
-                                Text(line.behavior == "FIXED" ? "Fijo" : line.behavior == "VARIABLE" ? "Variable" : "Mixto")
-                                Spacer()
-                                if snapshot.actual.sufficient { Text("\(line.perMile, format: .currency(code: "USD"))/mi") }
-                            }.font(.caption).foregroundStyle(.secondary)
-                            ProgressView(value: min(100, max(0, line.share)), total: 100).tint(OBColor.primary)
-                        }.padding(.vertical, 4)
+                    if let trailing = snapshot.trailing {
+                        Section("Referencia para planificar") {
+                            metric("Costo operativo / mi", trailing.actualCostPerMile, available: trailing.sufficient)
+                            Text(trailing.basisLabel).font(.caption).foregroundStyle(OBColor.mutedForeground)
+                        }
                     }
+                    Section("Categorías") {
+                        ForEach(snapshot.actual.lines) { line in
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text(line.label)
+                                    Spacer()
+                                    Text(line.amount, format: .currency(code: "USD")).monospacedDigit()
+                                }
+                                HStack {
+                                    Text(line.behavior == "FIXED" ? "Fijo" : line.behavior == "VARIABLE" ? "Variable" : "Mixto")
+                                    Spacer()
+                                    if snapshot.actual.sufficient { Text("\(line.perMile, format: .currency(code: "USD"))/mi") }
+                                }.font(.caption).foregroundStyle(OBColor.mutedForeground)
+                                ProgressView(value: min(100, max(0, line.share)), total: 100).tint(OBColor.primary)
+                            }.padding(.vertical, 4)
+                        }
+                    }
+                } else if failure == nil { ProgressView("Cargando costos…") }
+                if let failure {
+                    Text(failure).foregroundStyle(OBColor.neg)
+                    Button("Reintentar") { Task { await reload() } }
                 }
-            } else if failure == nil { ProgressView("Cargando costos…") }
-            if let failure {
-                Text(failure).foregroundStyle(OBColor.neg)
-                Button("Reintentar") { Task { await reload() } }
             }
+            .listRowBackground(OBColor.card)
+            .listRowSeparatorTint(OBColor.border)
         }
         .navigationTitle("Costo por milla")
         .navigationBarTitleDisplayMode(.inline)
@@ -82,7 +86,7 @@ struct CostPerMileView: View {
             Text(label)
             Spacer()
             if available { Text(amount, format: .currency(code: "USD")).monospacedDigit() }
-            else { Text("Sin millas").foregroundStyle(.secondary) }
+            else { Text("Sin millas").foregroundStyle(OBColor.mutedForeground) }
         }
     }
     @MainActor private func reload() async {

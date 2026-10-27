@@ -119,6 +119,14 @@ final class AuthSession: ObservableObject {
         name = newName
     }
 
+    func invalidate(rejectedToken: String) {
+        // An old request can finish after the owner has signed in again.
+        // Never let that response discard the newly issued session.
+        guard token == rejectedToken else { return }
+        logout()
+        lastError = "Tu sesión ya no es válida. Inicia sesión de nuevo para continuar."
+    }
+
     func logout() {
         KeychainHelper.delete(key: keychainKey)
         UserDefaults.standard.removeObject(forKey: emailDefaultsKey)
