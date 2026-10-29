@@ -8,6 +8,7 @@ import {
   ArrowUpDown,
   ChevronDown,
   ChevronUp,
+  Columns3,
   Package,
   Search,
   X,
@@ -17,6 +18,12 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { useLanguage } from "@/components/shell/language-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -53,6 +60,28 @@ import { SimpleLoadCards } from "./simple-load-cards";
 /** Sort order so "best loads first" is one click on the Rating column. */
 const RATING_ORDER: Record<string, number> = { BAD: 0, MARGINAL: 1, GOOD: 2, GREAT: 3 };
 
+const HIDDEN_COLUMNS_KEY = "onroadbooks:loads:columns:hidden:v1";
+
+/** Columns the owner chose to hide, per browser. The route column is never hidden. */
+function readHiddenColumns(): string[] {
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(HIDDEN_COLUMNS_KEY) ?? "[]");
+    return Array.isArray(parsed)
+      ? parsed.filter((key): key is string => typeof key === "string" && DETAILED_COLUMNS.some((column) => column.key === key && key !== "date"))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeHiddenColumns(keys: string[]) {
+  try {
+    window.localStorage.setItem(HIDDEN_COLUMNS_KEY, JSON.stringify(keys));
+  } catch {
+    // Private mode or blocked storage: the choice resets next visit.
+  }
+}
+
 type SortKey =
   | "date"
   | "broker"
@@ -75,17 +104,20 @@ type SortKey =
  */
 const DETAILED_COLUMNS: ResizableColumn[] = [
   { key: "date" },
-  { key: "broker", width: 104, minWidth: 64 },
-  { key: "loadedMiles", width: 68, minWidth: 48 },
-  { key: "deadheadMiles", width: 56, minWidth: 40 },
-  { key: "totalMiles", width: 72, minWidth: 48 },
-  { key: "grossRate", width: 112, minWidth: 72 },
-  { key: "ratePerLoaded", width: 72, minWidth: 52 },
-  { key: "ratePerTotal", width: 72, minWidth: 52 },
-  { key: "expenses", width: 96, minWidth: 64 },
-  { key: "profit", width: 112, minWidth: 72 },
-  { key: "profitPerMile", width: 88, minWidth: 56 },
-  { key: "rating", width: 100, minWidth: 72 },
+  // Minimums hold the widest normal value ("1,600", "$3,685.00", "-$1,574.24")
+  // so a number is never cut off: below them the table scrolls instead, and
+  // the owner can hide columns to make it fit.
+  { key: "broker", width: 104, minWidth: 72 },
+  { key: "loadedMiles", width: 72, minWidth: 64 },
+  { key: "deadheadMiles", width: 60, minWidth: 52 },
+  { key: "totalMiles", width: 76, minWidth: 64 },
+  { key: "grossRate", width: 112, minWidth: 96 },
+  { key: "ratePerLoaded", width: 76, minWidth: 64 },
+  { key: "ratePerTotal", width: 76, minWidth: 64 },
+  { key: "expenses", width: 104, minWidth: 96 },
+  { key: "profit", width: 112, minWidth: 96 },
+  { key: "profitPerMile", width: 88, minWidth: 64 },
+  { key: "rating", width: 104, minWidth: 96 },
 ];
 
 interface Column {
@@ -176,10 +208,22 @@ export function LoadsTable({
   const truckName = (id: string) => trucks.find((t) => t.id === id)?.name ?? copy.unknownTruck;
   const router = useRouter();
   const tableContainerRef = React.useRef<HTMLDivElement | null>(null);
+  const [hidden, setHidden] = React.useState<string[]>([]);
+  React.useEffect(() => setHidden(readHiddenColumns()), []);
+  const visibleColumns = React.useMemo(
+    () => DETAILED_COLUMNS.filter((column) => !hidden.includes(column.key)),
+    [hidden],
+  );
+  const shows = (key: string) => !hidden.includes(key);
+  const toggleColumn = (key: string, visible: boolean) => {
+    const next = visible ? hidden.filter((row) => row !== key) : [...hidden, key];
+    setHidden(next);
+    writeHiddenColumns(next);
+  };
   const resize = useColumnResize({
     containerRef: tableContainerRef,
     storageKey: "onroadbooks:loads:columns:detailed:v1",
-    columns: DETAILED_COLUMNS,
+    columns: visibleColumns,
     fillMinWidth: 160,
   });
   const [search, setSearch] = React.useState("");
@@ -341,6 +385,29 @@ export function LoadsTable({
         <span className="ml-auto whitespace-nowrap text-2xs text-muted-foreground tnum">
           {interpolate(copy.shownLoads, { shown: filtered.length, total: loads.length })}
         </span>
+
+        {!simple ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Columns3 />
+                {copy.columnsButton}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {columns.filter((column) => column.key !== "date").map((column) => (
+                <DropdownMenuCheckboxItem
+                  key={column.key}
+                  checked={shows(column.key)}
+                  onCheckedChange={(checked) => toggleColumn(column.key, checked === true)}
+                  onSelect={(event) => event.preventDefault()}
+                >
+                  {column.label}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
       </div>
 
       {filtered.length === 0 ? (
@@ -413,7 +480,7 @@ export function LoadsTable({
             style={{ "--table-min": `${resize.tableMinWidth}px` } as React.CSSProperties}
           >
             <colgroup>
-              {DETAILED_COLUMNS.map((column) => {
+              {visibleColumns.map((column) => {
                 const width = resize.widthOf(column.key);
                 return (
                   <col
@@ -426,7 +493,7 @@ export function LoadsTable({
             </colgroup>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                {columns.map((column) => {
+                {columns.filter((column) => shows(column.key)).map((column) => {
                   const active = sort.key === column.key;
                   const Icon = !active ? ArrowUpDown : sort.dir === "asc" ? ChevronUp : ChevronDown;
                   return (
@@ -444,7 +511,7 @@ export function LoadsTable({
                           column.numeric && "flex-row-reverse",
                         )}
                       >
-                        <span className="truncate">{column.label}</span>
+                        <span className="truncate" title={column.label}>{column.label}</span>
                         {active ? <Icon className="size-3 shrink-0 opacity-60" /> : null}
                       </button>
                       <ColumnResizeHandle state={resize} columnKey={column.key} label={copy.resizeColumn} />
@@ -479,66 +546,88 @@ export function LoadsTable({
                       </span>
                     </Link>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    <span className="block truncate">{load.broker ?? "--"}</span>
-                    {load.commodity ? (
-                      <span className="block truncate text-2xs text-muted-foreground/80">{load.commodity}</span>
-                    ) : null}
-                  </TableCell>
-                  <TableCell className="text-right tnum">
-                    {formatNumber(load.loadedMiles)}
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      "text-right tnum",
-                      isDeadheadElevated(load.metrics.deadheadPct, deadheadWarnPct)
-                        ? "text-warn"
-                        : "text-muted-foreground",
-                    )}
-                  >
-                    {formatNumber(load.deadheadMiles)}
-                  </TableCell>
-                  <TableCell className="text-right tnum">
-                    {formatNumber(load.metrics.totalMiles)}
-                  </TableCell>
-                  <TableCell className="text-right tnum font-medium">
-                    {formatMoney(loadRevenue(load))}
-                    {load.detentionPay ? (
-                      <span className="block truncate text-2xs font-normal text-muted-foreground">
-                        {interpolate(copy.inclDetention, { amount: formatMoney(load.detentionPay) })}
-                      </span>
-                    ) : null}
-                  </TableCell>
-                  <TableCell className="text-right tnum text-muted-foreground">
-                    {formatRateValue(load.metrics.revenuePerLoadedMile)}
-                  </TableCell>
-                  <TableCell className="text-right tnum text-muted-foreground">
-                    {formatRateValue(load.metrics.revenuePerTotalMile)}
-                  </TableCell>
-                  <TableCell className="text-right tnum text-neg">
-                    {load.metrics.tripExpenses > 0
-                      ? `-${formatMoney(load.metrics.tripExpenses)}`
-                      : formatMoney(0)}
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      "text-right tnum font-medium",
-                      load.metrics.tripProfit >= 0 ? "text-pos" : "text-neg",
-                    )}
-                  >
-                    {formatMoney(load.metrics.tripProfit)}
-                  </TableCell>
-                  <TableCell
-                    className={cn(
-                      "text-right tnum",
-                      load.metrics.profitPerMile >= 0 ? "text-pos" : "text-neg",
-                    )}
-                  >
-                    {formatRateValue(load.metrics.profitPerMile)}
-                  </TableCell>
-                  <TableCell className="overflow-hidden">
-                    <RatingBadge rating={load.metrics.rating} />
-                  </TableCell>
+                  {shows("broker") ? (
+                    <TableCell className="text-muted-foreground">
+                      <span className="block truncate">{load.broker ?? "--"}</span>
+                      {load.commodity ? (
+                        <span className="block truncate text-2xs text-muted-foreground/80">{load.commodity}</span>
+                      ) : null}
+                    </TableCell>
+                  ) : null}
+                  {shows("loadedMiles") ? (
+                    <TableCell className="text-right tnum">
+                      {formatNumber(load.loadedMiles)}
+                    </TableCell>
+                  ) : null}
+                  {shows("deadheadMiles") ? (
+                    <TableCell
+                      className={cn(
+                        "text-right tnum",
+                        isDeadheadElevated(load.metrics.deadheadPct, deadheadWarnPct)
+                          ? "text-warn"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {formatNumber(load.deadheadMiles)}
+                    </TableCell>
+                  ) : null}
+                  {shows("totalMiles") ? (
+                    <TableCell className="text-right tnum">
+                      {formatNumber(load.metrics.totalMiles)}
+                    </TableCell>
+                  ) : null}
+                  {shows("grossRate") ? (
+                    <TableCell className="text-right tnum font-medium">
+                      {formatMoney(loadRevenue(load))}
+                      {load.detentionPay ? (
+                        <span className="block truncate text-2xs font-normal text-muted-foreground">
+                          {interpolate(copy.inclDetention, { amount: formatMoney(load.detentionPay) })}
+                        </span>
+                      ) : null}
+                    </TableCell>
+                  ) : null}
+                  {shows("ratePerLoaded") ? (
+                    <TableCell className="text-right tnum text-muted-foreground">
+                      {formatRateValue(load.metrics.revenuePerLoadedMile)}
+                    </TableCell>
+                  ) : null}
+                  {shows("ratePerTotal") ? (
+                    <TableCell className="text-right tnum text-muted-foreground">
+                      {formatRateValue(load.metrics.revenuePerTotalMile)}
+                    </TableCell>
+                  ) : null}
+                  {shows("expenses") ? (
+                    <TableCell className="text-right tnum text-neg">
+                      {load.metrics.tripExpenses > 0
+                        ? `-${formatMoney(load.metrics.tripExpenses)}`
+                        : formatMoney(0)}
+                    </TableCell>
+                  ) : null}
+                  {shows("profit") ? (
+                    <TableCell
+                      className={cn(
+                        "text-right tnum font-medium",
+                        load.metrics.tripProfit >= 0 ? "text-pos" : "text-neg",
+                      )}
+                    >
+                      {formatMoney(load.metrics.tripProfit)}
+                    </TableCell>
+                  ) : null}
+                  {shows("profitPerMile") ? (
+                    <TableCell
+                      className={cn(
+                        "text-right tnum",
+                        load.metrics.profitPerMile >= 0 ? "text-pos" : "text-neg",
+                      )}
+                    >
+                      {formatRateValue(load.metrics.profitPerMile)}
+                    </TableCell>
+                  ) : null}
+                  {shows("rating") ? (
+                    <TableCell className="overflow-hidden">
+                      <RatingBadge rating={load.metrics.rating} />
+                    </TableCell>
+                  ) : null}
                 </TableRow>
               ))}
             </TableBody>
@@ -548,28 +637,50 @@ export function LoadsTable({
                 <TableCell className="text-2xs uppercase tracking-wider text-muted-foreground">
                   {copy.totals}
                 </TableCell>
-                <TableCell />
-                <TableCell className="text-right tnum">{formatNumber(totals.loaded)}</TableCell>
-                <TableCell className="text-right tnum">{formatNumber(totals.deadhead)}</TableCell>
-                <TableCell className="text-right tnum">{formatNumber(totals.total)}</TableCell>
-                <TableCell className="text-right tnum">{formatMoney(totals.rate)}</TableCell>
-                <TableCell />
-                <TableCell />
-                <TableCell className="text-right tnum text-neg">
-                  {totals.expenses > 0 ? `-${formatMoney(totals.expenses)}` : formatMoney(0)}
-                </TableCell>
-                <TableCell
-                  className={cn(
-                    "text-right tnum",
-                    totals.profit >= 0 ? "text-pos" : "text-neg",
-                  )}
-                >
-                  {formatMoney(totals.profit)}
-                </TableCell>
-                <TableCell className="text-right tnum">
-                  {formatRateValue(div(totals.profit, totals.total))}
-                </TableCell>
-                <TableCell />
+                {shows("broker") ? (
+                  <TableCell />
+                ) : null}
+                {shows("loadedMiles") ? (
+                  <TableCell className="text-right tnum">{formatNumber(totals.loaded)}</TableCell>
+                ) : null}
+                {shows("deadheadMiles") ? (
+                  <TableCell className="text-right tnum">{formatNumber(totals.deadhead)}</TableCell>
+                ) : null}
+                {shows("totalMiles") ? (
+                  <TableCell className="text-right tnum">{formatNumber(totals.total)}</TableCell>
+                ) : null}
+                {shows("grossRate") ? (
+                  <TableCell className="text-right tnum">{formatMoney(totals.rate)}</TableCell>
+                ) : null}
+                {shows("ratePerLoaded") ? (
+                  <TableCell />
+                ) : null}
+                {shows("ratePerTotal") ? (
+                  <TableCell />
+                ) : null}
+                {shows("expenses") ? (
+                  <TableCell className="text-right tnum text-neg">
+                    {totals.expenses > 0 ? `-${formatMoney(totals.expenses)}` : formatMoney(0)}
+                  </TableCell>
+                ) : null}
+                {shows("profit") ? (
+                  <TableCell
+                    className={cn(
+                      "text-right tnum",
+                      totals.profit >= 0 ? "text-pos" : "text-neg",
+                    )}
+                  >
+                    {formatMoney(totals.profit)}
+                  </TableCell>
+                ) : null}
+                {shows("profitPerMile") ? (
+                  <TableCell className="text-right tnum">
+                    {formatRateValue(div(totals.profit, totals.total))}
+                  </TableCell>
+                ) : null}
+                {shows("rating") ? (
+                  <TableCell />
+                ) : null}
               </TableRow>
             </TableFooter>
           </Table>
