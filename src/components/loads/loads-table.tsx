@@ -42,7 +42,8 @@ import {
 } from "@/lib/formatters";
 import { formatLocaleDate } from "@/lib/i18n-format";
 import { interpolate } from "@/lib/i18n/dictionaries";
-import { equipmentTypeLabel, loadCapacityLabel, loadRoute, loadStateRoute } from "@/lib/load-details";
+import { equipmentTypeLabel, loadCapacityLabel, loadRoute } from "@/lib/load-details";
+import { ColumnResizeHandle, useColumnResize, type ResizableColumn } from "@/components/ui/column-resize";
 import type { Driver, LoadWithMetrics, Truck } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { LoadFormDialog } from "./load-form-dialog";
@@ -65,6 +66,27 @@ type SortKey =
   | "profit"
   | "profitPerMile"
   | "rating";
+
+/**
+ * Detailed-table widths the owner drags, as in Excel. The route column is the
+ * fill: it takes what is left and gives way when another column is widened,
+ * so the table always fits its card (only a phone scrolls). Every border
+ * right of the route resizes the column on its right -- drag left to widen.
+ */
+const DETAILED_COLUMNS: ResizableColumn[] = [
+  { key: "date" },
+  { key: "broker", width: 104, minWidth: 64 },
+  { key: "loadedMiles", width: 68, minWidth: 48 },
+  { key: "deadheadMiles", width: 56, minWidth: 40 },
+  { key: "totalMiles", width: 72, minWidth: 48 },
+  { key: "grossRate", width: 112, minWidth: 72 },
+  { key: "ratePerLoaded", width: 72, minWidth: 52 },
+  { key: "ratePerTotal", width: 72, minWidth: 52 },
+  { key: "expenses", width: 96, minWidth: 64 },
+  { key: "profit", width: 112, minWidth: 72 },
+  { key: "profitPerMile", width: 88, minWidth: 56 },
+  { key: "rating", width: 100, minWidth: 72 },
+];
 
 interface Column {
   key: SortKey;
@@ -153,6 +175,13 @@ export function LoadsTable({
   const showTruck = trucks.length > 1;
   const truckName = (id: string) => trucks.find((t) => t.id === id)?.name ?? copy.unknownTruck;
   const router = useRouter();
+  const tableContainerRef = React.useRef<HTMLDivElement | null>(null);
+  const resize = useColumnResize({
+    containerRef: tableContainerRef,
+    storageKey: "onroadbooks:loads:columns:detailed:v1",
+    columns: DETAILED_COLUMNS,
+    fillMinWidth: 160,
+  });
   const [search, setSearch] = React.useState("");
   const [broker, setBroker] = React.useState("all");
   const [rating, setRating] = React.useState("all");
@@ -376,8 +405,25 @@ export function LoadsTable({
           </TableWrapper>
         </>
       ) : (
-        <TableWrapper>
-          <Table>
+        <TableWrapper ref={tableContainerRef}>
+          <Table
+            // Phones keep the natural layout and scroll sideways; from sm up
+            // the columns are fixed and sized by the owner.
+            className="sm:min-w-[var(--table-min)] sm:table-fixed sm:[&_td]:overflow-hidden sm:[&_td]:text-ellipsis"
+            style={{ "--table-min": `${resize.tableMinWidth}px` } as React.CSSProperties}
+          >
+            <colgroup>
+              {DETAILED_COLUMNS.map((column) => {
+                const width = resize.widthOf(column.key);
+                return (
+                  <col
+                    key={column.key}
+                    className={width != null ? "sm:w-[var(--col-w)]" : undefined}
+                    style={width != null ? ({ "--col-w": `${width}px` } as React.CSSProperties) : undefined}
+                  />
+                );
+              })}
+            </colgroup>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 {columns.map((column) => {
@@ -386,21 +432,22 @@ export function LoadsTable({
                   return (
                     <TableHead
                       key={column.key}
-                      className={cn(column.numeric && "text-right", column.className)}
+                      className={cn("relative", column.numeric && "text-right", column.className)}
                       aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
                     >
                       <button
                         type="button"
                         onClick={() => toggleSort(column.key)}
                         className={cn(
-                          "inline-flex items-center gap-1 rounded-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          "inline-flex max-w-full items-center gap-1 rounded-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                           active && "text-foreground",
                           column.numeric && "flex-row-reverse",
                         )}
                       >
-                        {column.label}
-                        <Icon className="size-3 opacity-60" />
+                        <span className="truncate">{column.label}</span>
+                        {active ? <Icon className="size-3 shrink-0 opacity-60" /> : null}
                       </button>
+                      <ColumnResizeHandle state={resize} columnKey={column.key} label={copy.resizeColumn} />
                     </TableHead>
                   );
                 })}
@@ -414,29 +461,25 @@ export function LoadsTable({
                   className="group cursor-pointer"
                   onClick={() => router.push(`/loads/${load.id}`)}
                 >
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="whitespace-normal py-2 text-muted-foreground">
+                    {/* Date above, route below: the route wraps to the column
+                        width the owner chose instead of being cut off. */}
                     <Link
                       href={`/loads/${load.id}`}
                       onClick={(event) => event.stopPropagation()}
-                      className="rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="block rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      title={loadRoute(load)}
                     >
-                      <span className="group-hover:text-foreground">
+                      <span className="block text-2xs group-hover:text-foreground">
                         {formatLocaleDate(load.date, locale, "short")}
+                        {showTruck ? ` · ${truckName(load.truckId)}` : ""}
                       </span>
-                      <span className="ml-2 hidden text-foreground group-hover:underline xl:inline">
-                        {loadRoute(load, ` ${copy.to} `)}
-                      </span>
-                      <span className="ml-2 text-foreground group-hover:underline xl:hidden">
-                        {loadStateRoute(load)}
+                      <span className="line-clamp-2 break-words text-foreground group-hover:underline">
+                        {loadRoute(load)}
                       </span>
                     </Link>
-                    {showTruck ? (
-                      <span className="ml-2 text-2xs text-muted-foreground">
-                        {truckName(load.truckId)}
-                      </span>
-                    ) : null}
                   </TableCell>
-                  <TableCell className="max-w-[13rem] text-muted-foreground">
+                  <TableCell className="text-muted-foreground">
                     <span className="block truncate">{load.broker ?? "--"}</span>
                     {load.commodity ? (
                       <span className="block truncate text-2xs text-muted-foreground/80">{load.commodity}</span>
@@ -461,7 +504,7 @@ export function LoadsTable({
                   <TableCell className="text-right tnum font-medium">
                     {formatMoney(loadRevenue(load))}
                     {load.detentionPay ? (
-                      <span className="block text-2xs font-normal text-muted-foreground">
+                      <span className="block truncate text-2xs font-normal text-muted-foreground">
                         {interpolate(copy.inclDetention, { amount: formatMoney(load.detentionPay) })}
                       </span>
                     ) : null}
@@ -493,7 +536,7 @@ export function LoadsTable({
                   >
                     {formatRateValue(load.metrics.profitPerMile)}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="overflow-hidden">
                     <RatingBadge rating={load.metrics.rating} />
                   </TableCell>
                 </TableRow>
