@@ -28,6 +28,7 @@ import { getDataset } from "@/lib/db";
 import {
   isDeadheadElevated,
   loadMetrics,
+  loadRevenue,
   thresholdsFromSettings,
   tripExpenseLines,
 } from "@/lib/calculations";
@@ -46,7 +47,7 @@ import {
   formatRateValue,
 } from "@/lib/formatters";
 import { categoryLabel } from "@/lib/categories";
-import { equipmentTypeLabel, loadCapacityLabel } from "@/lib/load-details";
+import { equipmentTypeLabel, loadCapacityLabel, loadRoute } from "@/lib/load-details";
 import { todayISO } from "@/lib/periods";
 import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
 import { formatLocaleDate } from "@/lib/i18n-format";
@@ -87,7 +88,7 @@ export default async function LoadDetailPage({
   // Business, Driver and Owner-Operator views of the same trip lines and the
   // same allocation basis as the waterfall and the rating above.
   const profitability = buildLoadProfitability({
-    grossRevenue: load.grossRate,
+    grossRevenue: loadRevenue(load),
     loadedMiles: load.loadedMiles,
     deadheadMiles: load.deadheadMiles,
     lines: tripExpenseLines(load, dataset.expenses, estimate),
@@ -99,7 +100,7 @@ export default async function LoadDetailPage({
   const brokers = savedBrokerNames(dataset.loads, dataset.brokers);
   const linkedExpenses = dataset.expenses.filter((expense) => expense.loadId === load.id);
   const documents = dataset.documents.filter((doc) => doc.loadId === load.id);
-  const route = `${load.originCity}, ${load.originState} ${copy.to} ${load.destinationCity}, ${load.destinationState}`;
+  const route = loadRoute(load, ` ${copy.to} `);
   const poReference = formatLoadReference(load.loadNumber);
 
   return (
@@ -182,7 +183,11 @@ export default async function LoadDetailPage({
           </CardHeader>
           <CardContent className="space-y-4 p-4">
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <Metric label={copy.grossRate} value={formatMoney(load.grossRate)} />
+              <Metric
+                label={copy.grossRate}
+                value={formatMoney(loadRevenue(load))}
+                sub={load.detentionPay ? interpolate(copy.inclDetention, { amount: formatMoney(load.detentionPay) }) : undefined}
+              />
               <Metric label={copy.loadedMiles} value={formatMiles(load.loadedMiles)} />
               <Metric label={copy.deadheadMiles} value={formatMiles(load.deadheadMiles)} />
               <Metric label={copy.totalMiles} value={formatMiles(metrics.totalMiles)} />

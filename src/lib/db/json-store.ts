@@ -337,6 +337,8 @@ function migrate(dataset: Dataset): Dataset {
     load.tolls ??= 0;
     load.otherExpenses ??= 0;
     load.claimDeduction ??= 0;
+    load.detentionPay ??= 0;
+    load.roundTrip ??= false;
     load.claimReason ??= null;
     load.dispatchPaidDate ??= null;
     load.driverId ??= null;
@@ -460,6 +462,8 @@ function loadFromInput(
     factoringFee: roundMoney(input.factoringFee),
     otherExpenses: roundMoney(input.otherExpenses),
     claimDeduction: input.claimDeduction === undefined ? existing?.claimDeduction ?? 0 : roundMoney(input.claimDeduction),
+    detentionPay: input.detentionPay === undefined ? existing?.detentionPay ?? 0 : roundMoney(input.detentionPay),
+    roundTrip: input.roundTrip === undefined ? existing?.roundTrip ?? false : input.roundTrip,
     claimReason: input.claimReason === undefined ? existing?.claimReason ?? null : input.claimReason?.trim() || null,
     dispatchPaidDate: existing?.dispatchPaidDate ?? null,
     driverPay: 0,

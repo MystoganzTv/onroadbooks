@@ -2,6 +2,7 @@ import {
   categoryTotals,
   expensesInPeriod,
   fuelInPeriod,
+  loadRevenue,
   loadsInPeriod,
   summarizeFuel,
   summarizePeriod,
@@ -196,7 +197,7 @@ function reviewChecksTable(dataset: Dataset, period: Period, businessName: strin
       {
         what: `${missingCustomer.length} LOAD${missingCustomer.length === 1 ? "" : "S"} NEED${missingCustomer.length === 1 ? "S" : ""} A CUSTOMER OR BROKER`,
         records: missingCustomer.length,
-        amount: money(missingCustomer.reduce((sum, load) => sum + load.grossRate, 0)),
+        amount: money(missingCustomer.reduce((sum, load) => sum + loadRevenue(load), 0)),
         why: "Revenue cannot be traced cleanly to the party responsible for payment.",
         action: "Add the broker or invoice customer to each load.",
         route: "/loads",

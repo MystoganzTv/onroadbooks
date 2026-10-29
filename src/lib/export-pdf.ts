@@ -1,5 +1,7 @@
 import "server-only";
 import { bareLoadReference } from "@/lib/load-reference";
+import { loadRevenue } from "@/lib/calculations";
+import { loadRoute } from "@/lib/load-details";
 
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import type { ReportTable } from "./export";
@@ -87,13 +89,20 @@ export async function invoicePdf(business: Business, load: Load): Promise<Uint8A
   page.drawRectangle({ x: 42, y: 532, width: 528, height: 26, color: blue });
   page.drawText("DESCRIPTION", { x: 50, y: 542, size: 8, font: bold, color: rgb(1, 1, 1) });
   page.drawText("AMOUNT", { x: 495, y: 542, size: 8, font: bold, color: rgb(1, 1, 1) });
-  const lane = `${load.originCity}, ${load.originState} to ${load.destinationCity}, ${load.destinationState}`;
+  const lane = loadRoute(load, " to ");
+  const usd = (value: number) => `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const detention = load.detentionPay ?? 0;
   page.drawText(fit(printable(lane), bold, 10, 395), { x: 50, y: 504, size: 10, font: bold, color: navy });
   page.drawText(`${(load.loadedMiles + load.deadheadMiles).toLocaleString("en-US")} total miles${load.broker ? ` | ${printable(load.broker)}` : ""}`, { x: 50, y: 486, size: 8, font, color: muted });
-  page.drawText(`$${load.grossRate.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, { x: 485, y: 504, size: 10, font: bold, color: navy });
-  page.drawLine({ start: { x: 42, y: 468 }, end: { x: 570, y: 468 }, thickness: 0.8, color: line });
+  page.drawText(usd(load.grossRate), { x: 485, y: 504, size: 10, font: bold, color: navy });
+  if (detention > 0) {
+    page.drawText("Detention", { x: 50, y: 458, size: 10, font: bold, color: navy });
+    page.drawText(usd(detention), { x: 485, y: 458, size: 10, font: bold, color: navy });
+  }
+  const ruleY = detention > 0 ? 444 : 468;
+  page.drawLine({ start: { x: 42, y: ruleY }, end: { x: 570, y: ruleY }, thickness: 0.8, color: line });
   page.drawText("INVOICE TOTAL", { x: 392, y: 428, size: 10, font: bold, color: muted });
-  page.drawText(`$${load.grossRate.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, { x: 480, y: 426, size: 14, font: bold, color: navy });
+  page.drawText(usd(loadRevenue(load)), { x: 480, y: 426, size: 14, font: bold, color: navy });
   if (load.invoiceNotes) { page.drawText("NOTES", { x: 42, y: 390, size: 9, font: bold, color: blue }); page.drawText(fit(printable(load.invoiceNotes), font, 9, 520), { x: 42, y: 372, size: 9, font, color: muted }); }
   page.drawText("Thank you for your business.", { x: 42, y: 64, size: 9, font: bold, color: navy });
   footer(page, font, 1);

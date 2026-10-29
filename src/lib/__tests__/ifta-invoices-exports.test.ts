@@ -350,10 +350,12 @@ describe("native exports", () => {
     assert.equal(loads.getCell("A10").value, "Truck");
     assert.equal(loads.getCell("AI10").value, "Load source");
     assert.equal(loads.getCell("AJ10").value, "Source name");
+    assert.equal(loads.getCell("AK10").value, "Detention");
+    assert.equal(loads.getCell("AL10").value, "Round Trip");
     assert.equal(loads.getCell("N9").value, "MILEAGE");
     assert.ok(loads.autoFilter);
     if (typeof loads.autoFilter === "string") {
-      assert.equal(loads.autoFilter, "A10:AJ10");
+      assert.equal(loads.autoFilter, "A10:AL10");
     } else {
       assert.deepEqual(loads.autoFilter.from, { row: 10, column: 1 });
     }

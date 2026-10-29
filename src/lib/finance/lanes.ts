@@ -14,7 +14,7 @@
  * ranking at all.
  */
 
-import { div, roundMoney, sum, type RatingThresholds } from "../calculations";
+import { div, loadRevenue, roundMoney, sum, type RatingThresholds } from "../calculations";
 import { rateLoad } from "../calculations";
 import type { LoadWithMetrics, ProfitabilityRating } from "../types";
 import { freightMarket } from "../markets";
@@ -82,7 +82,7 @@ export function calculateLanePerformance(
       const destination = grouping === "market"
         ? freightMarket(first.destinationCity, destinationState)
         : { key: destinationState, label: destinationState };
-      const revenue = roundMoney(sum(group, (l) => l.grossRate));
+      const revenue = roundMoney(sum(group, (l) => loadRevenue(l)));
       const totalMiles = sum(group, (l) => l.metrics.totalMiles);
       const loadedMiles = sum(group, (l) => l.loadedMiles);
       const deadheadMiles = sum(group, (l) => l.deadheadMiles);

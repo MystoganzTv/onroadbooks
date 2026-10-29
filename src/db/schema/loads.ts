@@ -37,6 +37,8 @@ export const load = pgTable("Load", {
   otherExpenses: numeric("otherExpenses", { precision: 12, scale: 2 }).notNull().default(sql`0`),
   claimDeduction: numeric("claimDeduction", { precision: 12, scale: 2 }).notNull().default(sql`0`),
   claimReason: text("claimReason"),
+  detentionPay: numeric("detentionPay", { precision: 12, scale: 2 }).notNull().default(sql`0`),
+  roundTrip: boolean("roundTrip").notNull().default(false),
   dispatchPaidDate: date("dispatchPaidDate", { mode: "string" }),
   driverPay: numeric("driverPay", { precision: 12, scale: 2 }).notNull().default(sql`0`),
   costsPosted: boolean("costsPosted").notNull().default(false),

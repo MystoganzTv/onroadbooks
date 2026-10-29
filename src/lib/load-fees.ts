@@ -44,14 +44,17 @@ export function exactPercentOfRate(fee: number, grossRate: number): number | nul
  * a rate change takes effect on the very next load.
  */
 export function latestFeeDefaults(
-  loads: Pick<Load, "date" | "createdAt" | "grossRate" | "dispatchFee" | "factoringFee">[],
+  loads: Pick<Load, "date" | "createdAt" | "grossRate" | "detentionPay" | "dispatchFee" | "factoringFee">[],
 ): FeeDefaults {
   const newest = [...loads].sort(
     (a, b) => b.date.localeCompare(a.date) || (b.createdAt ?? "").localeCompare(a.createdAt ?? ""),
   );
   const pick = (field: "dispatchFee" | "factoringFee") => {
     const load = newest.find((row) => row.grossRate > 0 && row[field] > 0);
-    return load ? percentOfRate(load[field], load.grossRate) : null;
+    if (!load) return null;
+    // Factoring is charged on the whole invoice, detention included; dispatch on the rate only.
+    const base = field === "factoringFee" ? load.grossRate + (load.detentionPay ?? 0) : load.grossRate;
+    return percentOfRate(load[field], base);
   };
   return { dispatchPct: pick("dispatchFee"), factoringPct: pick("factoringFee") };
 }

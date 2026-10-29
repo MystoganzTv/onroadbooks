@@ -531,6 +531,10 @@ model Load {
   /// What the broker took off the rate after delivery (damage, shortage).
   claimDeduction Decimal @default(0) @db.Decimal(12, 2)
   claimReason    String?
+  /// Extra the broker paid for waiting (detention). Revenue on top of the rate.
+  detentionPay   Decimal @default(0) @db.Decimal(12, 2)
+  /// One load out and back loaded on a single rate (origin -> destination -> origin).
+  roundTrip      Boolean @default(false)
   /// The day the dispatch commission was paid to the dispatcher; null while owed.
   /// A record only -- it posts nothing to the ledger.
   dispatchPaidDate DateTime? @db.Date

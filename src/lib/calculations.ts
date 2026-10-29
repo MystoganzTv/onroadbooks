@@ -210,6 +210,15 @@ export function tripExpenseLines(
   return lines.map((line) => ({ ...line, amount: roundMoney(line.amount) }));
 }
 
+/**
+ * What a load actually paid: the rate con plus any detention. Every revenue
+ * figure reads this; only "what rate should I ask" analytics read the bare
+ * grossRate, because detention is not something you negotiate up front.
+ */
+export function loadRevenue(load: Pick<Load, "grossRate" | "detentionPay">): number {
+  return roundMoney(num(load.grossRate) + num(load.detentionPay ?? 0));
+}
+
 export function loadMetrics(
   load: Load,
   thresholds?: RatingThresholds,
@@ -218,17 +227,18 @@ export function loadMetrics(
 ): LoadMetrics {
   const totalMiles = num(load.loadedMiles) + num(load.deadheadMiles);
   const tripExpenses = sum(tripExpenseLines(load, expenses, estimate), (line) => line.amount);
-  const tripProfit = num(load.grossRate) - tripExpenses;
+  const revenue = loadRevenue(load);
+  const tripProfit = revenue - tripExpenses;
   const profitPerMile = div(tripProfit, totalMiles);
 
   return {
     totalMiles,
-    revenuePerLoadedMile: div(num(load.grossRate), num(load.loadedMiles)),
-    revenuePerTotalMile: div(num(load.grossRate), totalMiles),
+    revenuePerLoadedMile: div(revenue, num(load.loadedMiles)),
+    revenuePerTotalMile: div(revenue, totalMiles),
     tripExpenses: roundMoney(tripExpenses),
     tripProfit: roundMoney(tripProfit),
     profitPerMile,
-    profitMargin: div(tripProfit, num(load.grossRate)) * 100,
+    profitMargin: div(tripProfit, revenue) * 100,
     deadheadPct: div(num(load.deadheadMiles), totalMiles) * 100,
     rating: rateLoad(profitPerMile, thresholds ?? DEFAULT_RATING_THRESHOLDS),
   };
@@ -293,7 +303,7 @@ export function summarizePeriod(
   const periodLoads = loadsInPeriod(loads, range);
   const periodExpenses = expensesInPeriod(expenses, range);
 
-  const bookedRevenue = roundMoney(sum(periodLoads, (l) => l.grossRate));
+  const bookedRevenue = roundMoney(sum(periodLoads, (l) => loadRevenue(l)));
   // Recording a load records received income on the load date. Historical
   // statuses/payment events remain stored, but never add or withhold income.
   const collectedRevenue = bookedRevenue;
@@ -477,7 +487,7 @@ export function brokerPerformance(
 
   return [...buckets.entries()]
     .map(([broker, group]) => {
-      const revenue = roundMoney(sum(group, (l) => l.grossRate));
+      const revenue = roundMoney(sum(group, (l) => loadRevenue(l)));
       const totalMiles = sum(group, (l) => l.metrics.totalMiles);
       const loadedMiles = sum(group, (l) => l.loadedMiles);
       const tripProfit = roundMoney(sum(group, (l) => l.metrics.tripProfit));
@@ -514,7 +524,7 @@ export function ratingBreakdown(loads: LoadWithMetrics[]): {
     return {
       rating,
       count: group.length,
-      revenue: roundMoney(sum(group, (l) => l.grossRate)),
+      revenue: roundMoney(sum(group, (l) => loadRevenue(l))),
       share: div(group.length, loads.length) * 100,
     };
   });
@@ -677,7 +687,7 @@ export function truckLifetime(dataset: Dataset, truck: Truck): TruckLifetime {
     (e) => e.scope !== "BUSINESS" && e.truckId === truck.id,
   );
 
-  const totalRevenue = roundMoney(sum(loads, (l) => l.grossRate));
+  const totalRevenue = roundMoney(sum(loads, (l) => loadRevenue(l)));
   const collectedRevenue = totalRevenue;
   const accountsReceivable = 0;
   const unallocatedCollectedRevenue = 0;

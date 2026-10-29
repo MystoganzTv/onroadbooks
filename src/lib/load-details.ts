@@ -1,4 +1,4 @@
-import type { EquipmentType, LoadCapacity } from "./types";
+import type { EquipmentType, Load, LoadCapacity } from "./types";
 import type { AppLocale } from "./i18n";
 
 export const EQUIPMENT_TYPES: { id: EquipmentType; label: string; labelEs: string }[] = [
@@ -24,4 +24,19 @@ export function equipmentTypeLabel(value: EquipmentType | null | undefined, loca
 export function loadCapacityLabel(value: LoadCapacity | null | undefined, locale: AppLocale = "en"): string {
   const option = LOAD_CAPACITIES.find((item) => item.id === value);
   return option ? (locale === "es" ? option.labelEs : option.label) : locale === "es" ? "Sin especificar" : "Not specified";
+}
+
+type RoutePart = Pick<Load, "originCity" | "originState" | "destinationCity" | "destinationState" | "roundTrip">;
+
+/** "Glendale, AZ → Chicago, IL", or "… → Glendale, AZ" again when the load comes back loaded. */
+export function loadRoute(load: RoutePart, separator = " → "): string {
+  const origin = `${load.originCity}, ${load.originState}`;
+  const stops = [origin, `${load.destinationCity}, ${load.destinationState}`];
+  if (load.roundTrip) stops.push(origin);
+  return stops.join(separator);
+}
+
+/** "AZ-IL", or "AZ-IL-AZ" for a round trip. */
+export function loadStateRoute(load: RoutePart): string {
+  return [load.originState, load.destinationState, ...(load.roundTrip ? [load.originState] : [])].join("-");
 }

@@ -114,6 +114,9 @@ export const loadSchema = z
     factoringFee: money,
     otherExpenses: money,
     claimDeduction: money.optional(),
+    // A blank phone field arrives as null: that is "no detention", not "keep".
+    detentionPay: money.nullable().optional().transform((value) => (value === null ? 0 : value)),
+    roundTrip: z.boolean().optional(),
     claimReason: z.string().trim().max(200).optional().nullable(),
     costsPosted: z.boolean().optional(),
     status: z.enum(["PENDING", "INVOICED", "PAID"]),

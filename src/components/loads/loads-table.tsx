@@ -34,7 +34,7 @@ import {
   TableRow,
   TableWrapper,
 } from "@/components/ui/table";
-import { div, isDeadheadElevated, type RatingThresholds } from "@/lib/calculations";
+import { div, isDeadheadElevated, loadRevenue, type RatingThresholds } from "@/lib/calculations";
 import {
   formatMoney,
   formatNumber,
@@ -42,7 +42,7 @@ import {
 } from "@/lib/formatters";
 import { formatLocaleDate } from "@/lib/i18n-format";
 import { interpolate } from "@/lib/i18n/dictionaries";
-import { equipmentTypeLabel, loadCapacityLabel } from "@/lib/load-details";
+import { equipmentTypeLabel, loadCapacityLabel, loadRoute, loadStateRoute } from "@/lib/load-details";
 import type { Driver, LoadWithMetrics, Truck } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { LoadFormDialog } from "./load-form-dialog";
@@ -86,7 +86,7 @@ function valueFor(load: LoadWithMetrics, key: SortKey): string | number {
     case "totalMiles":
       return load.metrics.totalMiles;
     case "grossRate":
-      return load.grossRate;
+      return loadRevenue(load);
     case "ratePerLoaded":
       return load.metrics.revenuePerLoadedMile;
     case "ratePerTotal":
@@ -208,7 +208,7 @@ export function LoadsTable({
           loaded: acc.loaded + load.loadedMiles,
           deadhead: acc.deadhead + load.deadheadMiles,
           total: acc.total + load.metrics.totalMiles,
-          rate: acc.rate + load.grossRate,
+          rate: acc.rate + loadRevenue(load),
           expenses: acc.expenses + load.metrics.tripExpenses,
           profit: acc.profit + load.metrics.tripProfit,
         }),
@@ -359,11 +359,11 @@ export function LoadsTable({
                   <TableCell className="whitespace-normal min-w-40">
                     <Link href={`/loads/${load.id}`} onClick={(event) => event.stopPropagation()} className="rounded-sm font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                       {formatLoadReference(load.loadNumber) ? <span className="block font-semibold tnum">{formatLoadReference(load.loadNumber)}</span> : null}
-                      <span className={formatLoadReference(load.loadNumber) ? "block text-sm font-normal" : undefined}>{load.originCity}, {load.originState} → {load.destinationCity}, {load.destinationState}</span>
+                      <span className={formatLoadReference(load.loadNumber) ? "block text-sm font-normal" : undefined}>{loadRoute(load)}</span>
                     </Link>
                     <span className="mt-1 block text-xs text-muted-foreground">{[load.broker, showTruck ? truckName(load.truckId) : null].filter(Boolean).join(" · ")}</span>
                   </TableCell>
-                  <TableCell className="text-right font-medium tnum">{formatMoney(load.grossRate)}</TableCell>
+                  <TableCell className="text-right font-medium tnum">{formatMoney(loadRevenue(load))}{load.detentionPay ? <span className="block text-2xs font-normal text-muted-foreground">{interpolate(copy.inclDetention, { amount: formatMoney(load.detentionPay) })}</span> : null}</TableCell>
                   <TableCell className={cn("text-right font-medium tnum", load.metrics.tripProfit >= 0 ? "text-pos" : "text-neg")}>{formatMoney(load.metrics.tripProfit)}</TableCell>
                 </TableRow>
               ))}</TableBody>
@@ -427,9 +427,13 @@ export function LoadsTable({
                         {load.originCity}, {load.originState}
                         <span className="mx-1 text-muted-foreground">{copy.to}</span>
                         {load.destinationCity}, {load.destinationState}
+                        {load.roundTrip ? <>
+                          <span className="mx-1 text-muted-foreground">{copy.to}</span>
+                          {load.originCity}, {load.originState}
+                        </> : null}
                       </span>
                       <span className="ml-2 text-foreground group-hover:underline xl:hidden">
-                        {load.originState}-{load.destinationState}
+                        {loadStateRoute(load)}
                       </span>
                     </Link>
                     {showTruck ? (
@@ -469,7 +473,12 @@ export function LoadsTable({
                     {formatNumber(load.metrics.totalMiles)}
                   </TableCell>
                   <TableCell className="text-right tnum font-medium">
-                    {formatMoney(load.grossRate)}
+                    {formatMoney(loadRevenue(load))}
+                    {load.detentionPay ? (
+                      <span className="block text-2xs font-normal text-muted-foreground">
+                        {interpolate(copy.inclDetention, { amount: formatMoney(load.detentionPay) })}
+                      </span>
+                    ) : null}
                   </TableCell>
                   <TableCell className="text-right tnum text-muted-foreground">
                     {formatRateValue(load.metrics.revenuePerLoadedMile)}

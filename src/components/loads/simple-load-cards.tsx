@@ -4,6 +4,8 @@ import Link from "next/link";
 import { formatLoadReference } from "@/lib/load-reference";
 import { useLanguage } from "@/components/shell/language-provider";
 import { formatMoney } from "@/lib/formatters";
+import { loadRevenue } from "@/lib/calculations";
+import { loadRoute } from "@/lib/load-details";
 import { formatLocaleDate } from "@/lib/i18n-format";
 import type { LoadWithMetrics, Truck } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -24,11 +26,11 @@ export function SimpleLoadCards({ loads, trucks = [], totals }: {
               <div>
                 <p className="text-xs text-muted-foreground">{formatLocaleDate(load.date, locale, "short")}</p>
                 {formatLoadReference(load.loadNumber) ? <p className="mt-1 break-words font-semibold tnum">{formatLoadReference(load.loadNumber)}</p> : null}
-                <p className={cn("mt-1 break-words", formatLoadReference(load.loadNumber) ? "text-sm" : "font-medium")}>{load.originCity}, {load.originState} → {load.destinationCity}, {load.destinationState}</p>
+                <p className={cn("mt-1 break-words", formatLoadReference(load.loadNumber) ? "text-sm" : "font-medium")}>{loadRoute(load)}</p>
                 <p className="mt-1 break-words text-xs text-muted-foreground">{[load.broker, trucks.length > 1 ? trucks.find((truck) => truck.id === load.truckId)?.name : null].filter(Boolean).join(" · ")}</p>
               </div>
               <dl className="grid grid-cols-2 gap-3">
-                <div><dt className="text-xs text-muted-foreground">{dictionary.loads.rate}</dt><dd className="mt-1 font-semibold tnum">{formatMoney(load.grossRate)}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">{dictionary.loads.rate}</dt><dd className="mt-1 font-semibold tnum">{formatMoney(loadRevenue(load))}</dd></div>
                 <div><dt className="text-xs text-muted-foreground">{dictionary.viewMode.tripProfit}</dt><dd className={cn("mt-1 font-semibold tnum", load.metrics.tripProfit >= 0 ? "text-pos" : "text-neg")}>{formatMoney(load.metrics.tripProfit)}</dd></div>
               </dl>
             </Link>

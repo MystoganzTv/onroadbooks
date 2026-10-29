@@ -205,6 +205,17 @@ export interface Load {
   loadedMiles: number;
   deadheadMiles: number;
   grossRate: number;
+  /**
+   * Extra the broker paid for waiting at pickup or delivery, on top of the
+   * rate con. Income: counts in revenue and in the factored invoice, but the
+   * dispatcher's commission is on the rate only. Optional for older records.
+   */
+  detentionPay?: number;
+  /**
+   * One load that goes out and comes back loaded on a single rate
+   * (origin -> destination -> origin). Loaded miles cover both legs.
+   */
+  roundTrip?: boolean;
   /** Fuel attributed directly to this trip (not the Fuel ledger). */
   fuelCost: number;
   tolls: number;

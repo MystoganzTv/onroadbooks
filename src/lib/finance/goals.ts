@@ -16,7 +16,7 @@
  * number the owner has.
  */
 
-import { div, roundMoney, sum } from "../calculations";
+import { div, loadRevenue, roundMoney, sum } from "../calculations";
 import { addDays, dayCount, inRange, parseMonth, daysInMonth, type DateRange, type Period } from "../periods";
 import type { Expense, FinancialGoal, Load, PeriodSummary } from "../types";
 import { isOperatingExpenseCategory } from "./terminology";
@@ -279,7 +279,7 @@ export function calculateDaySnapshot(
   const dayLoads = loads.filter((l) => inRange(l.date, range));
   const dayExpenses = expenses.filter((e) => inRange(e.date, range));
 
-  const revenue = roundMoney(sum(dayLoads, (l) => l.grossRate));
+  const revenue = roundMoney(sum(dayLoads, (l) => loadRevenue(l)));
   const spend = roundMoney(
     sum(dayExpenses.filter((expense) => isOperatingExpenseCategory(expense.category)), (e) => e.amount),
   );

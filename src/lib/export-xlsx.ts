@@ -306,7 +306,7 @@ function detailKpis(table: ReportTable, sheetName: string): DetailKpi[] {
   if (sheetName === "Loads") {
     return [
       { label: "LOADS MOVED", value: table.rows.length, format: "integer", accent: COLORS.navyMid, note: "Loads in this report" },
-      { label: "HOW MUCH YOU EARNED", value: sumRows(table.rows, table, "Gross Rate"), format: "money", accent: COLORS.blue, note: "Booked load revenue" },
+      { label: "HOW MUCH YOU EARNED", value: sumRows(table.rows, table, "Gross Rate") + sumRows(table.rows, table, "Detention"), format: "money", accent: COLORS.blue, note: "Booked load revenue, detention included" },
       { label: "MILES RUN", value: sumRows(table.rows, table, "Total Miles"), format: "integer", accent: COLORS.navyMid, note: "Loaded + deadhead" },
       { label: "AFTER DIRECT TRIP COSTS", value: sumRows(table.rows, table, "Contribution Profit"), format: "money", accent: COLORS.green, note: "Before shared operating costs" },
     ];

@@ -101,6 +101,10 @@ export interface LoadInput {
   otherExpenses: number;
   /** Omitted = keep the stored deduction. */
   claimDeduction?: number;
+  /** Omitted = keep the stored detention. */
+  detentionPay?: number;
+  /** Omitted = keep the stored round-trip flag. */
+  roundTrip?: boolean;
   claimReason?: string | null;
   costsPosted?: boolean;
   status: PaymentStatus;

@@ -169,6 +169,13 @@
       "when": 1793241249054,
       "tag": "0023_dispatch-paid",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793243483997,
+      "tag": "0024_load-detention-round-trip",
+      "breakpoints": true
     }
   ]
 }

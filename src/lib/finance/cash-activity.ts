@@ -1,4 +1,4 @@
-import { roundMoney, sum } from "../calculations";
+import { loadRevenue, roundMoney, sum } from "../calculations";
 import { inRange, type DateRange } from "../periods";
 import type { Expense, Load, PaymentEvent } from "../types";
 import { financialTreatmentOf } from "./terminology";
@@ -24,7 +24,7 @@ export function calculateCashActivity(
   // A reported load is already received income. Legacy payment events are
   // retained for history and must not count that income a second time.
   const collectedRevenue = roundMoney(
-    sum(loads.filter((load) => inRange(load.date, range)), (load) => load.grossRate),
+    sum(loads.filter((load) => inRange(load.date, range)), (load) => loadRevenue(load)),
   );
   const rows = expenses.filter((expense) => inRange(expense.date, range));
   const totalFor = (treatment: ReturnType<typeof financialTreatmentOf>) =>

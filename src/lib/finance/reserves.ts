@@ -16,7 +16,7 @@
  * are always available on top.
  */
 
-import { div, roundMoney } from "../calculations";
+import { div, loadRevenue, roundMoney } from "../calculations";
 import { inRange, type DateRange } from "../periods";
 import type { Load, ReserveAccount, ReserveBalance, ReserveTransaction, Truck } from "../types";
 
@@ -39,7 +39,7 @@ export interface TruckMaintenanceReserve {
  */
 export function calculateTruckMaintenanceReserves(
   trucks: Pick<Truck, "id" | "name" | "active">[],
-  loads: Pick<Load, "truckId" | "date" | "grossRate">[],
+  loads: Pick<Load, "truckId" | "date" | "grossRate" | "detentionPay">[],
   period: DateRange,
   contributionPct: number,
 ): TruckMaintenanceReserve[] {
@@ -48,7 +48,7 @@ export function calculateTruckMaintenanceReserves(
     if (!inRange(load.date, period)) continue;
     revenueByTruck.set(
       load.truckId,
-      roundMoney((revenueByTruck.get(load.truckId) ?? 0) + load.grossRate),
+      roundMoney((revenueByTruck.get(load.truckId) ?? 0) + loadRevenue(load)),
     );
   }
 

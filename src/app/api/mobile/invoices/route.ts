@@ -4,6 +4,8 @@ import { getMobileSession } from "@/lib/auth/mobile";
 import { getRepository } from "@/lib/db";
 import { invoiceAgeDays, invoicePaymentSummary, nextInvoiceNumber } from "@/lib/invoices";
 import { todayISO } from "@/lib/periods";
+import { loadRevenue } from "@/lib/calculations";
+import { loadRoute } from "@/lib/load-details";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,8 +29,8 @@ export async function GET(request: NextRequest) {
     invoiceNumber: load.invoiceNumber ?? null,
     loadNumber: load.loadNumber ?? null,
     customer: load.billToName ?? load.broker ?? null,
-    lane: `${load.originCity}, ${load.originState} → ${load.destinationCity}, ${load.destinationState}`,
-    amount: load.grossRate,
+    lane: loadRoute(load),
+    amount: loadRevenue(load),
     status: "PAID",
     date: load.date,
     invoiceDate: load.invoiceDate ?? null,

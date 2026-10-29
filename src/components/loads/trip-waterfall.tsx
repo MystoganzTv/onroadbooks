@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLanguage } from "@/components/shell/language-provider";
-import { tripExpenseLines } from "@/lib/calculations";
+import { loadRevenue, tripExpenseLines } from "@/lib/calculations";
 import { formatMiles, formatMoney, formatPercent, formatRateValue } from "@/lib/formatters";
 import type { TripCostEstimate } from "@/lib/load-estimates";
 import type { Expense, Load, LoadMetrics } from "@/lib/types";
@@ -33,8 +33,10 @@ export function TripWaterfall({
   const { dictionary } = useLanguage();
   const copy = dictionary.loads;
   const lines = tripExpenseLines(load, expenses, estimate);
+  const revenue = loadRevenue(load);
+  const detention = load.detentionPay ?? 0;
   const scale = (value: number) =>
-    load.grossRate > 0 ? Math.max((Math.abs(value) / load.grossRate) * 100, 0.6) : 0;
+    revenue > 0 ? Math.max((Math.abs(value) / revenue) * 100, 0.6) : 0;
 
   return (
     <Card>
@@ -50,10 +52,19 @@ export function TripWaterfall({
           <Row
             label={copy.grossRate}
             value={load.grossRate}
-            width={100}
+            width={detention > 0 ? scale(load.grossRate) : 100}
             barClass="bg-info"
             strong
           />
+          {detention > 0 ? (
+            <Row
+              label={copy.detention}
+              hint={interpolate(copy.detentionTotal, { amount: formatMoney(revenue) })}
+              value={detention}
+              width={scale(detention)}
+              barClass="bg-info"
+            />
+          ) : null}
 
           <div className="mt-1 space-y-1">
             {lines.map((line) => (
@@ -78,7 +89,7 @@ export function TripWaterfall({
                     })
                     : copy.fuelEstimateHint
                   : line.key === "claims" && line.amount > 0
-                  ? [load.claimReason, interpolate(copy.paidAfterDeduction, { amount: formatMoney(load.grossRate - line.amount) })].filter(Boolean).join(" · ")
+                  ? [load.claimReason, interpolate(copy.paidAfterDeduction, { amount: formatMoney(revenue - line.amount) })].filter(Boolean).join(" · ")
                   : undefined}
                 detail={line.key === "fuel" && line.estimated ? (
                   <FuelCalculation load={load} estimate={estimate} amount={line.amount} />

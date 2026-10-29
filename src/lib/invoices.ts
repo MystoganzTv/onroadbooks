@@ -1,4 +1,4 @@
-import { roundMoney } from "./calculations";
+import { loadRevenue } from "./calculations";
 import type { Load, PaymentEvent, PaymentStatus } from "./types";
 
 export interface InvoicePaymentSummary {
@@ -9,12 +9,12 @@ export interface InvoicePaymentSummary {
 }
 
 export function invoicePaymentSummary(
-  load: Pick<Load, "id" | "grossRate" | "status">,
+  load: Pick<Load, "id" | "grossRate" | "detentionPay" | "status">,
   paymentEvents: PaymentEvent[],
 ): InvoicePaymentSummary {
   const events = paymentEvents.filter((event) => event.loadId === load.id);
   const legacyPaid = events.length === 0 && load.status === "PAID";
-  const collected = roundMoney(load.grossRate);
+  const collected = loadRevenue(load);
   return {
     collected,
     balance: 0,

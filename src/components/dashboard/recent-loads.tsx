@@ -20,6 +20,7 @@ import {
   TableWrapper,
 } from "@/components/ui/table";
 import { formatMoney, formatNumber, formatRateValue } from "@/lib/formatters";
+import { loadRevenue } from "@/lib/calculations";
 import { formatLocaleDate } from "@/lib/i18n-format";
 import type { LoadWithMetrics } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -82,6 +83,10 @@ export function RecentLoads({ loads, simple = false }: { loads: LoadWithMetrics[
                         {load.originCity}, {load.originState}
                         <span className="mx-1 text-muted-foreground">{dictionary.loads.to}</span>
                         {load.destinationCity}, {load.destinationState}
+                        {load.roundTrip ? <>
+                          <span className="mx-1 text-muted-foreground">{dictionary.loads.to}</span>
+                          {load.originCity}, {load.originState}
+                        </> : null}
                       </Link>
                     </TableCell>
                     {!simple ? <><TableCell className="hidden max-w-[12rem] truncate text-muted-foreground sm:table-cell">
@@ -91,7 +96,7 @@ export function RecentLoads({ loads, simple = false }: { loads: LoadWithMetrics[
                       {formatNumber(load.metrics.totalMiles)}
                     </TableCell></> : null}
                     <TableCell className="text-right tnum font-medium">
-                      {formatMoney(load.grossRate)}
+                      {formatMoney(loadRevenue(load))}
                     </TableCell>
                     <TableCell
                       className={cn(

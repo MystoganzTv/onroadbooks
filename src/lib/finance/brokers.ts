@@ -16,7 +16,7 @@
  * smaller one -- that is information, not a bug in the sort.
  */
 
-import { brokerPerformance, div, roundMoney, sum, type BrokerPerformance, type RatingThresholds } from "../calculations";
+import { brokerPerformance, div, loadRevenue, roundMoney, sum, type BrokerPerformance, type RatingThresholds } from "../calculations";
 import type { LoadWithMetrics } from "../types";
 
 export const BROKER_MIN_LOADS = 2;
@@ -58,7 +58,7 @@ export function calculateBrokerPerformance(
       paidRevenue: roundMoney(
         sum(
           group.filter((l) => l.status === "PAID"),
-          (l) => l.grossRate,
+          (l) => loadRevenue(l),
         ),
       ),
       qualified: broker.loadCount >= minLoads,

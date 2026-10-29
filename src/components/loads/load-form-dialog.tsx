@@ -25,6 +25,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -80,6 +82,7 @@ const FIELD_LABELS: Record<string, string> = {
   factoringFee: "Factoring",
   otherExpenses: "Other",
   claimDeduction: "Broker deduction",
+  detentionPay: "Detention",
   claimReason: "Deduction reason",
   date: "Pickup date",
   equipmentLengthFt: "Equipment length",
@@ -120,6 +123,8 @@ interface FormState {
   otherExpenses: string;
   claimDeduction: string;
   claimReason: string;
+  detentionPay: string;
+  roundTrip: boolean;
   jurisdictionMiles: JurisdictionRow[];
   notes: string;
 }
@@ -164,6 +169,8 @@ function emptyState(defaultDate: string, truckId: string): FormState {
     otherExpenses: "",
     claimDeduction: "",
     claimReason: "",
+    detentionPay: "",
+    roundTrip: false,
     jurisdictionMiles: [],
     notes: "",
   };
@@ -196,10 +203,13 @@ function stateFromLoad(load: Load): FormState {
     fuelCost: load.fuelCost ? String(load.fuelCost) : "",
     tolls: load.tolls ? String(load.tolls) : "",
     ...feeState("dispatch", load.dispatchFee, load.grossRate),
-    ...feeState("factoring", load.factoringFee, load.grossRate),
+    // Factoring is taken on the whole invoice, detention included.
+    ...feeState("factoring", load.factoringFee, load.grossRate + (load.detentionPay ?? 0)),
     otherExpenses: load.otherExpenses ? String(load.otherExpenses) : "",
     claimDeduction: load.claimDeduction ? String(load.claimDeduction) : "",
     claimReason: load.claimReason ?? "",
+    detentionPay: load.detentionPay ? String(load.detentionPay) : "",
+    roundTrip: load.roundTrip ?? false,
     jurisdictionMiles: load.jurisdictionMiles.map((row, index) => ({
       id: `${row.jurisdiction}-${index}`,
       jurisdiction: row.jurisdiction,
@@ -491,9 +501,13 @@ export function LoadFormDialog({
   const loadedMiles = toNumber(values.loadedMiles);
   const deadheadMiles = toNumber(values.deadheadMiles);
   const grossRate = toNumber(values.grossRate);
+  const detentionPay = toNumber(values.detentionPay);
+  // What the broker pays in total: the rate con plus detention. Factoring is
+  // charged on all of it; the dispatcher's commission on the rate only.
+  const revenue = roundMoney(grossRate + detentionPay);
   const totalMiles = loadedMiles + deadheadMiles;
   const dispatchAmount = feeAmount(values.dispatchFee, values.dispatchMode, grossRate);
-  const factoringAmount = feeAmount(values.factoringFee, values.factoringMode, grossRate);
+  const factoringAmount = feeAmount(values.factoringFee, values.factoringMode, revenue);
   const assignedJurisdictionMiles = values.jurisdictionMiles.reduce(
     (total, row) => total + toNumber(row.totalMiles),
     0,
@@ -538,6 +552,8 @@ export function LoadFormDialog({
       otherExpenses: toNumber(values.otherExpenses),
       claimDeduction: toNumber(values.claimDeduction),
       claimReason: values.claimReason.trim() || null,
+      detentionPay,
+      roundTrip: values.roundTrip,
       costsPosted: load?.costsPosted ?? true,
       // Preserve legacy metadata. Reporting a load already records its income.
       status: load?.status ?? "PENDING",
@@ -579,7 +595,7 @@ export function LoadFormDialog({
         loadedMiles: copy.loadedMiles, deadheadMiles: copy.deadheadMiles,
         grossRate: copy.grossRate, fuelCost: copy.tripFuel, tolls: copy.tolls,
         dispatchFee: copy.dispatch, factoringFee: copy.factoring, otherExpenses: copy.other,
-        claimDeduction: copy.brokerDeduction, claimReason: copy.deductionReason,
+        claimDeduction: copy.brokerDeduction, claimReason: copy.deductionReason, detentionPay: copy.detention,
         date: copy.pickupDate, equipmentLengthFt: copy.lengthFeet, weightLbs: copy.weight, commodity: copy.commodity,
       } : FIELD_LABELS;
       toast.error(validationMessage(next, fieldLabels));
@@ -744,6 +760,26 @@ export function LoadFormDialog({
                 onManualConfirmedChange={setDestinationLocationOverride}
               />
             </div>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
+                <Label htmlFor="load-round-trip" className="normal-case tracking-normal text-foreground">
+                  {copy.roundTrip}
+                </Label>
+                <Switch
+                  id="load-round-trip"
+                  checked={values.roundTrip}
+                  onCheckedChange={(checked) => set("roundTrip", checked)}
+                  aria-describedby="load-round-trip-hint"
+                />
+              </div>
+              <p id="load-round-trip-hint" className="text-xs text-muted-foreground">
+                {values.roundTrip
+                  ? interpolate(copy.roundTripOn, {
+                      route: `${values.originCity || copy.originCity} → ${values.destinationCity || copy.destinationCity} → ${values.originCity || copy.originCity}`,
+                    })
+                  : copy.roundTripOff}
+              </p>
+            </div>
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <Field
@@ -751,6 +787,7 @@ export function LoadFormDialog({
                 htmlFor="load-loaded"
                 required
                 error={errors.loadedMiles}
+                hint={values.roundTrip ? copy.roundTripMilesHint : undefined}
               >
                 <Input
                   id="load-loaded"
@@ -817,26 +854,46 @@ export function LoadFormDialog({
                 label={copy.factoring}
                 value={values.factoringFee}
                 mode={values.factoringMode}
-                grossRate={grossRate}
+                grossRate={revenue}
                 amount={factoringAmount}
                 error={errors.factoringFee}
                 onValueChange={(value) => set("factoringFee", value)}
                 onModeChange={(mode) => setValues((prev) => ({
                   ...prev,
                   factoringMode: mode,
-                  factoringFee: convertFee(prev.factoringFee, prev.factoringMode, mode, grossRate),
+                  factoringFee: convertFee(prev.factoringFee, prev.factoringMode, mode, revenue),
                 }))}
               />
             </div>
             {/* After delivery: what the broker took off the rate (damage, shortage).
                 The rate above stays what the rate con says. */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <Field
+                label={copy.detention}
+                htmlFor="load-detention"
+                error={errors.detentionPay}
+                hint={detentionPay > 0 && grossRate > 0
+                  ? interpolate(copy.detentionTotal, { amount: formatMoney(revenue) })
+                  : copy.detentionHint}
+              >
+                <Input
+                  id="load-detention"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.01"
+                  value={values.detentionPay}
+                  onChange={(e) => set("detentionPay", e.target.value)}
+                  aria-invalid={Boolean(errors.detentionPay)}
+                  placeholder="0.00"
+                />
+              </Field>
               <Field
                 label={copy.brokerDeduction}
                 htmlFor="load-claim"
                 error={errors.claimDeduction}
                 hint={toNumber(values.claimDeduction) > 0 && grossRate > 0
-                  ? interpolate(copy.paidAfterDeduction, { amount: formatMoney(grossRate - toNumber(values.claimDeduction)) })
+                  ? interpolate(copy.paidAfterDeduction, { amount: formatMoney(revenue - toNumber(values.claimDeduction)) })
                   : copy.brokerDeductionHint}
               >
                 <Input
@@ -930,8 +987,8 @@ export function LoadFormDialog({
             {/* Live calculation strip -- the reason this form is fast. */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-md border border-border bg-surface-sunken px-3 py-2.5 sm:grid-cols-3">
               <Calc label={copy.totalMiles} value={formatMiles(totalMiles)} />
-              {!simple && <Calc label={copy.perLoaded} value={formatRateValue(div(grossRate, loadedMiles))} />}
-              {!simple && <Calc label={copy.perTotal} value={formatRateValue(div(grossRate, totalMiles))} />}
+              {!simple && <Calc label={copy.perLoaded} value={formatRateValue(div(revenue, loadedMiles))} />}
+              {!simple && <Calc label={copy.perTotal} value={formatRateValue(div(revenue, totalMiles))} />}
             </div>
 
             <FormSection title={dictionary.viewMode.loadDetails} expanded={!simple}>

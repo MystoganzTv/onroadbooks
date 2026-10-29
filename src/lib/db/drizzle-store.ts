@@ -1497,6 +1497,8 @@ export class DrizzleRepository implements Repository {
           factoringFee: num(row.factoringFee),
           otherExpenses: num(row.otherExpenses),
           claimDeduction: num(row.claimDeduction),
+          detentionPay: num(row.detentionPay),
+          roundTrip: row.roundTrip,
           claimReason: row.claimReason,
           dispatchPaidDate: row.dispatchPaidDate
             ? isoDate(row.dispatchPaidDate)
@@ -1634,6 +1636,8 @@ export class DrizzleRepository implements Repository {
       factoringFee: roundMoney(input.factoringFee),
       otherExpenses: roundMoney(input.otherExpenses),
       claimDeduction: input.claimDeduction === undefined ? undefined : roundMoney(input.claimDeduction),
+      detentionPay: input.detentionPay === undefined ? undefined : roundMoney(input.detentionPay),
+      roundTrip: input.roundTrip,
       claimReason: input.claimReason === undefined ? undefined : input.claimReason?.trim() || null,
       costsPosted: input.costsPosted ?? true,
       status: input.status,

@@ -31,7 +31,7 @@
  * tie back to the single number on the dashboard would be worse than none.
  */
 
-import { div, roundMoney, sum, summarizePeriod } from "../calculations";
+import { div, loadRevenue, roundMoney, sum, summarizePeriod } from "../calculations";
 import { expensesForTruck, loadsForTruck, overheadExpenses } from "../fleet";
 import { inRange, type DateRange } from "../periods";
 import type { Expense, FinancialSettings, Load, PaymentEvent, Truck } from "../types";
@@ -92,7 +92,7 @@ function contributionFor(
   const unitLoads = loadsForTruck(loads, truck.id).filter((l) => inRange(l.date, range));
   const unitExpenses = expensesForTruck(expenses, truck.id).filter((e) => inRange(e.date, range));
 
-  const revenue = roundMoney(sum(unitLoads, (l) => l.grossRate));
+  const revenue = roundMoney(sum(unitLoads, (l) => loadRevenue(l)));
   const directCosts = roundMoney(
     sum(
       unitExpenses.filter((expense) => isOperatingExpense(expense)),
