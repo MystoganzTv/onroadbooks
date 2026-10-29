@@ -8,6 +8,7 @@ import { fieldErrorsFrom } from "@/lib/actions/types";
 import { getMobileSession, requireMobileWrite } from "@/lib/auth/mobile";
 import { loadSchema } from "@/lib/schemas";
 import { getRepository } from "@/lib/db";
+import { rememberBrokerContact } from "@/lib/remember-broker-contact";
 import {
   loadsInPeriod,
   roundMoney,
@@ -117,6 +118,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const load = await gate.repository.createLoad(parsed.data);
+    await rememberBrokerContact(gate.repository, parsed.data);
     for (const path of ["/dashboard", "/loads", "/dispatchers", "/reports", "/truck"]) revalidatePath(path);
     return NextResponse.json({ id: load.id }, { status: 201 });
   } catch (error) {

@@ -14,6 +14,7 @@ import { ConfirmDelete } from "@/components/shared/confirm-delete";
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { saveBrokerContactsAction } from "@/lib/actions/brokers";
 import { contactPhoneHref, contactPhoneLabel } from "@/lib/brokers";
+import { contactFromName } from "@/lib/broker-contacts";
 import { interpolate } from "@/lib/i18n/dictionaries";
 import { localizedClientError } from "@/lib/i18n/errors";
 import type { BrokerContact } from "@/lib/types";
@@ -23,16 +24,20 @@ export function BrokerContactsCard({
   brokerId,
   brokerName,
   contacts,
+  unsaved = [],
   canManage,
 }: {
   brokerId: string;
   brokerName: string;
   contacts: BrokerContact[];
+  /** Names written on this broker's loads that are not saved contacts yet. */
+  unsaved?: string[];
   canManage: boolean;
 }) {
   const { dictionary } = useLanguage();
   const copy = dictionary.brokers;
   const router = useRouter();
+  const [saving, setSaving] = React.useState<string | null>(null);
 
   async function save(next: BrokerContact[], message: string): Promise<boolean> {
     const result = await saveBrokerContactsAction(brokerId, next);
@@ -49,12 +54,11 @@ export function BrokerContactsCard({
     <CardHeader className="flex-row items-start justify-between gap-3">
       <div>
         <CardTitle>{copy.contacts}</CardTitle>
-        <p className="mt-1 text-xs text-muted-foreground">{copy.contactsHint}</p>
       </div>
       {canManage ? <ContactDialog brokerName={brokerName} onSave={(contact) => save([...contacts, contact], copy.contactSaved)} /> : null}
     </CardHeader>
     <CardContent className="p-0">
-      {contacts.length === 0 ? <p className="p-4 text-sm text-muted-foreground">{copy.noContacts}</p> : <ul className="divide-y divide-border">
+      {contacts.length === 0 ? (unsaved.length ? null : <p className="p-4 text-sm text-muted-foreground">{copy.noContacts}</p>) : <ul className="divide-y divide-border">
         {contacts.map((contact) => <li key={contact.id} className="flex items-start gap-3 p-4">
           <UserRound className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
           <div className="min-w-0 flex-1 space-y-1">
@@ -80,6 +84,29 @@ export function BrokerContactsCard({
           </div> : null}
         </li>)}
       </ul>}
+      {unsaved.length ? <ul className={contacts.length ? "divide-y divide-border border-t border-border" : "divide-y divide-border"}>
+        {unsaved.map((name) => <li key={name} className="flex items-center gap-3 p-4">
+          <UserRound className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">{name}</p>
+            <p className="text-xs text-muted-foreground">{copy.onLoadsOnly}</p>
+          </div>
+          {canManage ? <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={saving === name}
+            onClick={async () => {
+              setSaving(name);
+              await save([...contacts, contactFromName(newContactId(), name)], copy.contactSaved);
+              setSaving(null);
+            }}
+          >
+            {saving === name ? <Loader2 className="animate-spin" /> : <Plus />}
+            {copy.saveContact}
+          </Button> : null}
+        </li>)}
+      </ul> : null}
     </CardContent>
   </Card>;
 }

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireWritableSession } from "@/lib/auth";
 import { getRepository } from "@/lib/db";
+import { rememberBrokerContact } from "@/lib/remember-broker-contact";
 import { locationReviewMessage, reviewLocation } from "@/lib/locations";
 import { loadSchema, type LoadFormValues } from "@/lib/schemas";
 import { fieldErrorsFrom, type ActionResult } from "./types";
@@ -85,7 +86,9 @@ export async function createLoadAction(values: unknown): Promise<ActionResult> {
         fieldErrors: locationErrors,
       };
     }
-    const load = await getRepository(session.businessId).createLoad(parsed.data);
+    const repository = getRepository(session.businessId);
+    const load = await repository.createLoad(parsed.data);
+    await rememberBrokerContact(repository, parsed.data);
     revalidateAll();
     return { ok: true, id: load.id };
   } catch (error) {
@@ -109,7 +112,9 @@ export async function updateLoadAction(id: string, values: unknown): Promise<Act
         fieldErrors: locationErrors,
       };
     }
-    await getRepository(session.businessId).updateLoad(id, parsed.data);
+    const repository = getRepository(session.businessId);
+    await repository.updateLoad(id, parsed.data);
+    await rememberBrokerContact(repository, parsed.data);
     revalidateAll();
     revalidatePath(`/loads/${id}`);
     return { ok: true, id };

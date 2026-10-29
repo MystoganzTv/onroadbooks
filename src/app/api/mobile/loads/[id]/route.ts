@@ -1,3 +1,4 @@
+import { rememberBrokerContact } from "@/lib/remember-broker-contact";
 import { revalidatePath } from "next/cache";
 import { bareLoadReference } from "@/lib/load-reference";
 import { NextResponse, type NextRequest } from "next/server";
@@ -159,6 +160,7 @@ export async function PATCH(
 
   try {
     await repository.updateLoad(id, parsed.data);
+    await rememberBrokerContact(repository, parsed.data);
     for (const path of TOUCHED) revalidatePath(path);
     revalidatePath(`/loads/${id}`);
     return NextResponse.json({ id });

@@ -1,3 +1,4 @@
+import { unsavedContactNames } from "@/lib/broker-contacts";
 import Link from "next/link";
 import { LinkRow } from "@/components/shared/link-row";
 import { formatLoadReference } from "@/lib/load-reference";
@@ -46,7 +47,7 @@ export default async function BrokerPage({ params }: { params: Promise<{ id: str
       {broker.notes ? <div className="sm:col-span-2 lg:col-span-3"><p className="label-xs">{copy.notes}</p><p className="mt-1 whitespace-pre-wrap text-sm">{broker.notes}</p></div> : null}
       {!broker.phone && !broker.email && !broker.mcNumber && !broker.address && !broker.notes ? <p className="text-sm text-muted-foreground">{copy.noContact}</p> : null}
     </CardContent></Card>
-    <BrokerContactsCard brokerId={broker.id} brokerName={broker.name} contacts={contacts} canManage={canManage} />
+    <BrokerContactsCard brokerId={broker.id} brokerName={broker.name} contacts={contacts} unsaved={unsavedContactNames(contacts, loads)} canManage={canManage} />
     <Card><CardHeader><CardTitle>{copy.history}</CardTitle><span className="text-sm tnum">{loads.length} {copy.loads.toLowerCase()} · {formatMoney(loads.reduce((sum, load) => sum + load.grossRate, 0))}{deducted > 0 ? <span className="text-neg"> · −{formatMoney(deducted)} {dictionary.loads.brokerDeduction.toLowerCase()}</span> : null}</span></CardHeader>
       <CardContent className="p-0">{!loads.length ? <p className="p-4 text-sm text-muted-foreground">{copy.noLoads}</p> : <div className="overflow-x-auto"><Table>
         <TableHeader><TableRow><TableHead>{dictionary.loads.pickup}</TableHead><TableHead>{dictionary.drivers.load}</TableHead><TableHead>{dictionary.drivers.route}</TableHead><TableHead>{copy.bookedWith}</TableHead><TableHead className="text-right">{copy.revenue}</TableHead></TableRow></TableHeader>

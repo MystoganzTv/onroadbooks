@@ -1,4 +1,5 @@
 import "server-only";
+import { rememberBrokerContact } from "@/lib/remember-broker-contact";
 
 import { z } from "zod";
 import { formatLoadReference } from "@/lib/load-reference";
@@ -282,7 +283,9 @@ export async function saveManagement(repository: Repository, resource: ResourceI
     case "loads": {
       const current = dataset.loads.find(row => row.id === id);
       const parsed = loadSchema.parse({ ...current, ...values });
-      return (id ? await repository.updateLoad(id, parsed) : await repository.createLoad(parsed)).id;
+      const saved = id ? await repository.updateLoad(id, parsed) : await repository.createLoad(parsed);
+      await rememberBrokerContact(repository, parsed);
+      return saved.id;
     }
     case "invoices": {
       const load = dataset.loads.find(row => row.id === id);
