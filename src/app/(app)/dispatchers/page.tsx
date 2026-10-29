@@ -50,6 +50,7 @@ export default async function DispatchersPage({ searchParams }: { searchParams: 
           loadId={load.id}
           pickup={load.date}
           loadLabel={formatLoadReference(load.loadNumber) ?? loadRoute(load)}
+          route={formatLoadReference(load.loadNumber) ? loadRoute(load) : null}
           broker={load.broker ?? "—"}
           fee={formatMoney(selected.loadFees[load.id] ?? 0)}
           paidDate={load.dispatchPaidDate ?? null}

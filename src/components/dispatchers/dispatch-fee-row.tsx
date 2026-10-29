@@ -24,6 +24,7 @@ export function DispatchFeeRow({
   loadId,
   pickup,
   loadLabel,
+  route,
   broker,
   fee,
   paidDate,
@@ -32,6 +33,8 @@ export function DispatchFeeRow({
   loadId: string;
   pickup: string;
   loadLabel: string;
+  /** "Glendale, AZ → Chicago, IL"; shown under the PO so the load is recognisable. */
+  route: string | null;
   broker: string;
   fee: string;
   paidDate: string | null;
@@ -94,6 +97,7 @@ export function DispatchFeeRow({
       <TableCell className="whitespace-nowrap">{pickup}</TableCell>
       <TableCell>
         <Link className="text-primary hover:underline" href={`/loads/${loadId}`}>{loadLabel}</Link>
+        {route ? <span className="mt-0.5 block text-xs text-muted-foreground">{route}</span> : null}
       </TableCell>
       <TableCell>{broker}</TableCell>
       <TableCell className="text-right tabular-nums">{fee}</TableCell>
