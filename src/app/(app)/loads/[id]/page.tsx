@@ -47,7 +47,7 @@ import {
   formatRateValue,
 } from "@/lib/formatters";
 import { categoryLabel } from "@/lib/categories";
-import { equipmentTypeLabel, loadCapacityLabel, loadLegs, loadRoute } from "@/lib/load-details";
+import { loadLegs, loadRoute } from "@/lib/load-details";
 import { todayISO } from "@/lib/periods";
 import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
 import { formatLocaleDate } from "@/lib/i18n-format";
@@ -264,12 +264,6 @@ export default async function LoadDetailPage({
                 label={copy.delivery}
                 value={load.deliveryDate ? formatLocaleDate(load.deliveryDate, locale, "long") : copy.notSpecified}
               />
-              <Metric
-                label={copy.equipment}
-                value={equipmentTypeLabel(load.equipmentType, locale)}
-                sub={load.equipmentLengthFt ? `${load.equipmentLengthFt} ft` : undefined}
-              />
-              <Metric label={copy.loadType} value={loadCapacityLabel(load.loadCapacity, locale)} />
               <Metric
                 label={copy.weight}
                 value={load.weightLbs ? `${formatNumber(load.weightLbs)} lb` : copy.notSpecified}

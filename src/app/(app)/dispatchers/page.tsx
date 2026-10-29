@@ -40,7 +40,6 @@ export default async function DispatchersPage({ searchParams }: { searchParams: 
         </DispatcherRow>)}</TableBody>
       </Table>}
     </CardContent></Card>
-    <p className="text-xs text-muted-foreground">{copy.feesHint}</p>
     {selected ? <Card>
       <CardHeader><CardTitle>{selected.name}</CardTitle><p className="text-sm text-muted-foreground">{selected.profile?.notes}</p></CardHeader>
       <CardContent className="overflow-x-auto p-0"><Table>

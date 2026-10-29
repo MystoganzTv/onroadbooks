@@ -438,16 +438,8 @@ export function LoadsTable({
                   </TableCell>
                   <TableCell className="max-w-[13rem] text-muted-foreground">
                     <span className="block truncate">{load.broker ?? "--"}</span>
-                    {load.equipmentType || load.loadCapacity || load.commodity ? (
-                      <span className="block truncate text-2xs text-muted-foreground/80">
-                        {[
-                          load.equipmentType ? equipmentTypeLabel(load.equipmentType, locale) : null,
-                          load.loadCapacity ? loadCapacityLabel(load.loadCapacity, locale) : null,
-                          load.commodity,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </span>
+                    {load.commodity ? (
+                      <span className="block truncate text-2xs text-muted-foreground/80">{load.commodity}</span>
                     ) : null}
                   </TableCell>
                   <TableCell className="text-right tnum">

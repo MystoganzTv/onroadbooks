@@ -55,7 +55,6 @@ import { loadSchema } from "@/lib/schemas";
 import { todayISO } from "@/lib/periods";
 import { orderedTrucks } from "@/lib/fleet";
 import { IFTA_JURISDICTIONS } from "@/lib/ifta";
-import { EQUIPMENT_TYPES, LOAD_CAPACITIES } from "@/lib/load-details";
 import type { Driver, EquipmentType, Load, LoadCapacity, Truck } from "@/lib/types";
 import { toNumber } from "@/lib/utils";
 import { LocationFields } from "./location-fields";
@@ -684,7 +683,7 @@ export function LoadFormDialog({
           <DialogTitle>
             {isEdit ? copy.editLoad : copy.addLoad}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="sr-only">
             {copy.formDescription}
           </DialogDescription>
           <ViewModeToggle />
@@ -692,12 +691,24 @@ export function LoadFormDialog({
 
         <DialogBody>
           <form id="load-form" onSubmit={submit} className="space-y-4" noValidate>
+            {/* 1. The load: who it is, who booked it, who ran it. */}
+            <FormGroup title={copy.sectionLoad}>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label={copy.loadNumberLabel} htmlFor="load-number" error={errors.loadNumber}>
+                <Input
+                  id="load-number"
+                  maxLength={60}
+                  aria-invalid={Boolean(errors.loadNumber)}
+                  value={values.loadNumber}
+                  onChange={(e) => set("loadNumber", e.target.value)}
+                  placeholder="38525680"
+                />
+              </Field>
             {showTruck ? (
               <Field
                 label={copy.truck}
                 htmlFor="load-truck"
                 required
-                hint={copy.truckHint}
               >
                 <Select value={values.truckId} onValueChange={(value) => set("truckId", value)}>
                   <SelectTrigger id="load-truck">
@@ -714,306 +725,9 @@ export function LoadFormDialog({
                 </Select>
               </Field>
             ) : null}
-
-            {driverOptions.length > 0 ? (
-              <Field
-                label={copy.driver}
-                htmlFor="load-driver"
-                hint={copy.driverHint}
-              >
-                <Select value={values.driverId} onValueChange={(value) => set("driverId", value)}>
-                  <SelectTrigger id="load-driver">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="UNASSIGNED">{copy.unassigned}</SelectItem>
-                    {driverOptions.map((driver) => (
-                      <SelectItem key={driver.id} value={driver.id}>
-                        {driver.name}{driver.active ? "" : ` (${copy.inactive})`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-            ) : null}
-
-            {/* The PO is the load's identifier (a lane repeats, the PO never
-                does), so it sits up top in Simple mode too. */}
-            <div className="grid grid-cols-2 gap-3">
-              <Field label={copy.loadNumberLabel} htmlFor="load-number" error={errors.loadNumber}>
-                <Input
-                  id="load-number"
-                  maxLength={60}
-                  aria-invalid={Boolean(errors.loadNumber)}
-                  value={values.loadNumber}
-                  onChange={(e) => set("loadNumber", e.target.value)}
-                  placeholder="38525680"
-                />
-              </Field>
-              <Field label={values.extraLegs.length ? interpolate(copy.legPickup, { n: 1 }) : copy.pickupDate} htmlFor="load-date" required error={errors.date}>
-                <Input
-                  id="load-date"
-                  type="date"
-                  value={values.date}
-                  onChange={(e) => set("date", e.target.value)}
-                  aria-invalid={Boolean(errors.date)}
-                  required
-                />
-              </Field>
-            </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
-              <LocationFields
-                id="load-origin"
-                label={copy.originCity}
-                city={values.originCity}
-                state={values.originState}
-                cityError={errors.originCity}
-                stateError={errors.originState}
-                enabled={open}
-                manualConfirmed={locationOverrides.origin}
-                onCityChange={(value) => set("originCity", value)}
-                onStateChange={(value) => set("originState", value)}
-                onManualConfirmedChange={setOriginLocationOverride}
-              />
-              <LocationFields
-                id="load-destination"
-                label={copy.destinationCity}
-                city={values.destinationCity}
-                state={values.destinationState}
-                cityError={errors.destinationCity}
-                stateError={errors.destinationState}
-                enabled={open}
-                manualConfirmed={locationOverrides.destination}
-                onCityChange={(value) => set("destinationCity", value)}
-                onStateChange={(value) => set("destinationState", value)}
-                onManualConfirmedChange={setDestinationLocationOverride}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <Field
-                label={values.extraLegs.length ? copy.firstLegMiles : copy.loadedMiles}
-                htmlFor="load-loaded"
-                required
-                error={errors.loadedMiles}
-                hint={values.extraLegs.length ? interpolate(copy.legsTotal, { miles: formatMiles(loadedMiles), count: values.extraLegs.length + 1 }) : undefined}
-              >
-                <Input
-                  id="load-loaded"
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  step={1}
-                  value={values.loadedMiles}
-                  onChange={(e) => set("loadedMiles", e.target.value)}
-                  aria-invalid={Boolean(errors.loadedMiles)}
-                  required
-                />
-              </Field>
-              <Field
-                label={copy.deadheadMiles}
-                htmlFor="load-deadhead"
-                required
-                error={errors.deadheadMiles}
-              >
-                <Input
-                  id="load-deadhead"
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  step={1}
-                  value={values.deadheadMiles}
-                  onChange={(e) => set("deadheadMiles", e.target.value)}
-                  aria-invalid={Boolean(errors.deadheadMiles)}
-                  required
-                />
-              </Field>
-              <Field label={copy.grossRate} htmlFor="load-rate" required error={errors.grossRate}>
-                <Input
-                  id="load-rate"
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="0.01"
-                  value={values.grossRate}
-                  onChange={(e) => set("grossRate", e.target.value)}
-                  aria-invalid={Boolean(errors.grossRate)}
-                  required
-                />
-              </Field>
-            </div>
-            {/* More legs under the same PO and rate: the way back, a second drop. */}
-            <div className="space-y-3">
-              {values.extraLegs.map((leg, index) => {
-                const prefix = `load-leg-${index}`;
-                const setLeg = (patch: Partial<LegRow>) => setValues((prev) => ({
-                  ...prev,
-                  extraLegs: prev.extraLegs.map((row) => (row.id === leg.id ? { ...row, ...patch } : row)),
-                }));
-                return (
-                  <fieldset key={leg.id} className="space-y-3 rounded-md border border-border p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <legend className="text-sm font-semibold">{interpolate(copy.legTitle, { n: index + 2 })}</legend>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground hover:text-neg"
-                        aria-label={interpolate(copy.removeLeg, { n: index + 2 })}
-                        onClick={() => setValues((prev) => ({ ...prev, extraLegs: prev.extraLegs.filter((row) => row.id !== leg.id) }))}
-                      >
-                        <Trash2 />
-                      </Button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label={copy.pickupDate} htmlFor={`${prefix}-pickup`} required>
-                        <Input id={`${prefix}-pickup`} type="date" required value={leg.pickupDate} onChange={(e) => setLeg({ pickupDate: e.target.value })} />
-                      </Field>
-                      <Field label={copy.deliveryDate} htmlFor={`${prefix}-delivery`}>
-                        <Input id={`${prefix}-delivery`} type="date" min={leg.pickupDate || undefined} value={leg.deliveryDate} onChange={(e) => setLeg({ deliveryDate: e.target.value })} />
-                      </Field>
-                    </div>
-                    <div className="grid grid-cols-[1fr_4.5rem] gap-3 sm:grid-cols-[1fr_4.5rem_1fr_4.5rem]">
-                      <Field label={copy.originCity} htmlFor={`${prefix}-origin`} required>
-                        <Input id={`${prefix}-origin`} required maxLength={120} value={leg.originCity} onChange={(e) => setLeg({ originCity: e.target.value })} />
-                      </Field>
-                      <Field label={copy.legState} htmlFor={`${prefix}-origin-state`} required>
-                        <Input id={`${prefix}-origin-state`} required maxLength={2} className="uppercase" value={leg.originState} onChange={(e) => setLeg({ originState: e.target.value.toUpperCase() })} />
-                      </Field>
-                      <Field label={copy.destinationCity} htmlFor={`${prefix}-destination`} required>
-                        <Input id={`${prefix}-destination`} required maxLength={120} value={leg.destinationCity} onChange={(e) => setLeg({ destinationCity: e.target.value })} />
-                      </Field>
-                      <Field label={copy.legState} htmlFor={`${prefix}-destination-state`} required>
-                        <Input id={`${prefix}-destination-state`} required maxLength={2} className="uppercase" value={leg.destinationState} onChange={(e) => setLeg({ destinationState: e.target.value.toUpperCase() })} />
-                      </Field>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                      <Field label={copy.loadedMiles} htmlFor={`${prefix}-miles`} required>
-                        <Input id={`${prefix}-miles`} type="number" inputMode="numeric" min={1} step={1} required value={leg.miles} onChange={(e) => setLeg({ miles: e.target.value })} />
-                      </Field>
-                    </div>
-                  </fieldset>
-                );
-              })}
-              {errors.extraLegs ? <p className="text-xs text-neg">{errors.extraLegs}</p> : null}
-              {values.extraLegs.length < 5 ? (
-                <div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setValues((prev) => {
-                      const last = prev.extraLegs[prev.extraLegs.length - 1];
-                      // Start where the last leg ended and head back to the first pickup -- the usual shape.
-                      return {
-                        ...prev,
-                        extraLegs: [...prev.extraLegs, {
-                          id: `leg-${Date.now()}`,
-                          pickupDate: last?.deliveryDate || prev.deliveryDate || prev.date,
-                          deliveryDate: "",
-                          originCity: last?.destinationCity ?? prev.destinationCity,
-                          originState: last?.destinationState ?? prev.destinationState,
-                          destinationCity: prev.originCity,
-                          destinationState: prev.originState,
-                          miles: "",
-                        }],
-                      };
-                    })}
-                  >
-                    <Plus />
-                    {copy.addLeg}
-                  </Button>
-                  <p className="mt-1 text-xs text-muted-foreground">{copy.addLegHint}</p>
-                </div>
-              ) : null}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <FeeField
-                id="load-dispatch"
-                label={copy.dispatch}
-                value={values.dispatchFee}
-                mode={values.dispatchMode}
-                grossRate={grossRate}
-                amount={dispatchAmount}
-                error={errors.dispatchFee}
-                onValueChange={(value) => set("dispatchFee", value)}
-                onModeChange={(mode) => setValues((prev) => ({
-                  ...prev,
-                  dispatchMode: mode,
-                  dispatchFee: convertFee(prev.dispatchFee, prev.dispatchMode, mode, grossRate),
-                }))}
-              />
-              <FeeField
-                id="load-factoring"
-                label={copy.factoring}
-                value={values.factoringFee}
-                mode={values.factoringMode}
-                grossRate={revenue}
-                amount={factoringAmount}
-                error={errors.factoringFee}
-                onValueChange={(value) => set("factoringFee", value)}
-                onModeChange={(mode) => setValues((prev) => ({
-                  ...prev,
-                  factoringMode: mode,
-                  factoringFee: convertFee(prev.factoringFee, prev.factoringMode, mode, revenue),
-                }))}
-              />
-            </div>
-            {/* After delivery: what the broker took off the rate (damage, shortage).
-                The rate above stays what the rate con says. */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <Field
-                label={copy.detention}
-                htmlFor="load-detention"
-                error={errors.detentionPay}
-                hint={detentionPay > 0 && grossRate > 0
-                  ? interpolate(copy.detentionTotal, { amount: formatMoney(revenue) })
-                  : copy.detentionHint}
-              >
-                <Input
-                  id="load-detention"
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="0.01"
-                  value={values.detentionPay}
-                  onChange={(e) => set("detentionPay", e.target.value)}
-                  aria-invalid={Boolean(errors.detentionPay)}
-                  placeholder="0.00"
-                />
-              </Field>
-              <Field
-                label={copy.brokerDeduction}
-                htmlFor="load-claim"
-                error={errors.claimDeduction}
-                hint={toNumber(values.claimDeduction) > 0 && grossRate > 0
-                  ? interpolate(copy.paidAfterDeduction, { amount: formatMoney(revenue - toNumber(values.claimDeduction)) })
-                  : copy.brokerDeductionHint}
-              >
-                <Input
-                  id="load-claim"
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="0.01"
-                  value={values.claimDeduction}
-                  onChange={(e) => set("claimDeduction", e.target.value)}
-                  aria-invalid={Boolean(errors.claimDeduction)}
-                  placeholder="0.00"
-                />
-              </Field>
-              <Field label={copy.deductionReason} htmlFor="load-claim-reason" error={errors.claimReason}>
-                <Input
-                  id="load-claim-reason"
-                  maxLength={200}
-                  value={values.claimReason}
-                  onChange={(e) => set("claimReason", e.target.value)}
-                  aria-invalid={Boolean(errors.claimReason)}
-                  placeholder={copy.deductionReasonPlaceholder}
-                />
-              </Field>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label={copy.loadSource} htmlFor="load-source" error={errors.sourceKind} hint={copy.loadSourceHint}>
+              <Field label={copy.loadSource} htmlFor="load-source" error={errors.sourceKind}>
                 <Select value={values.sourceKind} onValueChange={(value) => setValues(prev => ({ ...prev, sourceKind: value as FormState["sourceKind"], sourceName: "" }))}>
                   <SelectTrigger id="load-source" aria-invalid={Boolean(errors.sourceKind)}><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -1060,7 +774,7 @@ export function LoadFormDialog({
                   </button>
                 ) : null}
               </Field>
-              <Field label={copy.brokerContact} htmlFor="load-broker-contact" error={errors.brokerContact} hint={copy.brokerContactHint}>
+              <Field label={copy.brokerContact} htmlFor="load-broker-contact" error={errors.brokerContact}>
                 <Input
                   id="load-broker-contact"
                   list="broker-contact-list"
@@ -1077,16 +791,44 @@ export function LoadFormDialog({
                 </datalist>
               </Field>
             </div>
-            {/* Live calculation strip -- the reason this form is fast. */}
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-md border border-border bg-surface-sunken px-3 py-2.5 sm:grid-cols-3">
-              <Calc label={copy.totalMiles} value={formatMiles(totalMiles)} />
-              {!simple && <Calc label={copy.perLoaded} value={formatRateValue(div(revenue, loadedMiles))} />}
-              {!simple && <Calc label={copy.perTotal} value={formatRateValue(div(revenue, totalMiles))} />}
-            </div>
+            {driverOptions.length > 0 ? (
+              <Field
+                label={copy.driver}
+                htmlFor="load-driver"
+              >
+                <Select value={values.driverId} onValueChange={(value) => set("driverId", value)}>
+                  <SelectTrigger id="load-driver">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="UNASSIGNED">{copy.unassigned}</SelectItem>
+                    {driverOptions.map((driver) => (
+                      <SelectItem key={driver.id} value={driver.id}>
+                        {driver.name}{driver.active ? "" : ` (${copy.inactive})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            ) : null}
+            </FormGroup>
 
-            <FormSection title={dictionary.viewMode.loadDetails} expanded={!simple}>
+            {/* 2. Route & miles: each leg carries its own dates, route and miles. */}
+            <FormGroup title={copy.sectionRoute}>
+            <div className={values.extraLegs.length ? "space-y-3 rounded-md border border-border p-3" : "space-y-3"}>
+              {values.extraLegs.length ? <p className="text-sm font-semibold">{interpolate(copy.legTitle, { n: 1 })}</p> : null}
             <div className="grid grid-cols-2 gap-3">
-              <Field label={values.extraLegs.length ? interpolate(copy.legDelivery, { n: 1 }) : copy.deliveryDate} htmlFor="load-delivery-date" error={errors.deliveryDate}>
+              <Field label={copy.pickupDate} htmlFor="load-date" required error={errors.date}>
+                <Input
+                  id="load-date"
+                  type="date"
+                  value={values.date}
+                  onChange={(e) => set("date", e.target.value)}
+                  aria-invalid={Boolean(errors.date)}
+                  required
+                />
+              </Field>
+              <Field label={copy.deliveryDate} htmlFor="load-delivery-date" error={errors.deliveryDate}>
                 <Input
                   id="load-delivery-date"
                   type="date"
@@ -1096,75 +838,285 @@ export function LoadFormDialog({
                   aria-invalid={Boolean(errors.deliveryDate)}
                 />
               </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
+              <LocationFields
+                id="load-origin"
+                label={copy.originCity}
+                city={values.originCity}
+                state={values.originState}
+                cityError={errors.originCity}
+                stateError={errors.originState}
+                enabled={open}
+                manualConfirmed={locationOverrides.origin}
+                onCityChange={(value) => set("originCity", value)}
+                onStateChange={(value) => set("originState", value)}
+                onManualConfirmedChange={setOriginLocationOverride}
+              />
+              <LocationFields
+                id="load-destination"
+                label={copy.destinationCity}
+                city={values.destinationCity}
+                state={values.destinationState}
+                cityError={errors.destinationCity}
+                stateError={errors.destinationState}
+                enabled={open}
+                manualConfirmed={locationOverrides.destination}
+                onCityChange={(value) => set("destinationCity", value)}
+                onStateChange={(value) => set("destinationState", value)}
+                onManualConfirmedChange={setDestinationLocationOverride}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <Field
-                label={copy.endingOdometer}
-                htmlFor="load-ending-odometer"
-                error={errors.endingOdometer}
-                hint={copy.actualDashboard}
+                label={copy.loadedMiles}
+                htmlFor="load-loaded"
+                required
+                error={errors.loadedMiles}
+                hint={values.extraLegs.length ? interpolate(copy.legsTotal, { miles: formatMiles(loadedMiles), count: values.extraLegs.length + 1 }) : undefined}
               >
                 <Input
-                  id="load-ending-odometer"
+                  id="load-loaded"
                   type="number"
                   inputMode="numeric"
                   min={0}
-                  max={5_000_000}
                   step={1}
-                  value={values.endingOdometer}
-                  onChange={(e) => set("endingOdometer", e.target.value)}
-                  aria-invalid={Boolean(errors.endingOdometer)}
-                  placeholder={copy.optional}
+                  value={values.loadedMiles}
+                  onChange={(e) => set("loadedMiles", e.target.value)}
+                  aria-invalid={Boolean(errors.loadedMiles)}
+                  required
+                />
+              </Field>
+              <Field
+                label={copy.deadheadMiles}
+                htmlFor="load-deadhead"
+                required
+                error={errors.deadheadMiles}
+              >
+                <Input
+                  id="load-deadhead"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  step={1}
+                  value={values.deadheadMiles}
+                  onChange={(e) => set("deadheadMiles", e.target.value)}
+                  aria-invalid={Boolean(errors.deadheadMiles)}
+                  required
                 />
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
-              <Field label={copy.equipment} htmlFor="load-equipment" className="sm:col-span-2">
-                <Select
-                  value={values.equipmentType}
-                  onValueChange={(value) => set("equipmentType", value as FormState["equipmentType"])}
-                >
-                  <SelectTrigger id="load-equipment">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="UNSPECIFIED">{copy.notSpecified}</SelectItem>
-                    {EQUIPMENT_TYPES.map((option) => (
-                      <SelectItem key={option.id} value={option.id}>
-                        {locale === "es" ? option.labelEs : option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label={copy.loadType} htmlFor="load-capacity">
-                <Select
-                  value={values.loadCapacity}
-                  onValueChange={(value) => set("loadCapacity", value as FormState["loadCapacity"])}
-                >
-                  <SelectTrigger id="load-capacity">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="UNSPECIFIED">{copy.notSpecified}</SelectItem>
-                    {LOAD_CAPACITIES.map((option) => (
-                      <SelectItem key={option.id} value={option.id}>
-                        {locale === "es" ? option.labelEs : option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label={copy.lengthFeet} htmlFor="load-length" error={errors.equipmentLengthFt}>
+            </div>
+            {/* More legs under the same PO and rate: the way back, a second drop. */}
+            <div className="space-y-3">
+              {values.extraLegs.map((leg, index) => {
+                const prefix = `load-leg-${index}`;
+                const setLeg = (patch: Partial<LegRow>) => setValues((prev) => ({
+                  ...prev,
+                  extraLegs: prev.extraLegs.map((row) => (row.id === leg.id ? { ...row, ...patch } : row)),
+                }));
+                return (
+                  <fieldset key={leg.id} className="space-y-3 rounded-md border border-border p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <legend className="text-sm font-semibold">{interpolate(copy.legTitle, { n: index + 2 })}</legend>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-neg"
+                        aria-label={interpolate(copy.removeLeg, { n: index + 2 })}
+                        onClick={() => setValues((prev) => ({ ...prev, extraLegs: prev.extraLegs.filter((row) => row.id !== leg.id) }))}
+                      >
+                        <Trash2 />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label={copy.pickupDate} htmlFor={`${prefix}-pickup`} required>
+                        <Input id={`${prefix}-pickup`} type="date" required value={leg.pickupDate} onChange={(e) => setLeg({ pickupDate: e.target.value })} />
+                      </Field>
+                      <Field label={copy.deliveryDate} htmlFor={`${prefix}-delivery`}>
+                        <Input id={`${prefix}-delivery`} type="date" min={leg.pickupDate || undefined} value={leg.deliveryDate} onChange={(e) => setLeg({ deliveryDate: e.target.value })} />
+                      </Field>
+                    </div>
+                    <div className="grid grid-cols-[1fr_4.5rem] gap-3 sm:grid-cols-[1fr_4.5rem_1fr_4.5rem]">
+                      <Field label={copy.originCity} htmlFor={`${prefix}-origin`} required>
+                        <Input id={`${prefix}-origin`} required maxLength={120} value={leg.originCity} onChange={(e) => setLeg({ originCity: e.target.value })} />
+                      </Field>
+                      <Field label={copy.stateCode} htmlFor={`${prefix}-origin-state`} required>
+                        <Input id={`${prefix}-origin-state`} required maxLength={2} className="uppercase" value={leg.originState} onChange={(e) => setLeg({ originState: e.target.value.toUpperCase() })} />
+                      </Field>
+                      <Field label={copy.destinationCity} htmlFor={`${prefix}-destination`} required>
+                        <Input id={`${prefix}-destination`} required maxLength={120} value={leg.destinationCity} onChange={(e) => setLeg({ destinationCity: e.target.value })} />
+                      </Field>
+                      <Field label={copy.stateCode} htmlFor={`${prefix}-destination-state`} required>
+                        <Input id={`${prefix}-destination-state`} required maxLength={2} className="uppercase" value={leg.destinationState} onChange={(e) => setLeg({ destinationState: e.target.value.toUpperCase() })} />
+                      </Field>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label={copy.loadedMiles} htmlFor={`${prefix}-miles`} required>
+                        <Input id={`${prefix}-miles`} type="number" inputMode="numeric" min={1} step={1} required value={leg.miles} onChange={(e) => setLeg({ miles: e.target.value })} />
+                      </Field>
+                    </div>
+                  </fieldset>
+                );
+              })}
+              {errors.extraLegs ? <p className="text-xs text-neg">{errors.extraLegs}</p> : null}
+              {values.extraLegs.length < 5 ? (
+                <div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setValues((prev) => {
+                      const last = prev.extraLegs[prev.extraLegs.length - 1];
+                      // Start where the last leg ended and head back to the first pickup -- the usual shape.
+                      return {
+                        ...prev,
+                        extraLegs: [...prev.extraLegs, {
+                          id: `leg-${Date.now()}`,
+                          pickupDate: last?.deliveryDate || prev.deliveryDate || prev.date,
+                          deliveryDate: "",
+                          originCity: last?.destinationCity ?? prev.destinationCity,
+                          originState: last?.destinationState ?? prev.destinationState,
+                          destinationCity: prev.originCity,
+                          destinationState: prev.originState,
+                          miles: "",
+                        }],
+                      };
+                    })}
+                  >
+                    <Plus />
+                    {copy.addLeg}
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+            </FormGroup>
+
+            {/* 3. Pay: the rate con, what came on top, and what came off. */}
+            <FormGroup title={copy.sectionPay}>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label={copy.grossRate} htmlFor="load-rate" required error={errors.grossRate}>
                 <Input
-                  id="load-length"
+                  id="load-rate"
                   type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={100}
-                  step={1}
-                  value={values.equipmentLengthFt}
-                  onChange={(e) => set("equipmentLengthFt", e.target.value)}
-                  aria-invalid={Boolean(errors.equipmentLengthFt)}
-                  placeholder="26"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.01"
+                  value={values.grossRate}
+                  onChange={(e) => set("grossRate", e.target.value)}
+                  aria-invalid={Boolean(errors.grossRate)}
+                  required
+                />
+              </Field>
+              <Field
+                label={copy.detention}
+                htmlFor="load-detention"
+                error={errors.detentionPay}
+                hint={detentionPay > 0 && grossRate > 0
+                  ? interpolate(copy.detentionTotal, { amount: formatMoney(revenue) })
+                  : undefined}
+              >
+                <Input
+                  id="load-detention"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.01"
+                  value={values.detentionPay}
+                  onChange={(e) => set("detentionPay", e.target.value)}
+                  aria-invalid={Boolean(errors.detentionPay)}
+                  placeholder="0.00"
+                />
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <FeeField
+                id="load-dispatch"
+                label={copy.dispatch}
+                value={values.dispatchFee}
+                mode={values.dispatchMode}
+                grossRate={grossRate}
+                amount={dispatchAmount}
+                error={errors.dispatchFee}
+                onValueChange={(value) => set("dispatchFee", value)}
+                onModeChange={(mode) => setValues((prev) => ({
+                  ...prev,
+                  dispatchMode: mode,
+                  dispatchFee: convertFee(prev.dispatchFee, prev.dispatchMode, mode, grossRate),
+                }))}
+              />
+              <FeeField
+                id="load-factoring"
+                label={copy.factoring}
+                value={values.factoringFee}
+                mode={values.factoringMode}
+                grossRate={revenue}
+                amount={factoringAmount}
+                error={errors.factoringFee}
+                onValueChange={(value) => set("factoringFee", value)}
+                onModeChange={(mode) => setValues((prev) => ({
+                  ...prev,
+                  factoringMode: mode,
+                  factoringFee: convertFee(prev.factoringFee, prev.factoringMode, mode, revenue),
+                }))}
+              />
+            </div>
+            {/* After delivery: what the broker took off the rate (damage, shortage). */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field
+                label={copy.brokerDeduction}
+                htmlFor="load-claim"
+                error={errors.claimDeduction}
+                hint={toNumber(values.claimDeduction) > 0 && grossRate > 0
+                  ? interpolate(copy.paidAfterDeduction, { amount: formatMoney(revenue - toNumber(values.claimDeduction)) })
+                  : undefined}
+              >
+                <Input
+                  id="load-claim"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.01"
+                  value={values.claimDeduction}
+                  onChange={(e) => set("claimDeduction", e.target.value)}
+                  aria-invalid={Boolean(errors.claimDeduction)}
+                  placeholder="0.00"
+                />
+              </Field>
+              <Field label={copy.deductionReason} htmlFor="load-claim-reason" error={errors.claimReason}>
+                <Input
+                  id="load-claim-reason"
+                  maxLength={200}
+                  value={values.claimReason}
+                  onChange={(e) => set("claimReason", e.target.value)}
+                  aria-invalid={Boolean(errors.claimReason)}
+                  placeholder={copy.deductionReasonPlaceholder}
+                />
+              </Field>
+            </div>
+            {/* Live calculation strip -- the reason this form is fast. */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-md border border-border bg-surface-sunken px-3 py-2.5 sm:grid-cols-3">
+              <Calc label={copy.totalMiles} value={formatMiles(totalMiles)} />
+              {!simple && <Calc label={copy.perLoaded} value={formatRateValue(div(revenue, loadedMiles))} />}
+              {!simple && <Calc label={copy.perTotal} value={formatRateValue(div(revenue, totalMiles))} />}
+            </div>
+            </FormGroup>
+
+            {/* 4. Optional extras. Equipment is not asked: the truck is known. */}
+            <FormSection
+              title={copy.optionalDetails}
+              expanded={Boolean(values.commodity || values.weightLbs || values.endingOdometer || values.notes)}
+            >
+            <div className="grid grid-cols-2 gap-3">
+              <Field label={copy.commodity} htmlFor="load-commodity" error={errors.commodity}>
+                <Input
+                  id="load-commodity"
+                  maxLength={120}
+                  value={values.commodity}
+                  onChange={(e) => set("commodity", e.target.value)}
+                  aria-invalid={Boolean(errors.commodity)}
+                  placeholder={copy.generalFreight}
                 />
               </Field>
               <Field label={copy.weightPounds} htmlFor="load-weight" error={errors.weightLbs}>
@@ -1181,18 +1133,25 @@ export function LoadFormDialog({
                   placeholder={copy.optional}
                 />
               </Field>
-              <Field label={copy.commodity} htmlFor="load-commodity" error={errors.commodity}>
+            </div>
+              <Field
+                label={copy.endingOdometer}
+                htmlFor="load-ending-odometer"
+                error={errors.endingOdometer}
+              >
                 <Input
-                  id="load-commodity"
-                  maxLength={120}
-                  value={values.commodity}
-                  onChange={(e) => set("commodity", e.target.value)}
-                  aria-invalid={Boolean(errors.commodity)}
-                  placeholder={copy.generalFreight}
+                  id="load-ending-odometer"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={5_000_000}
+                  step={1}
+                  value={values.endingOdometer}
+                  onChange={(e) => set("endingOdometer", e.target.value)}
+                  aria-invalid={Boolean(errors.endingOdometer)}
+                  placeholder={copy.optional}
                 />
               </Field>
-            </div>
-
             <Field label={copy.notes} htmlFor="load-notes" error={errors.notes}>
               <Textarea
                 id="load-notes"
@@ -1204,7 +1163,6 @@ export function LoadFormDialog({
                 rows={2}
               />
             </Field>
-
             </FormSection>
 
             {showIfta ? <FormSection title={copy.iftaMiles} expanded={!simple}>
@@ -1212,9 +1170,6 @@ export function LoadFormDialog({
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="label-xs">{copy.iftaMiles}</p>
-                  <p className="mt-1 text-2xs text-muted-foreground">
-                    {copy.iftaDescription}
-                  </p>
                 </div>
                 <Button
                   type="button"
@@ -1450,5 +1405,15 @@ function FeeField({
         </div>
       </div>
     </Field>
+  );
+}
+
+/** One titled step of the form, in the order an owner fills a load in. */
+function FormGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-3 border-t border-border pt-4 first:border-t-0 first:pt-0">
+      <h3 className="label-xs text-muted-foreground">{title}</h3>
+      {children}
+    </section>
   );
 }
