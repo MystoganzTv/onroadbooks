@@ -210,6 +210,12 @@ export interface Load {
   tolls: number;
   /** Dispatch commission on this load. */
   dispatchFee: number;
+  /**
+   * The day the owner paid this load's dispatch commission to the dispatcher,
+   * or null while it is still owed. A record only: it posts nothing to the
+   * ledger (the commission is already there as the load's dispatch cost).
+   */
+  dispatchPaidDate?: string | null;
   /** Factoring fee on this load's invoice. */
   factoringFee: number;
   otherExpenses: number;

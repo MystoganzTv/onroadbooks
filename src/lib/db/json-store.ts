@@ -338,6 +338,7 @@ function migrate(dataset: Dataset): Dataset {
     load.otherExpenses ??= 0;
     load.claimDeduction ??= 0;
     load.claimReason ??= null;
+    load.dispatchPaidDate ??= null;
     load.driverId ??= null;
     load.driverPay ??= 0;
     load.jurisdictionMiles = normalizeJurisdictionMiles(load.jurisdictionMiles);
@@ -460,6 +461,7 @@ function loadFromInput(
     otherExpenses: roundMoney(input.otherExpenses),
     claimDeduction: input.claimDeduction === undefined ? existing?.claimDeduction ?? 0 : roundMoney(input.claimDeduction),
     claimReason: input.claimReason === undefined ? existing?.claimReason ?? null : input.claimReason?.trim() || null,
+    dispatchPaidDate: existing?.dispatchPaidDate ?? null,
     driverPay: 0,
     costsPosted: input.costsPosted ?? true,
     status: input.status,
@@ -1124,6 +1126,15 @@ export class JsonRepository implements Repository {
         throw new Error("Jurisdiction miles cannot exceed total trip miles.");
       }
       load.jurisdictionMiles = normalized;
+      return load;
+    }, this.businessId);
+  }
+
+  async setLoadDispatchPaid(id: string, paidDate: string | null): Promise<Load> {
+    return mutate((dataset) => {
+      const load = dataset.loads.find((row) => row.id === id);
+      if (!load) throw new Error(`Load ${id} not found`);
+      load.dispatchPaidDate = paidDate;
       return load;
     }, this.businessId);
   }

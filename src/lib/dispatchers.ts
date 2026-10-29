@@ -18,15 +18,23 @@ export function dispatcherDirectory(dataset: Pick<Dataset, "dispatchers" | "load
     entries.push(expense);
     expensesByLoad.set(expense.loadId, entries);
   }
-  const rows = new Map<string, { name: string; profile?: Dispatcher; loads: Load[]; fees: number }>();
-  for (const profile of dataset.dispatchers ?? []) rows.set(profile.nameKey, { name: profile.name, profile, loads: [], fees: 0 });
+  type Row = { name: string; profile?: Dispatcher; loads: Load[]; fees: number; paid: number; owed: number; loadFees: Record<string, number> };
+  const rows = new Map<string, Row>();
+  const empty = (name: string, profile?: Dispatcher): Row => ({ name, profile, loads: [], fees: 0, paid: 0, owed: 0, loadFees: {} });
+  for (const profile of dataset.dispatchers ?? []) rows.set(profile.nameKey, empty(profile.name, profile));
   for (const load of dataset.loads) {
     if (load.sourceKind !== "DISPATCHER" || !load.sourceName?.trim()) continue;
     const key = brokerNameKey(load.sourceName);
-    const row = rows.get(key) ?? { name: load.sourceName.trim(), loads: [], fees: 0 };
+    const row = rows.get(key) ?? empty(load.sourceName.trim());
+    const fee = tripExpenseLines(load, expensesByLoad.get(load.id) ?? []).find(line => line.key === "dispatch")?.amount ?? 0;
     row.loads.push(load);
-    row.fees += tripExpenseLines(load, expensesByLoad.get(load.id) ?? []).find(line => line.key === "dispatch")?.amount ?? 0;
+    row.loadFees[load.id] = fee;
+    row.fees += fee;
+    if (load.dispatchPaidDate) row.paid += fee;
+    else row.owed += fee;
     rows.set(key, row);
   }
-  return [...rows.values()].map(row => ({ ...row, fees: roundMoney(row.fees) })).sort((a, b) => a.name.localeCompare(b.name));
+  return [...rows.values()]
+    .map(row => ({ ...row, fees: roundMoney(row.fees), paid: roundMoney(row.paid), owed: roundMoney(row.owed) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }

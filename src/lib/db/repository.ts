@@ -376,6 +376,8 @@ export interface Repository {
   updateLoadJurisdictionMiles(id: string, mileage: Load["jurisdictionMiles"]): Promise<Load>;
   /** Updates the load field that owns a generated trip-cost ledger row. */
   updateLoadExpense(id: string, amount: number): Promise<Load>;
+  /** Marks the dispatch commission paid on a day, or owed again with null. Touches nothing else. */
+  setLoadDispatchPaid(id: string, paidDate: string | null): Promise<Load>;
   deleteLoad(id: string): Promise<void>;
 
   createDriver(input: DriverInput): Promise<Driver>;

@@ -37,6 +37,7 @@ export const load = pgTable("Load", {
   otherExpenses: numeric("otherExpenses", { precision: 12, scale: 2 }).notNull().default(sql`0`),
   claimDeduction: numeric("claimDeduction", { precision: 12, scale: 2 }).notNull().default(sql`0`),
   claimReason: text("claimReason"),
+  dispatchPaidDate: date("dispatchPaidDate", { mode: "string" }),
   driverPay: numeric("driverPay", { precision: 12, scale: 2 }).notNull().default(sql`0`),
   costsPosted: boolean("costsPosted").notNull().default(false),
   status: enums.paymentStatus("status").notNull().default("PENDING"),

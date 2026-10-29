@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatLoadReference } from "@/lib/load-reference";
 import { DispatcherFormDialog } from "@/components/dispatchers/dispatcher-form-dialog";
+import { DispatchFeeRow } from "@/components/dispatchers/dispatch-fee-row";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -8,7 +9,6 @@ import { requireSession } from "@/lib/auth";
 import { getDataset } from "@/lib/db";
 import { brokerNameKey } from "@/lib/brokers";
 import { dispatcherDirectory } from "@/lib/dispatchers";
-import { tripExpenseLines } from "@/lib/calculations";
 import { getAppLocale } from "@/lib/i18n-server";
 import { getWebDictionary } from "@/lib/i18n/dictionaries";
 import { formatMoney } from "@/lib/formatters";
@@ -28,11 +28,12 @@ export default async function DispatchersPage({ searchParams }: { searchParams: 
     <PageHeader title={copy.title} description={copy.description} actions={canManage ? <DispatcherFormDialog /> : undefined} />
     <Card><CardContent className="overflow-x-auto p-0">
       {rows.length === 0 ? <p className="p-6 text-sm text-muted-foreground">{copy.empty}</p> : <Table>
-        <TableHeader><TableRow><TableHead>{copy.name}</TableHead><TableHead>{copy.contact}</TableHead><TableHead className="text-right">{copy.loads}</TableHead><TableHead className="text-right">{copy.fees}</TableHead><TableHead /></TableRow></TableHeader>
+        <TableHeader><TableRow><TableHead>{copy.name}</TableHead><TableHead>{copy.contact}</TableHead><TableHead className="text-right">{copy.loads}</TableHead><TableHead className="text-right">{copy.fees}</TableHead><TableHead className="text-right">{copy.owedColumn}</TableHead><TableHead /></TableRow></TableHeader>
         <TableBody>{rows.map(row => <TableRow key={brokerNameKey(row.name)}>
           <TableCell><Link className="font-medium text-primary hover:underline" href={`/dispatchers?name=${encodeURIComponent(row.name)}`}>{row.name}</Link></TableCell>
           <TableCell><p>{row.profile?.phone}</p><p>{row.profile?.email}</p></TableCell>
           <TableCell className="text-right">{row.loads.length}</TableCell><TableCell className="text-right tabular-nums">{formatMoney(row.fees)}</TableCell>
+          <TableCell className={row.owed > 0 ? "text-right font-semibold tabular-nums" : "text-right tabular-nums text-muted-foreground"}>{formatMoney(row.owed)}</TableCell>
           <TableCell>{canManage ? <DispatcherFormDialog dispatcher={row.profile} initialName={row.name} /> : null}</TableCell>
         </TableRow>)}</TableBody>
       </Table>}
@@ -41,12 +42,23 @@ export default async function DispatchersPage({ searchParams }: { searchParams: 
     {selected ? <Card>
       <CardHeader><CardTitle>{selected.name}</CardTitle><p className="text-sm text-muted-foreground">{selected.profile?.notes}</p></CardHeader>
       <CardContent className="overflow-x-auto p-0"><Table>
-        <TableHeader><TableRow><TableHead>{copy.date}</TableHead><TableHead>{copy.load}</TableHead><TableHead>{copy.broker}</TableHead><TableHead className="text-right">{copy.fee}</TableHead></TableRow></TableHeader>
-        <TableBody>{[...selected.loads].sort((a, b) => b.date.localeCompare(a.date)).map(load => <TableRow key={load.id}>
-          <TableCell className="whitespace-nowrap">{load.date}</TableCell><TableCell><Link className="text-primary hover:underline" href={`/loads/${load.id}`}>{formatLoadReference(load.loadNumber) ?? `${load.originCity} → ${load.destinationCity}`}</Link></TableCell><TableCell>{load.broker ?? "—"}</TableCell>
-          <TableCell className="text-right tabular-nums">{formatMoney(tripExpenseLines(load, dataset.expenses).find(line => line.key === "dispatch")?.amount ?? 0)}</TableCell>
-        </TableRow>)}</TableBody>
-      </Table><p className="border-t border-border p-4 text-right font-semibold">{copy.total}: {formatMoney(selected.fees)}</p></CardContent>
+        <TableHeader><TableRow><TableHead>{copy.paidColumn}</TableHead><TableHead>{copy.date}</TableHead><TableHead>{copy.load}</TableHead><TableHead>{copy.broker}</TableHead><TableHead className="text-right">{copy.fee}</TableHead></TableRow></TableHeader>
+        <TableBody>{[...selected.loads].sort((a, b) => b.date.localeCompare(a.date)).map(load => <DispatchFeeRow
+          key={load.id}
+          loadId={load.id}
+          pickup={load.date}
+          loadLabel={formatLoadReference(load.loadNumber) ?? `${load.originCity} → ${load.destinationCity}`}
+          broker={load.broker ?? "—"}
+          fee={formatMoney(selected.loadFees[load.id] ?? 0)}
+          paidDate={load.dispatchPaidDate ?? null}
+          canManage={canManage}
+        />)}</TableBody>
+      </Table>
+      <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1 border-t border-border p-4 text-sm">
+        <span className="text-muted-foreground">{copy.paidTotal}: <span className="tabular-nums text-primary">{formatMoney(selected.paid)}</span></span>
+        <span className="text-muted-foreground">{copy.owedTotal}: <span className="font-semibold tabular-nums text-foreground">{formatMoney(selected.owed)}</span></span>
+        <span className="font-semibold">{copy.total}: <span className="tabular-nums">{formatMoney(selected.fees)}</span></span>
+      </div></CardContent>
     </Card> : null}
   </div>;
 }

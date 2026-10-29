@@ -644,6 +644,28 @@ describe("load IFTA mileage", () => {
   });
 });
 
+describe("dispatch commission paid", () => {
+  it("marks paid and owed again without touching the load's money or ledger, and survives an edit", async () => {
+    const load = await repo.createLoad(loadInput({ sourceKind: "DISPATCHER", sourceName: "Dayana", dispatchFee: 115, grossRate: 1900 }));
+    assert.equal(load.dispatchPaidDate ?? null, null);
+    const before = await repo.getDataset();
+    const ledgerBefore = before.expenses.filter((row) => row.loadId === load.id).map((row) => [row.id, row.amount]);
+
+    const paid = await repo.setLoadDispatchPaid(load.id, "2026-10-28");
+    assert.equal(paid.dispatchPaidDate, "2026-10-28");
+    assert.equal(paid.dispatchFee, 115);
+    assert.equal(paid.grossRate, 1900);
+    const after = await repo.getDataset();
+    assert.deepEqual(after.expenses.filter((row) => row.loadId === load.id).map((row) => [row.id, row.amount]), ledgerBefore);
+
+    const edited = await repo.updateLoad(load.id, loadInput({ sourceKind: "DISPATCHER", sourceName: "Dayana", dispatchFee: 120, grossRate: 1900 }));
+    assert.equal(edited.dispatchPaidDate, "2026-10-28", "editing the load must not clear the payment");
+
+    const owed = await repo.setLoadDispatchPaid(load.id, null);
+    assert.equal(owed.dispatchPaidDate ?? null, null);
+  });
+});
+
 describe("deleting a load", () => {
   it("unlinks its costs instead of deleting them", async () => {
     const load = await repo.createLoad({

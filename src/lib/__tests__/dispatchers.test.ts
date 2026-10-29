@@ -23,6 +23,23 @@ describe("dispatcher records", () => {
     assert.equal(rows[0].profile?.id, "alex");
   });
 
+  it("splits each dispatcher's commissions into paid and still owed", () => {
+    const dataset = buildSeedDataset();
+    const base = dataset.loads[0];
+    dataset.loads = [
+      { ...base, id: "a", sourceKind: "DISPATCHER", sourceName: "Martin", dispatchFee: 203.1, dispatchPaidDate: "2026-10-22" },
+      { ...base, id: "b", sourceKind: "DISPATCHER", sourceName: "Martin", dispatchFee: 120, dispatchPaidDate: null },
+      { ...base, id: "c", sourceKind: "DISPATCHER", sourceName: "Martin", dispatchFee: 18 },
+    ];
+    dataset.expenses = [];
+    dataset.dispatchers = [];
+    const [row] = dispatcherDirectory(dataset);
+    assert.equal(row.fees, 341.1);
+    assert.equal(row.paid, 203.1);
+    assert.equal(row.owed, 138);
+    assert.equal(row.loadFees.a, 203.1);
+  });
+
   it("requires a name for dispatcher attribution and accepts older clients without source fields", () => {
     const load = { ...buildSeedDataset().loads[0], sourceKind: "DISPATCHER", sourceName: "" };
     assert.equal(loadSchema.safeParse(load).success, false);

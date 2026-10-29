@@ -1498,6 +1498,9 @@ export class DrizzleRepository implements Repository {
           otherExpenses: num(row.otherExpenses),
           claimDeduction: num(row.claimDeduction),
           claimReason: row.claimReason,
+          dispatchPaidDate: row.dispatchPaidDate
+            ? isoDate(row.dispatchPaidDate)
+            : null,
           driverPay: num(row.driverPay),
           costsPosted: row.costsPosted,
           status: row.status as PaymentStatus,
@@ -1845,6 +1848,23 @@ export class DrizzleRepository implements Repository {
       );
     });
 
+    const dataset = await this.getDataset();
+    return dataset.loads.find((load) => load.id === id)!;
+  }
+
+  async setLoadDispatchPaid(
+    id: string,
+    paidDate: string | null,
+  ): Promise<Load> {
+    const client = await this.clientProvider();
+    const business = await this.business(client);
+    const updated = await client
+      .update(s.load)
+      .set(updateValues(s.load, { dispatchPaidDate: paidDate }))
+      .where(and(eq(s.load.id, id), eq(s.load.businessId, business.id)))
+      .returning({ id: s.load.id });
+    if (updated.length === 0)
+      throw new Error("That load does not belong to this workspace.");
     const dataset = await this.getDataset();
     return dataset.loads.find((load) => load.id === id)!;
   }

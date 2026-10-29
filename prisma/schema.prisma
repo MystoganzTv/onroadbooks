@@ -531,6 +531,9 @@ model Load {
   /// What the broker took off the rate after delivery (damage, shortage).
   claimDeduction Decimal @default(0) @db.Decimal(12, 2)
   claimReason    String?
+  /// The day the dispatch commission was paid to the dispatcher; null while owed.
+  /// A record only -- it posts nothing to the ledger.
+  dispatchPaidDate DateTime? @db.Date
   /// Frozen when a driver settlement is paid. The matching ledger expense is
   /// linked through DriverSettlementLine, so load profitability and the P&L
   /// show the same dollars without double-counting them.

@@ -1124,6 +1124,7 @@ export class PrismaRepository implements Repository {
           otherExpenses: num(row.otherExpenses),
           claimDeduction: num(row.claimDeduction),
           claimReason: row.claimReason,
+          dispatchPaidDate: row.dispatchPaidDate ? isoDate(row.dispatchPaidDate) : null,
           driverPay: num(row.driverPay),
           costsPosted: row.costsPosted,
           status: row.status as PaymentStatus,
@@ -1385,6 +1386,18 @@ export class PrismaRepository implements Repository {
       });
     });
 
+    const dataset = await this.getDataset();
+    return dataset.loads.find((load) => load.id === id)!;
+  }
+
+  async setLoadDispatchPaid(id: string, paidDate: string | null): Promise<Load> {
+    const client = await getClient();
+    const business = await this.business(client);
+    const { count } = await client.load.updateMany({
+      where: { id, businessId: business.id },
+      data: { dispatchPaidDate: paidDate ? toDate(paidDate) : null },
+    });
+    if (count === 0) throw new Error("That load does not belong to this workspace.");
     const dataset = await this.getDataset();
     return dataset.loads.find((load) => load.id === id)!;
   }

@@ -409,8 +409,10 @@ const en = {
     add: "Add dispatcher", edit: "Edit dispatcher", contactDetails: "Contact details", formDescription: "Save a name and optional contact details for your records.",
     name: "Name", phone: "Phone", email: "Email", notes: "Notes", contact: "Contact", cancel: "Cancel", save: "Save dispatcher", saving: "Saving…",
     empty: "No dispatchers yet. Add one here or enter their name when recording a load.",
-    loads: "Loads", fees: "Recorded fees", feesHint: "All recorded loads. These are dispatch commissions, not an unpaid balance; payments are not tracked here.",
+    loads: "Loads", fees: "Recorded fees", feesHint: "All recorded loads. Open a dispatcher and tap each load once you have paid their commission.",
     date: "Pickup", load: "Load", broker: "Broker", fee: "Dispatch fee", total: "Total recorded fees",
+    paidColumn: "Paid", markPaid: "Mark paid", paidOn: "Paid {date}", owed: "Owed", owedColumn: "Still owed",
+    paidTotal: "Paid", owedTotal: "Still owed",
   },
   brokers: {
     title: "Brokers", description: "Contacts and load history in one place.", add: "Add broker", edit: "Edit broker",
@@ -2321,8 +2323,10 @@ const es: DictionaryShape<typeof en> = {
     add: "Agregar dispatcher", edit: "Editar dispatcher", contactDetails: "Datos de contacto", formDescription: "Guarda un nombre y sus datos de contacto opcionales para tu registro.",
     name: "Nombre", phone: "Teléfono", email: "Correo", notes: "Notas", contact: "Contacto", cancel: "Cancelar", save: "Guardar dispatcher", saving: "Guardando…",
     empty: "Todavía no hay dispatchers. Agrega uno aquí o escribe su nombre al registrar una carga.",
-    loads: "Cargas", fees: "Comisiones registradas", feesHint: "Todas las cargas registradas. Son comisiones de dispatch, no un saldo pendiente; aquí no se registran pagos.",
+    loads: "Cargas", fees: "Comisiones registradas", feesHint: "Todas las cargas registradas. Abre un dispatcher y toca cada carga cuando le hayas pagado su comisión.",
     date: "Recogida", load: "Carga", broker: "Broker", fee: "Comisión de dispatch", total: "Total de comisiones registradas",
+    paidColumn: "Pagado", markPaid: "Marcar pagado", paidOn: "Pagado {date}", owed: "Pendiente", owedColumn: "Por pagar",
+    paidTotal: "Pagado", owedTotal: "Por pagar",
   },
   brokers: {
     title: "Brokers", description: "Contactos e historial de cargas en un solo lugar.", add: "Agregar broker", edit: "Editar broker",
