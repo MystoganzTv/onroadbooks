@@ -197,6 +197,8 @@ export default async function LoadDetailPage({
         <div className="min-w-0 space-y-4 lg:col-span-2">
         <LoadScoreBreakdown score={score} showBasis="trip" />
 
+        <LoadDaysCard perDay={perDay} />
+
         <TripWaterfall load={load} metrics={metrics} expenses={linkedExpenses} estimate={estimate} />
 
         <LoadProfitabilityCard
@@ -256,8 +258,6 @@ export default async function LoadDetailPage({
             ) : null}
           </CardContent>
         </Card>
-
-        <LoadDaysCard perDay={perDay} />
         </div>
 
         <div className="min-w-0 space-y-4">
