@@ -43,6 +43,7 @@ import {
   expensesInPeriod,
   loadsInPeriod,
   pctChangeOrNull,
+  roundMoney,
   thresholdsFromSettings,
   withMetricsAll,
 } from "@/lib/calculations";
@@ -99,6 +100,7 @@ import { getWebDictionary } from "@/lib/i18n/dictionaries";
 import { formatLocalePeriod } from "@/lib/i18n-format";
 import { getAppLocale } from "@/lib/i18n-server";
 import { workedDays } from "@/lib/worked-days";
+import { driverPayForLoad } from "@/lib/finance/load-days";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getAppLocale();
@@ -260,6 +262,8 @@ export default async function DashboardPage({
 
   const buckets = periodBuckets(loads, expenses, period);
   const daysWorked = workedDays(loads, period, today);
+  // Profit after trip costs and driver pay, as the load page's per-day view counts it.
+  const workedDaysProfit = roundMoney(periodLoads.reduce((total, load) => total + load.metrics.tripProfit - driverPayForLoad(load, drivers), 0));
   const query = scopeQuery(period, truckId);
   const brokerNames = savedBrokerNames(loads, dataset.brokers);
   const hasLedgerHistory = allLoads.length > 0 || allExpenses.length > 0;
@@ -447,7 +451,7 @@ export default async function DashboardPage({
 
         {/* ---- Days worked ------------------------------------------------- */}
         <Section title={copy.daysWorkedTitle} description={periodDisplayLabel}>
-          <WorkedDaysCard report={daysWorked} revenue={summary.bookedRevenue} />
+          <WorkedDaysCard report={daysWorked} profit={workedDaysProfit} />
         </Section>
 
         {/* ---- Revenue and expenses ---------------------------------------- */}

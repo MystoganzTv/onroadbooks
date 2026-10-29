@@ -48,15 +48,22 @@ export interface WorkedDaysReport {
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Every calendar day a load occupied, pickup through delivery. */
-export function tripDays(load: Pick<Load, "date" | "deliveryDate">): string[] {
-  if (!ISO_DAY.test(load.date)) return [];
-  const end =
-    load.deliveryDate && ISO_DAY.test(load.deliveryDate) && load.deliveryDate >= load.date
-      ? load.deliveryDate
-      : load.date;
-  const days = eachDay({ start: load.date, end });
-  return days.length > MAX_TRIP_DAYS ? [load.date] : days;
+function legDays(pickup: string, delivery: string | null | undefined): string[] {
+  if (!ISO_DAY.test(pickup)) return [];
+  const end = delivery && ISO_DAY.test(delivery) && delivery >= pickup ? delivery : pickup;
+  const days = eachDay({ start: pickup, end });
+  return days.length > MAX_TRIP_DAYS ? [pickup] : days;
+}
+
+/**
+ * Every calendar day a load had freight on the truck: each leg's pickup
+ * through its delivery. A day between two legs with nothing on board is not
+ * a worked day -- it shows as off, the way the owner counts it.
+ */
+export function tripDays(load: Pick<Load, "date" | "deliveryDate" | "extraLegs">): string[] {
+  const days = new Set(legDays(load.date, load.deliveryDate));
+  for (const leg of load.extraLegs ?? []) for (const day of legDays(leg.pickupDate, leg.deliveryDate)) days.add(day);
+  return [...days].sort();
 }
 
 /**
@@ -66,7 +73,7 @@ export function tripDays(load: Pick<Load, "date" | "deliveryDate">): string[] {
  * fleet's, in which case a day counts when ANY unit had a load.
  */
 export function workedDays(
-  loads: Pick<Load, "date" | "deliveryDate">[],
+  loads: Pick<Load, "date" | "deliveryDate" | "extraLegs">[],
   range: DateRange,
   today: string,
 ): WorkedDaysReport {

@@ -12,6 +12,17 @@ describe("worked days", () => {
     ]);
   });
 
+  it("counts every leg of a load, and the day between legs as off", () => {
+    const glendale = {
+      date: "2026-10-21", deliveryDate: "2026-10-23",
+      extraLegs: [{ pickupDate: "2026-10-25", deliveryDate: "2026-10-27", originCity: "Chicago", originState: "IL", destinationCity: "Glendale", destinationState: "NY", miles: 800 }],
+    };
+    assert.deepEqual(tripDays(glendale), ["2026-10-21", "2026-10-22", "2026-10-23", "2026-10-25", "2026-10-26", "2026-10-27"]);
+    const report = workedDays([glendale], { start: "2026-10-21", end: "2026-10-28" }, "2026-10-29");
+    assert.equal(report.worked, 6);
+    assert.equal(report.off, 2);
+  });
+
   it("counts only the pickup day when there is no delivery date, or it is before pickup", () => {
     assert.deepEqual(tripDays({ date: "2026-10-03", deliveryDate: null }), ["2026-10-03"]);
     assert.deepEqual(tripDays({ date: "2026-10-03", deliveryDate: "2026-10-01" }), ["2026-10-03"]);

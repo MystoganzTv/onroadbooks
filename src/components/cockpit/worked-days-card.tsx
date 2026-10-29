@@ -32,8 +32,12 @@ const BAR: Record<WorkDayState, string> = {
 
 interface WorkedDaysCardProps {
   report: WorkedDaysReport;
-  /** Booked revenue in the period, so the card can show what a working day earned. */
-  revenue: number;
+  /**
+   * What the period's loads left after trip costs and driver pay -- the same
+   * figure the load page divides by its days -- so a working day's worth is
+   * profit, not gross.
+   */
+  profit: number;
   className?: string;
 }
 
@@ -44,7 +48,7 @@ interface WorkedDaysCardProps {
  * delivery. Days that are over with nothing on them are the days off; today
  * and later are never called off, because they are not over.
  */
-export function WorkedDaysCard({ report, revenue, className }: WorkedDaysCardProps) {
+export function WorkedDaysCard({ report, profit, className }: WorkedDaysCardProps) {
   const { dictionary, locale } = useLanguage();
   const copy = dictionary.dashboard;
   const tag = localeTag(locale);
@@ -87,9 +91,9 @@ export function WorkedDaysCard({ report, revenue, className }: WorkedDaysCardPro
           />
           <MiniStat
             label={copy.earnedPerWorkedDay}
-            value={earningDays > 0 ? formatMoney(revenue / earningDays) : "—"}
-            sub={copy.grossRevenue}
-            tone="info"
+            value={earningDays > 0 ? formatMoney(profit / earningDays) : "—"}
+            sub={earningDays > 0 ? `${formatMoney(profit)} ÷ ${earningDays} ${dayUnit(earningDays)}` : undefined}
+            tone={profit >= 0 ? "positive" : "negative"}
           />
         </div>
 
