@@ -25,8 +25,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -124,9 +122,21 @@ interface FormState {
   claimDeduction: string;
   claimReason: string;
   detentionPay: string;
-  roundTrip: boolean;
+  /** Legs after the first; `loadedMiles` above is the FIRST leg's miles. */
+  extraLegs: LegRow[];
   jurisdictionMiles: JurisdictionRow[];
   notes: string;
+}
+
+interface LegRow {
+  id: string;
+  pickupDate: string;
+  deliveryDate: string;
+  originCity: string;
+  originState: string;
+  destinationCity: string;
+  destinationState: string;
+  miles: string;
 }
 
 interface JurisdictionRow {
@@ -170,7 +180,7 @@ function emptyState(defaultDate: string, truckId: string): FormState {
     claimDeduction: "",
     claimReason: "",
     detentionPay: "",
-    roundTrip: false,
+    extraLegs: [],
     jurisdictionMiles: [],
     notes: "",
   };
@@ -197,7 +207,8 @@ function stateFromLoad(load: Load): FormState {
     weightLbs: load.weightLbs ? String(load.weightLbs) : "",
     commodity: load.commodity ?? "",
     endingOdometer: load.endingOdometer ? String(load.endingOdometer) : "",
-    loadedMiles: String(load.loadedMiles),
+    // The form edits each leg's own miles; the stored total is their sum.
+    loadedMiles: String(load.loadedMiles - (load.extraLegs ?? []).reduce((total, leg) => total + leg.miles, 0)),
     deadheadMiles: String(load.deadheadMiles),
     grossRate: String(load.grossRate),
     fuelCost: load.fuelCost ? String(load.fuelCost) : "",
@@ -209,7 +220,16 @@ function stateFromLoad(load: Load): FormState {
     claimDeduction: load.claimDeduction ? String(load.claimDeduction) : "",
     claimReason: load.claimReason ?? "",
     detentionPay: load.detentionPay ? String(load.detentionPay) : "",
-    roundTrip: load.roundTrip ?? false,
+    extraLegs: (load.extraLegs ?? []).map((leg, index) => ({
+      id: `leg-${index}`,
+      pickupDate: leg.pickupDate,
+      deliveryDate: leg.deliveryDate ?? "",
+      originCity: leg.originCity,
+      originState: leg.originState,
+      destinationCity: leg.destinationCity,
+      destinationState: leg.destinationState,
+      miles: leg.miles ? String(leg.miles) : "",
+    })),
     jurisdictionMiles: load.jurisdictionMiles.map((row, index) => ({
       id: `${row.jurisdiction}-${index}`,
       jurisdiction: row.jurisdiction,
@@ -498,7 +518,8 @@ export function LoadFormDialog({
 
   const showIfta = truckOptions.find((truck) => truck.id === values.truckId)?.iftaReportingEnabled === true;
 
-  const loadedMiles = toNumber(values.loadedMiles);
+  const firstLegMiles = toNumber(values.loadedMiles);
+  const loadedMiles = firstLegMiles + values.extraLegs.reduce((total, leg) => total + toNumber(leg.miles), 0);
   const deadheadMiles = toNumber(values.deadheadMiles);
   const grossRate = toNumber(values.grossRate);
   const detentionPay = toNumber(values.detentionPay);
@@ -553,7 +574,15 @@ export function LoadFormDialog({
       claimDeduction: toNumber(values.claimDeduction),
       claimReason: values.claimReason.trim() || null,
       detentionPay,
-      roundTrip: values.roundTrip,
+      extraLegs: values.extraLegs.map((leg) => ({
+        pickupDate: leg.pickupDate,
+        deliveryDate: leg.deliveryDate || null,
+        originCity: leg.originCity.trim(),
+        originState: leg.originState.trim().toUpperCase(),
+        destinationCity: leg.destinationCity.trim(),
+        destinationState: leg.destinationState.trim().toUpperCase(),
+        miles: Math.round(toNumber(leg.miles)),
+      })),
       costsPosted: load?.costsPosted ?? true,
       // Preserve legacy metadata. Reporting a load already records its income.
       status: load?.status ?? "PENDING",
@@ -721,7 +750,7 @@ export function LoadFormDialog({
                   placeholder="38525680"
                 />
               </Field>
-              <Field label={copy.pickupDate} htmlFor="load-date" required error={errors.date}>
+              <Field label={values.extraLegs.length ? interpolate(copy.legPickup, { n: 1 }) : copy.pickupDate} htmlFor="load-date" required error={errors.date}>
                 <Input
                   id="load-date"
                   type="date"
@@ -760,34 +789,13 @@ export function LoadFormDialog({
                 onManualConfirmedChange={setDestinationLocationOverride}
               />
             </div>
-            <div className="space-y-1">
-              <div className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
-                <Label htmlFor="load-round-trip" className="normal-case tracking-normal text-foreground">
-                  {copy.roundTrip}
-                </Label>
-                <Switch
-                  id="load-round-trip"
-                  checked={values.roundTrip}
-                  onCheckedChange={(checked) => set("roundTrip", checked)}
-                  aria-describedby="load-round-trip-hint"
-                />
-              </div>
-              <p id="load-round-trip-hint" className="text-xs text-muted-foreground">
-                {values.roundTrip
-                  ? interpolate(copy.roundTripOn, {
-                      route: `${values.originCity || copy.originCity} → ${values.destinationCity || copy.destinationCity} → ${values.originCity || copy.originCity}`,
-                    })
-                  : copy.roundTripOff}
-              </p>
-            </div>
-
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <Field
-                label={copy.loadedMiles}
+                label={values.extraLegs.length ? copy.firstLegMiles : copy.loadedMiles}
                 htmlFor="load-loaded"
                 required
                 error={errors.loadedMiles}
-                hint={values.roundTrip ? copy.roundTripMilesHint : undefined}
+                hint={values.extraLegs.length ? interpolate(copy.legsTotal, { miles: formatMiles(loadedMiles), count: values.extraLegs.length + 1 }) : undefined}
               >
                 <Input
                   id="load-loaded"
@@ -832,6 +840,91 @@ export function LoadFormDialog({
                   required
                 />
               </Field>
+            </div>
+            {/* More legs under the same PO and rate: the way back, a second drop. */}
+            <div className="space-y-3">
+              {values.extraLegs.map((leg, index) => {
+                const prefix = `load-leg-${index}`;
+                const setLeg = (patch: Partial<LegRow>) => setValues((prev) => ({
+                  ...prev,
+                  extraLegs: prev.extraLegs.map((row) => (row.id === leg.id ? { ...row, ...patch } : row)),
+                }));
+                return (
+                  <fieldset key={leg.id} className="space-y-3 rounded-md border border-border p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <legend className="text-sm font-semibold">{interpolate(copy.legTitle, { n: index + 2 })}</legend>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-neg"
+                        aria-label={interpolate(copy.removeLeg, { n: index + 2 })}
+                        onClick={() => setValues((prev) => ({ ...prev, extraLegs: prev.extraLegs.filter((row) => row.id !== leg.id) }))}
+                      >
+                        <Trash2 />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label={copy.pickupDate} htmlFor={`${prefix}-pickup`} required>
+                        <Input id={`${prefix}-pickup`} type="date" required value={leg.pickupDate} onChange={(e) => setLeg({ pickupDate: e.target.value })} />
+                      </Field>
+                      <Field label={copy.deliveryDate} htmlFor={`${prefix}-delivery`}>
+                        <Input id={`${prefix}-delivery`} type="date" min={leg.pickupDate || undefined} value={leg.deliveryDate} onChange={(e) => setLeg({ deliveryDate: e.target.value })} />
+                      </Field>
+                    </div>
+                    <div className="grid grid-cols-[1fr_4.5rem] gap-3 sm:grid-cols-[1fr_4.5rem_1fr_4.5rem]">
+                      <Field label={copy.originCity} htmlFor={`${prefix}-origin`} required>
+                        <Input id={`${prefix}-origin`} required maxLength={120} value={leg.originCity} onChange={(e) => setLeg({ originCity: e.target.value })} />
+                      </Field>
+                      <Field label={copy.legState} htmlFor={`${prefix}-origin-state`} required>
+                        <Input id={`${prefix}-origin-state`} required maxLength={2} className="uppercase" value={leg.originState} onChange={(e) => setLeg({ originState: e.target.value.toUpperCase() })} />
+                      </Field>
+                      <Field label={copy.destinationCity} htmlFor={`${prefix}-destination`} required>
+                        <Input id={`${prefix}-destination`} required maxLength={120} value={leg.destinationCity} onChange={(e) => setLeg({ destinationCity: e.target.value })} />
+                      </Field>
+                      <Field label={copy.legState} htmlFor={`${prefix}-destination-state`} required>
+                        <Input id={`${prefix}-destination-state`} required maxLength={2} className="uppercase" value={leg.destinationState} onChange={(e) => setLeg({ destinationState: e.target.value.toUpperCase() })} />
+                      </Field>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      <Field label={copy.loadedMiles} htmlFor={`${prefix}-miles`} required>
+                        <Input id={`${prefix}-miles`} type="number" inputMode="numeric" min={1} step={1} required value={leg.miles} onChange={(e) => setLeg({ miles: e.target.value })} />
+                      </Field>
+                    </div>
+                  </fieldset>
+                );
+              })}
+              {errors.extraLegs ? <p className="text-xs text-neg">{errors.extraLegs}</p> : null}
+              {values.extraLegs.length < 5 ? (
+                <div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setValues((prev) => {
+                      const last = prev.extraLegs[prev.extraLegs.length - 1];
+                      // Start where the last leg ended and head back to the first pickup -- the usual shape.
+                      return {
+                        ...prev,
+                        extraLegs: [...prev.extraLegs, {
+                          id: `leg-${Date.now()}`,
+                          pickupDate: last?.deliveryDate || prev.deliveryDate || prev.date,
+                          deliveryDate: "",
+                          originCity: last?.destinationCity ?? prev.destinationCity,
+                          originState: last?.destinationState ?? prev.destinationState,
+                          destinationCity: prev.originCity,
+                          destinationState: prev.originState,
+                          miles: "",
+                        }],
+                      };
+                    })}
+                  >
+                    <Plus />
+                    {copy.addLeg}
+                  </Button>
+                  <p className="mt-1 text-xs text-muted-foreground">{copy.addLegHint}</p>
+                </div>
+              ) : null}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <FeeField
@@ -993,7 +1086,7 @@ export function LoadFormDialog({
 
             <FormSection title={dictionary.viewMode.loadDetails} expanded={!simple}>
             <div className="grid grid-cols-2 gap-3">
-              <Field label={copy.deliveryDate} htmlFor="load-delivery-date" error={errors.deliveryDate}>
+              <Field label={values.extraLegs.length ? interpolate(copy.legDelivery, { n: 1 }) : copy.deliveryDate} htmlFor="load-delivery-date" error={errors.deliveryDate}>
                 <Input
                   id="load-delivery-date"
                   type="date"

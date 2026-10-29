@@ -47,7 +47,7 @@ import {
   formatRateValue,
 } from "@/lib/formatters";
 import { categoryLabel } from "@/lib/categories";
-import { equipmentTypeLabel, loadCapacityLabel, loadRoute } from "@/lib/load-details";
+import { equipmentTypeLabel, loadCapacityLabel, loadLegs, loadRoute } from "@/lib/load-details";
 import { todayISO } from "@/lib/periods";
 import { getWebDictionary, interpolate } from "@/lib/i18n/dictionaries";
 import { formatLocaleDate } from "@/lib/i18n-format";
@@ -134,6 +134,26 @@ export default async function LoadDetailPage({
               ? ` - ${dataset.drivers.find((driver) => driver.id === load.driverId)?.name ?? copy.unknownDriver}`
               : ""}
           </p>
+          {load.extraLegs?.length ? (
+            <ol aria-label={copy.legsOnLoad} className="mt-2 space-y-0.5 text-sm">
+              {loadLegs(load).map((leg, index) => {
+                const extra = index > 0 ? load.extraLegs![index - 1] : null;
+                const pickup = extra ? extra.pickupDate : load.date;
+                const delivery = extra ? extra.deliveryDate : load.deliveryDate;
+                return (
+                  <li key={index} className="flex flex-wrap gap-x-2 text-muted-foreground">
+                    <span className="font-medium text-foreground">{interpolate(copy.legTitle, { n: index + 1 })}</span>
+                    <span>{leg.route}</span>
+                    <span className="tnum">· {formatMiles(leg.miles)}</span>
+                    <span className="tnum">
+                      · {pickup ? formatLocaleDate(pickup, locale, "short") : "—"}
+                      {delivery ? ` – ${formatLocaleDate(delivery, locale, "short")}` : ""}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          ) : null}
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">

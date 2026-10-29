@@ -98,6 +98,7 @@ import {
 } from "../load-expenses";
 import { resolveTruckId } from "../fleet";
 import { normalizeJurisdictionMiles } from "../ifta";
+import { normalizeExtraLegs } from "../load-details";
 import type {
   AdminAccountSummary,
   AuthStore,
@@ -1498,7 +1499,7 @@ export class DrizzleRepository implements Repository {
           otherExpenses: num(row.otherExpenses),
           claimDeduction: num(row.claimDeduction),
           detentionPay: num(row.detentionPay),
-          roundTrip: row.roundTrip,
+          extraLegs: normalizeExtraLegs(row.extraLegs),
           claimReason: row.claimReason,
           dispatchPaidDate: row.dispatchPaidDate
             ? isoDate(row.dispatchPaidDate)
@@ -1637,7 +1638,7 @@ export class DrizzleRepository implements Repository {
       otherExpenses: roundMoney(input.otherExpenses),
       claimDeduction: input.claimDeduction === undefined ? undefined : roundMoney(input.claimDeduction),
       detentionPay: input.detentionPay === undefined ? undefined : roundMoney(input.detentionPay),
-      roundTrip: input.roundTrip,
+      extraLegs: input.extraLegs === undefined ? undefined : normalizeExtraLegs(input.extraLegs),
       claimReason: input.claimReason === undefined ? undefined : input.claimReason?.trim() || null,
       costsPosted: input.costsPosted ?? true,
       status: input.status,

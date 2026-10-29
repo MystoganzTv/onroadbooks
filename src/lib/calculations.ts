@@ -230,6 +230,12 @@ export function loadMetrics(
   const revenue = loadRevenue(load);
   const tripProfit = revenue - tripExpenses;
   const profitPerMile = div(tripProfit, totalMiles);
+  // Rated as booked: detention is paid for time lost, not earned by the load.
+  const bookedProfit = num(load.grossRate) - tripExpenses;
+  const ratingBasis = {
+    profitPerMile: div(bookedProfit, totalMiles),
+    profitMargin: div(bookedProfit, num(load.grossRate)) * 100,
+  };
 
   return {
     totalMiles,
@@ -240,7 +246,8 @@ export function loadMetrics(
     profitPerMile,
     profitMargin: div(tripProfit, revenue) * 100,
     deadheadPct: div(num(load.deadheadMiles), totalMiles) * 100,
-    rating: rateLoad(profitPerMile, thresholds ?? DEFAULT_RATING_THRESHOLDS),
+    ratingBasis,
+    rating: rateLoad(ratingBasis.profitPerMile, thresholds ?? DEFAULT_RATING_THRESHOLDS),
   };
 }
 
@@ -492,6 +499,8 @@ export function brokerPerformance(
       const loadedMiles = sum(group, (l) => l.loadedMiles);
       const tripProfit = roundMoney(sum(group, (l) => l.metrics.tripProfit));
       const profitPerMile = div(tripProfit, totalMiles);
+      // Rated as booked: detention never lifts a broker's rating.
+      const bookedProfitPerMile = div(tripProfit - sum(group, (l) => num(l.detentionPay ?? 0)), totalMiles);
 
       return {
         broker,
@@ -505,7 +514,7 @@ export function brokerPerformance(
         profitPerMile,
         revenuePerLoadedMile: div(revenue, loadedMiles),
         outstanding: 0,
-        rating: rateLoad(profitPerMile, thresholds),
+        rating: rateLoad(bookedProfitPerMile, thresholds),
       } satisfies BrokerPerformance;
     })
     .sort((a, b) => b.tripProfit - a.tripProfit);

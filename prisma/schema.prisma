@@ -533,8 +533,14 @@ model Load {
   claimReason    String?
   /// Extra the broker paid for waiting (detention). Revenue on top of the rate.
   detentionPay   Decimal @default(0) @db.Decimal(12, 2)
-  /// One load out and back loaded on a single rate (origin -> destination -> origin).
+  /// RETIRED 2026-10-29 -- superseded by extraLegs; the migration moved every
+  /// true row into a leg back. Kept only so a deployment still running the
+  /// previous build keeps reading during rollout. Drop in a later migration.
   roundTrip      Boolean @default(false)
+  /// More legs under the same PO and rate (the way back, a second drop):
+  /// [{ pickupDate, deliveryDate, originCity, originState, destinationCity,
+  /// destinationState, miles }]. loadedMiles is the total of every leg.
+  extraLegs      Json    @default("[]")
   /// The day the dispatch commission was paid to the dispatcher; null while owed.
   /// A record only -- it posts nothing to the ledger.
   dispatchPaidDate DateTime? @db.Date

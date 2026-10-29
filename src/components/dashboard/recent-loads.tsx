@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/table";
 import { formatMoney, formatNumber, formatRateValue } from "@/lib/formatters";
 import { loadRevenue } from "@/lib/calculations";
+import { loadRoute } from "@/lib/load-details";
 import { formatLocaleDate } from "@/lib/i18n-format";
 import type { LoadWithMetrics } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -80,13 +81,7 @@ export function RecentLoads({ loads, simple = false }: { loads: LoadWithMetrics[
                         className="rounded-sm outline-none group-hover:underline focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         {formatLoadReference(load.loadNumber) ? <span className="mr-2 font-semibold tnum">{formatLoadReference(load.loadNumber)}</span> : null}
-                        {load.originCity}, {load.originState}
-                        <span className="mx-1 text-muted-foreground">{dictionary.loads.to}</span>
-                        {load.destinationCity}, {load.destinationState}
-                        {load.roundTrip ? <>
-                          <span className="mx-1 text-muted-foreground">{dictionary.loads.to}</span>
-                          {load.originCity}, {load.originState}
-                        </> : null}
+                        {loadRoute(load, ` ${dictionary.loads.to} `)}
                       </Link>
                     </TableCell>
                     {!simple ? <><TableCell className="hidden max-w-[12rem] truncate text-muted-foreground sm:table-cell">

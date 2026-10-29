@@ -103,8 +103,8 @@ export interface LoadInput {
   claimDeduction?: number;
   /** Omitted = keep the stored detention. */
   detentionPay?: number;
-  /** Omitted = keep the stored round-trip flag. */
-  roundTrip?: boolean;
+  /** Omitted = keep the stored legs; [] removes them. */
+  extraLegs?: Load["extraLegs"];
   claimReason?: string | null;
   costsPosted?: boolean;
   status: PaymentStatus;

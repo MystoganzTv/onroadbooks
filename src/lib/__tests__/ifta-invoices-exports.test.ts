@@ -351,7 +351,7 @@ describe("native exports", () => {
     assert.equal(loads.getCell("AI10").value, "Load source");
     assert.equal(loads.getCell("AJ10").value, "Source name");
     assert.equal(loads.getCell("AK10").value, "Detention");
-    assert.equal(loads.getCell("AL10").value, "Round Trip");
+    assert.equal(loads.getCell("AL10").value, "Extra Legs");
     assert.equal(loads.getCell("N9").value, "MILEAGE");
     assert.ok(loads.autoFilter);
     if (typeof loads.autoFilter === "string") {

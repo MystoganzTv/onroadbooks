@@ -424,13 +424,7 @@ export function LoadsTable({
                         {formatLocaleDate(load.date, locale, "short")}
                       </span>
                       <span className="ml-2 hidden text-foreground group-hover:underline xl:inline">
-                        {load.originCity}, {load.originState}
-                        <span className="mx-1 text-muted-foreground">{copy.to}</span>
-                        {load.destinationCity}, {load.destinationState}
-                        {load.roundTrip ? <>
-                          <span className="mx-1 text-muted-foreground">{copy.to}</span>
-                          {load.originCity}, {load.originState}
-                        </> : null}
+                        {loadRoute(load, ` ${copy.to} `)}
                       </span>
                       <span className="ml-2 text-foreground group-hover:underline xl:hidden">
                         {loadStateRoute(load)}

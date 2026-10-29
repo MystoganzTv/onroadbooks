@@ -116,12 +116,33 @@ export const loadSchema = z
     claimDeduction: money.optional(),
     // A blank phone field arrives as null: that is "no detention", not "keep".
     detentionPay: money.nullable().optional().transform((value) => (value === null ? 0 : value)),
-    roundTrip: z.boolean().optional(),
+    extraLegs: z
+      .array(
+        z.object({
+          pickupDate: isoDate,
+          deliveryDate: isoDate.nullable(),
+          originCity: z.string().trim().min(1, "Enter the city").max(120),
+          originState: z.string().trim().length(2, "Use the 2-letter state").transform((value) => value.toUpperCase()),
+          destinationCity: z.string().trim().min(1, "Enter the city").max(120),
+          destinationState: z.string().trim().length(2, "Use the 2-letter state").transform((value) => value.toUpperCase()),
+          miles: z.number({ invalid_type_error: "Enter a number" }).int("Use whole miles").min(1, "Enter this leg's miles").max(10_000),
+        }),
+      )
+      .max(5, "Five extra legs at most")
+      .optional(),
     claimReason: z.string().trim().max(200).optional().nullable(),
     costsPosted: z.boolean().optional(),
     status: z.enum(["PENDING", "INVOICED", "PAID"]),
     jurisdictionMiles: jurisdictionMilesSchema.optional(),
     notes: z.string().trim().max(2000).optional().nullable(),
+  })
+  .refine((value) => (value.extraLegs ?? []).every((leg) => !leg.deliveryDate || leg.deliveryDate >= leg.pickupDate), {
+    message: "A leg's delivery cannot be before its pickup",
+    path: ["extraLegs"],
+  })
+  .refine((value) => (value.extraLegs ?? []).reduce((total, leg) => total + leg.miles, 0) < value.loadedMiles, {
+    message: "The first leg needs its own miles",
+    path: ["loadedMiles"],
   })
   .refine((value) => (value.claimDeduction ?? 0) <= value.grossRate, {
     message: "A deduction cannot be more than the rate",

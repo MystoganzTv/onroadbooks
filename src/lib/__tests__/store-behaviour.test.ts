@@ -644,21 +644,22 @@ describe("load IFTA mileage", () => {
   });
 });
 
-describe("detention and round trip", () => {
+describe("detention and extra legs", () => {
   it("stores both, and an edit that omits them keeps them", async () => {
-    const load = await repo.createLoad(loadInput({ grossRate: 3385, loadedMiles: 1600, detentionPay: 300, roundTrip: true }));
+    const back = { pickupDate: "2026-08-22", deliveryDate: "2026-08-23", originCity: "Atlanta", originState: "GA", destinationCity: "Dallas", destinationState: "TX", miles: 780 };
+    const load = await repo.createLoad(loadInput({ grossRate: 3385, loadedMiles: 1564, detentionPay: 300, extraLegs: [back] }));
     assert.equal(load.detentionPay, 300);
-    assert.equal(load.roundTrip, true);
-    const { detentionPay: _d, roundTrip: _r, ...withoutThem } = loadInput({ grossRate: 3385, loadedMiles: 1600 });
+    assert.deepEqual(load.extraLegs, [back]);
+    const { detentionPay: _d, extraLegs: _l, ...withoutThem } = loadInput({ grossRate: 3385, loadedMiles: 1564 });
     const kept = await repo.updateLoad(load.id, withoutThem);
     assert.equal(kept.detentionPay, 300);
-    assert.equal(kept.roundTrip, true);
-    const cleared = await repo.updateLoad(load.id, loadInput({ grossRate: 3385, loadedMiles: 1600, detentionPay: 0, roundTrip: false }));
+    assert.deepEqual(kept.extraLegs, [back]);
+    const cleared = await repo.updateLoad(load.id, loadInput({ grossRate: 3385, loadedMiles: 784, detentionPay: 0, extraLegs: [] }));
     assert.equal(cleared.detentionPay, 0);
-    assert.equal(cleared.roundTrip, false);
+    assert.deepEqual(cleared.extraLegs, []);
     const plain = await repo.createLoad(loadInput());
     assert.equal(plain.detentionPay ?? 0, 0);
-    assert.equal(plain.roundTrip ?? false, false);
+    assert.deepEqual(plain.extraLegs ?? [], []);
   });
 });
 

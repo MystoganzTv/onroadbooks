@@ -51,10 +51,12 @@ export interface LoadScore {
 const clamp01 = (value: number) => (value < 0 ? 0 : value > 1 ? 1 : value);
 
 export function calculateLoadScore(
-  metrics: Pick<LoadMetrics, "profitPerMile" | "profitMargin" | "deadheadPct">,
+  input: Pick<LoadMetrics, "profitPerMile" | "profitMargin" | "deadheadPct"> & Partial<Pick<LoadMetrics, "ratingBasis">>,
   thresholds: RatingThresholds,
   deadheadWarnPct: number,
 ): LoadScore {
+  // A saved load is scored as booked (no detention); the calculator has no basis and scores what it sees.
+  const metrics = { ...input, ...(input.ratingBasis ?? {}) };
   const greatFloor = thresholds.great > 0 ? thresholds.great : DEFAULT_RATING_THRESHOLDS.great;
   const ppmTarget = greatFloor * PPM_FULL_MARKS_MULTIPLE;
   const deadheadFloor = Math.max(0, deadheadWarnPct) * 2;
@@ -135,7 +137,7 @@ export function bestAndWorst(loads: ScoredLoad[]): {
   worst: ScoredLoad | undefined;
 } {
   if (loads.length === 0) return { best: undefined, worst: undefined };
-  const sorted = [...loads].sort((a, b) => b.metrics.profitPerMile - a.metrics.profitPerMile);
+  const sorted = [...loads].sort((a, b) => b.metrics.ratingBasis.profitPerMile - a.metrics.ratingBasis.profitPerMile);
   return {
     best: sorted[0],
     // With a single load there is no "worst" worth showing next to the best.

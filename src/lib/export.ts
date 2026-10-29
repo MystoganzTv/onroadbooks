@@ -121,7 +121,7 @@ export function buildReport(
           "Estimated Fuel", "Tolls", "Dispatch", "Factoring", "Other", "Broker Deduction", "Deduction Reason", "Driver Pay",
           "Direct Trip Costs", "Contribution Profit", "Contribution/Total Mile",
           "Contribution Margin %", "Rating", "Notes", "Load source", "Source name",
-          "Detention", "Round Trip",
+          "Detention", "Extra Legs",
         ],
         rows: periodLoads.map((load) => [
           truckName(load.truckId),
@@ -161,7 +161,7 @@ export function buildReport(
           load.sourceKind ?? "",
           load.sourceName ?? "",
           money(load.detentionPay ?? 0),
-          load.roundTrip ? "Yes" : "",
+          (load.extraLegs ?? []).map((leg) => `${leg.pickupDate} ${leg.originCity}, ${leg.originState} → ${leg.destinationCity}, ${leg.destinationState} (${leg.miles} mi)`).join("; "),
         ]),
       };
 

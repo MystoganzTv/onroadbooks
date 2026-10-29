@@ -338,7 +338,18 @@ function migrate(dataset: Dataset): Dataset {
     load.otherExpenses ??= 0;
     load.claimDeduction ??= 0;
     load.detentionPay ??= 0;
-    load.roundTrip ??= false;
+    // A load saved with the short-lived round-trip switch becomes a leg back
+    // whose miles the owner fills in; the flag itself is retired.
+    const legacy = load as Load & { roundTrip?: boolean };
+    if (legacy.roundTrip && !load.extraLegs?.length) {
+      load.extraLegs = [{
+        pickupDate: load.deliveryDate ?? load.date, deliveryDate: null,
+        originCity: load.destinationCity, originState: load.destinationState,
+        destinationCity: load.originCity, destinationState: load.originState, miles: 0,
+      }];
+    }
+    delete legacy.roundTrip;
+    load.extraLegs ??= [];
     load.claimReason ??= null;
     load.dispatchPaidDate ??= null;
     load.driverId ??= null;
@@ -463,7 +474,7 @@ function loadFromInput(
     otherExpenses: roundMoney(input.otherExpenses),
     claimDeduction: input.claimDeduction === undefined ? existing?.claimDeduction ?? 0 : roundMoney(input.claimDeduction),
     detentionPay: input.detentionPay === undefined ? existing?.detentionPay ?? 0 : roundMoney(input.detentionPay),
-    roundTrip: input.roundTrip === undefined ? existing?.roundTrip ?? false : input.roundTrip,
+    extraLegs: input.extraLegs === undefined ? existing?.extraLegs ?? [] : input.extraLegs,
     claimReason: input.claimReason === undefined ? existing?.claimReason ?? null : input.claimReason?.trim() || null,
     dispatchPaidDate: existing?.dispatchPaidDate ?? null,
     driverPay: 0,

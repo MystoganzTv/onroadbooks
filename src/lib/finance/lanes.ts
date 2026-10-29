@@ -109,7 +109,8 @@ export function calculateLanePerformance(
         revenuePerLoadedMile: div(revenue, loadedMiles),
         revenuePerTotalMile: div(revenue, totalMiles),
         averageMargin: div(profit, revenue) * 100,
-        rating: rateLoad(profitPerMile, thresholds),
+        // Rated as booked: detention never lifts a lane's rating.
+        rating: rateLoad(div(profit - sum(group, (l) => l.detentionPay ?? 0), totalMiles), thresholds),
         qualified: group.length >= minLoads,
       } satisfies LanePerformance;
     })

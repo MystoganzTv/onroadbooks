@@ -176,6 +176,18 @@ export interface Dispatcher {
 export const LOAD_SOURCE_KINDS = ["SELF", "DISPATCHER", "BROKER_DIRECT", "OTHER"] as const;
 export type LoadSourceKind = (typeof LOAD_SOURCE_KINDS)[number];
 
+/** One more leg of a load: same PO, same rate, its own dates, route and loaded miles. */
+export interface LoadLeg {
+  /** Pickup date of this leg, ISO day. */
+  pickupDate: string;
+  deliveryDate: string | null;
+  originCity: string;
+  originState: string;
+  destinationCity: string;
+  destinationState: string;
+  miles: number;
+}
+
 export interface Load {
   id: string;
   businessId: string;
@@ -212,10 +224,12 @@ export interface Load {
    */
   detentionPay?: number;
   /**
-   * One load that goes out and comes back loaded on a single rate
-   * (origin -> destination -> origin). Loaded miles cover both legs.
+   * More legs run under the same PO and the same rate -- the way back of a
+   * round trip, or a second drop. The origin/destination fields above are the
+   * first leg; `loadedMiles` is the total of every leg, so the first leg's
+   * miles are `loadedMiles` minus these. Optional for older records.
    */
-  roundTrip?: boolean;
+  extraLegs?: LoadLeg[];
   /** Fuel attributed directly to this trip (not the Fuel ledger). */
   fuelCost: number;
   tolls: number;
@@ -553,6 +567,13 @@ export interface LoadMetrics {
   profitPerMile: number;
   profitMargin: number;
   deadheadPct: number;
+  /**
+   * The load as booked: profit per mile and margin WITHOUT detention. The
+   * rating and the score read this -- detention was not known when the load
+   * was accepted, and it pays for hours lost waiting, so it must never lift
+   * a load from GOOD to GREAT. Equal to the fields above when there is none.
+   */
+  ratingBasis: { profitPerMile: number; profitMargin: number };
   rating: ProfitabilityRating;
 }
 

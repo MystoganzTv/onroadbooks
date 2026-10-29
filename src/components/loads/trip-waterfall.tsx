@@ -132,7 +132,12 @@ export function TripWaterfall({
           <Summary label={copy.contributionMargin} value={formatPercent(metrics.profitMargin)} />
         </div>
 
-        <RatingVerdict rating={metrics.rating} profitPerMile={metrics.profitPerMile} />
+        <RatingVerdict rating={metrics.rating} profitPerMile={metrics.ratingBasis.profitPerMile} />
+        {detention > 0 ? (
+          <p className="text-xs text-muted-foreground">
+            {interpolate(copy.ratedWithoutDetention, { rate: formatRateValue(metrics.ratingBasis.profitPerMile) })}
+          </p>
+        ) : null}
       </CardContent>
     </Card>
   );
