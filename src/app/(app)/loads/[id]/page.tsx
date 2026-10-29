@@ -17,6 +17,8 @@ import { DocumentList } from "@/components/documents/document-list";
 import { DocumentUploader } from "@/components/documents/document-uploader";
 import { DeleteLoadButton } from "@/components/loads/delete-load-button";
 import { TripWaterfall } from "@/components/loads/trip-waterfall";
+import { LoadDaysCard } from "@/components/loads/load-days-card";
+import { loadPerDay } from "@/lib/finance/load-days";
 import { LoadFormDialog } from "@/components/loads/load-form-dialog";
 import { HistoryBackButton } from "@/components/shared/history-back-button";
 import { Metric } from "@/components/shared/metric";
@@ -95,6 +97,13 @@ export default async function LoadDetailPage({
     allocatedCostPerMile: overheadCostPerMile(allocationBasis),
     allocationAvailable: hasSufficientOperatingCostBasis(allocationBasis),
     debtServicePerMile: allocationBasis.debtServicePerMile,
+  });
+  const perDay = loadPerDay({
+    load,
+    tripProfit: metrics.tripProfit,
+    drivers: dataset.drivers,
+    expenses: dataset.expenses,
+    today: todayISO(),
   });
   const brokerProfile = dataset.brokers?.find((row) => row.nameKey === brokerNameKey(load.broker ?? ""));
   const brokers = savedBrokerNames(dataset.loads, dataset.brokers);
@@ -247,6 +256,8 @@ export default async function LoadDetailPage({
             ) : null}
           </CardContent>
         </Card>
+
+        <LoadDaysCard perDay={perDay} />
         </div>
 
         <div className="min-w-0 space-y-4">
