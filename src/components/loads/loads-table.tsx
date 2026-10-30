@@ -50,7 +50,7 @@ import {
 import { formatLocaleDate } from "@/lib/i18n-format";
 import { interpolate } from "@/lib/i18n/dictionaries";
 import { equipmentTypeLabel, loadCapacityLabel, loadRoute } from "@/lib/load-details";
-import { ColumnResizeHandle, useColumnResize, type ResizableColumn } from "@/components/ui/column-resize";
+import { SheetResizeHandle, useSheetColumns, type SheetColumn } from "@/components/ui/sheet-columns";
 import type { Driver, LoadWithMetrics, Truck } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { LoadFormDialog } from "./load-form-dialog";
@@ -97,27 +97,24 @@ type SortKey =
   | "rating";
 
 /**
- * Detailed-table widths the owner drags, as in Excel. The route column is the
- * fill: it takes what is left and gives way when another column is widened,
- * so the table always fits its card (only a phone scrolls). Every border
- * right of the route resizes the column on its right -- drag left to widen.
+ * Detailed-table widths, Excel-style (see sheet-columns.tsx): drag a
+ * column's right border to change only that column; the table is as wide as
+ * its columns and scrolls sideways when it is wider than the card.
  */
-const DETAILED_COLUMNS: ResizableColumn[] = [
-  { key: "date" },
-  // Minimums hold the widest normal value ("1,600", "$3,685.00", "-$1,574.24")
-  // so a number is never cut off: below them the table scrolls instead, and
-  // the owner can hide columns to make it fit.
-  { key: "broker", width: 104, minWidth: 72 },
-  { key: "loadedMiles", width: 72, minWidth: 64 },
-  { key: "deadheadMiles", width: 60, minWidth: 52 },
-  { key: "totalMiles", width: 76, minWidth: 64 },
-  { key: "grossRate", width: 112, minWidth: 96 },
-  { key: "ratePerLoaded", width: 76, minWidth: 64 },
-  { key: "ratePerTotal", width: 76, minWidth: 64 },
-  { key: "expenses", width: 104, minWidth: 96 },
-  { key: "profit", width: 112, minWidth: 96 },
-  { key: "profitPerMile", width: 88, minWidth: 64 },
-  { key: "rating", width: 104, minWidth: 96 },
+const DETAILED_COLUMNS: SheetColumn[] = [
+  // Defaults add up to ~980px so the table fits a laptop card untouched.
+  { key: "date", width: 200, minWidth: 120 },
+  { key: "broker", width: 96, minWidth: 48 },
+  { key: "loadedMiles", width: 64, minWidth: 40 },
+  { key: "deadheadMiles", width: 52, minWidth: 40 },
+  { key: "totalMiles", width: 68, minWidth: 40 },
+  { key: "grossRate", width: 104, minWidth: 48 },
+  { key: "ratePerLoaded", width: 64, minWidth: 40 },
+  { key: "ratePerTotal", width: 64, minWidth: 40 },
+  { key: "expenses", width: 96, minWidth: 48 },
+  { key: "profit", width: 104, minWidth: 48 },
+  { key: "profitPerMile", width: 72, minWidth: 40 },
+  { key: "rating", width: 96, minWidth: 48 },
 ];
 
 interface Column {
@@ -207,7 +204,6 @@ export function LoadsTable({
   const showTruck = trucks.length > 1;
   const truckName = (id: string) => trucks.find((t) => t.id === id)?.name ?? copy.unknownTruck;
   const router = useRouter();
-  const tableContainerRef = React.useRef<HTMLDivElement | null>(null);
   const [hidden, setHidden] = React.useState<string[]>([]);
   React.useEffect(() => setHidden(readHiddenColumns()), []);
   const visibleColumns = React.useMemo(
@@ -220,11 +216,9 @@ export function LoadsTable({
     setHidden(next);
     writeHiddenColumns(next);
   };
-  const resize = useColumnResize({
-    containerRef: tableContainerRef,
-    storageKey: "onroadbooks:loads:columns:detailed:v1",
-    columns: visibleColumns,
-    fillMinWidth: 160,
+  const resize = useSheetColumns({
+    storageKey: "onroadbooks:loads:columns:sheet:v1",
+    columns: DETAILED_COLUMNS,
   });
   const [search, setSearch] = React.useState("");
   const [broker, setBroker] = React.useState("all");
@@ -472,24 +466,17 @@ export function LoadsTable({
           </TableWrapper>
         </>
       ) : (
-        <TableWrapper ref={tableContainerRef}>
+        <TableWrapper>
           <Table
-            // Phones keep the natural layout and scroll sideways; from sm up
-            // the columns are fixed and sized by the owner.
-            className="sm:min-w-[var(--table-min)] sm:table-fixed sm:[&_td]:overflow-hidden sm:[&_td]:text-ellipsis"
-            style={{ "--table-min": `${resize.tableMinWidth}px` } as React.CSSProperties}
+            // Exactly as wide as its columns, like a sheet: wider than the
+            // card scrolls sideways, narrower simply ends.
+            className="table-fixed [&_td]:overflow-hidden [&_td]:text-ellipsis"
+            style={{ width: resize.totalWidth(visibleColumns.map((column) => column.key)) }}
           >
             <colgroup>
-              {visibleColumns.map((column) => {
-                const width = resize.widthOf(column.key);
-                return (
-                  <col
-                    key={column.key}
-                    className={width != null ? "sm:w-[var(--col-w)]" : undefined}
-                    style={width != null ? ({ "--col-w": `${width}px` } as React.CSSProperties) : undefined}
-                  />
-                );
-              })}
+              {visibleColumns.map((column) => (
+                <col key={column.key} style={{ width: resize.widthOf(column.key) }} />
+              ))}
             </colgroup>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -514,7 +501,7 @@ export function LoadsTable({
                         <span className="truncate" title={column.label}>{column.label}</span>
                         {active ? <Icon className="size-3 shrink-0 opacity-60" /> : null}
                       </button>
-                      <ColumnResizeHandle state={resize} columnKey={column.key} label={copy.resizeColumn} />
+                      <SheetResizeHandle state={resize} columnKey={column.key} label={copy.resizeColumn} />
                     </TableHead>
                   );
                 })}
